@@ -16,6 +16,9 @@ model User {
   updatedAt    DateTime  @updatedAt @db.Timestamp(6)
   sessions     Session[]
   accounts     Account[]
+  members      Member[]
+  invitations  Invitation[] @relation("InvitationInviter")
+  teamMembers  TeamMember[]
 
   @@map("user")
 }
@@ -29,6 +32,8 @@ model Session {
   ipAddress String?  @db.Text
   userAgent String?  @db.Text
   userId    String   @db.Text
+  activeOrganizationId String? @db.Text
+  activeTeamId         String? @db.Text
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
@@ -51,6 +56,84 @@ model Account {
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("account")
+}
+
+model Organization {
+  id        String    @id @db.Text
+  name      String    @db.Text
+  slug      String    @unique @db.Text
+  logo      String?   @db.Text
+  metadata  Json?
+  createdAt DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt DateTime? @db.Timestamp(6)
+  members   Member[]
+  teams     Team[]
+  invitations Invitation[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String   @id @db.Text
+  organizationId  String   @db.Text
+  userId          String   @db.Text
+  role            String   @db.Text @default("member")
+  createdAt       DateTime @default(now()) @db.Timestamp(6)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String   @id @db.Text
+  organizationId  String   @db.Text
+  email          String   @db.Text
+  role           String   @db.Text
+  status         String   @db.Text @default("pending")
+  expiresAt      DateTime @db.Timestamp(6)
+  createdAt      DateTime @default(now()) @db.Timestamp(6)
+  inviterId      String   @db.Text
+  teamId         String?  @db.Text
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter        User     @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  team           Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([teamId])
+  @@index([email])
+  @@map("invitation")
+}
+
+model Team {
+  id             String   @id @db.Text
+  name           String   @db.Text
+  organizationId  String   @db.Text
+  createdAt      DateTime @db.Timestamp(6)
+  updatedAt      DateTime? @db.Timestamp(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamMembers    TeamMember[]
+  invitations    Invitation[]
+
+  @@index([organizationId])
+  @@map("team")
+}
+
+model TeamMember {
+  id        String   @id @db.Text
+  teamId    String   @db.Text
+  userId    String   @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("teamMember")
 }
 
 model Verification {
