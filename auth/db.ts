@@ -1,8 +1,5 @@
 import { SQLDatabase } from "encore.dev/storage/sqldb";
 
-// Encore provisions and manages the database automatically.
-// Locally it uses Docker, in the cloud it provisions the appropriate
-// managed database (e.g. Cloud SQL on GCP, RDS on AWS).
-export const db = new SQLDatabase("auth", {
-  migrations: "./migrations",
-});
+// Encore still provisions the auth database, but Prisma now owns the schema
+// and migrations for this service.
+export const db = new SQLDatabase("auth");
