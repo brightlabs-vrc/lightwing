@@ -16,7 +16,6 @@ const administratorRoleLimit = 3;
 const accessControl = createAccessControl({
   organization: ["read", "update", "delete"],
   member: ["read", "create", "update", "delete"],
-  team: ["read", "create", "update", "delete"],
   invitation: ["read", "create", "update", "delete"],
   event: ["read", "create", "update", "delete"],
 });
@@ -25,28 +24,24 @@ const roles = {
   administrator: accessControl.newRole({
     organization: ["read", "update", "delete"],
     member: ["read", "create", "update", "delete"],
-    team: ["read", "create", "update", "delete"],
     invitation: ["read", "create", "update", "delete"],
     event: ["read", "create", "update", "delete"],
   }),
   eventAdministrator: accessControl.newRole({
     organization: ["read"],
     member: ["read"],
-    team: ["read"],
     invitation: ["read"],
     event: ["read", "create", "update", "delete"],
   }),
-  teamAdministrator: accessControl.newRole({
+  organizationAdministrator: accessControl.newRole({
     organization: ["read"],
     member: ["read", "create", "update"],
-    team: ["read", "create", "update", "delete"],
     invitation: ["read", "create"],
     event: ["read"],
   }),
   member: accessControl.newRole({
     organization: ["read"],
     member: ["read"],
-    team: ["read"],
     invitation: ["read"],
     event: ["read"],
   }),
@@ -86,14 +81,6 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     organization({
       creatorRole: administratorRole,
       roles,
-      teams: {
-        enabled: true,
-        defaultTeam: {
-          enabled: true,
-        },
-        maximumTeams: 1,
-        allowRemovingAllTeams: false,
-      },
       organizationHooks: {
         beforeAddMember: async ({ member }) => {
           if (!isAdministratorRole(member.role)) {
@@ -103,7 +90,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
           const currentAdministrators = await countAdministrators();
           if (currentAdministrators >= administratorRoleLimit) {
             throw APIError.fromStatus("BAD_REQUEST", {
-              message: "At most three administrators can belong to a team.",
+              message: "At most three administrators can belong to an organization.",
             });
           }
         },
@@ -115,7 +102,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
           const currentAdministrators = await countAdministrators();
           if (currentAdministrators >= administratorRoleLimit) {
             throw APIError.fromStatus("BAD_REQUEST", {
-              message: "At most three administrators can belong to a team.",
+              message: "At most three administrators can belong to an organization.",
             });
           }
         },
@@ -127,7 +114,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
           const currentAdministrators = await countAdministrators(member.id);
           if (currentAdministrators >= administratorRoleLimit) {
             throw APIError.fromStatus("BAD_REQUEST", {
-              message: "At most three administrators can belong to a team.",
+              message: "At most three administrators can belong to an organization.",
             });
           }
         },
