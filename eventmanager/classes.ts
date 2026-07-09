@@ -1,8 +1,8 @@
 import { api, APIError, Header } from "encore.dev/api";
-import { ClassTier } from "@prisma/client";
 import { prisma } from "./prisma";
 import { requirePermission } from "../auth/rbac";
 import {
+  type ClassTier,
   CLASS_TIER_LABELS,
   CLASS_TIER_ORDER,
   isEligible,

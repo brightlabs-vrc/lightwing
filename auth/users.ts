@@ -1,7 +1,7 @@
 import { api, APIError, Header } from "encore.dev/api";
-import { ClassTier } from "@prisma/client";
 import { prisma } from "./prisma";
 import { resolveActor } from "./rbac";
+import type { ClassTier } from "../eventmanager/classtier";
 
 // Netkeiba-style participant profile (issue #7). Combines core user info with a
 // biography, a free-form career overview, the participant's skill class tier

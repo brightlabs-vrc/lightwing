@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { api, APIError, Header, Query } from "encore.dev/api";
-import { ClassTier } from "@prisma/client";
 import { prisma } from "./prisma";
 import { requirePermission } from "../auth/rbac";
-import { isEligible } from "./classtier";
+import { type ClassTier, isEligible } from "./classtier";
 
 // Event scoring types (issue #4). 1 = points-based, 2 = ladder-elo.
 export const SCORING_POINTS = 1;
