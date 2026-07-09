@@ -4,14 +4,16 @@ import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { Prisma } from "@prisma/client";
 import { secret } from "encore.dev/config";
 import { prisma } from "./prisma";
+import {
+  administratorRole,
+  administratorRoleLimit,
+  roleStatements,
+} from "./permissions";
 
 // Store secrets using the Encore CLI:
 //   encore secret set --type dev,local,pr,production AuthSecret
 // Generate a strong value with: openssl rand -base64 32
 const authSecret = secret("AuthSecret");
-
-const administratorRole = "administrator";
-const administratorRoleLimit = 3;
 
 const accessControl = createAccessControl({
   organization: ["read", "update", "delete"],
@@ -20,31 +22,13 @@ const accessControl = createAccessControl({
   event: ["read", "create", "update", "delete"],
 });
 
+// Build the better-auth roles from the shared permission matrix so the access
+// control policy stays in sync with the checks performed by other services.
 const roles = {
-  administrator: accessControl.newRole({
-    organization: ["read", "update", "delete"],
-    member: ["read", "create", "update", "delete"],
-    invitation: ["read", "create", "update", "delete"],
-    event: ["read", "create", "update", "delete"],
-  }),
-  eventAdministrator: accessControl.newRole({
-    organization: ["read"],
-    member: ["read"],
-    invitation: ["read"],
-    event: ["read", "create", "update", "delete"],
-  }),
-  organizationAdministrator: accessControl.newRole({
-    organization: ["read"],
-    member: ["read", "create", "update"],
-    invitation: ["read", "create"],
-    event: ["read"],
-  }),
-  member: accessControl.newRole({
-    organization: ["read"],
-    member: ["read"],
-    invitation: ["read"],
-    event: ["read"],
-  }),
+  administrator: accessControl.newRole({ ...roleStatements.administrator }),
+  eventAdministrator: accessControl.newRole({ ...roleStatements.eventAdministrator }),
+  organizationAdministrator: accessControl.newRole({ ...roleStatements.organizationAdministrator }),
+  member: accessControl.newRole({ ...roleStatements.member }),
 };
 
 function isAdministratorRole(role: string) {

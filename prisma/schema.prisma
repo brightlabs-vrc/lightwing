@@ -6,18 +6,32 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ClassTier {
+  PRE_OP
+  OP
+  G3
+  G2
+  G1
+}
+
 model User {
   id           String    @id @db.Text
   name         String    @db.Text
   email        String    @unique @db.Text
   emailVerified Boolean  @default(false)
   image        String?   @db.Text
+  biography      String?  @db.Text
+  careerOverview String?  @db.Text
+  classTier      ClassTier?
   createdAt    DateTime  @default(now()) @db.Timestamp(6)
   updatedAt    DateTime  @updatedAt @db.Timestamp(6)
   sessions     Session[]
   accounts     Account[]
   members      Member[]
   invitations  Invitation[] @relation("InvitationInviter")
+  eventMembers   EventMember[]
+  eventPoints    EventPointsEntry[]
+  eventLadder    EventLadderEntry[]
 
   @@map("user")
 }
@@ -62,10 +76,15 @@ model Organization {
   slug      String    @unique @db.Text
   logo      String?   @db.Text
   metadata  Json?
+  rankingAverage        Float? @db.DoublePrecision
+  pointsAverage         Float? @db.DoublePrecision
+  seasonRank            Int?
+  averagePointsPerEvent Float? @db.DoublePrecision
   createdAt DateTime  @default(now()) @db.Timestamp(6)
   updatedAt DateTime? @db.Timestamp(6)
   members   Member[]
   invitations Invitation[]
+  events    Event[]
 
   @@map("organization")
 }
@@ -111,4 +130,85 @@ model Verification {
   updatedAt  DateTime? @db.Timestamp(6)
 
   @@map("verification")
+}
+
+model Event {
+  id               String     @id @db.Text
+  name             String     @db.Text
+  description      String?    @db.Text
+  organizationId   String     @db.Text
+  scoringType      Int        @db.SmallInt
+  classRestriction ClassTier?
+  createdAt        DateTime   @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime   @updatedAt @db.Timestamp(6)
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members          EventMember[]
+  schedules        EventSchedule[]
+  pointsEntries    EventPointsEntry[]
+  ladderEntries    EventLadderEntry[]
+
+  @@index([organizationId])
+  @@map("event")
+}
+
+model EventMember {
+  id        String   @id @db.Text
+  eventId   String   @db.Text
+  userId    String   @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@map("event_member")
+}
+
+model EventSchedule {
+  id        String    @id @db.Text
+  eventId   String    @db.Text
+  title     String?   @db.Text
+  startsAt  DateTime  @db.Timestamp(6)
+  endsAt    DateTime? @db.Timestamp(6)
+  location  String?   @db.Text
+  createdAt DateTime  @default(now()) @db.Timestamp(6)
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("event_schedule")
+}
+
+model EventPointsEntry {
+  id        String   @id @db.Text
+  eventId   String   @db.Text
+  userId    String   @db.Text
+  points    Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@map("event_points_entry")
+}
+
+model EventLadderEntry {
+  id        String   @id @db.Text
+  eventId   String   @db.Text
+  userId    String   @db.Text
+  elo       Int      @default(1200)
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@map("event_ladder_entry")
 }
