@@ -47,5 +47,4 @@ jobs:
         run: echo "ENCORE_RUNTIME_LIB=$(encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$GITHUB_ENV"
 
       - name: Run backend unit tests
-        working-directory: packages/mgm-backend
         run: encore test
