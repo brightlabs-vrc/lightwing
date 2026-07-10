@@ -5,4 +5,4 @@ import { Service } from "encore.dev/service";
 // for permission checks.
 // https://encore.dev/docs/ts/primitives/services
 
-export default new Service("teams");
+export default new Service("teammanager");

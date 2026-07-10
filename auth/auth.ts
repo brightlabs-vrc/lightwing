@@ -3,6 +3,7 @@ import { createAccessControl, multiSession, organization } from "better-auth/plu
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { Prisma } from "@prisma/client";
 import { secret } from "encore.dev/config";
+import { appMeta } from "encore.dev";
 import { prisma } from "./prisma";
 import {
   administratorRole,
@@ -54,11 +55,14 @@ async function countAdministrators(excludeMemberId?: string) {
 
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
-  basePath: "/auth",
+  baseURL: appMeta().apiBaseUrl,
+  basePath: "/api/auth",
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   trustedOrigins: [
     "http://localhost:4000",
     "http://localhost:3000",
+    // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
+    appMeta().apiBaseUrl,
   ],
   emailAndPassword: {
     enabled: true,

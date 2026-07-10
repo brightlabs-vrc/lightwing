@@ -7,7 +7,7 @@
   "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
-    "test": "vitest --passWithNoTests",
+    "test": "vitest --run",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
