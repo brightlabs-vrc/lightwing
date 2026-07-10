@@ -15,7 +15,32 @@ permissions:
   contents: read
 
 jobs:
-  unit-tests:
+  frontend-unit:
+    name: Frontend Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm ci
+
+      - name: Frontend Typecheck
+        working-directory: frontend
+        run: pnpm typecheck
+
+  backend-unit:
     name: Backend Unit Tests
     runs-on: ubuntu-latest
 
