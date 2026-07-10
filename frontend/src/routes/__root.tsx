@@ -1,4 +1,4 @@
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
+import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import { useAuth } from '../hooks/useAuth'
 
@@ -8,6 +8,9 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const { session, loading, signOutUser } = useAuth()
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const isAdminArea = pathname.startsWith('/admin')
+  const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
 
   return (
     <>
@@ -17,11 +20,20 @@ function RootLayout() {
           <Link to='/' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Home</Link>
           <Link to='/dashboard' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Dashboard</Link>
           <Link to='/auth' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Auth</Link>
-          <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Admin</Link>
-          <Link to='/admin/events' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Events</Link>
-          <Link to='/admin/users' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Users</Link>
-          <Link to='/admin/datasets' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Datasets</Link>
-          {session?.user?.id ? (
+          {isSiteAdmin && !isAdminArea ? (
+            <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>
+              Admin Portal
+            </Link>
+          ) : null}
+          {isAdminArea ? (
+            <>
+              <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Admin</Link>
+              <Link to='/admin/events' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Events</Link>
+              <Link to='/admin/users' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Users</Link>
+              <Link to='/admin/datasets' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Datasets</Link>
+            </>
+          ) : null}
+          {isAdminArea && session?.user?.id ? (
             <Link to='/admin/users/$userId' params={{ userId: session.user.id }} activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>
               My Admin Profile
             </Link>
