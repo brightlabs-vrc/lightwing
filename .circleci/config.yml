@@ -1,36 +1,32 @@
-# This config was automatically generated from your source code
-# Stacks detected: cicd:github-actions:.github/workflows,deps:node:.
 version: 2.1
+
 orbs:
   node: circleci/node@5
+
 jobs:
-  test-node:
-    # Install node dependencies and run tests
-    executor: node/default
+  unit-tests:
+    docker:
+      - image: cimg/node:24.0
     steps:
       - checkout
       - node/install-packages:
-          cache-path: ~/project/node_modules
-          override-ci-command: npm install
+          pkg-manager: pnpm
       - run:
-          name: Run tests
-          command: npm test --passWithNoTests
-  deploy:
-    # This is an example deploy job, not actually used by the workflow
-    docker:
-      - image: cimg/base:stable
-    steps:
-      # Replace this with steps to deploy to users
+          name: Install Encore CLI
+          command: |
+            curl -L https://encore.dev/install.sh | bash
+            echo 'export PATH="$HOME/.encore/bin:$PATH"' >> "$BASH_ENV"
       - run:
-          name: deploy
-          command: '#e.g. ./deploy.sh'
+          name: Disable Encore telemetry
+          command: encore telemetry disable
       - run:
-          name: found github actions config
-          command: ':'
+          name: Export Encore runtime library
+          command: echo "export ENCORE_RUNTIME_LIB=$(encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$BASH_ENV"
+      - run:
+          name: Run backend unit tests
+          command: encore test
+
 workflows:
   build-and-test:
     jobs:
-      - test-node
-    # - deploy:
-    #     requires:
-    #       - test-node
+      - unit-tests
