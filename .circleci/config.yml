@@ -1,0 +1,38 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@5
+
+jobs:
+  unit-tests:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    steps:
+      - checkout
+      - node/install:
+          node-version: '24'
+      - run:
+          name: Enable corepack (installs pnpm)
+          command: corepack enable
+      - node/install-packages:
+          pkg-manager: pnpm
+      - run:
+          name: Install Encore CLI
+          command: |
+            curl -L https://encore.dev/install.sh | bash
+            echo 'export PATH="$HOME/.encore/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Disable Encore telemetry
+          command: encore telemetry disable
+      - run:
+          name: Export Encore runtime library
+          command: echo "export ENCORE_RUNTIME_LIB=$(encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$BASH_ENV"
+      - run:
+          name: Run backend unit tests
+          command: encore test
+
+workflows:
+  build-and-test:
+    jobs:
+      - unit-tests
