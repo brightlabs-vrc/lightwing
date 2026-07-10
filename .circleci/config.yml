@@ -5,10 +5,13 @@ orbs:
 
 jobs:
   unit-tests:
-    docker:
-      - image: cimg/node:24.0
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
     steps:
       - checkout
+      - node/install:
+          node-version: '24'
       - node/install-packages:
           pkg-manager: pnpm
       - run:
