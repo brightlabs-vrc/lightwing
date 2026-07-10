@@ -15,12 +15,12 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "encore:gen-client": "encore gen client --output frontend/src/lib/client.ts --lang ts",
-    "frontend:build" : "pnpm --dir frontend i -S &&  pnpm --dir frontend build && pnpm encore:gen-client",
+    "frontend:build": "pnpm --dir frontend i -S &&  pnpm --dir frontend build && pnpm encore:gen-client",
     "postinstall": "prisma generate && pnpm frontend:build"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1",
     "@types/node": "^20.5.7",
+    "concurrently": "^9.2.1",
     "prisma": "^7.8.0",
     "typescript": "^5.2.2",
     "vitest": "^1.5.0"
@@ -30,6 +30,8 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "better-auth": "^1.6.23",
+    "discord-api-types": "^0.38.49",
+    "discord.js": "^14.26.4",
     "encore.dev": "^1.57.9"
   },
   "optionalDependencies": {
