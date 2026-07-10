@@ -1,7 +1,7 @@
 import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
-import { requirePermission } from "./rbac";
-import { administratorRole, administratorRoleLimit } from "./permissions";
+import { requirePermission } from "../auth/rbac";
+import { administratorRole, administratorRoleLimit } from "../auth/permissions";
 
 // A team is modelled as a better-auth organization (issue #6). Beyond the core
 // organization fields it carries a set of aggregate "container" statistics that
