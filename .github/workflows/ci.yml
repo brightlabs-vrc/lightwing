@@ -57,9 +57,6 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm ci
-
       - name: Install Encore CLI
         run: |
           curl -L https://encore.dev/install.sh | bash
@@ -70,6 +67,9 @@ jobs:
 
       - name: Export Encore runtime library
         run: echo "ENCORE_RUNTIME_LIB=$(encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm ci
 
       - name: Run backend unit tests
         run: encore test
