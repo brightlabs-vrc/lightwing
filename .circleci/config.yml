@@ -12,6 +12,9 @@ jobs:
       - checkout
       - node/install:
           node-version: '24'
+      - run:
+          name: Enable corepack (installs pnpm)
+          command: corepack enable
       - node/install-packages:
           pkg-manager: pnpm
       - run:
