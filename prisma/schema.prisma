@@ -14,6 +14,23 @@ enum ClassTier {
   G1
 }
 
+enum EventOwnerType {
+  ORGANIZATION
+  USER
+}
+
+enum EventStatus {
+  DRAFT
+  UNOFFICIAL
+  OFFICIAL
+  ARCHIVED
+}
+
+enum SiteRole {
+  USER
+  SITE_ADMIN
+}
+
 model User {
   id           String    @id @db.Text
   name         String    @db.Text
@@ -23,6 +40,7 @@ model User {
   biography      String?  @db.Text
   careerOverview String?  @db.Text
   classTier      ClassTier?
+  siteRole       SiteRole  @default(USER)
   createdAt    DateTime  @default(now()) @db.Timestamp(6)
   updatedAt    DateTime  @updatedAt @db.Timestamp(6)
   sessions     Session[]
@@ -32,6 +50,9 @@ model User {
   eventMembers   EventMember[]
   eventPoints    EventPointsEntry[]
   eventLadder    EventLadderEntry[]
+  ownedEvents    Event[]      @relation("EventOwner")
+  eventAdminOf   EventAdmin[]
+  raceResults    RaceResult[]
 
   @@map("user")
 }
@@ -133,22 +154,81 @@ model Verification {
 }
 
 model Event {
-  id               String     @id @db.Text
-  name             String     @db.Text
-  description      String?    @db.Text
-  organizationId   String     @db.Text
-  scoringType      Int        @db.SmallInt
+  id               String         @id @db.Text
+  name             String         @db.Text
+  description      String?        @db.Text
+  ownerType        EventOwnerType
+  organizationId   String?        @db.Text
+  ownerUserId      String?        @db.Text
+  status           EventStatus    @default(UNOFFICIAL)
+  scoringType      Int            @db.SmallInt
   classRestriction ClassTier?
-  createdAt        DateTime   @default(now()) @db.Timestamp(6)
-  updatedAt        DateTime   @updatedAt @db.Timestamp(6)
-  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime       @updatedAt @db.Timestamp(6)
+  organization     Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner            User?          @relation("EventOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  raceEvents       RaceEvent[]
+  admins           EventAdmin[]
   members          EventMember[]
   schedules        EventSchedule[]
   pointsEntries    EventPointsEntry[]
   ladderEntries    EventLadderEntry[]
 
   @@index([organizationId])
+  @@index([ownerUserId])
   @@map("event")
+}
+
+model RaceEvent {
+  id               String     @id @db.Text
+  eventId          String     @db.Text
+  name             String     @db.Text
+  sequence         Int        @default(0)
+  distanceMeters   Int
+  trackType        String     @db.Text
+  location         String     @db.Text
+  scoringType      Int?       @db.SmallInt
+  classRestriction ClassTier?
+  startsAt         DateTime?  @db.Timestamp(6)
+  endsAt           DateTime?  @db.Timestamp(6)
+  createdAt        DateTime   @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime   @updatedAt @db.Timestamp(6)
+  event            Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  results          RaceResult[]
+
+  @@index([eventId])
+  @@map("race_event")
+}
+
+model RaceResult {
+  id          String    @id @db.Text
+  raceEventId String    @db.Text
+  userId      String    @db.Text
+  position    Int?
+  points      Int       @default(0)
+  createdAt   DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamp(6)
+  raceEvent   RaceEvent @relation(fields: [raceEventId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raceEventId, userId])
+  @@index([raceEventId])
+  @@index([userId])
+  @@map("race_result")
+}
+
+model EventAdmin {
+  id        String   @id @db.Text
+  eventId   String   @db.Text
+  userId    String   @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@map("event_admin")
 }
 
 model EventMember {

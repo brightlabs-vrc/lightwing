@@ -1,8 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { api, APIError, Header, Query } from "encore.dev/api";
 import { prisma } from "./prisma";
-import { requirePermission } from "../auth/rbac";
+import {
+  requireEventPermission,
+  requirePermission,
+  requireSiteAdmin,
+  resolveActor,
+} from "../auth/rbac";
+import { isSiteAdmin } from "../auth/permissions";
 import { type ClassTier, isEligible } from "./classtier";
+
+// API-facing string unions mirroring the Prisma enums. Encore's schema parser
+// cannot use Prisma's runtime enum objects as types, so these are declared as
+// plain literal unions with byte-identical values (see classtier.ts).
+export type EventOwnerType = "ORGANIZATION" | "USER";
+export type EventStatus = "DRAFT" | "UNOFFICIAL" | "OFFICIAL" | "ARCHIVED";
 
 // Event scoring types (issue #4). 1 = points-based, 2 = ladder-elo.
 export const SCORING_POINTS = 1;
@@ -46,14 +58,31 @@ export interface LadderEntryView {
   rank: number;
 }
 
+export interface RaceEventView {
+  id: string;
+  name: string;
+  sequence: number;
+  distanceMeters: number;
+  trackType: string;
+  location: string;
+  scoringType: number | null;
+  classRestriction: ClassTier | null;
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
 export interface EventDetail {
   id: string;
   name: string;
   description: string | null;
-  organizationId: string;
+  ownerType: EventOwnerType;
+  organizationId: string | null;
+  ownerUserId: string | null;
+  status: EventStatus;
   scoringType: number;
   scoringTypeLabel: string;
   classRestriction: ClassTier | null;
+  raceEvents: RaceEventView[];
   members: EventMemberView[];
   schedules: EventScheduleView[];
   pointsOverview: PointsEntryView[] | null;
@@ -66,28 +95,56 @@ interface CreateEventParams {
   authorization: Header<"Authorization">;
   name: string;
   description?: string | null;
-  organizationId: string;
+  ownerType: EventOwnerType;
+  organizationId?: string | null;
+  ownerUserId?: string | null;
   scoringType: ScoringType;
   classRestriction?: ClassTier | null;
 }
 
-// Creates an event within an organization (issue #4). Gated by the Event Admin
-// RBAC role: the caller must hold event-create permission in the organization.
+// Creates an event owned by either an organization or a single user (issue #4).
+// Org-owned events require event-create permission in the organization (or site
+// admin). User-owned events may be created by any authenticated user for
+// themselves; site admins may create one on behalf of any user.
 export const createEvent = api(
   { expose: true, method: "POST", path: "/events" },
   async (params: CreateEventParams): Promise<EventDetail> => {
-    await requirePermission(prisma, {
-      authorization: params.authorization,
-      organizationId: params.organizationId,
-      resource: "event",
-      action: "create",
-    });
+    let organizationId: string | null = null;
+    let ownerUserId: string | null = null;
 
-    const organization = await prisma.organization.findUnique({
-      where: { id: params.organizationId },
-    });
-    if (!organization) {
-      throw APIError.notFound("organization not found");
+    if (params.ownerType === "ORGANIZATION") {
+      if (!params.organizationId) {
+        throw APIError.invalidArgument(
+          "organizationId is required for organization-owned events",
+        );
+      }
+      await requirePermission(prisma, {
+        authorization: params.authorization,
+        organizationId: params.organizationId,
+        resource: "event",
+        action: "create",
+      });
+
+      const organization = await prisma.organization.findUnique({
+        where: { id: params.organizationId },
+      });
+      if (!organization) {
+        throw APIError.notFound("organization not found");
+      }
+      organizationId = params.organizationId;
+    } else {
+      const actor = await resolveActor(prisma, params.authorization);
+      ownerUserId = params.ownerUserId ?? actor.userId;
+      if (ownerUserId !== actor.userId && !isSiteAdmin(actor.siteRole)) {
+        throw APIError.permissionDenied(
+          "only a site administrator can create an event on behalf of another user",
+        );
+      }
+
+      const owner = await prisma.user.findUnique({ where: { id: ownerUserId } });
+      if (!owner) {
+        throw APIError.notFound("owner user not found");
+      }
     }
 
     const event = await prisma.event.create({
@@ -95,7 +152,9 @@ export const createEvent = api(
         id: randomUUID(),
         name: params.name,
         description: params.description ?? null,
-        organizationId: params.organizationId,
+        ownerType: params.ownerType,
+        organizationId,
+        ownerUserId,
         scoringType: params.scoringType,
         classRestriction: params.classRestriction ?? null,
       },
@@ -155,11 +214,10 @@ interface UpdateEventParams {
 export const updateEvent = api(
   { expose: true, method: "PATCH", path: "/events/:id" },
   async (params: UpdateEventParams): Promise<EventDetail> => {
-    const event = await requireEvent(params.id);
-    await requirePermission(prisma, {
+    await requireEvent(params.id);
+    await requireEventPermission(prisma, {
       authorization: params.authorization,
-      organizationId: event.organizationId,
-      resource: "event",
+      eventId: params.id,
       action: "update",
     });
 
@@ -186,11 +244,10 @@ interface DeleteEventParams {
 export const deleteEvent = api(
   { expose: true, method: "DELETE", path: "/events/:id" },
   async ({ id, authorization }: DeleteEventParams): Promise<{ deleted: boolean }> => {
-    const event = await requireEvent(id);
-    await requirePermission(prisma, {
+    await requireEvent(id);
+    await requireEventPermission(prisma, {
       authorization,
-      organizationId: event.organizationId,
-      resource: "event",
+      eventId: id,
       action: "delete",
     });
 
@@ -211,10 +268,9 @@ export const addEventMember = api(
   { expose: true, method: "POST", path: "/events/:id/members" },
   async ({ id, authorization, userId }: AddMemberParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
-    await requirePermission(prisma, {
+    await requireEventPermission(prisma, {
       authorization,
-      organizationId: event.organizationId,
-      resource: "event",
+      eventId: id,
       action: "update",
     });
 
@@ -262,11 +318,10 @@ interface RemoveMemberParams {
 export const removeEventMember = api(
   { expose: true, method: "DELETE", path: "/events/:id/members/:userId" },
   async ({ id, userId, authorization }: RemoveMemberParams): Promise<EventDetail> => {
-    const event = await requireEvent(id);
-    await requirePermission(prisma, {
+    await requireEvent(id);
+    await requireEventPermission(prisma, {
       authorization,
-      organizationId: event.organizationId,
-      resource: "event",
+      eventId: id,
       action: "update",
     });
 
@@ -288,11 +343,10 @@ interface AddScheduleParams {
 export const addEventSchedule = api(
   { expose: true, method: "POST", path: "/events/:id/schedules" },
   async (params: AddScheduleParams): Promise<EventDetail> => {
-    const event = await requireEvent(params.id);
-    await requirePermission(prisma, {
+    await requireEvent(params.id);
+    await requireEventPermission(prisma, {
       authorization: params.authorization,
-      organizationId: event.organizationId,
-      resource: "event",
+      eventId: params.id,
       action: "update",
     });
 
@@ -323,10 +377,9 @@ export const setEventPoints = api(
   { expose: true, method: "PUT", path: "/events/:id/points/:userId" },
   async ({ id, userId, authorization, points }: SetPointsParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
-    await requirePermission(prisma, {
+    await requireEventPermission(prisma, {
       authorization,
-      organizationId: event.organizationId,
-      resource: "event",
+      eventId: id,
       action: "update",
     });
 
@@ -358,10 +411,9 @@ export const recordLadderMatch = api(
   { expose: true, method: "POST", path: "/events/:id/ladder/matches" },
   async ({ id, authorization, winnerId, loserId }: LadderMatchParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
-    await requirePermission(prisma, {
+    await requireEventPermission(prisma, {
       authorization,
-      organizationId: event.organizationId,
-      resource: "event",
+      eventId: id,
       action: "update",
     });
 
@@ -388,6 +440,34 @@ export const recordLadderMatch = api(
       data: { elo: loserElo, losses: { increment: 1 } },
     });
 
+    return loadEvent(id);
+  },
+);
+
+interface SetStatusParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  status: EventStatus;
+}
+
+// Sets an event's lifecycle status. Endorsing an event as OFFICIAL is a
+// platform action reserved for site administrators; all other statuses
+// (DRAFT/UNOFFICIAL/ARCHIVED) may be set by anyone who can update the event.
+export const setEventStatus = api(
+  { expose: true, method: "PUT", path: "/events/:id/status" },
+  async ({ id, authorization, status }: SetStatusParams): Promise<EventDetail> => {
+    await requireEvent(id);
+    if (status === "OFFICIAL") {
+      await requireSiteAdmin(prisma, authorization);
+    } else {
+      await requireEventPermission(prisma, {
+        authorization,
+        eventId: id,
+        action: "update",
+      });
+    }
+
+    await prisma.event.update({ where: { id }, data: { status } });
     return loadEvent(id);
   },
 );
@@ -433,6 +513,7 @@ async function loadEvent(id: string): Promise<EventDetail> {
   const event = await prisma.event.findUnique({
     where: { id },
     include: {
+      raceEvents: { orderBy: { sequence: "asc" } },
       members: { include: { user: { select: { name: true, classTier: true } } } },
       schedules: { orderBy: { startsAt: "asc" } },
       pointsEntries: {
@@ -475,10 +556,25 @@ async function loadEvent(id: string): Promise<EventDetail> {
     id: event.id,
     name: event.name,
     description: event.description,
+    ownerType: event.ownerType as EventOwnerType,
     organizationId: event.organizationId,
+    ownerUserId: event.ownerUserId,
+    status: event.status as EventStatus,
     scoringType: event.scoringType,
     scoringTypeLabel: SCORING_LABELS[event.scoringType] ?? "unknown",
     classRestriction: event.classRestriction,
+    raceEvents: event.raceEvents.map((race) => ({
+      id: race.id,
+      name: race.name,
+      sequence: race.sequence,
+      distanceMeters: race.distanceMeters,
+      trackType: race.trackType,
+      location: race.location,
+      scoringType: race.scoringType,
+      classRestriction: race.classRestriction,
+      startsAt: race.startsAt ? race.startsAt.toISOString() : null,
+      endsAt: race.endsAt ? race.endsAt.toISOString() : null,
+    })),
     members: event.members.map((member) => ({
       userId: member.userId,
       name: member.user.name,

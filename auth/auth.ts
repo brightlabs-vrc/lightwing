@@ -20,6 +20,8 @@ const accessControl = createAccessControl({
   member: ["read", "create", "update", "delete"],
   invitation: ["read", "create", "update", "delete"],
   event: ["read", "create", "update", "delete"],
+  raceEvent: ["read", "create", "update", "delete"],
+  raceResult: ["read", "create", "update", "delete"],
 });
 
 // Build the better-auth roles from the shared permission matrix so the access
