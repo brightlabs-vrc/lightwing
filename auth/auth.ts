@@ -179,6 +179,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   trustedOrigins: [
     "http://localhost:4000",
     "http://localhost:3000",
+    "http://localhost:5173",
     // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
     appMeta().apiBaseUrl,
   ],
