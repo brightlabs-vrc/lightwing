@@ -64,7 +64,7 @@ const landingPage = `<!DOCTYPE html>
 
 // Returns a personalized greeting.
 export const get = api(
-  { expose: true, method: "GET", path: "/hello/:name" },
+  { expose: true, method: "GET", path: "/test/:name" },
   async ({ name }: { name: string }): Promise<Response> => {
     const msg = `Hello ${name}!`;
     return { message: msg };
