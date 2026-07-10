@@ -15,7 +15,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "encore:gen-client": "encore gen client --output frontend/src/lib/client.ts --lang ts",
-    "frontend:build" : "pnpm encore:gen-client && pnpm --dir frontend i -S && pnpm --dir frontend build",
+    "frontend:build" : " pnpm --dir frontend i -S && pnpm encore:gen-client && pnpm --dir frontend build",
     "postinstall": "prisma generate && pnpm frontend:build"
   },
   "devDependencies": {
