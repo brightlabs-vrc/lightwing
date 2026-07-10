@@ -41,7 +41,7 @@ interface CreateRaceEventParams {
 
 // Adds a race to an event. Gated by event-update permission on the parent event.
 export const createRaceEvent = api(
-  { expose: true, method: "POST", path: "/events/:eventId/races" },
+  { expose: true, auth: true, method: "POST", path: "/events/:eventId/races" },
   async (params: CreateRaceEventParams): Promise<RaceEventDetail> => {
     await requireEventPermission(prisma, {
       authorization: params.authorization,
@@ -116,7 +116,7 @@ interface UpdateRaceEventParams {
 
 // Updates a race's editable fields. Gated by event-update permission.
 export const updateRaceEvent = api(
-  { expose: true, method: "PATCH", path: "/events/:eventId/races/:raceId" },
+  { expose: true, auth: true, method: "PATCH", path: "/events/:eventId/races/:raceId" },
   async (params: UpdateRaceEventParams): Promise<RaceEventDetail> => {
     await requireRaceEvent(params.eventId, params.raceId);
     await requireEventPermission(prisma, {
@@ -164,7 +164,7 @@ interface DeleteRaceEventParams {
 
 // Deletes a race and its results (cascade). Gated by event-delete permission.
 export const deleteRaceEvent = api(
-  { expose: true, method: "DELETE", path: "/events/:eventId/races/:raceId" },
+  { expose: true, auth: true, method: "DELETE", path: "/events/:eventId/races/:raceId" },
   async ({ eventId, raceId, authorization }: DeleteRaceEventParams): Promise<{ deleted: boolean }> => {
     await requireRaceEvent(eventId, raceId);
     await requireEventPermission(prisma, {

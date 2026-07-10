@@ -36,7 +36,7 @@ interface AssignRaceResultParams {
 // Assigns (or updates) a participant's result on a race. Gated by event-update
 // permission on the parent event (event admins, with site-admin override).
 export const assignRaceResult = api(
-  { expose: true, method: "PUT", path: "/events/:eventId/races/:raceId/results/:userId" },
+  { expose: true, auth: true, method: "PUT", path: "/events/:eventId/races/:raceId/results/:userId" },
   async (params: AssignRaceResultParams): Promise<RaceResultView> => {
     await requireEventPermission(prisma, {
       authorization: params.authorization,
@@ -81,7 +81,7 @@ interface ReplaceRaceResultsParams {
 // aggregate (added, changed and removed) is recomputed. Gated by event-update
 // permission on the parent event.
 export const replaceRaceResults = api(
-  { expose: true, method: "PUT", path: "/events/:eventId/races/:raceId/results" },
+  { expose: true, auth: true, method: "PUT", path: "/events/:eventId/races/:raceId/results" },
   async (params: ReplaceRaceResultsParams): Promise<{ results: RaceResultView[] }> => {
     await requireEventPermission(prisma, {
       authorization: params.authorization,
@@ -149,7 +149,7 @@ interface MergeRaceResultsParams {
 // /events/:id/members and recordLadderMatch on /events/:id/ladder/matches),
 // keeping the full-replace semantics on PUT and the additive merge on POST.
 export const mergeRaceResults = api(
-  { expose: true, method: "POST", path: "/events/:eventId/races/:raceId/results" },
+  { expose: true, auth: true, method: "POST", path: "/events/:eventId/races/:raceId/results" },
   async (params: MergeRaceResultsParams): Promise<{ results: RaceResultView[] }> => {
     await requireEventPermission(prisma, {
       authorization: params.authorization,
@@ -196,7 +196,7 @@ interface DeleteRaceResultParams {
 // participant's event-level aggregate. Returns 404 if no such result exists.
 // Gated by event-update permission on the parent event.
 export const deleteRaceResult = api(
-  { expose: true, method: "DELETE", path: "/events/:eventId/races/:raceId/results/:userId" },
+  { expose: true, auth: true, method: "DELETE", path: "/events/:eventId/races/:raceId/results/:userId" },
   async (params: DeleteRaceResultParams): Promise<{ deleted: boolean }> => {
     await requireEventPermission(prisma, {
       authorization: params.authorization,

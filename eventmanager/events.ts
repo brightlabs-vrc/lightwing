@@ -107,7 +107,7 @@ interface CreateEventParams {
 // admin). User-owned events may be created by any authenticated user for
 // themselves; site admins may create one on behalf of any user.
 export const createEvent = api(
-  { expose: true, method: "POST", path: "/events" },
+  { expose: true, auth: true, method: "POST", path: "/events" },
   async (params: CreateEventParams): Promise<EventDetail> => {
     let organizationId: string | null = null;
     let ownerUserId: string | null = null;
@@ -212,7 +212,7 @@ interface UpdateEventParams {
 
 // Updates an event's editable fields (scoring type is immutable once set).
 export const updateEvent = api(
-  { expose: true, method: "PATCH", path: "/events/:id" },
+  { expose: true, auth: true, method: "PATCH", path: "/events/:id" },
   async (params: UpdateEventParams): Promise<EventDetail> => {
     await requireEvent(params.id);
     await requireEventPermission(prisma, {
@@ -242,7 +242,7 @@ interface DeleteEventParams {
 
 // Deletes an event and its related records.
 export const deleteEvent = api(
-  { expose: true, method: "DELETE", path: "/events/:id" },
+  { expose: true, auth: true, method: "DELETE", path: "/events/:id" },
   async ({ id, authorization }: DeleteEventParams): Promise<{ deleted: boolean }> => {
     await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -265,7 +265,7 @@ interface AddMemberParams {
 // Registers a participant for an event. Enforces the event's class restriction
 // (issue #3) and seeds the scoring record for the event's scoring type.
 export const addEventMember = api(
-  { expose: true, method: "POST", path: "/events/:id/members" },
+  { expose: true, auth: true, method: "POST", path: "/events/:id/members" },
   async ({ id, authorization, userId }: AddMemberParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -316,7 +316,7 @@ interface RemoveMemberParams {
 
 // Removes a participant from an event.
 export const removeEventMember = api(
-  { expose: true, method: "DELETE", path: "/events/:id/members/:userId" },
+  { expose: true, auth: true, method: "DELETE", path: "/events/:id/members/:userId" },
   async ({ id, userId, authorization }: RemoveMemberParams): Promise<EventDetail> => {
     await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -341,7 +341,7 @@ interface AddScheduleParams {
 
 // Adds a schedule slot to an event (issue #4).
 export const addEventSchedule = api(
-  { expose: true, method: "POST", path: "/events/:id/schedules" },
+  { expose: true, auth: true, method: "POST", path: "/events/:id/schedules" },
   async (params: AddScheduleParams): Promise<EventDetail> => {
     await requireEvent(params.id);
     await requireEventPermission(prisma, {
@@ -374,7 +374,7 @@ interface SetPointsParams {
 
 // Sets a participant's points on a points-based event (points overview).
 export const setEventPoints = api(
-  { expose: true, method: "PUT", path: "/events/:id/points/:userId" },
+  { expose: true, auth: true, method: "PUT", path: "/events/:id/points/:userId" },
   async ({ id, userId, authorization, points }: SetPointsParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -408,7 +408,7 @@ interface LadderMatchParams {
 // Records a 1v1 result on a ladder-elo event and updates both ratings
 // (ladder overview).
 export const recordLadderMatch = api(
-  { expose: true, method: "POST", path: "/events/:id/ladder/matches" },
+  { expose: true, auth: true, method: "POST", path: "/events/:id/ladder/matches" },
   async ({ id, authorization, winnerId, loserId }: LadderMatchParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -454,7 +454,7 @@ interface SetStatusParams {
 // platform action reserved for site administrators; all other statuses
 // (DRAFT/UNOFFICIAL/CONCLUDED) may be set by anyone who can update the event.
 export const setEventStatus = api(
-  { expose: true, method: "PUT", path: "/events/:id/status" },
+  { expose: true, auth: true, method: "PUT", path: "/events/:id/status" },
   async ({ id, authorization, status }: SetStatusParams): Promise<EventDetail> => {
     await requireEvent(id);
     if (status === "OFFICIAL") {

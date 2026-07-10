@@ -67,7 +67,7 @@ interface UpdateTeamStatsParams {
 // Updates a team's aggregate statistics. Requires a role with organization
 // update permission (administrator) in the target team.
 export const updateTeamStats = api(
-  { expose: true, method: "PATCH", path: "/teams/:id/stats" },
+  { expose: true, auth: true, method: "PATCH", path: "/teams/:id/stats" },
   async ({
     id,
     authorization,

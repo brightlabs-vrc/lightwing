@@ -41,7 +41,7 @@ interface SetUserClassParams {
 // role that manages events; site administrators may set a class tier globally
 // (no organization context required).
 export const setUserClass = api(
-  { expose: true, method: "PUT", path: "/users/:userId/class" },
+  { expose: true, auth: true, method: "PUT", path: "/users/:userId/class" },
   async ({
     userId,
     authorization,

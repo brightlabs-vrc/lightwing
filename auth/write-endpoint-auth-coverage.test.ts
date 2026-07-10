@@ -8,6 +8,7 @@ interface EndpointRule {
   endpoint: string;
   method: "POST" | "PATCH" | "PUT" | "DELETE";
   guardPatterns: string[];
+  requireAuthOption?: boolean;
 }
 
 const MUTATING_ENDPOINTS: EndpointRule[] = [
@@ -28,90 +29,126 @@ const MUTATING_ENDPOINTS: EndpointRule[] = [
     endpoint: "updateTeamStats",
     method: "PATCH",
     guardPatterns: ["requirePermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/classes.ts",
     endpoint: "setUserClass",
     method: "PUT",
     guardPatterns: ["requirePermission(", "requireSiteAdmin("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "createEvent",
     method: "POST",
     guardPatterns: ["requirePermission(", "resolveActor("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "updateEvent",
     method: "PATCH",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "deleteEvent",
     method: "DELETE",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "addEventMember",
     method: "POST",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "removeEventMember",
     method: "DELETE",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "addEventSchedule",
     method: "POST",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "setEventPoints",
     method: "PUT",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "recordLadderMatch",
     method: "POST",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/events.ts",
     endpoint: "setEventStatus",
     method: "PUT",
     guardPatterns: ["requireEventPermission(", "requireSiteAdmin("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/raceevents.ts",
     endpoint: "createRaceEvent",
     method: "POST",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/raceevents.ts",
     endpoint: "updateRaceEvent",
     method: "PATCH",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/raceevents.ts",
     endpoint: "deleteRaceEvent",
     method: "DELETE",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
   {
     file: "eventmanager/results.ts",
     endpoint: "assignRaceResult",
     method: "PUT",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
+  },
+  {
+    file: "eventmanager/results.ts",
+    endpoint: "replaceRaceResults",
+    method: "PUT",
+    guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
+  },
+  {
+    file: "eventmanager/results.ts",
+    endpoint: "mergeRaceResults",
+    method: "POST",
+    guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
+  },
+  {
+    file: "eventmanager/results.ts",
+    endpoint: "deleteRaceResult",
+    method: "DELETE",
+    guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
   },
 ];
 
@@ -165,6 +202,9 @@ describe("mutating endpoint authentication coverage", () => {
       const block = getExportBlock(source, rule.endpoint);
 
       expect(block).toContain(`method: "${rule.method}"`);
+      if (rule.requireAuthOption) {
+        expect(block).toContain("auth: true");
+      }
 
       const paramsInterface = getParamsInterfaceName(block);
       expect(interfaceDeclaresAuthorization(source, paramsInterface)).toBe(true);
