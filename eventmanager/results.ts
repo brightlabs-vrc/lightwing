@@ -47,6 +47,16 @@ export const assignRaceResult = api(
       throw APIError.notFound("user not found");
     }
 
+    // A result must belong to an actual participant of the parent event.
+    // Guarding here prevents dangling results (and cross-event leakage) for
+    // users who were never registered for the event.
+    const member = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId: params.eventId, userId: params.userId } },
+    });
+    if (!member) {
+      throw APIError.failedPrecondition("user is not a member of this event");
+    }
+
     const result = await prisma.raceResult.upsert({
       where: { raceEventId_userId: { raceEventId: params.raceId, userId: params.userId } },
       create: {
