@@ -1,86 +1,119 @@
-import { describe, expect, test } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import { afterEach, describe, expect, test } from "vitest";
+import { prisma } from "./prisma";
 import { requireEventPermission, requireSiteAdmin } from "./rbac";
 
-// Lightweight in-memory stand-in for the subset of PrismaClient the RBAC
-// helpers touch. Encore provisions a real database for integration tests, but
-// the authorization *logic* (ownership resolution, the site-admin
-// short-circuit, the EventAdmin fallback) is pure branching that is far clearer
-// to exercise against fixed fixtures than against seeded rows.
-interface Fixtures {
-  sessions: Record<string, { userId: string; siteRole: string; expired?: boolean }>;
-  events: Record<
-    string,
-    { ownerType: "ORGANIZATION" | "USER"; ownerUserId: string | null; organizationId: string | null }
-  >;
-  members: Record<string, string>; // `${organizationId}:${userId}` -> role
-  eventAdmins: Set<string>; // `${eventId}:${userId}`
+const createdUserIds: string[] = [];
+const createdOrganizationIds: string[] = [];
+const createdSessionTokens: string[] = [];
+const createdEventIds: string[] = [];
+
+async function createUser(id: string, name: string, siteRole: "USER" | "SITE_ADMIN" = "USER") {
+  await prisma.user.create({
+    data: {
+      id,
+      name,
+      email: `${id}@example.com`,
+      siteRole,
+    },
+  });
+  createdUserIds.push(id);
+  return id;
 }
 
-function makePrisma(f: Fixtures): PrismaClient {
-  return {
-    session: {
-      findUnique: async ({ where: { token } }: { where: { token: string } }) => {
-        const s = f.sessions[token];
-        if (!s) return null;
-        return {
-          token,
-          userId: s.userId,
-          activeOrganizationId: null,
-          expiresAt: new Date(Date.now() + (s.expired ? -1000 : 3_600_000)),
-          user: { siteRole: s.siteRole },
-        };
-      },
+async function createSession(userId: string, token?: string) {
+  const sessionToken = token ?? `token-${randomUUID()}`;
+  await prisma.session.create({
+    data: {
+      id: `session-${randomUUID()}`,
+      token: sessionToken,
+      userId,
+      expiresAt: new Date(Date.now() + 60_000 * 60),
     },
-    event: {
-      findUnique: async ({ where: { id } }: { where: { id: string } }) =>
-        f.events[id] ? { id, ...f.events[id] } : null,
-    },
-    member: {
-      findUnique: async ({
-        where: { organizationId_userId },
-      }: {
-        where: { organizationId_userId: { organizationId: string; userId: string } };
-      }) => {
-        const role =
-          f.members[`${organizationId_userId.organizationId}:${organizationId_userId.userId}`];
-        return role ? { role } : null;
-      },
-    },
-    eventAdmin: {
-      findUnique: async ({
-        where: { eventId_userId },
-      }: {
-        where: { eventId_userId: { eventId: string; userId: string } };
-      }) =>
-        f.eventAdmins.has(`${eventId_userId.eventId}:${eventId_userId.userId}`)
-          ? { id: "ea", ...eventId_userId }
-          : null,
-    },
-  } as unknown as PrismaClient;
+  });
+  createdSessionTokens.push(sessionToken);
+  return sessionToken;
 }
 
-const baseFixtures = (): Fixtures => ({
-  sessions: {
-    "owner-token": { userId: "owner", siteRole: "USER" },
-    "orgadmin-token": { userId: "orgadmin", siteRole: "USER" },
-    "stranger-token": { userId: "stranger", siteRole: "USER" },
-    "eventadmin-token": { userId: "eadmin", siteRole: "USER" },
-    "site-token": { userId: "root", siteRole: "SITE_ADMIN" },
-  },
-  events: {
-    "user-event": { ownerType: "USER", ownerUserId: "owner", organizationId: null },
-    "org-event": { ownerType: "ORGANIZATION", ownerUserId: null, organizationId: "org1" },
-  },
-  members: { "org1:orgadmin": "administrator" },
-  eventAdmins: new Set<string>(),
+async function createOrganization(id: string, name: string) {
+  await prisma.organization.create({
+    data: {
+      id,
+      name,
+      slug: `${id.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    },
+  });
+  createdOrganizationIds.push(id);
+  return id;
+}
+
+async function createMember(organizationId: string, userId: string, role: string) {
+  await prisma.member.create({
+    data: {
+      id: `member-${randomUUID()}`,
+      organizationId,
+      userId,
+      role,
+    },
+  });
+}
+
+async function createEvent(id: string, options: { ownerType: "USER" | "ORGANIZATION"; ownerUserId?: string | null; organizationId?: string | null }) {
+  await prisma.event.create({
+    data: {
+      id,
+      name: `Event ${id}`,
+      ownerType: options.ownerType,
+      ownerUserId: options.ownerUserId ?? null,
+      organizationId: options.organizationId ?? null,
+      scoringType: 1,
+    },
+  });
+  createdEventIds.push(id);
+}
+
+async function createEventAdmin(eventId: string, userId: string) {
+  await prisma.eventAdmin.create({
+    data: {
+      id: `event-admin-${randomUUID()}`,
+      eventId,
+      userId,
+    },
+  });
+}
+
+afterEach(async () => {
+  if (createdSessionTokens.length > 0) {
+    await prisma.session.deleteMany({ where: { token: { in: createdSessionTokens } } });
+    createdSessionTokens.length = 0;
+  }
+
+  if (createdEventIds.length > 0) {
+    await prisma.eventAdmin.deleteMany({ where: { eventId: { in: createdEventIds } } });
+    await prisma.event.deleteMany({ where: { id: { in: createdEventIds } } });
+    createdEventIds.length = 0;
+  }
+
+  if (createdOrganizationIds.length > 0) {
+    await prisma.member.deleteMany({ where: { organizationId: { in: createdOrganizationIds } } });
+    await prisma.organization.deleteMany({ where: { id: { in: createdOrganizationIds } } });
+    createdOrganizationIds.length = 0;
+  }
+
+  if (createdUserIds.length > 0) {
+    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    createdUserIds.length = 0;
+  }
 });
 
 describe("requireEventPermission", () => {
   test("user-owned: the owner has full control", async () => {
-    const prisma = makePrisma(baseFixtures());
+    await createUser("owner", "Owner");
+    await createEvent("user-event", { ownerType: "USER", ownerUserId: "owner" });
+    const token = await createSession("owner");
+
     const { actor } = await requireEventPermission(prisma, {
-      authorization: "Bearer owner-token",
+      authorization: `Bearer ${token}`,
       eventId: "user-event",
       action: "update",
     });
@@ -88,10 +121,14 @@ describe("requireEventPermission", () => {
   });
 
   test("user-owned: a stranger is denied", async () => {
-    const prisma = makePrisma(baseFixtures());
+    await createUser("owner", "Owner");
+    await createUser("stranger", "Stranger");
+    await createEvent("user-event", { ownerType: "USER", ownerUserId: "owner" });
+    const token = await createSession("stranger");
+
     await expect(
       requireEventPermission(prisma, {
-        authorization: "Bearer stranger-token",
+        authorization: `Bearer ${token}`,
         eventId: "user-event",
         action: "update",
       }),
@@ -99,9 +136,14 @@ describe("requireEventPermission", () => {
   });
 
   test("org-owned: an org administrator is allowed via the RBAC matrix", async () => {
-    const prisma = makePrisma(baseFixtures());
+    await createUser("orgadmin", "Org Admin");
+    const orgId = await createOrganization("org1", "Org One");
+    await createMember(orgId, "orgadmin", "administrator");
+    await createEvent("org-event", { ownerType: "ORGANIZATION", organizationId: orgId });
+    const token = await createSession("orgadmin");
+
     const { actor } = await requireEventPermission(prisma, {
-      authorization: "Bearer orgadmin-token",
+      authorization: `Bearer ${token}`,
       eventId: "org-event",
       action: "delete",
     });
@@ -109,10 +151,14 @@ describe("requireEventPermission", () => {
   });
 
   test("org-owned: a non-member is denied", async () => {
-    const prisma = makePrisma(baseFixtures());
+    await createUser("stranger", "Stranger");
+    const orgId = await createOrganization("org2", "Org Two");
+    await createEvent("org-event", { ownerType: "ORGANIZATION", organizationId: orgId });
+    const token = await createSession("stranger");
+
     await expect(
       requireEventPermission(prisma, {
-        authorization: "Bearer stranger-token",
+        authorization: `Bearer ${token}`,
         eventId: "org-event",
         action: "update",
       }),
@@ -120,11 +166,14 @@ describe("requireEventPermission", () => {
   });
 
   test("explicit EventAdmin row grants access on either ownership kind", async () => {
-    const f = baseFixtures();
-    f.eventAdmins.add("user-event:eadmin");
-    const prisma = makePrisma(f);
+    await createUser("eadmin", "Event Admin");
+    await createUser("owner", "Owner");
+    await createEvent("user-event", { ownerType: "USER", ownerUserId: "owner" });
+    await createEventAdmin("user-event", "eadmin");
+    const token = await createSession("eadmin");
+
     const { actor } = await requireEventPermission(prisma, {
-      authorization: "Bearer eventadmin-token",
+      authorization: `Bearer ${token}`,
       eventId: "user-event",
       action: "update",
     });
@@ -132,10 +181,16 @@ describe("requireEventPermission", () => {
   });
 
   test("site admin has absolute control and short-circuits ownership checks", async () => {
-    const prisma = makePrisma(baseFixtures());
+    await createUser("root", "Root", "SITE_ADMIN");
+    await createUser("other", "Other User");
+    const orgId = await createOrganization("existing-org", "Existing Org");
+    await createEvent("user-event", { ownerType: "USER", ownerUserId: "other" });
+    await createEvent("org-event", { ownerType: "ORGANIZATION", organizationId: orgId });
+    const token = await createSession("root");
+
     for (const eventId of ["user-event", "org-event"]) {
       const { actor } = await requireEventPermission(prisma, {
-        authorization: "Bearer site-token",
+        authorization: `Bearer ${token}`,
         eventId,
         action: "delete",
       });
@@ -144,10 +199,12 @@ describe("requireEventPermission", () => {
   });
 
   test("missing event yields not found for non-site-admins", async () => {
-    const prisma = makePrisma(baseFixtures());
+    await createUser("owner", "Owner");
+    const token = await createSession("owner");
+
     await expect(
       requireEventPermission(prisma, {
-        authorization: "Bearer owner-token",
+        authorization: `Bearer ${token}`,
         eventId: "ghost",
         action: "read",
       }),
@@ -157,14 +214,18 @@ describe("requireEventPermission", () => {
 
 describe("requireSiteAdmin", () => {
   test("permits site administrators", async () => {
-    const prisma = makePrisma(baseFixtures());
-    const actor = await requireSiteAdmin(prisma, "Bearer site-token");
+    await createUser("root", "Root", "SITE_ADMIN");
+    const token = await createSession("root");
+
+    const actor = await requireSiteAdmin(prisma, `Bearer ${token}`);
     expect(actor.siteRole).toBe("SITE_ADMIN");
   });
 
   test("denies regular users", async () => {
-    const prisma = makePrisma(baseFixtures());
-    await expect(requireSiteAdmin(prisma, "Bearer owner-token")).rejects.toThrow(
+    await createUser("owner", "Owner");
+    const token = await createSession("owner");
+
+    await expect(requireSiteAdmin(prisma, `Bearer ${token}`)).rejects.toThrow(
       /site administrator/,
     );
   });

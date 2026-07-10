@@ -1,83 +1,120 @@
-import { describe, expect, test, beforeEach, vi } from "vitest";
-
-const {
-  mockFindUnique,
-  mockUpdate,
-  mockRequirePermission,
-} = vi.hoisted(() => ({
-  mockFindUnique: vi.fn(),
-  mockUpdate: vi.fn(),
-  mockRequirePermission: vi.fn(),
-}));
-
-vi.mock("./prisma", () => ({
-  prisma: {
-    organization: {
-      findUnique: mockFindUnique,
-      update: mockUpdate,
-    },
-  },
-}));
-
-vi.mock("../auth/rbac", () => ({
-  requirePermission: mockRequirePermission,
-}));
-
+import { randomUUID } from "node:crypto";
+import { afterEach, describe, expect, test } from "vitest";
+import { prisma } from "./prisma";
 import { getTeam, updateTeamStats } from "./teams";
 
-function makeOrganization(
-  overrides: Partial<{
-    id: string;
-    name: string;
-    slug: string;
-    logo: string | null;
-    rankingAverage: number | null;
-    pointsAverage: number | null;
-    seasonRank: number | null;
-    averagePointsPerEvent: number | null;
-    members: { userId: string; role: string; user: { name: string } }[];
-  }> = {},
-) {
-  return {
-    id: "org-1",
-    name: "Sky Team",
-    slug: "sky-team",
-    logo: null,
-    rankingAverage: 4.2,
-    pointsAverage: 91.5,
-    seasonRank: 7,
-    averagePointsPerEvent: 14.3,
-    members: [
-      { userId: "u-1", role: "administrator", user: { name: "Aster" } },
-      { userId: "u-2", role: "administrator", user: { name: "Blake" } },
-      { userId: "u-3", role: "member", user: { name: "Casey" } },
-    ],
-    ...overrides,
-  };
-}
+const createdUserIds: string[] = [];
+const createdOrganizationIds: string[] = [];
+const createdSessionTokens: string[] = [];
 
-describe("teammanager endpoints", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+async function createOrgWithMembers(
+  options?: {
+    members?: Array<{ userId: string; role: string; name: string }>;
+    id?: string;
+    name?: string;
+    slug?: string;
+  },
+) {
+  const id = options?.id ?? `org-${randomUUID()}`;
+  const name = options?.name ?? `Team ${id}`;
+  const slug = options?.slug ?? `${id.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+  const organization = await prisma.organization.create({
+    data: {
+      id,
+      name,
+      slug,
+    },
   });
 
+  createdOrganizationIds.push(id);
+
+  const members = options?.members ?? [];
+  for (const member of members) {
+    const userId = member.userId;
+    await prisma.user.create({
+      data: {
+        id: userId,
+        name: member.name,
+        email: `${userId}@example.com`,
+      },
+    });
+    createdUserIds.push(userId);
+
+    await prisma.member.create({
+      data: {
+        id: `member-${randomUUID()}`,
+        organizationId: organization.id,
+        userId,
+        role: member.role,
+      },
+    });
+  }
+
+  return organization;
+}
+
+async function createSession(userId: string) {
+  const token = `token-${randomUUID()}`;
+  createdSessionTokens.push(token);
+
+  await prisma.session.create({
+    data: {
+      id: `session-${randomUUID()}`,
+      token,
+      userId,
+      expiresAt: new Date(Date.now() + 60_000 * 60),
+    },
+  });
+
+  return token;
+}
+
+afterEach(async () => {
+  if (createdSessionTokens.length > 0) {
+    await prisma.session.deleteMany({ where: { token: { in: createdSessionTokens } } });
+    createdSessionTokens.length = 0;
+  }
+
+  if (createdOrganizationIds.length > 0) {
+    await prisma.member.deleteMany({ where: { organizationId: { in: createdOrganizationIds } } });
+    await prisma.organization.deleteMany({ where: { id: { in: createdOrganizationIds } } });
+    createdOrganizationIds.length = 0;
+  }
+
+  if (createdUserIds.length > 0) {
+    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    createdUserIds.length = 0;
+  }
+});
+
+describe("teammanager endpoints", () => {
   test("getTeam returns mapped team with member summaries and stats", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeOrganization());
+    const organization = await createOrgWithMembers({
+      id: "org-get-team",
+      name: "Sky Team",
+      slug: "sky-team",
+      members: [
+        { userId: "user-aster", role: "administrator", name: "Aster" },
+        { userId: "user-blake", role: "administrator", name: "Blake" },
+        { userId: "user-casey", role: "member", name: "Casey" },
+      ],
+    });
 
-    const team = await getTeam({ id: "org-1" });
-
-    expect(mockFindUnique).toHaveBeenCalledWith({
-      where: { id: "org-1" },
-      include: {
-        members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
+    await prisma.organization.update({
+      where: { id: organization.id },
+      data: {
+        rankingAverage: 4.2,
+        pointsAverage: 91.5,
+        seasonRank: 7,
+        averagePointsPerEvent: 14.3,
       },
     });
 
+    const team = await getTeam({ id: organization.id });
+
     expect(team).toEqual({
-      id: "org-1",
+      id: organization.id,
       name: "Sky Team",
       slug: "sky-team",
       logo: null,
@@ -89,115 +126,83 @@ describe("teammanager endpoints", () => {
       },
       administratorSlotsRemaining: 1,
       members: [
-        { userId: "u-1", name: "Aster", role: "administrator" },
-        { userId: "u-2", name: "Blake", role: "administrator" },
-        { userId: "u-3", name: "Casey", role: "member" },
+        { userId: "user-aster", name: "Aster", role: "administrator" },
+        { userId: "user-blake", name: "Blake", role: "administrator" },
+        { userId: "user-casey", name: "Casey", role: "member" },
       ],
     });
   });
 
   test("getTeam caps administratorSlotsRemaining at zero", async () => {
-    mockFindUnique.mockResolvedValueOnce(
-      makeOrganization({
-        members: [
-          { userId: "u-1", role: "administrator", user: { name: "A" } },
-          { userId: "u-2", role: "administrator", user: { name: "B" } },
-          { userId: "u-3", role: "administrator", user: { name: "C" } },
-          { userId: "u-4", role: "administrator", user: { name: "D" } },
-        ],
-      }),
-    );
+    await createOrgWithMembers({
+      id: "org-admin-slots",
+      name: "Admin Heavy Team",
+      slug: "admin-heavy-team",
+      members: [
+        { userId: "user-admin-1", role: "administrator", name: "Admin One" },
+        { userId: "user-admin-2", role: "administrator", name: "Admin Two" },
+        { userId: "user-admin-3", role: "administrator", name: "Admin Three" },
+        { userId: "user-admin-4", role: "administrator", name: "Admin Four" },
+      ],
+    });
 
-    const team = await getTeam({ id: "org-1" });
+    const team = await getTeam({ id: "org-admin-slots" });
     expect(team.administratorSlotsRemaining).toBe(0);
   });
 
   test("getTeam throws not found when organization is missing", async () => {
-    mockFindUnique.mockResolvedValueOnce(null);
-
-    await expect(getTeam({ id: "missing" })).rejects.toMatchObject({
+    await expect(getTeam({ id: "missing-org" })).rejects.toMatchObject({
       code: "not_found",
       message: "team not found",
     });
   });
 
   test("updateTeamStats enforces permission and updates only provided fields", async () => {
-    const existing = makeOrganization();
-    const updated = makeOrganization({
-      rankingAverage: 5.5,
-      pointsAverage: 99.1,
-      seasonRank: null,
-      averagePointsPerEvent: 18.2,
+    const organization = await createOrgWithMembers({
+      id: "org-update-team",
+      name: "Update Team",
+      slug: "update-team",
+      members: [{ userId: "user-updater", role: "administrator", name: "Updater" }],
     });
-
-    mockFindUnique.mockResolvedValueOnce(existing);
-    mockUpdate.mockResolvedValueOnce(updated);
-    mockRequirePermission.mockResolvedValueOnce({
-      actor: { userId: "u-1", activeOrganizationId: null, siteRole: "USER" },
-      role: "administrator",
-    });
+    const sessionToken = await createSession("user-updater");
 
     const team = await updateTeamStats({
-      id: "org-1",
-      authorization: "Bearer token-1",
+      id: organization.id,
+      authorization: `Bearer ${sessionToken}`,
       rankingAverage: 5.5,
       pointsAverage: 99.1,
       seasonRank: null,
-    });
-
-    expect(mockRequirePermission).toHaveBeenCalledWith(
-      expect.anything(),
-      {
-        authorization: "Bearer token-1",
-        organizationId: "org-1",
-        resource: "organization",
-        action: "update",
-      },
-    );
-
-    expect(mockFindUnique).toHaveBeenCalledWith({ where: { id: "org-1" } });
-    expect(mockUpdate).toHaveBeenCalledWith({
-      where: { id: "org-1" },
-      data: {
-        rankingAverage: 5.5,
-        pointsAverage: 99.1,
-        seasonRank: null,
-        averagePointsPerEvent: undefined,
-      },
-      include: {
-        members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
     });
 
     expect(team.stats).toEqual({
       rankingAverage: 5.5,
       pointsAverage: 99.1,
       seasonRank: null,
-      averagePointsPerEvent: 18.2,
+      averagePointsPerEvent: null,
     });
   });
 
   test("updateTeamStats throws not found and does not update a missing organization", async () => {
-    mockRequirePermission.mockResolvedValueOnce({
-      actor: { userId: "u-1", activeOrganizationId: null, siteRole: "USER" },
-      role: "administrator",
+    await prisma.user.create({
+      data: {
+        id: "site-admin-missing-org",
+        name: "Missing Org Site Admin",
+        email: "site-admin-missing-org@example.com",
+        siteRole: "SITE_ADMIN",
+      },
     });
-    mockFindUnique.mockResolvedValueOnce(null);
+    createdUserIds.push("site-admin-missing-org");
+    const sessionToken = await createSession("site-admin-missing-org");
 
     await expect(
       updateTeamStats({
-        id: "missing",
-        authorization: "Bearer token-1",
+        id: "missing-org",
+        authorization: `Bearer ${sessionToken}`,
         pointsAverage: 12.3,
       }),
     ).rejects.toMatchObject({
       code: "not_found",
       message: "team not found",
     });
-
-    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
