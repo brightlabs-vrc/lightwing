@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Encore CLI
+        run: |
+          curl -L https://encore.dev/install.sh | bash
+          echo "$HOME/.encore/bin" >> "$GITHUB_PATH"
+
+      - name: Disable Encore telemetry
+        run: encore telemetry disable
+
+      - name: Export Encore runtime library
+        run: echo "ENCORE_RUNTIME_LIB=$(encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$GITHUB_ENV"
+
+      - name: Run backend unit tests
+        working-directory: packages/mgm-backend
+        run: encore test
