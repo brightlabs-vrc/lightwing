@@ -40,6 +40,10 @@ jobs:
           curl -L https://encore.dev/install.sh | bash
           echo "$HOME/.encore/bin" >> "$GITHUB_PATH"
 
+      - name: Export database URLs
+        run: |
+          echo "DATABASE_URL=$(encore db conn-uri lightwing)" >> "$GITHUB_ENV"
+
       - name: Disable Encore telemetry
         run: encore telemetry disable
 

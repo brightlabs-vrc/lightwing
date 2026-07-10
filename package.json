@@ -10,7 +10,8 @@
     "test": "vitest --passWithNoTests",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
     "@types/node": "^20.5.7",
