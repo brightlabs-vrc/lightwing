@@ -1,6 +1,7 @@
 import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
-import { resolveActor } from "./rbac";
+import { requireSiteAdmin, resolveActor } from "./rbac";
+import type { SiteRoleName } from "./permissions";
 import type { ClassTier } from "../eventmanager/classtier";
 
 // Netkeiba-style participant profile (issue #7). Combines core user info with a
@@ -21,6 +22,7 @@ export interface UserProfile {
   biography: string | null;
   careerOverview: string | null;
   classTier: ClassTier | null;
+  siteRole: SiteRoleName;
   teams: TeamAffiliation[];
   createdAt: string;
   updatedAt: string;
@@ -101,6 +103,38 @@ export const updateUserProfile = api(
   },
 );
 
+interface SetSiteRoleParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  siteRole: SiteRoleName;
+}
+
+// Grants or revokes the global SITE_ADMIN role. Restricted to existing site
+// administrators, the single choke point that bootstraps platform-wide control.
+export const setUserSiteRole = api(
+  { expose: true, method: "PUT", path: "/users/:id/site-role" },
+  async ({ id, authorization, siteRole }: SetSiteRoleParams): Promise<UserProfile> => {
+    await requireSiteAdmin(prisma, authorization);
+
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw APIError.notFound("user not found");
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { siteRole },
+      include: {
+        members: {
+          include: { organization: true },
+        },
+      },
+    });
+
+    return toProfile(user);
+  },
+);
+
 type UserWithMembers = {
   id: string;
   name: string;
@@ -109,6 +143,7 @@ type UserWithMembers = {
   biography: string | null;
   careerOverview: string | null;
   classTier: ClassTier | null;
+  siteRole: string;
   createdAt: Date;
   updatedAt: Date;
   members: {
@@ -126,6 +161,7 @@ function toProfile(user: UserWithMembers): UserProfile {
     biography: user.biography,
     careerOverview: user.careerOverview,
     classTier: user.classTier,
+    siteRole: user.siteRole as SiteRoleName,
     teams: user.members.map((member) => ({
       organizationId: member.organization.id,
       name: member.organization.name,

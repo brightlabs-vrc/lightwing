@@ -1,6 +1,6 @@
 import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
-import { requirePermission } from "../auth/rbac";
+import { requirePermission, requireSiteAdmin } from "../auth/rbac";
 import {
   type ClassTier,
   CLASS_TIER_LABELS,
@@ -32,13 +32,14 @@ export const listClassTiers = api(
 interface SetUserClassParams {
   userId: string;
   authorization: Header<"Authorization">;
-  organizationId: string;
+  organizationId?: string | null;
   classTier: ClassTier | null;
 }
 
 // Tags a participant with a skill class tier (issue #3). This is an
-// administrative action gated by the same RBAC role that manages events: the
-// caller must hold event-management permission in the supplied organization.
+// administrative action: within an organization it is gated by the same RBAC
+// role that manages events; site administrators may set a class tier globally
+// (no organization context required).
 export const setUserClass = api(
   { expose: true, method: "PUT", path: "/users/:userId/class" },
   async ({
@@ -47,12 +48,16 @@ export const setUserClass = api(
     organizationId,
     classTier,
   }: SetUserClassParams): Promise<{ userId: string; classTier: ClassTier | null }> => {
-    await requirePermission(prisma, {
-      authorization,
-      organizationId,
-      resource: "event",
-      action: "update",
-    });
+    if (organizationId) {
+      await requirePermission(prisma, {
+        authorization,
+        organizationId,
+        resource: "event",
+        action: "update",
+      });
+    } else {
+      await requireSiteAdmin(prisma, authorization);
+    }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -71,7 +76,7 @@ export const setUserClass = api(
 export interface EligibleEvent {
   id: string;
   name: string;
-  organizationId: string;
+  organizationId: string | null;
   classRestriction: ClassTier | null;
 }
 
