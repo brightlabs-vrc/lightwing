@@ -14,7 +14,7 @@ import { type ClassTier, isEligible } from "./classtier";
 // cannot use Prisma's runtime enum objects as types, so these are declared as
 // plain literal unions with byte-identical values (see classtier.ts).
 export type EventOwnerType = "ORGANIZATION" | "USER";
-export type EventStatus = "DRAFT" | "UNOFFICIAL" | "OFFICIAL" | "ARCHIVED";
+export type EventStatus = "DRAFT" | "UNOFFICIAL" | "OFFICIAL" | "CONCLUDED";
 
 // Event scoring types (issue #4). 1 = points-based, 2 = ladder-elo.
 export const SCORING_POINTS = 1;
@@ -452,7 +452,7 @@ interface SetStatusParams {
 
 // Sets an event's lifecycle status. Endorsing an event as OFFICIAL is a
 // platform action reserved for site administrators; all other statuses
-// (DRAFT/UNOFFICIAL/ARCHIVED) may be set by anyone who can update the event.
+// (DRAFT/UNOFFICIAL/CONCLUDED) may be set by anyone who can update the event.
 export const setEventStatus = api(
   { expose: true, method: "PUT", path: "/events/:id/status" },
   async ({ id, authorization, status }: SetStatusParams): Promise<EventDetail> => {
