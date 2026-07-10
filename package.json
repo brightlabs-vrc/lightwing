@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "description": "Lightwing",
   "license": "BSD-3-Clause",
+  "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
     "test": "vitest --passWithNoTests",
