@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { router } from '../router'
 import { getAuthSession, signInWithDiscord, signOut, type AuthSession } from '../lib/auth'
 
 interface AuthContextValue {
@@ -6,7 +7,7 @@ interface AuthContextValue {
   loading: boolean
   refreshSession: () => Promise<void>
   startDiscordSignIn: (redirectPath?: string) => Promise<void>
-  signOutUser: () => Promise<void>
+  signOutUser: (redirectTo?: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -29,10 +30,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithDiscord(redirectPath)
   }, [])
 
-  const signOutUser = useCallback(async () => {
-    await signOut()
-    setSession(null)
-  }, [])
+  const signOutUser = useCallback(
+    async (redirectTo: string = '/auth') => {
+      await signOut()
+      setSession(null)
+      // Navigate via the router instance directly. AuthProvider sits above
+      // RouterProvider, so useNavigate() here is outside the router context
+      // and would be a no-op.
+      await router.navigate({ to: redirectTo })
+    },
+    [],
+  )
 
   useEffect(() => {
     void refreshSession()

@@ -1,14 +1,14 @@
 import { redirect } from '@tanstack/react-router'
-import { getAuthSession } from './auth'
+import { getAuthSession, type AuthSession } from './auth'
 
-interface RouteLocation {
+export interface RouteLocation {
   href?: string
   pathname: string
   search?: string | Record<string, unknown>
   hash?: string
 }
 
-function buildRedirectPath(location: RouteLocation) {
+export function buildRedirectPath(location: RouteLocation): string {
   if (location.href?.startsWith('/')) {
     return location.href
   }
@@ -17,7 +17,11 @@ function buildRedirectPath(location: RouteLocation) {
   return `${location.pathname}${searchPart}${location.hash ?? ''}`
 }
 
-export async function requireSiteAdmin(location: RouteLocation) {
+/**
+ * Ensures the caller is authenticated. If not, redirects to the unified
+ * `/auth` route, preserving the current location so auth can return there.
+ */
+export async function requireAuth(location: RouteLocation): Promise<AuthSession> {
   const authSession = await getAuthSession()
 
   if (!authSession) {
@@ -28,6 +32,16 @@ export async function requireSiteAdmin(location: RouteLocation) {
       },
     })
   }
+
+  return authSession
+}
+
+/**
+ * Ensures the caller is an authenticated SITE_ADMIN. Non-admins are sent to
+ * `/auth` with a `forbidden` error so the page can explain the situation.
+ */
+export async function requireSiteAdmin(location: RouteLocation): Promise<AuthSession> {
+  const authSession = await requireAuth(location)
 
   if (authSession.user.siteRole !== 'SITE_ADMIN') {
     throw redirect({

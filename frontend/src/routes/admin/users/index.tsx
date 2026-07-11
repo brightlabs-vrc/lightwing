@@ -1,7 +1,7 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
-import { requireSiteAdmin } from '../../../lib/admin-guard'
+import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { getAdminUserProfile, updateAdminUserSiteRole } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import type { auth } from '../../../lib/client'
