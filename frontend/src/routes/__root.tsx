@@ -10,12 +10,24 @@ function RootLayout() {
   const { session, loading, signOutUser } = useAuth()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const isAdminArea = pathname.startsWith('/admin')
+  const isAuthArea = pathname === '/auth'
   const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
 
   if (isAdminArea) {
     return (
       <>
         <Outlet />
+        <TanStackRouterDevtools position='bottom-right' />
+      </>
+    )
+  }
+
+  if (isAuthArea) {
+    return (
+      <>
+        <div className='min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_28%,_#f8fafc_62%,_#ffffff_100%)] text-slate-900'>
+          <Outlet />
+        </div>
         <TanStackRouterDevtools position='bottom-right' />
       </>
     )
@@ -39,7 +51,7 @@ function RootLayout() {
             {!loading && session ? (
               <>
                 <span>{session.user.name} ({session.user.siteRole ?? 'USER'})</span>
-                <button type='button' onClick={() => void signOutUser()} className='rounded-md border border-slate-300 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-50'>Sign out</button>
+                <button type='button' onClick={() => void signOutUser('/auth')} className='rounded-md border border-slate-300 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-50'>Sign out</button>
               </>
             ) : null}
             {!loading && !session ? <span>Not signed in</span> : null}

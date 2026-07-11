@@ -47,7 +47,7 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
                 </span>
                 <button
                   type="button"
-                  onClick={() => void signOutUser()}
+                  onClick={() => void signOutUser('/')}
                   className="slds-button slds-button_neutral"
                   style={{ padding: '2px 12px', fontSize: '12px', lineHeight: '1.5' }}
                 >
