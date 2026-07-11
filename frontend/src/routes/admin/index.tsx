@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
-import { requireSiteAdmin } from '../../lib/admin-guard'
+import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 
 export const Route = createFileRoute('/admin/')({

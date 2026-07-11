@@ -103,7 +103,9 @@ export async function signInWithDiscord(redirectPath?: string): Promise<void> {
   }
 
   const callbackPath = sanitizeRedirectPath(redirectPath)
-  const callbackURL = `${window.location.origin}${callbackPath}`
+  // Route the OAuth callback back through /auth so the unified auth page can
+  // verify the session and then return the user to where they were.
+  const callbackURL = `${window.location.origin}/auth?redirect=${encodeURIComponent(callbackPath)}`
 
   const response = await fetch(authUrl('/sign-in/social'), {
     method: 'POST',
