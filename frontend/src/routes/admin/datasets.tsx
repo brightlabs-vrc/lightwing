@@ -2,6 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
+import { SldsIcon } from '../../components/SldsIcon'
 
 export const Route = createFileRoute('/admin/datasets')({
   beforeLoad: async ({ location }) => {
@@ -67,7 +68,7 @@ function AdminDatasetsPage() {
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-dataset" style={{ fontSize: '18px' }}>📊</span>
+                  <SldsIcon category="standard" name="dataset" size={24} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">

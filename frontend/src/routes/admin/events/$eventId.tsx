@@ -7,6 +7,7 @@ import { isRaceNotStarted, isRaceOngoing } from '../../../lib/raceStatus'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { LoadingBox } from '../../../components/LoadingBox'
 import { StandingsEditor } from '../../../components/StandingsEditor'
+import { SldsIcon } from '../../../components/SldsIcon'
 import type { eventmanager } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/events/$eventId')({
@@ -74,7 +75,7 @@ function AdminEventDetailPage() {
           className="slds-button slds-button_neutral"
           style={{ padding: '4px 12px', fontSize: '12px' }}
         >
-          ← Back to Events
+          <SldsIcon category="utility" name="back" size={14} /> Back to Events
         </Link>
       }
     >
@@ -91,7 +92,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'DRAFT' && (
             <AlertBanner variant="warning">
               <div style={{ textAlign: 'left' }}>
-                <strong>🛠️ Event Status: DRAFT (Setup Mode)</strong>
+                <strong><SldsIcon category="utility" name="settings" size={14} color="warning" /> Event Status: DRAFT (Setup Mode)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7c2d12' }}>
                   This event is in private preparation. <strong>Next steps:</strong> Register participants under the "Event Members" tab, create race tracks under the "Races & Tracks" tab, and set Lifecycle Status to <strong>UNOFFICIAL</strong> to publish it.
                 </p>
@@ -101,7 +102,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'UNOFFICIAL' && (
             <AlertBanner variant="warning">
               <div style={{ textAlign: 'left' }}>
-                <strong>🚀 Event Status: UNOFFICIAL (Live / Staging)</strong>
+                <strong><SldsIcon category="utility" name="play" size={14} color="warning" /> Event Status: UNOFFICIAL (Live / Staging)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7c2d12' }}>
                   This event is visible to participants. <strong>Next steps:</strong> Start and end configured races from the "Races & Tracks" tab, record standings, and set status to <strong>OFFICIAL</strong> (admins only) or <strong>CONCLUDED</strong> to finalize.
                 </p>
@@ -111,7 +112,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'OFFICIAL' && (
             <AlertBanner variant="success">
               <div style={{ textAlign: 'left' }}>
-                <strong>🏆 Event Status: OFFICIAL (Validated)</strong>
+                <strong><SldsIcon category="utility" name="success" size={14} color="white" /> Event Status: OFFICIAL (Validated)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#ffffff' }}>
                   Results and overall points have been approved by Site Administrators. Real-time scores and standings are finalized.
                 </p>
@@ -121,7 +122,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'CONCLUDED' && (
             <AlertBanner variant="warning">
               <div style={{ textAlign: 'left' }}>
-                <strong>🏁 Event Status: CONCLUDED (Locked)</strong>
+                <strong><SldsIcon category="utility" name="record" size={14} color="warning" /> Event Status: CONCLUDED (Locked)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7c2d12' }}>
                   This competition has finished. Historical standings are locked and archived.
                 </p>
@@ -319,7 +320,7 @@ function AdminEventDetailPage() {
                     </button>
                   </form>
                   <p className="slds-text-body_small text-slate-500 slds-m-top_x-small" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
-                    💡 For mock testing, you can input "mock-user-1", "mock-user-2", "mock-user-3" or other valid IDs.
+                    <SldsIcon category="utility" name="info" size={14} color="default" /> For mock testing, you can input "mock-user-1", "mock-user-2", "mock-user-3" or other valid IDs.
                   </p>
                 </div>
 
@@ -378,7 +379,7 @@ function AdminEventDetailPage() {
                     className="slds-button slds-button_brand"
                     style={{ padding: '6px 12px', fontSize: '12px' }}
                   >
-                    ➕ Create Race Track
+                    <SldsIcon category="utility" name="add" size={14} buttonIcon /> Create Race Track
                   </button>
                 </div>
                 {races.length === 0 ? (
@@ -417,7 +418,7 @@ function AdminEventDetailPage() {
                                 </span>
                               ) : isRaceOngoing(race) ? (
                                 <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', borderRadius: '4px', background: '#ff9800', color: '#fff', animation: 'pulse 2s infinite' }}>
-                                  🔴 Ongoing / Live
+                                  <SldsIcon category="utility" name="record" size={12} color="white" /> Ongoing / Live
                                 </span>
                               ) : (
                                 <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
@@ -439,7 +440,7 @@ function AdminEventDetailPage() {
                                     className="slds-button slds-button_success"
                                     style={{ padding: '2px 8px', fontSize: '11px', background: '#2e7d32', color: '#fff' }}
                                   >
-                                    🚀 Start
+                                    <SldsIcon category="utility" name="play" size={12} buttonIcon /> Start
                                   </button>
                                 )}
                                 {/* End Race */}
@@ -450,7 +451,7 @@ function AdminEventDetailPage() {
                                     className="slds-button slds-button_destructive"
                                     style={{ padding: '2px 8px', fontSize: '11px', background: '#d32f2f', color: '#fff' }}
                                   >
-                                    🏁 End
+                                    <SldsIcon category="utility" name="stop" size={12} buttonIcon /> End
                                   </button>
                                 )}
                                 {/* Edit Standings/Results */}
@@ -460,7 +461,7 @@ function AdminEventDetailPage() {
                                   className="slds-button slds-button_brand"
                                   style={{ padding: '2px 8px', fontSize: '11px' }}
                                 >
-                                  🎯 Edit Results
+                                  <SldsIcon category="utility" name="target" size={12} buttonIcon /> Edit Results
                                 </button>
                                 {/* Delete */}
                                 <button
@@ -469,7 +470,7 @@ function AdminEventDetailPage() {
                                   className="slds-button slds-button_neutral"
                                   style={{ padding: '2px 8px', fontSize: '11px', color: '#d32f2f' }}
                                 >
-                                  🗑️ Delete
+                                  <SldsIcon category="utility" name="delete" size={12} buttonIcon /> Delete
                                 </button>
                               </div>
                             </td>
@@ -509,7 +510,7 @@ function AdminEventDetailPage() {
       ) : (
         <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div className="slds-text-align_center">
-            <span style={{ fontSize: '48px' }}>🏁</span>
+            <SldsIcon category="utility" name="record" size={48} />
             <p className="slds-text-heading_medium font-bold text-slate-700 slds-m-top_medium" style={{ fontWeight: 'bold' }}>
               Event Not Found
             </p>
@@ -521,7 +522,7 @@ function AdminEventDetailPage() {
               className="slds-button slds-button_brand slds-m-top_medium"
               style={{ padding: '6px 16px' }}
             >
-              ← Back to Events
+              <SldsIcon category="utility" name="back" size={14} buttonIcon /> Back to Events
             </Link>
           </div>
         </div>
@@ -548,7 +549,7 @@ function AdminEventDetailPage() {
                     color: '#747474',
                   }}
                 >
-                  ✕
+                  <SldsIcon category="utility" name="close" size={16} buttonIcon title="Close" />
                 </button>
                 <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                   Configure New Race Track

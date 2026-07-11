@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
+import { SldsIcon } from './SldsIcon'
 
 type AlertVariant = 'error' | 'success' | 'warning'
 
@@ -14,10 +15,10 @@ const VARIANT_STYLES: Record<AlertVariant, CSSProperties> = {
   warning: { background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' },
 }
 
-const VARIANT_ICON: Record<AlertVariant, string> = {
-  error: '⚠️',
-  success: '✓',
-  warning: '📝',
+const VARIANT_ICON: Record<AlertVariant, { name: string; title: string; color: 'white' | 'warning' }> = {
+  error: { name: 'error', title: 'Error', color: 'white' },
+  success: { name: 'success', title: 'Success', color: 'white' },
+  warning: { name: 'warning', title: 'Warning', color: 'warning' },
 }
 
 export function AlertBanner({ variant, children, action }: AlertBannerProps) {
@@ -35,7 +36,9 @@ export function AlertBanner({ variant, children, action }: AlertBannerProps) {
       }}
     >
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <span className="slds-icon_container slds-p-right_small">{VARIANT_ICON[variant]}</span>
+        <span className="slds-icon_container slds-p-right_small">
+          <SldsIcon category="utility" name={VARIANT_ICON[variant].name} size={20} color={VARIANT_ICON[variant].color} title={VARIANT_ICON[variant].title} />
+        </span>
         <h2>{children}</h2>
       </div>
       {action}

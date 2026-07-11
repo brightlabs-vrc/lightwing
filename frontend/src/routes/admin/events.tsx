@@ -5,6 +5,7 @@ import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
+import { SldsIcon } from '../../components/SldsIcon'
 import type { eventmanager } from '../../lib/client'
 import { MOCK_MODE } from '../../lib/mock-mode'
 
@@ -138,7 +139,7 @@ function AdminEventsListPage() {
             className="slds-button slds-button_brand"
             style={{ padding: '4px 12px', fontSize: '12px' }}
           >
-            ➕ Create Event
+            <SldsIcon category="utility" name="add" size={14} buttonIcon /> Create Event
           </button>
         </div>
       }
@@ -153,7 +154,7 @@ function AdminEventsListPage() {
             <div className="slds-card__header slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-                  <span className="slds-icon_container" style={{ fontSize: '18px' }}>🏁</span>
+                  <SldsIcon category="utility" name="record" size={18} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
@@ -244,7 +245,7 @@ function AdminEventsListPage() {
                     color: '#747474',
                   }}
                 >
-                  ✕
+                  <SldsIcon category="utility" name="close" size={16} buttonIcon title="Close" />
                 </button>
                 <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
                   Create New Competition Event

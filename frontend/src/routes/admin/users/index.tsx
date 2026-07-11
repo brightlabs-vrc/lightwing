@@ -5,6 +5,7 @@ import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { getAdminUserProfile, updateAdminUserSiteRole } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
+import { SldsIcon } from '../../../components/SldsIcon'
 import type { auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/')({
@@ -112,7 +113,7 @@ function AdminUsersPage() {
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-people" style={{ fontSize: '18px' }}>👥</span>
+                  <SldsIcon category="standard" name="people" size={24} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
@@ -162,7 +163,7 @@ function AdminUsersPage() {
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-contact" style={{ fontSize: '18px' }}>🔍</span>
+                  <SldsIcon category="standard" name="contact" size={24} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">

@@ -2,6 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
+import { SldsIcon } from '../../components/SldsIcon'
 
 export const Route = createFileRoute('/admin/')({
   beforeLoad: async ({ location }) => {
@@ -25,7 +26,7 @@ function AdminPage() {
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-user" style={{ fontSize: '18px' }}>👤</span>
+                  <SldsIcon category="standard" name="user" size={24} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
@@ -63,7 +64,7 @@ function AdminPage() {
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-event" style={{ fontSize: '20px' }}>🏆</span>
+                  <SldsIcon category="standard" name="event" size={28} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
@@ -92,7 +93,7 @@ function AdminPage() {
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-people" style={{ fontSize: '20px' }}>👥</span>
+                  <SldsIcon category="standard" name="people" size={28} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
@@ -121,7 +122,7 @@ function AdminPage() {
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
                 <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-dataset" style={{ fontSize: '20px' }}>📊</span>
+                  <SldsIcon category="standard" name="dataset" size={28} />
                 </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
