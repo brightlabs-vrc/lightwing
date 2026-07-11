@@ -89,7 +89,8 @@ export function SldsIcon({
   const svgStyle: CSSProperties = {
     width: `${size}px`,
     height: `${size}px`,
-    fill: COLOR_FILL[color],
+    // buttonIcon icons inherit the button's text color; otherwise use the explicit fill.
+    fill: buttonIcon ? 'currentColor' : COLOR_FILL[color],
   }
 
   return (
