@@ -1,0 +1,13 @@
+Already up to date
+Done in 634ms using pnpm v11.9.0
+$ pnpm --dir frontend dev
+$ vite --host --port 5173
+
+  VITE v8.1.4  ready in 950 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/
+  ➜  Network: http://172.17.0.1:5173/
+5:26:52 AM [vite] (client) hmr update /src/styles.css, /src/routes/admin/events.tsx
+5:27:19 AM [vite] .env changed, restarting server...
+5:27:19 AM [vite] server restarted.
