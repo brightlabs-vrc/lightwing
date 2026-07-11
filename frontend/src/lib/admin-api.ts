@@ -248,6 +248,56 @@ export async function updateAdminEventStatus(
   return updated
 }
 
+export async function createAdminEvent(
+  params: {
+    name: string
+    description?: string | null
+    ownerType: eventmanager.EventOwnerType
+    organizationId?: string | null
+    ownerUserId?: string | null
+    scoringType: number
+    classRestriction?: eventmanager.ClassTier | null
+  },
+  authorization: string,
+): Promise<eventmanager.EventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.createEvent({
+      authorization,
+      name: params.name,
+      description: params.description,
+      ownerType: params.ownerType,
+      organizationId: params.organizationId,
+      ownerUserId: params.ownerUserId,
+      scoringType: params.scoringType as any,
+      classRestriction: params.classRestriction,
+    })
+  }
+
+  const id = `evt_mock_${Math.floor(Math.random() * 10000)}`
+  const newEvent: eventmanager.EventDetail = {
+    id,
+    name: params.name,
+    description: params.description ?? null,
+    ownerType: params.ownerType,
+    organizationId: params.organizationId ?? null,
+    ownerUserId: params.ownerUserId ?? null,
+    status: 'DRAFT',
+    scoringType: params.scoringType,
+    scoringTypeLabel: params.scoringType === 1 ? 'points-based' : 'ladder-elo',
+    classRestriction: params.classRestriction ?? null,
+    raceEvents: [],
+    members: [],
+    schedules: [],
+    pointsOverview: params.scoringType === 1 ? [] : null,
+    ladderOverview: params.scoringType === 2 ? [] : null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  mockEvents.unshift(newEvent)
+  return newEvent
+}
+
 // -----------------------------------------------------------------------------
 // RACE EVENT METHODS
 // -----------------------------------------------------------------------------

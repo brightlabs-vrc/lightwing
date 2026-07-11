@@ -1,0 +1,11 @@
+
+> @lightwing/frontend@0.1.0 dev:mock /app/frontend
+> VITE_MOCK_MODE=true vite --host --port 5173
+
+
+  VITE v8.1.4  ready in 1037 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/
+  ➜  Network: http://172.17.0.1:5173/
+7:10:42 PM [vite] (client) [optimizer] bundling dependencies...

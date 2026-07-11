@@ -5,11 +5,14 @@ import { AlertBanner } from './AlertBanner'
 interface StandingsEditorProps {
   raceName: string
   isRaceOngoing: boolean
+  isRaceNotStarted: boolean
   loadingResults: boolean
   memberCount: number
   rows: DerivedRow[]
   changeSummary: ChangeSummary
   savingBatch: boolean
+  onStartRace: () => void
+  onEndRace: () => void
   onInferTimes: () => void
   onCancel: () => void
   onSave: () => void
@@ -22,11 +25,14 @@ interface StandingsEditorProps {
 export function StandingsEditor({
   raceName,
   isRaceOngoing,
+  isRaceNotStarted,
   loadingResults,
   memberCount,
   rows,
   changeSummary,
   savingBatch,
+  onStartRace,
+  onEndRace,
   onInferTimes,
   onCancel,
   onSave,
@@ -55,22 +61,46 @@ export function StandingsEditor({
               </span>
             </h2>
             <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px' }}>
-              Assign finishes for registered event participants. Ongoing: {isRaceOngoing ? 'Yes' : 'No'}
+              Assign finishes for registered event participants. Status: {isRaceNotStarted ? 'Not Started' : isRaceOngoing ? 'Ongoing (Live)' : 'Concluded'}
             </p>
           </div>
         </header>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={onInferTimes}
-            disabled={savingBatch || loadingResults}
-            className="slds-button slds-button_neutral"
-            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
-            title="Fill in missing finish times from the leader's time plus each horse's margin/length"
-          >
-            ⏱️ Infer Times
-          </button>
+          {isRaceOngoing && (
+            <button
+              type="button"
+              onClick={onEndRace}
+              disabled={savingBatch || loadingResults}
+              className="slds-button slds-button_destructive"
+              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold', background: '#dc2626', color: '#fff' }}
+            >
+              🏁 Conclude Race
+            </button>
+          )}
+          {isRaceNotStarted && (
+            <button
+              type="button"
+              onClick={onStartRace}
+              disabled={savingBatch || loadingResults}
+              className="slds-button slds-button_success"
+              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold', background: '#16a34a', color: '#fff' }}
+            >
+              🚀 Start Race
+            </button>
+          )}
+          {!isRaceNotStarted && !isRaceOngoing && (
+            <button
+              type="button"
+              onClick={onInferTimes}
+              disabled={savingBatch || loadingResults}
+              className="slds-button slds-button_neutral"
+              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+              title="Fill in missing finish times from the leader's time plus each horse's margin/length"
+            >
+              ⏱️ Infer Times
+            </button>
+          )}
           <button
             type="button"
             onClick={onCancel}
@@ -80,49 +110,97 @@ export function StandingsEditor({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={savingBatch || loadingResults || changeSummary.totalCount === 0}
-            className={`slds-button ${changeSummary.totalCount > 0 ? 'slds-button_brand' : 'slds-button_neutral'}`}
-            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
-          >
-            {savingBatch ? 'Saving Standings...' : `💾 Save Standings (${changeSummary.totalCount} unsaved)`}
-          </button>
+          {!isRaceNotStarted && (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={savingBatch || loadingResults || isRaceOngoing || changeSummary.totalCount === 0}
+              className={`slds-button ${changeSummary.totalCount > 0 && !isRaceOngoing ? 'slds-button_brand' : 'slds-button_neutral'}`}
+              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+              title={isRaceOngoing ? 'Conclude the race first to save standings.' : ''}
+            >
+              {savingBatch ? 'Saving Standings...' : `💾 Save Standings ${isRaceOngoing ? '(Conclude first)' : `(${changeSummary.totalCount} unsaved)`}`}
+            </button>
+          )}
         </div>
       </div>
 
       <div className="slds-card__body" style={{ padding: '16px' }}>
-        {changeSummary.totalCount > 0 && (
-          <AlertBanner
-            variant="warning"
-            action={
-              <button type="button" onClick={onResetAll} className="slds-button slds-button_neutral" style={{ padding: '2px 8px', fontSize: '10px' }}>
-                Reset All Changes
-              </button>
-            }
-          >
-            <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
-              Unsaved Standings changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
-              {changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}
-              {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save Standings" above to submit.
-            </span>
-          </AlertBanner>
-        )}
-
-        {loadingResults ? (
-          <p className="slds-text-body_medium text-slate-500">Loading race results data...</p>
-        ) : memberCount === 0 ? (
-          <div className="slds-align_absolute-center slds-p-around_large text-slate-500">
-            No registered event participants found. Add participants under "Event Members" tab first.
+        {isRaceNotStarted ? (
+          <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '200px', textAlign: 'center' }}>
+            <span style={{ fontSize: '48px', marginBottom: '12px' }}>🏇</span>
+            <h3 className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>
+              Race Has Not Started Yet
+            </h3>
+            <p className="slds-text-body_regular text-slate-500 slds-m-top_small" style={{ maxWidth: '400px', marginBottom: '16px' }}>
+              Standings and finish times can only be recorded once the race has officially started. You can start the race now to begin tracking results.
+            </p>
+            <button
+              type="button"
+              onClick={onStartRace}
+              disabled={savingBatch || loadingResults}
+              className="slds-button slds-button_success"
+              style={{ padding: '8px 24px', fontSize: '14px', fontWeight: 'bold', background: '#16a34a', color: '#fff' }}
+            >
+              🚀 Start Race Now
+            </button>
           </div>
         ) : (
-          <StandingsTable
-            rows={rows}
-            onResultChange={onResultChange}
-            onTogglePendingDeletion={onTogglePendingDeletion}
-            onUndoRow={onUndoRow}
-          />
+          <>
+            {isRaceOngoing && (
+              <div className="slds-m-bottom_medium">
+                <AlertBanner
+                  variant="warning"
+                  action={
+                    <button
+                      type="button"
+                      onClick={onEndRace}
+                      className="slds-button slds-button_destructive"
+                      style={{ padding: '4px 12px', fontSize: '11px', background: '#dc2626', color: '#fff' }}
+                    >
+                      🏁 Conclude Race Now
+                    </button>
+                  }
+                >
+                  <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
+                    🔴 Race is currently Ongoing (Live). You can draft and stage competitor results below, but they can only be saved to the leaderboard once the race has concluded.
+                  </span>
+                </AlertBanner>
+              </div>
+            )}
+
+            {changeSummary.totalCount > 0 && !isRaceOngoing && (
+              <AlertBanner
+                variant="warning"
+                action={
+                  <button type="button" onClick={onResetAll} className="slds-button slds-button_neutral" style={{ padding: '2px 8px', fontSize: '10px' }}>
+                    Reset All Changes
+                  </button>
+                }
+              >
+                <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
+                  Unsaved Standings changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
+                  {changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}
+                  {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save Standings" above to submit.
+                </span>
+              </AlertBanner>
+            )}
+
+            {loadingResults ? (
+              <p className="slds-text-body_medium text-slate-500">Loading race results data...</p>
+            ) : memberCount === 0 ? (
+              <div className="slds-align_absolute-center slds-p-around_large text-slate-500">
+                No registered event participants found. Add participants under "Event Members" tab first.
+              </div>
+            ) : (
+              <StandingsTable
+                rows={rows}
+                onResultChange={onResultChange}
+                onTogglePendingDeletion={onTogglePendingDeletion}
+                onUndoRow={onUndoRow}
+              />
+            )}
+          </>
         )}
       </div>
     </article>
