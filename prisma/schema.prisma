@@ -206,6 +206,13 @@ model RaceResult {
   userId      String    @db.Text
   position    Int?
   points      Int       @default(0)
+  // Netkeiba-style recordkeeping fields (Umamusume race game). All nullable so
+  // existing results remain valid; descriptive only and excluded from scoring.
+  gateNumber  Int?      @db.SmallInt // ゲート番号 (starting gate)
+  finishTime  String?   @db.Text // タイム (e.g. "1:32.1")
+  margin      String?   @db.Text // 着差 (e.g. "1/2馬身", "ハナ差")
+  passingOrder String?  @db.Text // 通過順 (e.g. "3-2-1")
+  final3F     String?   @db.Text // 上がり3F (e.g. "34.5")
   createdAt   DateTime  @default(now()) @db.Timestamp(6)
   updatedAt   DateTime  @updatedAt @db.Timestamp(6)
   raceEvent   RaceEvent @relation(fields: [raceEventId], references: [id], onDelete: Cascade)

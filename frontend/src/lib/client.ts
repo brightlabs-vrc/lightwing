@@ -238,6 +238,11 @@ export namespace eventmanager {
         authorization: string
         position?: number | null
         points: number
+        gateNumber?: number | null
+        finishTime?: string | null
+        margin?: string | null
+        passingOrder?: string | null
+        final3F?: string | null
     }
 
     /**
@@ -415,6 +420,11 @@ export namespace eventmanager {
         userId: string
         position?: number | null
         points: number
+        gateNumber?: number | null
+        finishTime?: string | null
+        margin?: string | null
+        passingOrder?: string | null
+        final3F?: string | null
     }
 
     /**
@@ -429,6 +439,11 @@ export namespace eventmanager {
         userId: string
         position: number | null
         points: number
+        gateNumber: number | null
+        finishTime: string | null
+        margin: string | null
+        passingOrder: string | null
+        final3F: string | null
         createdAt: string
         updatedAt: string
     }
@@ -565,8 +580,13 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                points:   params.points,
-                position: params.position,
+                final3F:      params.final3F,
+                finishTime:   params.finishTime,
+                gateNumber:   params.gateNumber,
+                margin:       params.margin,
+                passingOrder: params.passingOrder,
+                points:       params.points,
+                position:     params.position,
             }
 
             // Now make the actual call to the API

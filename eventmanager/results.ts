@@ -14,6 +14,11 @@ export interface RaceResultView {
   userId: string;
   position: number | null;
   points: number;
+  gateNumber: number | null;
+  finishTime: string | null;
+  margin: string | null;
+  passingOrder: string | null;
+  final3F: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,6 +28,11 @@ export interface RaceResultInput {
   userId: string;
   position?: number | null;
   points: number;
+  gateNumber?: number | null;
+  finishTime?: string | null;
+  margin?: string | null;
+  passingOrder?: string | null;
+  final3F?: string | null;
 }
 
 interface AssignRaceResultParams {
@@ -32,6 +42,11 @@ interface AssignRaceResultParams {
   authorization: Header<"Authorization">;
   position?: number | null;
   points: number;
+  gateNumber?: number | null;
+  finishTime?: string | null;
+  margin?: string | null;
+  passingOrder?: string | null;
+  final3F?: string | null;
 }
 
 // Assigns (or updates) a participant's result on a race. Gated by event-update
@@ -56,10 +71,20 @@ export const assignRaceResult = api(
         userId: params.userId,
         position: params.position ?? null,
         points: params.points,
+        gateNumber: params.gateNumber ?? null,
+        finishTime: params.finishTime ?? null,
+        margin: params.margin ?? null,
+        passingOrder: params.passingOrder ?? null,
+        final3F: params.final3F ?? null,
       },
       update: {
         position: params.position === undefined ? undefined : params.position,
         points: params.points,
+        gateNumber: params.gateNumber === undefined ? undefined : params.gateNumber,
+        finishTime: params.finishTime === undefined ? undefined : params.finishTime,
+        margin: params.margin === undefined ? undefined : params.margin,
+        passingOrder: params.passingOrder === undefined ? undefined : params.passingOrder,
+        final3F: params.final3F === undefined ? undefined : params.final3F,
       },
     });
 
@@ -111,10 +136,20 @@ export const replaceRaceResults = api(
           userId: entry.userId,
           position: entry.position ?? null,
           points: entry.points,
+          gateNumber: entry.gateNumber ?? null,
+          finishTime: entry.finishTime ?? null,
+          margin: entry.margin ?? null,
+          passingOrder: entry.passingOrder ?? null,
+          final3F: entry.final3F ?? null,
         },
         update: {
           position: entry.position === undefined ? undefined : entry.position,
           points: entry.points,
+          gateNumber: entry.gateNumber === undefined ? undefined : entry.gateNumber,
+          finishTime: entry.finishTime === undefined ? undefined : entry.finishTime,
+          margin: entry.margin === undefined ? undefined : entry.margin,
+          passingOrder: entry.passingOrder === undefined ? undefined : entry.passingOrder,
+          final3F: entry.final3F === undefined ? undefined : entry.final3F,
         },
       });
     }
@@ -171,10 +206,20 @@ export const mergeRaceResults = api(
           userId: entry.userId,
           position: entry.position ?? null,
           points: entry.points,
+          gateNumber: entry.gateNumber ?? null,
+          finishTime: entry.finishTime ?? null,
+          margin: entry.margin ?? null,
+          passingOrder: entry.passingOrder ?? null,
+          final3F: entry.final3F ?? null,
         },
         update: {
           position: entry.position === undefined ? undefined : entry.position,
           points: entry.points,
+          gateNumber: entry.gateNumber === undefined ? undefined : entry.gateNumber,
+          finishTime: entry.finishTime === undefined ? undefined : entry.finishTime,
+          margin: entry.margin === undefined ? undefined : entry.margin,
+          passingOrder: entry.passingOrder === undefined ? undefined : entry.passingOrder,
+          final3F: entry.final3F === undefined ? undefined : entry.final3F,
         },
       });
     }
@@ -299,6 +344,11 @@ type RaceResultRow = {
   userId: string;
   position: number | null;
   points: number;
+  gateNumber: number | null;
+  finishTime: string | null;
+  margin: string | null;
+  passingOrder: string | null;
+  final3F: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -310,6 +360,11 @@ function toRaceResultView(result: RaceResultRow): RaceResultView {
     userId: result.userId,
     position: result.position,
     points: result.points,
+    gateNumber: result.gateNumber,
+    finishTime: result.finishTime,
+    margin: result.margin,
+    passingOrder: result.passingOrder,
+    final3F: result.final3F,
     createdAt: result.createdAt.toISOString(),
     updatedAt: result.updatedAt.toISOString(),
   };

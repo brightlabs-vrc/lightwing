@@ -47,7 +47,20 @@ function AdminEventsPage() {
 
   // Results Editor States
   const [results, setResults] = useState<eventmanager.RaceResultView[]>([])
-  const [editedResults, setEditedResults] = useState<Record<string, { position: string; points: string }>>({})
+  const [editedResults, setEditedResults] = useState<
+    Record<
+      string,
+      {
+        position: string
+        points: string
+        gateNumber: string
+        finishTime: string
+        margin: string
+        passingOrder: string
+        final3F: string
+      }
+    >
+  >({})
   const [pendingDeletions, setPendingDeletions] = useState<Set<string>>(new Set())
 
   // Form States
@@ -278,11 +291,27 @@ function AdminEventsPage() {
       setResults(response.results)
 
       // Initialize form input buffer with existing values
-      const initialEdits: Record<string, { position: string; points: string }> = {}
+      const initialEdits: Record<
+        string,
+        {
+          position: string
+          points: string
+          gateNumber: string
+          finishTime: string
+          margin: string
+          passingOrder: string
+          final3F: string
+        }
+      > = {}
       for (const res of response.results) {
         initialEdits[res.userId] = {
           position: res.position !== null ? String(res.position) : '',
           points: String(res.points),
+          gateNumber: res.gateNumber !== null ? String(res.gateNumber) : '',
+          finishTime: res.finishTime ?? '',
+          margin: res.margin ?? '',
+          passingOrder: res.passingOrder ?? '',
+          final3F: res.final3F ?? '',
         }
       }
       setEditedResults(initialEdits)
@@ -295,11 +324,23 @@ function AdminEventsPage() {
   }
 
   // Handle single result input change
-  function handleResultChange(userId: string, field: 'position' | 'points', value: string) {
+  function handleResultChange(
+    userId: string,
+    field: 'position' | 'points' | 'gateNumber' | 'finishTime' | 'margin' | 'passingOrder' | 'final3F',
+    value: string,
+  ) {
     setEditedResults((current) => ({
       ...current,
       [userId]: {
-        ...(current[userId] ?? { position: '', points: '0' }),
+        ...(current[userId] ?? {
+          position: '',
+          points: '0',
+          gateNumber: '',
+          finishTime: '',
+          margin: '',
+          passingOrder: '',
+          final3F: '',
+        }),
         [field]: value,
       },
     }))
@@ -326,6 +367,11 @@ function AdminEventsPage() {
       [userId]: {
         position: saved && saved.position !== null ? String(saved.position) : '',
         points: saved ? String(saved.points) : '0',
+        gateNumber: saved && saved.gateNumber !== null ? String(saved.gateNumber) : '',
+        finishTime: saved?.finishTime ?? '',
+        margin: saved?.margin ?? '',
+        passingOrder: saved?.passingOrder ?? '',
+        final3F: saved?.final3F ?? '',
       },
     }))
     setPendingDeletions((current) => {
@@ -338,7 +384,6 @@ function AdminEventsPage() {
   // Derive status and states for each member in the results editor
   const derivedStates = useMemo(() => {
     if (!selectedEvent) return []
-
     return selectedEvent.members.map((member) => {
       const savedResult = results.find((r) => r.userId === member.userId)
       const edit = editedResults[member.userId] ?? { position: '', points: '0' }
@@ -414,6 +459,11 @@ function AdminEventsPage() {
             userId: d.member.userId,
             position: d.edit.position.trim() !== '' ? Number(d.edit.position) : null,
             points: Number(d.edit.points) || 0,
+            gateNumber: d.edit.gateNumber.trim() !== '' ? Number(d.edit.gateNumber) : null,
+            finishTime: d.edit.finishTime.trim() !== '' ? d.edit.finishTime.trim() : null,
+            margin: d.edit.margin.trim() !== '' ? d.edit.margin.trim() : null,
+            passingOrder: d.edit.passingOrder.trim() !== '' ? d.edit.passingOrder.trim() : null,
+            final3F: d.edit.final3F.trim() !== '' ? d.edit.final3F.trim() : null,
           })
         }
       }
@@ -438,7 +488,15 @@ function AdminEventsPage() {
             selectedEventId,
             selectedRaceId,
             change.userId,
-            { position: change.position, points: change.points },
+            {
+              position: change.position,
+              points: change.points,
+              gateNumber: change.gateNumber,
+              finishTime: change.finishTime,
+              margin: change.margin,
+              passingOrder: change.passingOrder,
+              final3F: change.final3F,
+            },
             authHeader,
           )
           const exists = results.some((r) => r.userId === change.userId)
@@ -463,12 +521,22 @@ function AdminEventsPage() {
                 userId: d.member.userId,
                 position: d.savedResult.position,
                 points: d.savedResult.points,
+                gateNumber: d.savedResult.gateNumber,
+                finishTime: d.savedResult.finishTime,
+                margin: d.savedResult.margin,
+                passingOrder: d.savedResult.passingOrder,
+                final3F: d.savedResult.final3F,
               })
             } else if (d.rowState === 'new' || d.rowState === 'modified') {
               fullReplacePayload.push({
                 userId: d.member.userId,
                 position: d.edit.position.trim() !== '' ? Number(d.edit.position) : null,
                 points: d.edit.points.trim() !== '' ? Number(d.edit.points) : 0,
+                gateNumber: d.edit.gateNumber.trim() !== '' ? Number(d.edit.gateNumber) : null,
+                finishTime: d.edit.finishTime.trim() !== '' ? d.edit.finishTime.trim() : null,
+                margin: d.edit.margin.trim() !== '' ? d.edit.margin.trim() : null,
+                passingOrder: d.edit.passingOrder.trim() !== '' ? d.edit.passingOrder.trim() : null,
+                final3F: d.edit.final3F.trim() !== '' ? d.edit.final3F.trim() : null,
               })
             }
           }
@@ -490,11 +558,27 @@ function AdminEventsPage() {
       }
 
       // Re-initialize input buffer using nextResults
-      const nextEdits: Record<string, { position: string; points: string }> = {}
+      const nextEdits: Record<
+        string,
+        {
+          position: string
+          points: string
+          gateNumber: string
+          finishTime: string
+          margin: string
+          passingOrder: string
+          final3F: string
+        }
+      > = {}
       for (const res of nextResults) {
         nextEdits[res.userId] = {
           position: res.position !== null ? String(res.position) : '',
           points: String(res.points),
+          gateNumber: res.gateNumber !== null ? String(res.gateNumber) : '',
+          finishTime: res.finishTime ?? '',
+          margin: res.margin ?? '',
+          passingOrder: res.passingOrder ?? '',
+          final3F: res.final3F ?? '',
         }
       }
       setEditedResults(nextEdits)
@@ -1112,11 +1196,16 @@ function AdminEventsPage() {
                               onClick={() => {
                                 setPendingDeletions(new Set())
                                 // Reset edits to current saved state
-                                const nextEdits: Record<string, { position: string; points: string }> = {}
+                                const nextEdits: Record<string, { position: string; points: string; gateNumber: string; finishTime: string; margin: string; passingOrder: string; final3F: string }> = {}
                                 for (const res of results) {
                                   nextEdits[res.userId] = {
                                     position: res.position !== null ? String(res.position) : '',
                                     points: String(res.points),
+                                    gateNumber: res.gateNumber !== null ? String(res.gateNumber) : '',
+                                    finishTime: res.finishTime ?? '',
+                                    margin: res.margin ?? '',
+                                    passingOrder: res.passingOrder ?? '',
+                                    final3F: res.final3F ?? '',
                                   }
                                 }
                                 setEditedResults(nextEdits)
@@ -1142,8 +1231,13 @@ function AdminEventsPage() {
                                 <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
                                   <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Competitor Name</div></th>
                                   <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-                                  <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate">Position</div></th>
-                                  <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate">Points</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Gate</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Position</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Points</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Time</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Margin</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Passing</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Last 3F</div></th>
                                   <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status</div></th>
                                   <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate">Staged Actions</div></th>
                                 </tr>
@@ -1176,6 +1270,20 @@ function AdminEventsPage() {
                                           <div className="slds-form-element__control">
                                             <input
                                               type="number"
+                                              placeholder="—"
+                                              value={edit.gateNumber}
+                                              onChange={(e) => handleResultChange(member.userId, 'gateNumber', e.target.value)}
+                                              className="slds-input"
+                                              style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <div className="slds-form-element">
+                                          <div className="slds-form-element__control">
+                                            <input
+                                              type="number"
                                               placeholder="None"
                                               disabled={isDeleted}
                                               value={edit.position}
@@ -1195,6 +1303,66 @@ function AdminEventsPage() {
                                               disabled={isDeleted}
                                               value={edit.points}
                                               onChange={(e) => handleResultChange(member.userId, 'points', e.target.value)}
+                                              className="slds-input"
+                                              style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <div className="slds-form-element">
+                                          <div className="slds-form-element__control">
+                                            <input
+                                              type="text"
+                                              placeholder="1:32.1"
+                                              disabled={isDeleted}
+                                              value={edit.finishTime}
+                                              onChange={(e) => handleResultChange(member.userId, 'finishTime', e.target.value)}
+                                              className="slds-input"
+                                              style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <div className="slds-form-element">
+                                          <div className="slds-form-element__control">
+                                            <input
+                                              type="text"
+                                              placeholder="—"
+                                              disabled={isDeleted}
+                                              value={edit.margin}
+                                              onChange={(e) => handleResultChange(member.userId, 'margin', e.target.value)}
+                                              className="slds-input"
+                                              style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <div className="slds-form-element">
+                                          <div className="slds-form-element__control">
+                                            <input
+                                              type="text"
+                                              placeholder="3-2-1"
+                                              disabled={isDeleted}
+                                              value={edit.passingOrder}
+                                              onChange={(e) => handleResultChange(member.userId, 'passingOrder', e.target.value)}
+                                              className="slds-input"
+                                              style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <div className="slds-form-element">
+                                          <div className="slds-form-element__control">
+                                            <input
+                                              type="text"
+                                              placeholder="34.5"
+                                              disabled={isDeleted}
+                                              value={edit.final3F}
+                                              onChange={(e) => handleResultChange(member.userId, 'final3F', e.target.value)}
                                               className="slds-input"
                                               style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
                                             />

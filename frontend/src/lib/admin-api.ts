@@ -51,6 +51,11 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
         userId: 'mock-user-1',
         position: 1,
         points: 10,
+        gateNumber: 4,
+        finishTime: '1:32.1',
+        margin: '—',
+        passingOrder: '3-2-1',
+        final3F: '34.5',
         createdAt: now,
         updatedAt: now,
       },
@@ -60,6 +65,11 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
         userId: 'mock-user-2',
         position: 2,
         points: 6,
+        gateNumber: 7,
+        finishTime: '1:32.4',
+        margin: '2馬身',
+        passingOrder: '1-1-2',
+        final3F: '35.0',
         createdAt: now,
         updatedAt: now,
       },
@@ -446,6 +456,11 @@ export async function assignRaceResult(
   params: {
     position?: number | null
     points: number
+    gateNumber?: number | null
+    finishTime?: string | null
+    margin?: string | null
+    passingOrder?: string | null
+    final3F?: string | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceResultView> {
@@ -454,6 +469,11 @@ export async function assignRaceResult(
       authorization,
       position: params.position,
       points: params.points,
+      gateNumber: params.gateNumber,
+      finishTime: params.finishTime,
+      margin: params.margin,
+      passingOrder: params.passingOrder,
+      final3F: params.final3F,
     })
   }
 
@@ -466,6 +486,11 @@ export async function assignRaceResult(
     userId,
     position: params.position ?? null,
     points: params.points,
+    gateNumber: params.gateNumber ?? null,
+    finishTime: params.finishTime ?? null,
+    margin: params.margin ?? null,
+    passingOrder: params.passingOrder ?? null,
+    final3F: params.final3F ?? null,
     createdAt: existingResult?.createdAt ?? now,
     updatedAt: now,
   }
@@ -499,6 +524,11 @@ export async function replaceRaceResults(
     userId: r.userId,
     position: r.position ?? null,
     points: r.points,
+    gateNumber: r.gateNumber ?? null,
+    finishTime: r.finishTime ?? null,
+    margin: r.margin ?? null,
+    passingOrder: r.passingOrder ?? null,
+    final3F: r.final3F ?? null,
     createdAt: now,
     updatedAt: now,
   }))
@@ -533,6 +563,11 @@ export async function mergeRaceResults(
       userId: r.userId,
       position: r.position ?? null,
       points: r.points,
+      gateNumber: r.gateNumber ?? null,
+      finishTime: r.finishTime ?? null,
+      margin: r.margin ?? null,
+      passingOrder: r.passingOrder ?? null,
+      final3F: r.final3F ?? null,
       createdAt: idx >= 0 ? updatedList[idx].createdAt : now,
       updatedAt: now,
     }
