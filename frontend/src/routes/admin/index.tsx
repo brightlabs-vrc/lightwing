@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { requireSiteAdmin } from '../../lib/admin-guard'
+import { AdminLayout } from './-AdminLayout'
 
 export const Route = createFileRoute('/admin/')({
   beforeLoad: async ({ location }) => {
@@ -13,54 +14,137 @@ function AdminPage() {
   const { session } = useAuth()
 
   return (
-    <section className='space-y-6'>
-      <header className='space-y-2'>
-        <h1 className='text-3xl font-bold tracking-tight text-slate-900'>Admin Dashboard</h1>
-        <p className='text-sm text-slate-600'>
-          Central operations view for events, users, and dataset record workflows.
-        </p>
-      </header>
+    <AdminLayout
+      title="Admin Dashboard"
+      subtitle="Welcome to the Project Lightwing control center. Oversee system entities, manage dynamic event results, and verify ingestion pipelines."
+    >
+      <div className="slds-grid slds-wrap slds-gutters">
+        {/* Active Session summary card */}
+        <div className="slds-col slds-size_1-of-1 slds-m-bottom_large">
+          <article className="slds-card" style={{ border: '1px solid #dddbda', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+            <div className="slds-card__header slds-grid">
+              <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
+                  <span className="slds-icon_container slds-icon-standard-user" style={{ fontSize: '18px' }}>👤</span>
+                </div>
+                <div className="slds-media__body">
+                  <h2 className="slds-card__header-title">
+                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>
+                      Active Administrator Session
+                    </span>
+                  </h2>
+                </div>
+              </header>
+            </div>
+            <div className="slds-card__body slds-card__body_inner">
+              <div className="slds-grid slds-wrap" style={{ gap: '24px' }}>
+                <div>
+                  <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Name</p>
+                  <p className="slds-text-body_regular font-medium" style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.name}</p>
+                </div>
+                <div>
+                  <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Email</p>
+                  <p className="slds-text-body_regular" style={{ fontSize: '14px' }}>{session?.user.email}</p>
+                </div>
+                <div>
+                  <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Authorization Role</p>
+                  <span className="slds-badge slds-theme_success" style={{ padding: '2px 10px', fontSize: '11px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
+                    {session?.user.siteRole ?? 'SITE_ADMIN'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
 
-      <div className='rounded-xl border border-slate-200 bg-white p-4 shadow-sm'>
-        <p className='text-sm text-slate-700'>
-          <span className='font-semibold'>Signed in:</span> {session?.user.name} ({session?.user.email})
-        </p>
-        <p className='text-sm text-slate-700'>
-          <span className='font-semibold'>Role:</span> {session?.user.siteRole ?? 'USER'}
-        </p>
+        {/* Section Cards */}
+        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
+          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
+            <div className="slds-card__header slds-grid">
+              <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
+                  <span className="slds-icon_container slds-icon-standard-event" style={{ fontSize: '20px' }}>🏆</span>
+                </div>
+                <div className="slds-media__body">
+                  <h2 className="slds-card__header-title">
+                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      Events & Race Management
+                    </span>
+                  </h2>
+                </div>
+              </header>
+            </div>
+            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
+              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+                View complete details for competition events. Register event participants, configure race events, and update race results in real-time or batch format.
+              </p>
+            </div>
+            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
+              <Link to="/admin/events" className="slds-button slds-button_brand" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+                Manage Events
+              </Link>
+            </footer>
+          </article>
+        </div>
+
+        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
+          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
+            <div className="slds-card__header slds-grid">
+              <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
+                  <span className="slds-icon_container slds-icon-standard-people" style={{ fontSize: '20px' }}>👥</span>
+                </div>
+                <div className="slds-media__body">
+                  <h2 className="slds-card__header-title">
+                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      User Administration
+                    </span>
+                  </h2>
+                </div>
+              </header>
+            </div>
+            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
+              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+                Lookup platform user accounts, view skill class tier parameters, check team affiliations, and modify administrative system access.
+              </p>
+            </div>
+            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
+              <Link to="/admin/users" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+                Manage Users
+              </Link>
+            </footer>
+          </article>
+        </div>
+
+        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
+          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
+            <div className="slds-card__header slds-grid">
+              <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
+                  <span className="slds-icon_container slds-icon-standard-dataset" style={{ fontSize: '20px' }}>📊</span>
+                </div>
+                <div className="slds-media__body">
+                  <h2 className="slds-card__header-title">
+                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      Dataset Records
+                    </span>
+                  </h2>
+                </div>
+              </header>
+            </div>
+            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
+              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+                Monitor CSV/JSON pipeline records and manual data imports. Retry, approve, or mark ingest pipeline tasks done.
+              </p>
+            </div>
+            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
+              <Link to="/admin/datasets" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+                View Datasets
+              </Link>
+            </footer>
+          </article>
+        </div>
       </div>
-
-      <div className='grid gap-4 md:grid-cols-3'>
-        <Link
-          to='/admin/events'
-          className='rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow'
-        >
-          <h2 className='text-lg font-semibold text-slate-900'>Events</h2>
-          <p className='mt-2 text-sm text-slate-600'>
-            Inspect and update event lifecycle status across the competition system.
-          </p>
-        </Link>
-
-        <Link
-          to='/admin/users'
-          className='rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow'
-        >
-          <h2 className='text-lg font-semibold text-slate-900'>Users</h2>
-          <p className='mt-2 text-sm text-slate-600'>
-            Find users, review profile details, and grant or revoke site admin access.
-          </p>
-        </Link>
-
-        <Link
-          to='/admin/datasets'
-          className='rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow'
-        >
-          <h2 className='text-lg font-semibold text-slate-900'>Dataset Records</h2>
-          <p className='mt-2 text-sm text-slate-600'>
-            Monitor ingest records and operational pipeline state.
-          </p>
-        </Link>
-      </div>
-    </section>
+    </AdminLayout>
   )
 }
