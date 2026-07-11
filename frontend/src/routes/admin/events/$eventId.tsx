@@ -42,6 +42,16 @@ type EditedResult = {
   final3F: string
 }
 
+const EMPTY_EDIT: EditedResult = {
+  position: '',
+  points: '0',
+  gateNumber: '',
+  finishTime: '',
+  margin: '',
+  passingOrder: '',
+  final3F: '',
+}
+
 function AdminEventDetailPage() {
   const { eventId } = Route.useParams()
   const { session } = useAuth()
@@ -353,7 +363,7 @@ function AdminEventDetailPage() {
     if (!selectedEvent) return []
     return selectedEvent.members.map((member) => {
       const savedResult = results.find((r) => r.userId === member.userId)
-      const edit = editedResults[member.userId] ?? { position: '', points: '0' }
+      const edit = editedResults[member.userId] ?? EMPTY_EDIT
       const isPendingDelete = pendingDeletions.has(member.userId)
 
       let rowState: 'unchanged' | 'new' | 'modified' | 'pending_delete' = 'unchanged'
@@ -418,6 +428,96 @@ function AdminEventDetailPage() {
       }
     }
     setEditedResults(nextEdits)
+  }
+
+  // Parse a finish time string (m:ss.t / mm:ss.t / ss.t) into seconds.
+  function parseFinishTimeToSeconds(value: string): number | null {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const match = trimmed.match(/^(?:(\d+):)?(\d+)(?:\.(\d+))?$/)
+    if (!match) return null
+    const minutes = match[1] ? Number(match[1]) : 0
+    const seconds = Number(match[2])
+    if (Number.isNaN(minutes) || Number.isNaN(seconds)) return null
+    return minutes * 60 + seconds + (match[3] ? Number(`0.${match[3]}`) : 0)
+  }
+
+  // Format seconds back into m:ss.t (one decimal) finish time notation.
+  function formatSecondsToFinishTime(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds - minutes * 60
+    return `${minutes}:${seconds.toFixed(1).padStart(4, '0')}`
+  }
+
+  // Parse a margin string into a gap in seconds. Supports lengths, noses, heads,
+  // necks and shorthand like "2 1/2", "1/2", "3/4". Falls back to 0 for "—"/"".
+  function parseMarginToSeconds(value: string): number {
+    const trimmed = value.trim().toLowerCase()
+    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed === '0') return 0
+
+    // Capture optional fractional part like "1/2" or "3/4" after a whole number.
+    const fractionMatch = trimmed.match(/(\d+)\/(\d+)/)
+    let fraction = 0
+    if (fractionMatch) {
+      fraction = Number(fractionMatch[1]) / Number(fractionMatch[2])
+    }
+
+    const wholeMatch = trimmed.match(/^(\d+)/)
+    const whole = wholeMatch ? Number(wholeMatch[1]) : 0
+
+    const base = whole + fraction
+
+    if (trimmed.includes('nose')) return base * 0.05
+    if (trimmed.includes('head')) return base * 0.15
+    if (trimmed.includes('neck')) return base * 0.25
+    // Default unit is "length" (~2 horse lengths per second in flat racing).
+    return base * 0.5
+  }
+
+  // Infer missing finish times from the leader's time plus each horse's margin.
+  // Operates on the staged (edited) values so it works with unsaved changes.
+  function handleInferFinishTimes() {
+    const rowsWithTime = derivedStates.filter(
+      (d) => d.rowState !== 'pending_delete' && (d.edit.finishTime ?? '').trim() !== '',
+    )
+    if (rowsWithTime.length !== 1) {
+      setGlobalError('Infer Times needs exactly one horse with a known finish time (the leader).')
+      return
+    }
+
+    const leader = rowsWithTime[0]
+    const leaderSeconds = parseFinishTimeToSeconds(leader.edit.finishTime ?? '')
+    if (leaderSeconds === null) {
+      setGlobalError('Unable to parse the leader finish time. Use m:ss.t format (e.g. 1:32.1).')
+      return
+    }
+
+    const nextEdits: Record<string, EditedResult> = { ...editedResults }
+    let inferredCount = 0
+
+    for (const d of derivedStates) {
+      if (d.rowState === 'pending_delete') continue
+      if (d.member.userId === leader.member.userId) continue
+      if ((d.edit.finishTime ?? '').trim() !== '') continue
+
+      const gapSeconds = parseMarginToSeconds(d.edit.margin ?? '')
+      if (gapSeconds === 0) continue
+
+      const inferredSeconds = leaderSeconds + gapSeconds
+      nextEdits[d.member.userId] = {
+        ...(nextEdits[d.member.userId] ?? EMPTY_EDIT),
+        finishTime: formatSecondsToFinishTime(inferredSeconds),
+      }
+      inferredCount++
+    }
+
+    if (inferredCount === 0) {
+      setGlobalError('No finish times could be inferred. Ensure trailing horses have a margin/length value.')
+      return
+    }
+
+    setEditedResults(nextEdits)
+    setGlobalSuccess(`Inferred finish times for ${inferredCount} horse(s) from the leader's time and margins.`)
   }
 
   function handleCancelStandingsEdit() {
@@ -1071,6 +1171,16 @@ function AdminEventDetailPage() {
                 </header>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleInferFinishTimes}
+                    disabled={savingBatch || loadingResults}
+                    className="slds-button slds-button_neutral"
+                    style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+                    title="Fill in missing finish times from the leader's time plus each horse's margin/length"
+                  >
+                    ⏱️ Infer Times
+                  </button>
                   <button
                     type="button"
                     onClick={handleCancelStandingsEdit}
