@@ -48,6 +48,7 @@ function AdminEventsPage() {
   // Results Editor States
   const [results, setResults] = useState<eventmanager.RaceResultView[]>([])
   const [editedResults, setEditedResults] = useState<Record<string, { position: string; points: string }>>({})
+  const [pendingDeletions, setPendingDeletions] = useState<Set<string>>(new Set())
 
   // Form States
   const [newMemberUserId, setNewMemberUserId] = useState('')
@@ -65,7 +66,6 @@ function AdminEventsPage() {
   const [loadingEventDetail, setLoadingEventDetail] = useState(false)
   const [loadingRaces, setLoadingRaces] = useState(false)
   const [loadingResults, setLoadingResults] = useState(false)
-  const [savingRowUserId, setSavingRowUserId] = useState<string | null>(null)
   const [savingBatch, setSavingBatch] = useState(false)
   const [eventStatusSaving, setEventStatusSaving] = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
@@ -104,6 +104,7 @@ function AdminEventsPage() {
     setSelectedRace(null)
     setResults([])
     setEditedResults({})
+    setPendingDeletions(new Set())
     try {
       const detail = await getAdminEvent(eventId)
       setSelectedEvent(detail)
@@ -254,6 +255,7 @@ function AdminEventsPage() {
         setSelectedRace(null)
         setResults([])
         setEditedResults({})
+        setPendingDeletions(new Set())
       }
       await reloadCurrentEvent()
       setGlobalSuccess('Race event deleted successfully.')
@@ -270,6 +272,7 @@ function AdminEventsPage() {
     setGlobalError(null)
     setGlobalSuccess(null)
     setEditedResults({})
+    setPendingDeletions(new Set())
     try {
       const response = await listRaceResults(selectedEventId!, race.id)
       setResults(response.results)
@@ -302,97 +305,201 @@ function AdminEventsPage() {
     }))
   }
 
-  // Save single row in-place
-  async function handleSaveRow(userId: string) {
-    if (!selectedEventId || !selectedRaceId || !authHeader) return
-    const edit = editedResults[userId]
-    if (!edit) return
+  // Mark row as pending deletion or reset its inputs
+  function togglePendingDeletion(userId: string) {
+    setPendingDeletions((current) => {
+      const next = new Set(current)
+      if (next.has(userId)) {
+        next.delete(userId)
+      } else {
+        next.add(userId)
+      }
+      return next
+    })
+  }
 
-    setSavingRowUserId(userId)
-    setGlobalError(null)
-    setGlobalSuccess(null)
-    try {
-      const position = edit.position.trim() !== '' ? Number(edit.position) : null
-      const points = Number(edit.points) || 0
+  // Undo changes to a single row
+  function handleUndoRow(userId: string) {
+    const saved = results.find((r) => r.userId === userId)
+    setEditedResults((current) => ({
+      ...current,
+      [userId]: {
+        position: saved && saved.position !== null ? String(saved.position) : '',
+        points: saved ? String(saved.points) : '0',
+      },
+    }))
+    setPendingDeletions((current) => {
+      const next = new Set(current)
+      next.delete(userId)
+      return next
+    })
+  }
 
-      const updated = await assignRaceResult(selectedEventId, selectedRaceId, userId, { position, points }, authHeader)
+  // Derive status and states for each member in the results editor
+  const derivedStates = useMemo(() => {
+    if (!selectedEvent) return []
 
-      setResults((current) => {
-        const exists = current.some((r) => r.userId === userId)
-        if (exists) {
-          return current.map((r) => (r.userId === userId ? updated : r))
+    return selectedEvent.members.map((member) => {
+      const savedResult = results.find((r) => r.userId === member.userId)
+      const edit = editedResults[member.userId] ?? { position: '', points: '0' }
+      const isPendingDelete = pendingDeletions.has(member.userId)
+
+      let rowState: 'unchanged' | 'new' | 'modified' | 'pending_delete' = 'unchanged'
+
+      if (isPendingDelete) {
+        rowState = 'pending_delete'
+      } else if (savedResult) {
+        const savedPos = savedResult.position !== null ? String(savedResult.position) : ''
+        const savedPoints = String(savedResult.points)
+        if (edit.position !== savedPos || edit.points !== savedPoints) {
+          rowState = 'modified'
         }
-        return [...current, updated]
-      })
-      await reloadCurrentEvent() // Refresh point aggregates
-      setGlobalSuccess(`Successfully updated results in-place for participant.`)
-    } catch (cause) {
-      setGlobalError(cause instanceof Error ? cause.message : 'Unable to update result')
-    } finally {
-      setSavingRowUserId(null)
+      } else {
+        const isDefault = edit.position === '' && (edit.points === '' || edit.points === '0')
+        if (!isDefault) {
+          rowState = 'new'
+        }
+      }
+
+      return {
+        member,
+        savedResult,
+        edit,
+        rowState,
+      }
+    })
+  }, [selectedEvent, results, editedResults, pendingDeletions])
+
+  // Aggregate staged changes and deletions
+  const changeSummary = useMemo(() => {
+    let newCount = 0
+    let modifiedCount = 0
+    let deletedCount = 0
+
+    for (const d of derivedStates) {
+      if (d.rowState === 'new') newCount++
+      if (d.rowState === 'modified') modifiedCount++
+      if (d.rowState === 'pending_delete') deletedCount++
     }
-  }
 
-  // Delete single row result
-  async function handleDeleteRowResult(userId: string) {
-    if (!selectedEventId || !selectedRaceId || !authHeader) return
-    if (!confirm('Are you sure you want to delete this user\'s result from this race?')) return
-
-    setSavingRowUserId(userId)
-    setGlobalError(null)
-    setGlobalSuccess(null)
-    try {
-      await deleteRaceResult(selectedEventId, selectedRaceId, userId, authHeader)
-      setResults((current) => current.filter((r) => r.userId !== userId))
-      setEditedResults((current) => {
-        const copy = { ...current }
-        delete copy[userId]
-        return copy
-      })
-      await reloadCurrentEvent()
-      setGlobalSuccess('Result removed successfully.')
-    } catch (cause) {
-      setGlobalError(cause instanceof Error ? cause.message : 'Unable to remove result')
-    } finally {
-      setSavingRowUserId(null)
+    return {
+      newCount,
+      modifiedCount,
+      deletedCount,
+      totalCount: newCount + modifiedCount + deletedCount,
     }
-  }
+  }, [derivedStates])
 
-  // Batch Update Results (Replace or Merge)
-  async function handleBatchSave(mode: 'replace' | 'merge') {
+  // Unified Save Standings action (smart endpoint selection)
+  async function handleUnifiedSave() {
     if (!selectedEventId || !selectedRaceId || !authHeader) return
     setSavingBatch(true)
     setGlobalError(null)
     setGlobalSuccess(null)
 
-    // Prepare payload of results
-    const payload: eventmanager.RaceResultInput[] = []
-    for (const [userId, edit] of Object.entries(editedResults)) {
-      if (edit.position.trim() === '' && edit.points.trim() === '') {
-        continue // Skip unconfigured ones
-      }
-      payload.push({
-        userId,
-        position: edit.position.trim() !== '' ? Number(edit.position) : null,
-        points: Number(edit.points) || 0,
-      })
-    }
-
     try {
-      const response =
-        mode === 'replace'
-          ? await replaceRaceResults(selectedEventId, selectedRaceId, payload, authHeader)
-          : await mergeRaceResults(selectedEventId, selectedRaceId, payload, authHeader)
+      const { newCount, modifiedCount, deletedCount, totalCount } = changeSummary
 
-      setResults(response.results)
-      await reloadCurrentEvent()
-      setGlobalSuccess(
-        mode === 'replace'
-          ? 'Successfully batch replaced all standings for this race.'
-          : 'Successfully batch merged/updated standings for this race.',
-      )
+      if (totalCount === 0) {
+        setGlobalError('No changes detected to save.')
+        setSavingBatch(false)
+        return
+      }
+
+      // Prepare payload of all non-deleted changes and additions
+      const activeStagedChanges: eventmanager.RaceResultInput[] = []
+      for (const d of derivedStates) {
+        if (d.rowState === 'new' || d.rowState === 'modified') {
+          activeStagedChanges.push({
+            userId: d.member.userId,
+            position: d.edit.position.trim() !== '' ? Number(d.edit.position) : null,
+            points: Number(d.edit.points) || 0,
+          })
+        }
+      }
+
+      let nextResults = [...results]
+
+      // Check for single-row optimizations
+      if (totalCount === 1) {
+        if (deletedCount === 1) {
+          // Exactly 1 deletion
+          const deletedUserId = Array.from(pendingDeletions)[0]
+          await deleteRaceResult(selectedEventId, selectedRaceId, deletedUserId, authHeader)
+          nextResults = results.filter((r) => r.userId !== deletedUserId)
+          setResults(nextResults)
+          setPendingDeletions(new Set())
+          await reloadCurrentEvent()
+          setGlobalSuccess('Successfully deleted participant result.')
+        } else {
+          // Exactly 1 addition or update
+          const change = activeStagedChanges[0]
+          const updated = await assignRaceResult(
+            selectedEventId,
+            selectedRaceId,
+            change.userId,
+            { position: change.position, points: change.points },
+            authHeader,
+          )
+          const exists = results.some((r) => r.userId === change.userId)
+          if (exists) {
+            nextResults = results.map((r) => (r.userId === change.userId ? updated : r))
+          } else {
+            nextResults = [...results, updated]
+          }
+          setResults(nextResults)
+          await reloadCurrentEvent()
+          setGlobalSuccess('Successfully updated result in-place.')
+        }
+      } else {
+        // Multi-row batch logic
+        if (deletedCount > 0) {
+          // At least 1 deletion: must do a Full Replace All to safely reconcile and remove deleted ones
+          const fullReplacePayload: eventmanager.RaceResultInput[] = []
+
+          for (const d of derivedStates) {
+            if (d.rowState === 'unchanged' && d.savedResult) {
+              fullReplacePayload.push({
+                userId: d.member.userId,
+                position: d.savedResult.position,
+                points: d.savedResult.points,
+              })
+            } else if (d.rowState === 'new' || d.rowState === 'modified') {
+              fullReplacePayload.push({
+                userId: d.member.userId,
+                position: d.edit.position.trim() !== '' ? Number(d.edit.position) : null,
+                points: d.edit.points.trim() !== '' ? Number(d.edit.points) : 0,
+              })
+            }
+          }
+
+          const response = await replaceRaceResults(selectedEventId, selectedRaceId, fullReplacePayload, authHeader)
+          nextResults = response.results
+          setResults(nextResults)
+          setPendingDeletions(new Set())
+          await reloadCurrentEvent()
+          setGlobalSuccess('Successfully updated standings (Full Replace applied to reconcile deletions).')
+        } else {
+          // No deletions, only multiple additions/updates: we can safely perform a Merge
+          const response = await mergeRaceResults(selectedEventId, selectedRaceId, activeStagedChanges, authHeader)
+          nextResults = response.results
+          setResults(nextResults)
+          await reloadCurrentEvent()
+          setGlobalSuccess('Successfully merged and updated standings.')
+        }
+      }
+
+      // Re-initialize input buffer using nextResults
+      const nextEdits: Record<string, { position: string; points: string }> = {}
+      for (const res of nextResults) {
+        nextEdits[res.userId] = {
+          position: res.position !== null ? String(res.position) : '',
+          points: String(res.points),
+        }
+      }
+      setEditedResults(nextEdits)
     } catch (cause) {
-      setGlobalError(cause instanceof Error ? cause.message : 'Unable to execute batch update')
+      setGlobalError(cause instanceof Error ? cause.message : 'Unable to save standings changes')
     } finally {
       setSavingBatch(false)
     }
@@ -977,29 +1084,51 @@ function AdminEventsPage() {
                           </div>
                         </header>
 
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div>
                           <button
                             type="button"
-                            onClick={() => void handleBatchSave('merge')}
-                            disabled={savingBatch || loadingResults}
-                            className="slds-button slds-button_neutral"
-                            style={{ padding: '4px 12px', fontSize: '12px' }}
+                            onClick={() => void handleUnifiedSave()}
+                            disabled={savingBatch || loadingResults || changeSummary.totalCount === 0}
+                            className={`slds-button ${changeSummary.totalCount > 0 ? 'slds-button_brand' : 'slds-button_neutral'}`}
+                            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
                           >
-                            ⚡ Batch Merge (Update only)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleBatchSave('replace')}
-                            disabled={savingBatch || loadingResults}
-                            className="slds-button slds-button_brand"
-                            style={{ padding: '4px 12px', fontSize: '12px' }}
-                          >
-                            💥 Batch Replace All (Strict)
+                            {savingBatch ? 'Saving Standings...' : `💾 Save Standings (${changeSummary.totalCount} unsaved)`}
                           </button>
                         </div>
                       </div>
 
                       <div className="slds-card__body" style={{ padding: '16px' }}>
+                        {/* Staged Changes Indicator Banner */}
+                        {changeSummary.totalCount > 0 && (
+                          <div className="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_warning slds-m-bottom_medium" role="alert" style={{ borderRadius: '4px', background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '16px' }}>📝</span>
+                              <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
+                                Unsaved Standings changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}{changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}{changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save Standings" above to submit.
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPendingDeletions(new Set())
+                                // Reset edits to current saved state
+                                const nextEdits: Record<string, { position: string; points: string }> = {}
+                                for (const res of results) {
+                                  nextEdits[res.userId] = {
+                                    position: res.position !== null ? String(res.position) : '',
+                                    points: String(res.points),
+                                  }
+                                }
+                                setEditedResults(nextEdits)
+                              }}
+                              className="slds-button slds-button_neutral"
+                              style={{ padding: '2px 8px', fontSize: '10px' }}
+                            >
+                              Reset All Changes
+                            </button>
+                          </div>
+                        )}
+
                         {loadingResults ? (
                           <p className="slds-text-body_medium text-slate-500">Loading race results data...</p>
                         ) : selectedEvent.members.length === 0 ? (
@@ -1016,16 +1145,26 @@ function AdminEventsPage() {
                                   <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate">Position</div></th>
                                   <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate">Points</div></th>
                                   <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status</div></th>
-                                  <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate">In-Place Actions</div></th>
+                                  <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate">Staged Actions</div></th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {selectedEvent.members.map((member) => {
-                                  const savedResult = results.find((r) => r.userId === member.userId)
-                                  const edit = editedResults[member.userId] ?? { position: '', points: '0' }
+                                {derivedStates.map(({ member, savedResult, edit, rowState }) => {
+                                  const isDeleted = rowState === 'pending_delete'
+                                  const isModified = rowState === 'modified'
+                                  const isNew = rowState === 'new'
 
                                   return (
-                                    <tr key={member.userId} className="slds-hint-parent">
+                                    <tr
+                                      key={member.userId}
+                                      className="slds-hint-parent"
+                                      style={{
+                                        background: isDeleted ? '#fee2e2' : isModified ? '#eff6ff' : isNew ? '#f0fdf4' : 'transparent',
+                                        transition: 'background 0.2s',
+                                        textDecoration: isDeleted ? 'line-through' : 'none',
+                                        opacity: isDeleted ? 0.6 : 1,
+                                      }}
+                                    >
                                       <td>
                                         <span className="font-bold text-slate-800" style={{ fontWeight: 'bold' }}>{member.name}</span>
                                       </td>
@@ -1038,6 +1177,7 @@ function AdminEventsPage() {
                                             <input
                                               type="number"
                                               placeholder="None"
+                                              disabled={isDeleted}
                                               value={edit.position}
                                               onChange={(e) => handleResultChange(member.userId, 'position', e.target.value)}
                                               className="slds-input"
@@ -1052,6 +1192,7 @@ function AdminEventsPage() {
                                             <input
                                               type="number"
                                               placeholder="0"
+                                              disabled={isDeleted}
                                               value={edit.points}
                                               onChange={(e) => handleResultChange(member.userId, 'points', e.target.value)}
                                               className="slds-input"
@@ -1061,7 +1202,19 @@ function AdminEventsPage() {
                                         </div>
                                       </td>
                                       <td>
-                                        {savedResult ? (
+                                        {isDeleted ? (
+                                          <span className="slds-badge slds-theme_error" style={{ padding: '2px 8px', background: '#dc2626', color: '#fff', borderRadius: '4px' }}>
+                                            Pending Deletion
+                                          </span>
+                                        ) : isModified ? (
+                                          <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', background: '#2563eb', color: '#fff', borderRadius: '4px' }}>
+                                            Modified (Unsaved)
+                                          </span>
+                                        ) : isNew ? (
+                                          <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', background: '#16a34a', color: '#fff', borderRadius: '4px' }}>
+                                            New (Unsaved)
+                                          </span>
+                                        ) : savedResult ? (
                                           <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', background: '#2e7d32', color: '#fff', borderRadius: '4px' }}>
                                             Saved (Pos: {savedResult.position ?? 'n/a'}, Pts: {savedResult.points})
                                           </span>
@@ -1073,25 +1226,49 @@ function AdminEventsPage() {
                                       </td>
                                       <td>
                                         <div className="slds-grid" style={{ display: 'flex', gap: '6px' }}>
-                                          <button
-                                            type="button"
-                                            disabled={savingRowUserId === member.userId}
-                                            onClick={() => void handleSaveRow(member.userId)}
-                                            className="slds-button slds-button_brand"
-                                            style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
-                                          >
-                                            {savingRowUserId === member.userId ? '...' : '💾 Save Row'}
-                                          </button>
-                                          {savedResult && (
+                                          {isDeleted ? (
                                             <button
                                               type="button"
-                                              disabled={savingRowUserId === member.userId}
-                                              onClick={() => void handleDeleteRowResult(member.userId)}
+                                              onClick={() => togglePendingDeletion(member.userId)}
                                               className="slds-button slds-button_neutral"
-                                              style={{ padding: '2px 8px', fontSize: '11px', color: '#d32f2f' }}
+                                              style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
+                                            >
+                                              ↩️ Undo Delete
+                                            </button>
+                                          ) : isModified || isNew ? (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleUndoRow(member.userId)}
+                                                className="slds-button slds-button_neutral"
+                                                style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
+                                              >
+                                                ↩️ Reset Row
+                                              </button>
+                                              {savedResult && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => togglePendingDeletion(member.userId)}
+                                                  className="slds-button slds-button_destructive"
+                                                  style={{ padding: '2px 8px', fontSize: '11px', background: '#dc2626', color: '#fff' }}
+                                                >
+                                                  🗑️ Remove
+                                                </button>
+                                              )}
+                                            </>
+                                          ) : savedResult ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => togglePendingDeletion(member.userId)}
+                                              className="slds-button slds-button_destructive"
+                                              style={{ padding: '2px 8px', fontSize: '11px', background: '#dc2626', color: '#fff', flexGrow: 1 }}
                                             >
                                               🗑️ Remove
                                             </button>
+                                          ) : (
+                                            <span style={{ fontSize: '11px', color: '#888', fontStyle: 'italic', padding: '2px 8px' }}>
+                                              No changes
+                                            </span>
                                           )}
                                         </div>
                                       </td>
@@ -1104,9 +1281,15 @@ function AdminEventsPage() {
                             <div className="slds-m-top_medium slds-box" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '12px' }}>
                               <h4 className="font-bold text-slate-800" style={{ fontWeight: 'bold' }}>💡 Explanation of Standings update actions</h4>
                               <ul style={{ paddingLeft: '1.25rem', marginTop: '4px' }}>
-                                <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Save Row</strong> - Instantly saves/assigns position and points for that competitor in-place (supports ongoing live race tracking!).</li>
-                                <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Batch Merge (Update only)</strong> - Merges and updates points/positions for all rows with values. Any competitor without assigned numbers is ignored (leaves existing database rows unmodified).</li>
-                                <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Batch Replace All (Strict)</strong> - Overwrites the entire standings for this race. Any participant row with empty values is removed completely from this race's results.</li>
+                                <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Staging Changes</strong> - Edits to the standings are compiled locally. Highlighting shows which rows have modified values or are pending deletion.</li>
+                                <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Smart Save Standings</strong> - The system analyzes your edits and executes the safest, most performant update automatically:
+                                  <ul style={{ paddingLeft: '1.25rem', marginTop: '2px', listStyleType: 'circle' }}>
+                                    <li style={{ fontSize: '11px' }}>Exactly 1 change: Updates single row in-place.</li>
+                                    <li style={{ fontSize: '11px' }}>Exactly 1 delete: Removes single result in-place.</li>
+                                    <li style={{ fontSize: '11px' }}>Multiple changes w/o deletions: Blends/merges the bulk updates safely.</li>
+                                    <li style={{ fontSize: '11px' }}>Multiple changes containing deletions: Replaces standings to reconcile deleted results.</li>
+                                  </ul>
+                                </li>
                               </ul>
                             </div>
                           </div>
