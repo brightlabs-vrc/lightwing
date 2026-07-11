@@ -12,6 +12,15 @@ function RootLayout() {
   const isAdminArea = pathname.startsWith('/admin')
   const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
 
+  if (isAdminArea) {
+    return (
+      <>
+        <Outlet />
+        <TanStackRouterDevtools position='bottom-right' />
+      </>
+    )
+  }
+
   return (
     <>
       <div className='min-h-screen bg-slate-50 text-slate-900'>
@@ -20,22 +29,9 @@ function RootLayout() {
           <Link to='/' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Home</Link>
           <Link to='/dashboard' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Dashboard</Link>
           <Link to='/auth' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Auth</Link>
-          {isSiteAdmin && !isAdminArea ? (
+          {isSiteAdmin ? (
             <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>
               Admin Portal
-            </Link>
-          ) : null}
-          {isAdminArea ? (
-            <>
-              <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Admin</Link>
-              <Link to='/admin/events' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Events</Link>
-              <Link to='/admin/users' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Users</Link>
-              <Link to='/admin/datasets' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Datasets</Link>
-            </>
-          ) : null}
-          {isAdminArea && session?.user?.id ? (
-            <Link to='/admin/users/$userId' params={{ userId: session.user.id }} activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>
-              My Admin Profile
             </Link>
           ) : null}
           <div className='ml-auto flex items-center gap-2 text-xs text-slate-600'>
