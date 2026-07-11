@@ -1,0 +1,37 @@
+encore: Building Encore application graph...
+encore: Analyzing service topology...
+encore: Building Encore application graph done (500ms)
+encore: Analyzing service topology done (300ms)
+encore: Creating PostgreSQL database cluster...
+encore: Fetching application secrets...
+encore: Fetching application secrets done (150ms)
+encore: Running database migrations...
+encore: Creating PostgreSQL database cluster done (9.058s)
+encore: Running database migrations done (250ms)
+encore: Starting Encore application...
+encore: Starting Encore application done (50ms)
+
+  Encore development server running!
+
+  Your API is running at:     [36mhttp://127.0.0.1:4000[0m
+  Development Dashboard URL:  [36mhttp://127.0.0.1:9400/qduiy[0m
+  MCP SSE URL:                [36mhttp://127.0.0.1:9900/sse?appID=qduiy[0m
+
+
+[31mwarning: secrets not defined: AuthSecret, DiscordBotToken, DiscordClientId, DiscordClientSecret[0m
+[38;5;248mnote: undefined secrets are left empty for local development only.
+see https://encore.dev/docs/primitives/secrets for more information[0m
+
+[2m2026-07-11T00:54:48.182Z[0m [33mWARN[0m [1m[Better Auth]:[0m Social provider discord is missing clientId or clientSecret
+
+Hint: make an API call by running: [36mcurl -X PATCH http://127.0.0.1:4000/events/foo/races/foo -d '{"authorization":"hello","name":"hello","sequence":2.3,"distanceMeters":2.3,"trackType":"hello","location":"hello","scoringType":2.3,"classRestriction":"PRE_OP","startsAt":"hello","endsAt":"hello"}'[0m
+Changes detected, recompiling...
+[2m2026-07-11T00:57:33.247Z[0m [33mWARN[0m [1m[Better Auth]:[0m Social provider discord is missing clientId or clientSecret
+Reloaded successfully.
+
+[31mwarning: secrets not defined: AuthSecret, DiscordBotToken, DiscordClientId, DiscordClientSecret[0m
+[38;5;248mnote: undefined secrets are left empty for local development only.
+see https://encore.dev/docs/primitives/secrets for more information[0m
+
+
+Hint: deploy your app to the cloud by running: [36mgit push encore[0m
