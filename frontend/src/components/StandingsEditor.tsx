@@ -119,7 +119,7 @@ export function StandingsEditor({
               style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
               title={isRaceOngoing ? 'Conclude the race first to save standings.' : ''}
             >
-              {savingBatch ? 'Saving Standings...' : `💾 Save Standings ${isRaceOngoing ? '(Conclude first)' : `(${changeSummary.totalCount} unsaved)`}`}
+              {savingBatch ? 'Saving...' : `💾 Save (${changeSummary.totalCount})`}
             </button>
           )}
         </div>
@@ -158,12 +158,12 @@ export function StandingsEditor({
                       className="slds-button slds-button_destructive"
                       style={{ padding: '4px 12px', fontSize: '11px', background: '#dc2626', color: '#fff' }}
                     >
-                      🏁 Conclude Race Now
+                      🏁 Conclude Race
                     </button>
                   }
                 >
                   <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
-                    🔴 Race is currently Ongoing (Live). You can draft and stage competitor results below, but they can only be saved to the leaderboard once the race has concluded.
+                    🔴 Race is currently Ongoing (Live). You can draft and stage competitor results below, but they can only be saved once the race has concluded.
                   </span>
                 </AlertBanner>
               </div>
@@ -174,14 +174,14 @@ export function StandingsEditor({
                 variant="warning"
                 action={
                   <button type="button" onClick={onResetAll} className="slds-button slds-button_neutral" style={{ padding: '2px 8px', fontSize: '10px' }}>
-                    Reset All Changes
+                    Reset All
                   </button>
                 }
               >
                 <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
-                  Unsaved Standings changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
+                  Unsaved changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
                   {changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}
-                  {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save Standings" above to submit.
+                  {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save" above to submit.
                 </span>
               </AlertBanner>
             )}
@@ -392,7 +392,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
                         className="slds-button slds-button_neutral"
                         style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
                       >
-                        ↩️ Undo Delete
+                        ↩️ Restore
                       </button>
                     ) : isModified || isNew ? (
                       <>
@@ -402,7 +402,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
                           className="slds-button slds-button_neutral"
                           style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
                         >
-                          ↩️ Reset Row
+                          ↩️ Reset
                         </button>
                         {savedResult && (
                           <button
