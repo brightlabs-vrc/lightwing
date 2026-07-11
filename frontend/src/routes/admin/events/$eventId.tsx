@@ -402,6 +402,32 @@ function AdminEventDetailPage() {
     }
   }, [derivedStates])
 
+  function resetStandingsDraft() {
+    setPendingDeletions(new Set())
+
+    const nextEdits: Record<string, EditedResult> = {}
+    for (const res of results) {
+      nextEdits[res.userId] = {
+        position: res.position !== null ? String(res.position) : '',
+        points: String(res.points),
+        gateNumber: res.gateNumber !== null ? String(res.gateNumber) : '',
+        finishTime: res.finishTime ?? '',
+        margin: res.margin ?? '',
+        passingOrder: res.passingOrder ?? '',
+        final3F: res.final3F ?? '',
+      }
+    }
+    setEditedResults(nextEdits)
+  }
+
+  function handleCancelStandingsEdit() {
+    resetStandingsDraft()
+    setSelectedRaceId(null)
+    setSelectedRace(null)
+    setGlobalError(null)
+    setGlobalSuccess(null)
+  }
+
   // Unified Save Standings action (smart endpoint selection)
   async function handleUnifiedSave() {
     if (!selectedRaceId || !authHeader) return
@@ -1044,7 +1070,16 @@ function AdminEventDetailPage() {
                   </div>
                 </header>
 
-                <div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleCancelStandingsEdit}
+                    disabled={savingBatch || loadingResults}
+                    className="slds-button slds-button_neutral"
+                    style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+                  >
+                    Cancel
+                  </button>
                   <button
                     type="button"
                     onClick={() => void handleUnifiedSave()}
@@ -1069,23 +1104,7 @@ function AdminEventDetailPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setPendingDeletions(new Set())
-                        // Reset edits to current saved state
-                        const nextEdits: Record<string, EditedResult> = {}
-                        for (const res of results) {
-                          nextEdits[res.userId] = {
-                            position: res.position !== null ? String(res.position) : '',
-                            points: String(res.points),
-                            gateNumber: res.gateNumber !== null ? String(res.gateNumber) : '',
-                            finishTime: res.finishTime ?? '',
-                            margin: res.margin ?? '',
-                            passingOrder: res.passingOrder ?? '',
-                            final3F: res.final3F ?? '',
-                          }
-                        }
-                        setEditedResults(nextEdits)
-                      }}
+                      onClick={resetStandingsDraft}
                       className="slds-button slds-button_neutral"
                       style={{ padding: '2px 8px', fontSize: '10px' }}
                     >
