@@ -206,7 +206,7 @@ model RaceResult {
   userId      String    @db.Text
   position    Int?
   points      Int       @default(0)
-  // Netkeiba-style recordkeeping fields (Umamusume race game). All nullable so
+  // Netkeiba-style recordkeeping fields. All nullable so
   // existing results remain valid; descriptive only and excluded from scoring.
   gateNumber  Int?      @db.SmallInt // ゲート番号 (starting gate)
   finishTime  String?   @db.Text // タイム (e.g. "1:32.1")
