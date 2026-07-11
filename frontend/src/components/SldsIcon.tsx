@@ -89,8 +89,15 @@ export function SldsIcon({
   const svgStyle: CSSProperties = {
     width: `${size}px`,
     height: `${size}px`,
-    // buttonIcon icons inherit the button's text color; otherwise use the explicit fill.
-    fill: buttonIcon ? 'currentColor' : COLOR_FILL[color],
+    // Standard icons are white glyphs on a colored square (background set by
+    // `slds-icon-standard-<name>`); utility buttonIcon icons inherit the button's
+    // text color; other utility icons use the explicit fill map.
+    fill:
+      category === 'standard'
+        ? '#ffffff'
+        : buttonIcon
+          ? 'currentColor'
+          : COLOR_FILL[color],
   }
 
   return (
