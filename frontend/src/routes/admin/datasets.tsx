@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { requireSiteAdmin } from '../../lib/admin-guard'
+import { AdminLayout } from './-AdminLayout'
 
 export const Route = createFileRoute('/admin/datasets')({
   beforeLoad: async ({ location }) => {
@@ -43,8 +44,11 @@ const initialRecords: DatasetRecord[] = [
   },
 ]
 
+// Private module-scoped static variable to keep local state when navigating between screens
+const recordsBuffer = initialRecords
+
 function AdminDatasetsPage() {
-  const [records, setRecords] = useState(initialRecords)
+  const [records, setRecords] = useState(recordsBuffer)
 
   function setStatus(id: string, status: DatasetStatus) {
     setRecords((current) =>
@@ -53,73 +57,108 @@ function AdminDatasetsPage() {
   }
 
   return (
-    <section className='space-y-6'>
-      <header className='space-y-2'>
-        <h1 className='text-3xl font-bold tracking-tight text-slate-900'>Dataset Records</h1>
-        <p className='text-sm text-slate-600'>
-          Operational panel for ingest pipeline visibility. Backend dataset-ingest endpoints are
-          not exposed yet, so this panel runs as an admin workflow mock until those APIs land.
-        </p>
-      </header>
+    <AdminLayout
+      title="Dataset Ingestion Records"
+      subtitle="Operational panel for CSV/JSON/Parquet file ingestion. View records, retry failed ingest tasks, and mark tasks completed."
+    >
+      <div className="slds-grid slds-wrap slds-gutters">
+        <div className="slds-col slds-size_1-of-1">
+          <article className="slds-card" style={{ border: '1px solid #dddbda' }}>
+            <div className="slds-card__header slds-grid">
+              <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
+                  <span className="slds-icon_container slds-icon-standard-dataset" style={{ fontSize: '18px' }}>📊</span>
+                </div>
+                <div className="slds-media__body">
+                  <h2 className="slds-card__header-title">
+                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
+                      Data Pipeline Ingest Log
+                    </span>
+                  </h2>
+                </div>
+              </header>
+            </div>
 
-      <div className='overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'>
-        <table className='min-w-full divide-y divide-slate-200 text-sm'>
-          <thead className='bg-slate-50'>
-            <tr>
-              <th className='px-3 py-2 text-left font-semibold text-slate-700'>Record</th>
-              <th className='px-3 py-2 text-left font-semibold text-slate-700'>Source</th>
-              <th className='px-3 py-2 text-left font-semibold text-slate-700'>Rows</th>
-              <th className='px-3 py-2 text-left font-semibold text-slate-700'>Imported At</th>
-              <th className='px-3 py-2 text-left font-semibold text-slate-700'>Status</th>
-              <th className='px-3 py-2 text-left font-semibold text-slate-700'>Actions</th>
-            </tr>
-          </thead>
-          <tbody className='divide-y divide-slate-100'>
-            {records.map((record) => (
-              <tr key={record.id}>
-                <td className='px-3 py-3 text-slate-900'>{record.id}</td>
-                <td className='px-3 py-3 text-slate-700'>{record.source}</td>
-                <td className='px-3 py-3 text-slate-700'>{record.rows.toLocaleString()}</td>
-                <td className='px-3 py-3 text-slate-700'>{new Date(record.importedAt).toLocaleString()}</td>
-                <td className='px-3 py-3'>
-                  <span className='rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700'>
-                    {record.status}
-                  </span>
-                </td>
-                <td className='px-3 py-3'>
-                  <div className='flex flex-wrap gap-2'>
-                    <button
-                      type='button'
-                      onClick={() => setStatus(record.id, 'RUNNING')}
-                      className='rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
-                    >
-                      Retry
-                    </button>
-                    <button
-                      type='button'
-                      onClick={() => setStatus(record.id, 'DONE')}
-                      className='rounded-md border border-emerald-300 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50'
-                    >
-                      Mark Done
-                    </button>
-                    <button
-                      type='button'
-                      onClick={() => setStatus(record.id, 'FAILED')}
-                      className='rounded-md border border-rose-300 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50'
-                    >
-                      Mark Failed
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <div className="slds-card__body slds-card__body_inner" style={{ padding: '0 1rem 1rem 1rem' }}>
+              <p className="slds-text-body_small text-slate-500 slds-m-bottom_medium" style={{ fontSize: '12px' }}>
+                Backend dataset-ingest endpoints are not fully exposed yet, so this pipeline runs as an admin operational workflow simulation until live endpoints land.
+              </p>
+
+              <div className="slds-scrollable_x">
+                <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
+                  <thead>
+                    <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
+                      <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Record ID</div></th>
+                      <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Source File Name</div></th>
+                      <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Row Count</div></th>
+                      <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Import Timestamp</div></th>
+                      <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Pipeline Status</div></th>
+                      <th scope="col" style={{ fontWeight: 'bold', width: '220px' }}><div className="slds-truncate">Pipeline Controls</div></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.map((record) => (
+                      <tr key={record.id} className="slds-hint-parent">
+                        <td><code className="text-xs font-bold" style={{ fontWeight: 'bold' }}>{record.id}</code></td>
+                        <td><span className="font-semibold text-slate-800">{record.source}</span></td>
+                        <td><strong>{record.rows.toLocaleString()}</strong> rows</td>
+                        <td>{new Date(record.importedAt).toLocaleString()}</td>
+                        <td>
+                          {record.status === 'DONE' ? (
+                            <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
+                              DONE
+                            </span>
+                          ) : record.status === 'RUNNING' ? (
+                            <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', borderRadius: '4px', background: '#ff9800', color: '#fff' }}>
+                              RUNNING
+                            </span>
+                          ) : record.status === 'FAILED' ? (
+                            <span className="slds-badge slds-theme_error" style={{ padding: '2px 8px', borderRadius: '4px', background: '#d32f2f', color: '#fff' }}>
+                              FAILED
+                            </span>
+                          ) : (
+                            <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', borderRadius: '4px', background: '#e0e0e0', color: '#333' }}>
+                              PENDING
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="slds-grid" style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setStatus(record.id, 'RUNNING')}
+                              className="slds-button slds-button_neutral"
+                              style={{ padding: '2px 10px', fontSize: '11px' }}
+                            >
+                              Retry
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setStatus(record.id, 'DONE')}
+                              className="slds-button slds-button_success"
+                              style={{ padding: '2px 10px', fontSize: '11px', background: '#2e7d32', color: '#fff' }}
+                            >
+                              Mark Done
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setStatus(record.id, 'FAILED')}
+                              className="slds-button slds-button_destructive"
+                              style={{ padding: '2px 10px', fontSize: '11px', background: '#d32f2f', color: '#fff' }}
+                            >
+                              Mark Failed
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </article>
+        </div>
       </div>
-
-      <Link to='/admin' className='text-sm font-medium text-sky-700 hover:text-sky-800'>
-        Back to Admin Dashboard
-      </Link>
-    </section>
+    </AdminLayout>
   )
 }

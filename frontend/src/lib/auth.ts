@@ -1,4 +1,4 @@
-import { Local } from './client'
+import { API_BASE_URL } from './api'
 import { MOCK_MODE } from './mock-mode'
 
 export type SiteRole = 'USER' | 'SITE_ADMIN'
@@ -24,7 +24,6 @@ interface SocialSignInResponse {
   redirect: boolean
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? Local
 const MOCK_SESSION_KEY = 'lightwing:mock:session'
 
 const defaultMockSession: AuthSession = {
