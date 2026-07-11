@@ -1107,13 +1107,13 @@ function AdminEventDetailPage() {
                         <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
                           <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Competitor Name</div></th>
                           <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Gate</div></th>
+                          <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Draw</div></th>
                           <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Position</div></th>
                           <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Points</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Time</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Margin</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Passing</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Last 3F</div></th>
+                          <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Finish Time</div></th>
+                          <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Behind</div></th>
+                          <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Passing Order</div></th>
+                          <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Final 3F</div></th>
                           <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status</div></th>
                           <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate">Staged Actions</div></th>
                         </tr>
@@ -1146,7 +1146,7 @@ function AdminEventDetailPage() {
                                   <div className="slds-form-element__control">
                                     <input
                                       type="number"
-                                      placeholder="—"
+                                      placeholder="Draw"
                                       value={edit.gateNumber}
                                       onChange={(e) => handleResultChange(member.userId, 'gateNumber', e.target.value)}
                                       className="slds-input"
@@ -1205,7 +1205,7 @@ function AdminEventDetailPage() {
                                   <div className="slds-form-element__control">
                                     <input
                                       type="text"
-                                      placeholder="—"
+                                      placeholder="nose"
                                       disabled={isDeleted}
                                       value={edit.margin}
                                       onChange={(e) => handleResultChange(member.userId, 'margin', e.target.value)}

@@ -39,7 +39,9 @@ const mockRaceEventsList: eventmanager.RaceEventView[] = [
   },
 ]
 
-// Rich initial mock race results
+// Rich initial mock race results.
+// Field mapping: gateNumber=Draw, finishTime=Finish Time,
+// margin=Distance Behind, passingOrder=Passing Order, final3F=Final 3F.
 // Key is raceId
 let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
   [
@@ -67,7 +69,7 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
         points: 6,
         gateNumber: 7,
         finishTime: '1:32.4',
-        margin: '2馬身',
+        margin: '2 lengths',
         passingOrder: '1-1-2',
         final3F: '35.0',
         createdAt: now,
