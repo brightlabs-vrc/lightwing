@@ -50,6 +50,16 @@ const COLOR_CLASS: Record<SldsIconColor, string> = {
   white: 'slds-icon-text-light',
 }
 
+// Explicit fill values so icons render correctly even when SLDS CSS is not loaded.
+const COLOR_FILL: Record<SldsIconColor, string> = {
+  default: '#706e6b',
+  current: 'currentColor',
+  error: '#ea001e',
+  warning: '#fe9339',
+  success: '#04844b',
+  white: '#ffffff',
+}
+
 /**
  * Renders an icon from the Salesforce Lightning Design System icon sprite.
  * Standard icons get their colored background via `slds-icon-standard-<name>`;
@@ -76,7 +86,11 @@ export function SldsIcon({
   ]
     .filter(Boolean)
     .join(' ')
-  const svgStyle: CSSProperties = { width: `${size}px`, height: `${size}px` }
+  const svgStyle: CSSProperties = {
+    width: `${size}px`,
+    height: `${size}px`,
+    fill: COLOR_FILL[color],
+  }
 
   return (
     <span className={className ? `${containerClass} ${className}` : containerClass}>

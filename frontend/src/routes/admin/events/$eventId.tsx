@@ -437,10 +437,11 @@ function AdminEventDetailPage() {
                                   <button
                                     type="button"
                                     onClick={() => void handleStartRace(race.id)}
-                                    className="slds-button slds-button_success"
-                                    style={{ padding: '2px 8px', fontSize: '11px', background: '#2e7d32', color: '#fff' }}
+                                    className="slds-button slds-button_icon slds-button_success"
+                                    style={{ padding: '4px', fontSize: '11px', background: '#2e7d32', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Start Race"
                                   >
-                                    <SldsIcon category="utility" name="play" size={12} buttonIcon /> Start
+                                    <SldsIcon category="utility" name="play" size={14} color="white" />
                                   </button>
                                 )}
                                 {/* End Race */}
@@ -448,29 +449,32 @@ function AdminEventDetailPage() {
                                   <button
                                     type="button"
                                     onClick={() => void handleEndRace(race.id)}
-                                    className="slds-button slds-button_destructive"
-                                    style={{ padding: '2px 8px', fontSize: '11px', background: '#d32f2f', color: '#fff' }}
+                                    className="slds-button slds-button_icon slds-button_destructive"
+                                    style={{ padding: '4px', fontSize: '11px', background: '#d32f2f', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="End Race"
                                   >
-                                    <SldsIcon category="utility" name="stop" size={12} buttonIcon /> End
+                                    <SldsIcon category="utility" name="stop" size={14} color="white" />
                                   </button>
                                 )}
                                 {/* Edit Standings/Results */}
                                 <button
                                   type="button"
                                   onClick={() => void handleSelectRace(race)}
-                                  className="slds-button slds-button_brand"
-                                  style={{ padding: '2px 8px', fontSize: '11px' }}
+                                  className="slds-button slds-button_icon slds-button_brand"
+                                  style={{ padding: '4px', fontSize: '11px', background: '#0176d3', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Edit Results"
                                 >
-                                  <SldsIcon category="utility" name="target" size={12} buttonIcon /> Edit Results
+                                  <SldsIcon category="utility" name="target" size={14} color="white" />
                                 </button>
                                 {/* Delete */}
                                 <button
                                   type="button"
                                   onClick={() => void handleDeleteRace(race.id)}
-                                  className="slds-button slds-button_neutral"
-                                  style={{ padding: '2px 8px', fontSize: '11px', color: '#d32f2f' }}
+                                  className="slds-button slds-button_icon slds-button_neutral"
+                                  style={{ padding: '4px', fontSize: '11px', color: '#d32f2f', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Delete Race"
                                 >
-                                  <SldsIcon category="utility" name="delete" size={12} buttonIcon /> Delete
+                                  <SldsIcon category="utility" name="delete" size={14} color="error" />
                                 </button>
                               </div>
                             </td>
