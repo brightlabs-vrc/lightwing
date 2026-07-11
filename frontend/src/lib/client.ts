@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-f6i4c.encr.app`
+    return `https://${name}-b3src.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the f6i4c Encore application.
+ * Client is an API client for the b3src Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -238,6 +238,11 @@ export namespace eventmanager {
         authorization: string
         position?: number | null
         points: number
+        gateNumber?: number | null
+        finishTime?: string | null
+        margin?: string | null
+        passingOrder?: string | null
+        final3F?: string | null
     }
 
     /**
@@ -415,6 +420,11 @@ export namespace eventmanager {
         userId: string
         position?: number | null
         points: number
+        gateNumber?: number | null
+        finishTime?: string | null
+        margin?: string | null
+        passingOrder?: string | null
+        final3F?: string | null
     }
 
     /**
@@ -429,6 +439,11 @@ export namespace eventmanager {
         userId: string
         position: number | null
         points: number
+        gateNumber: number | null
+        finishTime: string | null
+        margin: string | null
+        passingOrder: string | null
+        final3F: string | null
         createdAt: string
         updatedAt: string
     }
@@ -565,8 +580,13 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                points:   params.points,
-                position: params.position,
+                final3F:      params.final3F,
+                finishTime:   params.finishTime,
+                gateNumber:   params.gateNumber,
+                margin:       params.margin,
+                passingOrder: params.passingOrder,
+                points:       params.points,
+                position:     params.position,
             }
 
             // Now make the actual call to the API
@@ -1355,7 +1375,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "f6i4c-Generated-TS-Client (Encore/v1.57.9)";
+            this.headers["User-Agent"] = "b3src-Generated-TS-Client (Encore/v1.57.9)";
         }
 
         this.requestInit = options.requestInit ?? {};

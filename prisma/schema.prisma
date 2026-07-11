@@ -206,6 +206,13 @@ model RaceResult {
   userId      String    @db.Text
   position    Int?
   points      Int       @default(0)
+  // Netkeiba-style descriptive race notes. All nullable so existing results
+  // remain valid; informational only and excluded from scoring calculations.
+  gateNumber  Int?      @db.SmallInt // Draw / Gate No. (JP: ゲート番号)
+  finishTime  String?   @db.Text // Finish Time (JP: タイム), e.g. "1:32.1"
+  margin      String?   @db.Text // Distance Behind / Margin (JP: 着差), e.g. "1/2 length", "nose"
+  passingOrder String?  @db.Text // Passing Order at calls (JP: 通過順), e.g. "3-2-1"
+  final3F     String?   @db.Text // Final 3F split (JP: 上がり3F), e.g. "34.5"
   createdAt   DateTime  @default(now()) @db.Timestamp(6)
   updatedAt   DateTime  @updatedAt @db.Timestamp(6)
   raceEvent   RaceEvent @relation(fields: [raceEventId], references: [id], onDelete: Cascade)
@@ -291,4 +298,20 @@ model EventLadderEntry {
   @@index([eventId])
   @@index([userId])
   @@map("event_ladder_entry")
+}
+
+model ScoreCalcTask {
+  id         String   @id @db.Text
+  eventId    String   @db.Text
+  userId     String   @db.Text
+  status     String   @db.Text @default("PENDING")
+  retryCount Int      @default(0)
+  nextRunAt  DateTime @default(now()) @db.Timestamp(6)
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime @updatedAt @db.Timestamp(6)
+
+  @@index([status])
+  @@index([nextRunAt])
+  @@index([createdAt])
+  @@map("score_calc_task")
 }

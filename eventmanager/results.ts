@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireEventPermission } from "../auth/rbac";
+import { scorecalc } from "~encore/clients";
 
 // Per-race results. Event admins assign points to participants on a specific
 // RaceEvent; the event-level EventPointsEntry aggregate is then recomputed as
@@ -13,6 +14,11 @@ export interface RaceResultView {
   userId: string;
   position: number | null;
   points: number;
+  gateNumber: number | null;
+  finishTime: string | null;
+  margin: string | null;
+  passingOrder: string | null;
+  final3F: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +28,11 @@ export interface RaceResultInput {
   userId: string;
   position?: number | null;
   points: number;
+  gateNumber?: number | null;
+  finishTime?: string | null;
+  margin?: string | null;
+  passingOrder?: string | null;
+  final3F?: string | null;
 }
 
 interface AssignRaceResultParams {
@@ -31,6 +42,11 @@ interface AssignRaceResultParams {
   authorization: Header<"Authorization">;
   position?: number | null;
   points: number;
+  gateNumber?: number | null;
+  finishTime?: string | null;
+  margin?: string | null;
+  passingOrder?: string | null;
+  final3F?: string | null;
 }
 
 // Assigns (or updates) a participant's result on a race. Gated by event-update
@@ -55,14 +71,24 @@ export const assignRaceResult = api(
         userId: params.userId,
         position: params.position ?? null,
         points: params.points,
+        gateNumber: params.gateNumber ?? null,
+        finishTime: params.finishTime ?? null,
+        margin: params.margin ?? null,
+        passingOrder: params.passingOrder ?? null,
+        final3F: params.final3F ?? null,
       },
       update: {
         position: params.position === undefined ? undefined : params.position,
         points: params.points,
+        gateNumber: params.gateNumber === undefined ? undefined : params.gateNumber,
+        finishTime: params.finishTime === undefined ? undefined : params.finishTime,
+        margin: params.margin === undefined ? undefined : params.margin,
+        passingOrder: params.passingOrder === undefined ? undefined : params.passingOrder,
+        final3F: params.final3F === undefined ? undefined : params.final3F,
       },
     });
 
-    await recomputeEventPoints(params.eventId, params.userId);
+    await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
 
     return toRaceResultView(result);
   },
@@ -110,10 +136,20 @@ export const replaceRaceResults = api(
           userId: entry.userId,
           position: entry.position ?? null,
           points: entry.points,
+          gateNumber: entry.gateNumber ?? null,
+          finishTime: entry.finishTime ?? null,
+          margin: entry.margin ?? null,
+          passingOrder: entry.passingOrder ?? null,
+          final3F: entry.final3F ?? null,
         },
         update: {
           position: entry.position === undefined ? undefined : entry.position,
           points: entry.points,
+          gateNumber: entry.gateNumber === undefined ? undefined : entry.gateNumber,
+          finishTime: entry.finishTime === undefined ? undefined : entry.finishTime,
+          margin: entry.margin === undefined ? undefined : entry.margin,
+          passingOrder: entry.passingOrder === undefined ? undefined : entry.passingOrder,
+          final3F: entry.final3F === undefined ? undefined : entry.final3F,
         },
       });
     }
@@ -124,8 +160,9 @@ export const replaceRaceResults = api(
       });
     }
 
-    for (const userId of new Set([...payloadUserIds, ...removedUserIds])) {
-      await recomputeEventPoints(params.eventId, userId);
+    const allAffectedUserIds = Array.from(new Set([...payloadUserIds, ...removedUserIds]));
+    if (allAffectedUserIds.length > 0) {
+      await scorecalc.submitCalc({ eventId: params.eventId, userIds: allAffectedUserIds });
     }
 
     return listResults(params.raceId);
@@ -169,16 +206,27 @@ export const mergeRaceResults = api(
           userId: entry.userId,
           position: entry.position ?? null,
           points: entry.points,
+          gateNumber: entry.gateNumber ?? null,
+          finishTime: entry.finishTime ?? null,
+          margin: entry.margin ?? null,
+          passingOrder: entry.passingOrder ?? null,
+          final3F: entry.final3F ?? null,
         },
         update: {
           position: entry.position === undefined ? undefined : entry.position,
           points: entry.points,
+          gateNumber: entry.gateNumber === undefined ? undefined : entry.gateNumber,
+          finishTime: entry.finishTime === undefined ? undefined : entry.finishTime,
+          margin: entry.margin === undefined ? undefined : entry.margin,
+          passingOrder: entry.passingOrder === undefined ? undefined : entry.passingOrder,
+          final3F: entry.final3F === undefined ? undefined : entry.final3F,
         },
       });
     }
 
-    for (const entry of params.results) {
-      await recomputeEventPoints(params.eventId, entry.userId);
+    const affectedUserIds = params.results.map((entry) => entry.userId);
+    if (affectedUserIds.length > 0) {
+      await scorecalc.submitCalc({ eventId: params.eventId, userIds: affectedUserIds });
     }
 
     return listResults(params.raceId);
@@ -217,7 +265,7 @@ export const deleteRaceResult = api(
       where: { raceEventId_userId: { raceEventId: params.raceId, userId: params.userId } },
     });
 
-    await recomputeEventPoints(params.eventId, params.userId);
+    await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
 
     return { deleted: true };
   },
@@ -290,28 +338,17 @@ async function validateResultInputs(
   }
 }
 
-// Recomputes the event-level points aggregate for a participant as the sum of
-// their per-race points across the event, upserting the EventPointsEntry row.
-async function recomputeEventPoints(eventId: string, userId: string): Promise<void> {
-  const aggregate = await prisma.raceResult.aggregate({
-    where: { userId, raceEvent: { eventId } },
-    _sum: { points: true },
-  });
-  const total = aggregate._sum.points ?? 0;
-
-  await prisma.eventPointsEntry.upsert({
-    where: { eventId_userId: { eventId, userId } },
-    create: { id: randomUUID(), eventId, userId, points: total },
-    update: { points: total },
-  });
-}
-
 type RaceResultRow = {
   id: string;
   raceEventId: string;
   userId: string;
   position: number | null;
   points: number;
+  gateNumber: number | null;
+  finishTime: string | null;
+  margin: string | null;
+  passingOrder: string | null;
+  final3F: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -323,6 +360,11 @@ function toRaceResultView(result: RaceResultRow): RaceResultView {
     userId: result.userId,
     position: result.position,
     points: result.points,
+    gateNumber: result.gateNumber,
+    finishTime: result.finishTime,
+    margin: result.margin,
+    passingOrder: result.passingOrder,
+    final3F: result.final3F,
     createdAt: result.createdAt.toISOString(),
     updatedAt: result.updatedAt.toISOString(),
   };
