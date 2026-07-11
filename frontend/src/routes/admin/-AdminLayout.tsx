@@ -95,33 +95,46 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
       </header>
 
       {/* Main Content Area */}
-      <main className="slds-p-around_medium" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
         {/* Page Header */}
-        <div className="slds-page-header slds-m-bottom_medium" role="banner" style={{ borderRadius: '4px', border: '1px solid #dddbda', background: '#ffffff', padding: '1rem 1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div className="slds-grid slds-grid_align-spread slds-grid_vertical-align-center" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="slds-col slds-has-flexi-truncate">
-              <div className="slds-media slds-no-space slds-grow" style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="slds-media__figure" style={{ marginRight: '1rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-opportunity" style={{ background: '#0176d3', borderRadius: '4px', padding: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', color: '#fff', fontSize: '18px' }}>
+        <div className="slds-page-header slds-m-bottom_large" role="banner" style={{ borderRadius: '4px', border: '1px solid #dddbda', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div className="slds-page-header__row">
+            <div className="slds-page-header__col-title">
+              <div className="slds-media slds-no-space slds-grow">
+                <div className="slds-media__figure">
+                  <span className="slds-icon_container slds-icon-standard-opportunity" style={{ background: '#0176d3', borderRadius: '4px', padding: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', color: '#fff', fontSize: '20px' }}>
                     📈
                   </span>
                 </div>
-                <div className="slds-media__body">
-                  <p className="slds-text-title_caps slds-line-height_reset" style={{ fontSize: '10px', textTransform: 'uppercase', color: '#514f4d', margin: 0, letterSpacing: '0.0625rem' }}>Admin console</p>
-                  <h1 className="slds-page-header__title slds-m-right_small slds-align-middle slds-truncate" style={{ fontWeight: 'bold', fontSize: '1.5rem', margin: '2px 0 0 0', color: '#080707' }}>
-                    {title}
-                  </h1>
-                  {subtitle && (
-                    <p className="slds-text-body_small slds-m-top_xx-small" style={{ color: '#514f4d', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
+                <div className="slds-media__body" style={{ minWidth: 0 }}>
+                  <div className="slds-page-header__name">
+                    <div className="slds-page-header__name-title">
+                      <h1>
+                        <span className="slds-page-header__title slds-truncate" title={title} style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#080707' }}>
+                          {title}
+                        </span>
+                      </h1>
+                    </div>
+                  </div>
+                  {subtitle ? (
+                    <p className="slds-page-header__name-meta slds-text-body_regular text-slate-600" style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#514f4d', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                       {subtitle}
+                    </p>
+                  ) : (
+                    <p className="slds-page-header__name-meta slds-text-body_regular text-slate-600" style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#514f4d' }}>
+                      System Management & Operations Panel
                     </p>
                   )}
                 </div>
               </div>
             </div>
             {actions && (
-              <div className="slds-col slds-no-flex slds-grid slds-align-middle" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {actions}
+              <div className="slds-page-header__col-actions">
+                <div className="slds-page-header__controls">
+                  <div className="slds-page-header__control" style={{ display: 'flex', gap: '8px' }}>
+                    {actions}
+                  </div>
+                </div>
               </div>
             )}
           </div>

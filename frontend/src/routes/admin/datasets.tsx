@@ -44,6 +44,9 @@ const initialRecords: DatasetRecord[] = [
   },
 ]
 
+// Private module-scoped static variable to keep local state when navigating between screens
+const recordsBuffer = initialRecords
+
 function AdminDatasetsPage() {
   const [records, setRecords] = useState(recordsBuffer)
 
@@ -159,6 +162,3 @@ function AdminDatasetsPage() {
     </AdminLayout>
   )
 }
-
-// Private module-scoped static variable to keep local state when navigating between screens
-const recordsBuffer = initialRecords
