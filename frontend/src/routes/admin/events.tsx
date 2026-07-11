@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents } from '../../lib/admin-api'
+import { AlertBanner } from '../../components/AlertBanner'
 import type { eventmanager } from '../../lib/client'
 
 export const Route = createFileRoute('/admin/events')({
@@ -62,10 +63,7 @@ function AdminEventsListPage() {
       }
     >
       {globalError && (
-        <div className="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error slds-m-bottom_medium" role="alert" style={{ borderRadius: '4px', background: '#d32f2f', color: '#fff', padding: '10px 16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span className="slds-icon_container slds-p-right_small">⚠️</span>
-          <h2>{globalError}</h2>
-        </div>
+        <AlertBanner variant="error">{globalError}</AlertBanner>
       )}
 
       <div className="slds-grid slds-wrap slds-gutters">

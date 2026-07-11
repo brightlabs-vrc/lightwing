@@ -4,6 +4,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { getAdminUserProfile, updateAdminUserSiteRole } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
+import { AlertBanner } from '../../../components/AlertBanner'
 import type { auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/')({
@@ -204,14 +205,10 @@ function AdminUsersPage() {
               </div>
 
               {error && (
-                <div className="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_error slds-m-bottom_medium" role="alert" style={{ background: '#d32f2f', color: '#fff', padding: '8px 16px', borderRadius: '4px' }}>
-                  <h2>{error}</h2>
-                </div>
+                <AlertBanner variant="error">{error}</AlertBanner>
               )}
               {success && (
-                <div className="slds-notify slds-notify_alert slds-theme_alert-texture slds-theme_info slds-m-bottom_medium" role="alert" style={{ background: '#2e7d32', color: '#fff', padding: '8px 16px', borderRadius: '4px' }}>
-                  <h2>{success}</h2>
-                </div>
+                <AlertBanner variant="success">{success}</AlertBanner>
               )}
 
               {profile ? (
