@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
-import { listAdminEvents } from '../../lib/admin-api'
+import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
 import type { eventmanager } from '../../lib/client'
+import { MOCK_MODE } from '../../lib/mock-mode'
 
 export const Route = createFileRoute('/admin/events')({
   beforeLoad: async ({ location }) => {
@@ -24,6 +25,21 @@ function AdminEventsListPage() {
   const [loadingEvents, setLoadingEvents] = useState(true)
   const [globalError, setGlobalError] = useState<string | null>(null)
 
+  // Create Event Form state
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [formName, setFormName] = useState('')
+  const [formDescription, setFormDescription] = useState('')
+  const [formOwnerType, setFormOwnerType] = useState<eventmanager.EventOwnerType>('USER')
+  const [formOwnerUserId, setFormOwnerUserId] = useState('')
+  const [formOrganizationId, setFormOrganizationId] = useState('')
+  const [formScoringType, setFormScoringType] = useState<number>(1)
+  const [formClassRestriction, setFormClassRestriction] = useState<string>('OP')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const activeUserId = session?.user.id || ''
+  const activeOrgId = 'org_mock_urs'
+
   async function loadEvents() {
     setLoadingEvents(true)
     setGlobalError(null)
@@ -41,6 +57,58 @@ function AdminEventsListPage() {
     void loadEvents()
   }, [])
 
+  // Set default values when modal opens or active session changes
+  useEffect(() => {
+    if (showCreateModal) {
+      setFormName('')
+      setFormDescription('')
+      setFormOwnerType('USER')
+      setFormOwnerUserId(activeUserId || 'mock-admin-1')
+      setFormOrganizationId(activeOrgId || 'org_mock_urs')
+      setFormScoringType(1)
+      setFormClassRestriction('OP')
+    }
+  }, [showCreateModal, activeUserId, activeOrgId])
+
+  const handleCreateEventSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formName.trim()) {
+      setFormError('Event Name is required.')
+      return
+    }
+
+    const token = session?.session.token
+    const authHeader = token ? `Bearer ${token}` : ''
+    if (!authHeader && !MOCK_MODE) {
+      setFormError('Authentication required to create events.')
+      return
+    }
+
+    setSubmitting(true)
+    setFormError(null)
+
+    try {
+      await createAdminEvent(
+        {
+          name: formName.trim(),
+          description: formDescription.trim() || null,
+          ownerType: formOwnerType,
+          organizationId: formOwnerType === 'ORGANIZATION' ? (formOrganizationId.trim() || null) : null,
+          ownerUserId: formOwnerType === 'USER' ? (formOwnerUserId.trim() || null) : null,
+          scoringType: Number(formScoringType),
+          classRestriction: formClassRestriction ? (formClassRestriction as eventmanager.ClassTier) : null,
+        },
+        authHeader,
+      )
+      setShowCreateModal(false)
+      void loadEvents()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create event.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (!isListRoute) {
     return <Outlet />
   }
@@ -50,16 +118,29 @@ function AdminEventsListPage() {
       title="Event & Race Operations"
       subtitle="Select a competition event to manage its lifecycle, competitors, race tracks, and results."
       actions={
-        <button
-          type="button"
-          onClick={() => {
-            void loadEvents()
-          }}
-          className="slds-button slds-button_neutral"
-          style={{ padding: '4px 12px', fontSize: '12px' }}
-        >
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              void loadEvents()
+            }}
+            className="slds-button slds-button_neutral"
+            style={{ padding: '4px 12px', fontSize: '12px' }}
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateModal(true)
+              setFormError(null)
+            }}
+            className="slds-button slds-button_brand"
+            style={{ padding: '4px 12px', fontSize: '12px' }}
+          >
+            ➕ Create Event
+          </button>
+        </div>
       }
     >
       {globalError && (
@@ -141,6 +222,213 @@ function AdminEventsListPage() {
           </article>
         </div>
       </div>
+
+      {/* EVENT CREATION DIALOG MODAL */}
+      {showCreateModal && (
+        <div className="slds-scope">
+          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
+            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
+              <header className="slds-modal__header">
+                <button
+                  className="slds-button slds-button_icon slds-modal__close"
+                  title="Close"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    right: '1.5rem',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                    color: '#747474',
+                  }}
+                >
+                  ✕
+                </button>
+                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  Create New Competition Event
+                </h2>
+              </header>
+
+              <form onSubmit={handleCreateEventSubmit}>
+                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                  {formError && (
+                    <div className="slds-m-bottom_medium">
+                      <AlertBanner variant="error">{formError}</AlertBanner>
+                    </div>
+                  )}
+
+                  <div className="slds-form slds-form_stacked">
+                    {/* Event Name */}
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="event-name">
+                        Event Name <span className="text-red-500">*</span>
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="event-name"
+                          type="text"
+                          required
+                          placeholder="e.g. Winter Derby Championship"
+                          value={formName}
+                          onChange={(e) => setFormName(e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="event-desc">
+                        Description
+                      </label>
+                      <div className="slds-form-element__control">
+                        <textarea
+                          id="event-desc"
+                          placeholder="Brief description of the event details, dates, or format..."
+                          value={formDescription}
+                          onChange={(e) => setFormDescription(e.target.value)}
+                          className="slds-textarea"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%', minHeight: '80px' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Scoring Mode & Tier restriction */}
+                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="scoring-type">
+                            Scoring Mode
+                          </label>
+                          <div className="slds-form-element__control">
+                            <select
+                              id="scoring-type"
+                              value={formScoringType}
+                              onChange={(e) => setFormScoringType(Number(e.target.value))}
+                              className="slds-select"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            >
+                              <option value={1}>Points Aggregation</option>
+                              <option value={2}>Ladder Rating (ELO)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="class-tier">
+                            Class Tier Eligibility
+                          </label>
+                          <div className="slds-form-element__control">
+                            <select
+                              id="class-tier"
+                              value={formClassRestriction}
+                              onChange={(e) => setFormClassRestriction(e.target.value)}
+                              className="slds-select"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            >
+                              <option value="">Any Tier Eligibility (None)</option>
+                              <option value="PRE_OP">PRE_OP</option>
+                              <option value="OP">OP</option>
+                              <option value="G3">G3</option>
+                              <option value="G2">G2</option>
+                              <option value="G1">G1</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Owner Parameters */}
+                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-type">
+                            Ownership Type
+                          </label>
+                          <div className="slds-form-element__control">
+                            <select
+                              id="owner-type"
+                              value={formOwnerType}
+                              onChange={(e) => setFormOwnerType(e.target.value as eventmanager.EventOwnerType)}
+                              className="slds-select"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            >
+                              <option value="USER">Single User</option>
+                              <option value="ORGANIZATION">Organization</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_2-of-3" style={{ flex: 2 }}>
+                        {formOwnerType === 'USER' ? (
+                          <div className="slds-form-element">
+                            <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-user-id">
+                              Owner User ID
+                            </label>
+                            <div className="slds-form-element__control">
+                              <input
+                                id="owner-user-id"
+                                type="text"
+                                placeholder="e.g. user_abc123"
+                                value={formOwnerUserId}
+                                onChange={(e) => setFormOwnerUserId(e.target.value)}
+                                className="slds-input"
+                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="slds-form-element">
+                            <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-org-id">
+                              Organization ID
+                            </label>
+                            <div className="slds-form-element__control">
+                              <input
+                                id="owner-org-id"
+                                type="text"
+                                placeholder="e.g. org_abc123"
+                                value={formOrganizationId}
+                                onChange={(e) => setFormOrganizationId(e.target.value)}
+                                className="slds-input"
+                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="slds-button slds-button_neutral"
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="slds-button slds-button_brand"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Creating...' : 'Create Event'}
+                  </button>
+                </footer>
+              </form>
+            </div>
+          </section>
+          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }} />
+        </div>
+      )}
     </AdminLayout>
   )
 }
