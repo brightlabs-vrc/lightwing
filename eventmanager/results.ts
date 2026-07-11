@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireEventPermission } from "../auth/rbac";
+import { scorecalc } from "~encore/clients";
 
 // Per-race results. Event admins assign points to participants on a specific
 // RaceEvent; the event-level EventPointsEntry aggregate is then recomputed as
@@ -62,7 +63,7 @@ export const assignRaceResult = api(
       },
     });
 
-    await recomputeEventPoints(params.eventId, params.userId);
+    await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
 
     return toRaceResultView(result);
   },
@@ -124,8 +125,9 @@ export const replaceRaceResults = api(
       });
     }
 
-    for (const userId of new Set([...payloadUserIds, ...removedUserIds])) {
-      await recomputeEventPoints(params.eventId, userId);
+    const allAffectedUserIds = Array.from(new Set([...payloadUserIds, ...removedUserIds]));
+    if (allAffectedUserIds.length > 0) {
+      await scorecalc.submitCalc({ eventId: params.eventId, userIds: allAffectedUserIds });
     }
 
     return listResults(params.raceId);
@@ -177,8 +179,9 @@ export const mergeRaceResults = api(
       });
     }
 
-    for (const entry of params.results) {
-      await recomputeEventPoints(params.eventId, entry.userId);
+    const affectedUserIds = params.results.map((entry) => entry.userId);
+    if (affectedUserIds.length > 0) {
+      await scorecalc.submitCalc({ eventId: params.eventId, userIds: affectedUserIds });
     }
 
     return listResults(params.raceId);
@@ -217,7 +220,7 @@ export const deleteRaceResult = api(
       where: { raceEventId_userId: { raceEventId: params.raceId, userId: params.userId } },
     });
 
-    await recomputeEventPoints(params.eventId, params.userId);
+    await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
 
     return { deleted: true };
   },
@@ -288,22 +291,6 @@ async function validateResultInputs(
   for (const entry of results) {
     await requireEventMembership(eventId, entry.userId);
   }
-}
-
-// Recomputes the event-level points aggregate for a participant as the sum of
-// their per-race points across the event, upserting the EventPointsEntry row.
-async function recomputeEventPoints(eventId: string, userId: string): Promise<void> {
-  const aggregate = await prisma.raceResult.aggregate({
-    where: { userId, raceEvent: { eventId } },
-    _sum: { points: true },
-  });
-  const total = aggregate._sum.points ?? 0;
-
-  await prisma.eventPointsEntry.upsert({
-    where: { eventId_userId: { eventId, userId } },
-    create: { id: randomUUID(), eventId, userId, points: total },
-    update: { points: total },
-  });
 }
 
 type RaceResultRow = {
