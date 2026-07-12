@@ -94,6 +94,15 @@ export interface ClientOptions {
 }
 
 export namespace auth {
+    export interface AdminUpdateUserParams {
+        authorization: string
+        name?: string
+        image?: string | null
+        biography?: string | null
+        careerOverview?: string | null
+        classTier?: eventmanager.ClassTier | null
+    }
+
     export interface AuthParams {
         authorization: string
     }
@@ -143,15 +152,57 @@ export namespace auth {
         updatedAt: string
     }
 
+    /**
+     * Lightweight user record for directory listings (no team affiliations or
+     * long-form biography/career text).
+     */
+    export interface UserSummary {
+        id: string
+        name: string
+        email: string
+        classTier: eventmanager.ClassTier | null
+        siteRole: SiteRoleName
+        createdAt: string
+        updatedAt: string
+    }
+
     export class ServiceClient {
         private baseClient: BaseClient
 
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
+            this.adminUpdateUser = this.adminUpdateUser.bind(this)
             this.authHandler = this.authHandler.bind(this)
             this.getUserProfile = this.getUserProfile.bind(this)
+            this.listUsers = this.listUsers.bind(this)
             this.setUserSiteRole = this.setUserSiteRole.bind(this)
             this.updateUserProfile = this.updateUserProfile.bind(this)
+        }
+
+        /**
+         * Admin-only endpoint that edits any user's profile metadata and skill class
+         * tier. Distinct from `updateUserProfile`, which is self-service and cannot
+         * touch `classTier`. Gated to site administrators so the admin panel is the
+         * single place platform-wide profile edits happen.
+         */
+        public async adminUpdateUser(id: string, params: AdminUpdateUserParams): Promise<UserProfile> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                biography:      params.biography,
+                careerOverview: params.careerOverview,
+                classTier:      params.classTier,
+                image:          params.image,
+                name:           params.name,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/admin/users/${encodeURIComponent(id)}`, JSON.stringify(body), {headers})
+            return await resp.json() as UserProfile
         }
 
         /**
@@ -173,6 +224,20 @@ export namespace auth {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/users/${encodeURIComponent(id)}`)
             return await resp.json() as UserProfile
+        }
+
+        /**
+         * Admin-only directory listing of every platform user. Gated to site
+         * administrators so the admin panel is the single place to browse accounts.
+         */
+        public async listUsers(): Promise<{
+    users: UserSummary[]
+}> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/admin/users`)
+            return await resp.json() as {
+    users: UserSummary[]
+}
         }
 
         /**

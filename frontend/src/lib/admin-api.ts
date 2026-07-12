@@ -765,6 +765,32 @@ export async function getAdminUserProfile(userId: string): Promise<auth.UserProf
   throw new Error(`User ${userId} was not found in mock records`)
 }
 
+export async function listAdminUsers(): Promise<{ users: auth.UserSummary[] }> {
+  if (!MOCK_MODE) {
+    return appClient.auth.listUsers()
+  }
+
+  const users: auth.UserSummary[] = Array.from(mockUserProfiles.values()).map((profile) => ({
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    classTier: profile.classTier,
+    siteRole: profile.siteRole,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  }))
+
+  // Mirror backend ordering: site admins first, then by name.
+  users.sort((a, b) => {
+    if (a.siteRole !== b.siteRole) {
+      return a.siteRole === 'SITE_ADMIN' ? -1 : 1
+    }
+    return a.name.localeCompare(b.name)
+  })
+
+  return { users }
+}
+
 export async function updateAdminUserSiteRole(
   userId: string,
   siteRole: auth.SiteRoleName,
@@ -786,6 +812,44 @@ export async function updateAdminUserSiteRole(
   const updated: auth.UserProfile = {
     ...existing,
     siteRole: nextRole,
+    updatedAt: new Date().toISOString(),
+  }
+
+  mockUserProfiles.set(userId, updated)
+  return updated
+}
+
+export async function updateAdminUserMetadata(
+  userId: string,
+  params: {
+    name?: string;
+    image?: string | null;
+    biography?: string | null;
+    careerOverview?: string | null;
+    classTier?: auth.UserProfile['classTier'];
+  },
+  authorization: string,
+): Promise<auth.UserProfile> {
+  if (!MOCK_MODE) {
+    return appClient.auth.adminUpdateUser(userId, {
+      authorization,
+      ...params,
+    })
+  }
+
+  const existing = mockUserProfiles.get(userId)
+  if (!existing) {
+    throw new Error(`User ${userId} was not found in mock records`)
+  }
+
+  const updated: auth.UserProfile = {
+    ...existing,
+    name: params.name ?? existing.name,
+    image: params.image === undefined ? existing.image : params.image,
+    biography: params.biography === undefined ? existing.biography : params.biography,
+    careerOverview:
+      params.careerOverview === undefined ? existing.careerOverview : params.careerOverview,
+    classTier: params.classTier === undefined ? existing.classTier : params.classTier,
     updatedAt: new Date().toISOString(),
   }
 

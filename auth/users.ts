@@ -32,6 +32,52 @@ interface GetUserParams {
   id: string;
 }
 
+// Admin-only directory listing of every platform user. Gated to site
+// administrators so the admin panel is the single place to browse accounts.
+export const listUsers = api(
+  { expose: true, method: "GET", path: "/admin/users" },
+  async (): Promise<{ users: UserSummary[] }> => {
+    await requireSiteAdmin(prisma);
+
+    const users = await prisma.user.findMany({
+      orderBy: [{ siteRole: "desc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        classTier: true,
+        siteRole: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      users: users.map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        classTier: user.classTier,
+        siteRole: user.siteRole as SiteRoleName,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      })),
+    };
+  },
+);
+
+// Lightweight user record for directory listings (no team affiliations or
+// long-form biography/career text).
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+  classTier: ClassTier | null;
+  siteRole: SiteRoleName;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Returns a participant's public profile including team affiliations.
 export const getUserProfile = api(
   { expose: true, method: "GET", path: "/users/:id" },
@@ -91,6 +137,58 @@ export const updateUserProfile = api(
         image: image === undefined ? undefined : image,
         biography: biography === undefined ? undefined : biography,
         careerOverview: careerOverview === undefined ? undefined : careerOverview,
+      },
+      include: {
+        members: {
+          include: { organization: true },
+        },
+      },
+    });
+
+    return toProfile(user);
+  },
+);
+
+interface AdminUpdateUserParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  name?: string;
+  image?: string | null;
+  biography?: string | null;
+  careerOverview?: string | null;
+  classTier?: ClassTier | null;
+}
+
+// Admin-only endpoint that edits any user's profile metadata and skill class
+// tier. Distinct from `updateUserProfile`, which is self-service and cannot
+// touch `classTier`. Gated to site administrators so the admin panel is the
+// single place platform-wide profile edits happen.
+export const adminUpdateUser = api(
+  { expose: true, method: "PATCH", path: "/admin/users/:id" },
+  async ({
+    id,
+    authorization,
+    name,
+    image,
+    biography,
+    careerOverview,
+    classTier,
+  }: AdminUpdateUserParams): Promise<UserProfile> => {
+    await requireSiteAdmin(prisma, authorization);
+
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw APIError.notFound("user not found");
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        name: name ?? undefined,
+        image: image === undefined ? undefined : image,
+        biography: biography === undefined ? undefined : biography,
+        careerOverview: careerOverview === undefined ? undefined : careerOverview,
+        classTier: classTier === undefined ? undefined : classTier,
       },
       include: {
         members: {
