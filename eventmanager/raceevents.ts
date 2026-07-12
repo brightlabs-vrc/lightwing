@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireEventPermission } from "../auth/rbac";
-import type { ClassTier } from "./classtier";
+import { isEligible, type ClassTier } from "./classtier";
+
+export interface RaceEventMemberView {
+  userId: string;
+  name: string;
+  classTier: ClassTier | null;
+}
 
 // A RaceEvent is a single race contained within an Event. The parent Event acts
 // as the container/scoreboard; each RaceEvent carries its own distance, track
@@ -23,6 +29,7 @@ export interface RaceEventDetail {
   endsAt: string | null;
   createdAt: string;
   updatedAt: string;
+  members: RaceEventMemberView[];
 }
 
 interface CreateRaceEventParams {
@@ -79,6 +86,18 @@ export const listRaceEvents = api(
   async ({ eventId }: ListRaceEventsParams): Promise<{ races: RaceEventDetail[] }> => {
     const races = await prisma.raceEvent.findMany({
       where: { eventId },
+      include: {
+        raceMembers: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                classTier: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: { sequence: "asc" },
     });
     return { races: races.map(toRaceEventDetail) };
@@ -179,7 +198,21 @@ export const deleteRaceEvent = api(
 );
 
 async function requireRaceEvent(eventId: string, raceId: string) {
-  const race = await prisma.raceEvent.findUnique({ where: { id: raceId } });
+  const race = await prisma.raceEvent.findUnique({
+    where: { id: raceId },
+    include: {
+      raceMembers: {
+        include: {
+          user: {
+            select: {
+              name: true,
+              classTier: true,
+            },
+          },
+        },
+      },
+    },
+  });
   if (!race || race.eventId !== eventId) {
     throw APIError.notFound("race not found");
   }
@@ -200,6 +233,13 @@ type RaceEventRow = {
   endsAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  raceMembers?: {
+    userId: string;
+    user: {
+      name: string;
+      classTier: ClassTier | null;
+    };
+  }[];
 };
 
 function toRaceEventDetail(race: RaceEventRow): RaceEventDetail {
@@ -217,5 +257,145 @@ function toRaceEventDetail(race: RaceEventRow): RaceEventDetail {
     endsAt: race.endsAt ? race.endsAt.toISOString() : null,
     createdAt: race.createdAt.toISOString(),
     updatedAt: race.updatedAt.toISOString(),
+    members: race.raceMembers
+      ? race.raceMembers.map((rm) => ({
+          userId: rm.userId,
+          name: rm.user.name,
+          classTier: rm.user.classTier,
+        }))
+      : [],
   };
 }
+
+interface AddRaceMemberParams {
+  eventId: string;
+  raceId: string;
+  authorization: Header<"Authorization">;
+  userId: string;
+}
+
+// Registers a participant for a specific race.
+export const addRaceEventMember = api(
+  { expose: true, auth: true, method: "POST", path: "/events/:eventId/races/:raceId/members" },
+  async ({ eventId, raceId, authorization, userId }: AddRaceMemberParams): Promise<RaceEventDetail> => {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    await requireEventPermission(prisma, {
+      authorization,
+      eventId,
+      action: "update",
+    });
+
+    const race = await prisma.raceEvent.findUnique({ where: { id: raceId } });
+    if (!race || race.eventId !== eventId) {
+      throw APIError.notFound("race not found");
+    }
+
+    // User must be an event member first
+    const member = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    if (!member) {
+      throw APIError.failedPrecondition("user is not a member of this event");
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw APIError.notFound("user not found");
+    }
+
+    // Enforce the race's class restriction (fall back to event restriction)
+    const targetRestriction = race.classRestriction ?? event.classRestriction;
+    if (!isEligible(user.classTier, targetRestriction)) {
+      throw APIError.failedPrecondition(
+        "participant class tier does not satisfy the race class restriction",
+      );
+    }
+
+    await prisma.raceEventMember.upsert({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+      create: { id: randomUUID(), raceEventId: raceId, userId },
+      update: {},
+    });
+
+    const updatedRace = await requireRaceEvent(eventId, raceId);
+    return toRaceEventDetail(updatedRace);
+  }
+);
+
+interface RemoveRaceMemberParams {
+  eventId: string;
+  raceId: string;
+  userId: string;
+  authorization: Header<"Authorization">;
+}
+
+// Removes a participant from a specific race.
+export const removeRaceEventMember = api(
+  { expose: true, auth: true, method: "DELETE", path: "/events/:eventId/races/:raceId/members/:userId" },
+  async ({ eventId, raceId, userId, authorization }: RemoveRaceMemberParams): Promise<RaceEventDetail> => {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    await requireEventPermission(prisma, {
+      authorization,
+      eventId,
+      action: "update",
+    });
+
+    await requireRaceEvent(eventId, raceId);
+
+    // User must be an event member first
+    const member = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    if (!member) {
+      throw APIError.failedPrecondition("user is not a member of this event");
+    }
+
+    await prisma.raceEventMember.deleteMany({
+      where: { raceEventId: raceId, userId },
+    });
+
+    const updatedRace = await requireRaceEvent(eventId, raceId);
+    return toRaceEventDetail(updatedRace);
+  }
+);
+
+interface ListRaceMembersParams {
+  eventId: string;
+  raceId: string;
+}
+
+// Lists the registered participants for a specific race.
+export const listRaceEventMembers = api(
+  { expose: true, method: "GET", path: "/events/:eventId/races/:raceId/members" },
+  async ({ eventId, raceId }: ListRaceMembersParams): Promise<{ members: RaceEventMemberView[] }> => {
+    await requireRaceEvent(eventId, raceId);
+
+    const members = await prisma.raceEventMember.findMany({
+      where: { raceEventId: raceId },
+      include: {
+        user: {
+          select: {
+            name: true,
+            classTier: true,
+          },
+        },
+      },
+    });
+
+    return {
+      members: members.map((m) => ({
+        userId: m.userId,
+        name: m.user.name,
+        classTier: m.user.classTier,
+      })),
+    };
+  }
+);

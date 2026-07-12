@@ -34,6 +34,7 @@ function AdminEventsListPage() {
   const [formOrganizationId, setFormOrganizationId] = useState('')
   const [formScoringType, setFormScoringType] = useState<number>(1)
   const [formClassRestriction, setFormClassRestriction] = useState<string>('OP')
+  const [formGranularParticipation, setFormGranularParticipation] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -67,6 +68,7 @@ function AdminEventsListPage() {
       setFormOrganizationId(activeOrgId || 'org_mock_urs')
       setFormScoringType(1)
       setFormClassRestriction('OP')
+      setFormGranularParticipation(false)
     }
   }, [showCreateModal, activeUserId, activeOrgId])
 
@@ -97,6 +99,7 @@ function AdminEventsListPage() {
           ownerUserId: formOwnerType === 'USER' ? (formOwnerUserId.trim() || null) : null,
           scoringType: Number(formScoringType),
           classRestriction: formClassRestriction ? (formClassRestriction as eventmanager.ClassTier) : null,
+          granularParticipation: formGranularParticipation,
         },
         authHeader,
       )
@@ -340,6 +343,29 @@ function AdminEventsListPage() {
                             </select>
                           </div>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Granular Participation Toggle */}
+                    <div className="slds-form-element slds-m-bottom_medium" style={{ display: 'flex', alignItems: 'center' }}>
+                      <div className="slds-form-element__control">
+                        <div className="slds-checkbox">
+                          <input
+                            type="checkbox"
+                            name="options"
+                            id="granular-participation"
+                            checked={formGranularParticipation}
+                            onChange={(e) => setFormGranularParticipation(e.target.checked)}
+                            style={{ marginRight: '8px' }}
+                          />
+                          <label className="slds-checkbox__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="granular-participation">
+                            <span className="slds-checkbox_faux"></span>
+                            <span className="slds-form-element__label">Enable Granular Per-Race Participation</span>
+                          </label>
+                        </div>
+                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
+                          If enabled, participants must be registered separately for each individual race. Otherwise, registrations are event-wide.
+                        </p>
                       </div>
                     </div>
 

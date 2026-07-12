@@ -61,7 +61,7 @@ export const assignRaceResult = api(
     });
 
     await requireRace(params.eventId, params.raceId);
-    await requireEventMembership(params.eventId, params.userId);
+    await requireMembershipForResult(params.eventId, params.raceId, params.userId);
 
     const result = await prisma.raceResult.upsert({
       where: { raceEventId_userId: { raceEventId: params.raceId, userId: params.userId } },
@@ -116,7 +116,7 @@ export const replaceRaceResults = api(
     });
 
     await requireRace(params.eventId, params.raceId);
-    await validateResultInputs(params.eventId, params.results);
+    await validateResultInputs(params.eventId, params.raceId, params.results);
 
     const payloadUserIds = new Set(params.results.map((entry) => entry.userId));
     const existing = await prisma.raceResult.findMany({
@@ -195,7 +195,7 @@ export const mergeRaceResults = api(
     });
 
     await requireRace(params.eventId, params.raceId);
-    await validateResultInputs(params.eventId, params.results);
+    await validateResultInputs(params.eventId, params.raceId, params.results);
 
     for (const entry of params.results) {
       await prisma.raceResult.upsert({
@@ -303,27 +303,43 @@ async function requireRace(eventId: string, raceId: string) {
   return race;
 }
 
-// Asserts the user exists and is a registered member of the event. A result must
-// belong to an actual participant of the parent event; guarding here prevents
-// dangling results (and cross-event leakage) for users who were never
-// registered for the event.
-async function requireEventMembership(eventId: string, userId: string): Promise<void> {
+// Asserts the user exists and is registered based on granularParticipation settings.
+async function requireMembershipForResult(eventId: string, raceId: string, userId: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     throw APIError.notFound("user not found");
   }
-  const member = await prisma.eventMember.findUnique({
-    where: { eventId_userId: { eventId, userId } },
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { granularParticipation: true },
   });
-  if (!member) {
-    throw APIError.failedPrecondition("user is not a member of this event");
+  if (!event) {
+    throw APIError.notFound("event not found");
+  }
+
+  if (event.granularParticipation) {
+    const raceMember = await prisma.raceEventMember.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    if (!raceMember) {
+      throw APIError.failedPrecondition("user is not registered for this race");
+    }
+  } else {
+    const member = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    if (!member) {
+      throw APIError.failedPrecondition("user is not a member of this event");
+    }
   }
 }
 
 // Validates a bulk standings payload: rejects duplicate userIds and asserts each
-// participant exists and is a member of the event.
+// participant exists and is a member of the event/race.
 async function validateResultInputs(
   eventId: string,
+  raceId: string,
   results: RaceResultInput[],
 ): Promise<void> {
   const seen = new Set<string>();
@@ -334,7 +350,7 @@ async function validateResultInputs(
     seen.add(entry.userId);
   }
   for (const entry of results) {
-    await requireEventMembership(eventId, entry.userId);
+    await requireMembershipForResult(eventId, raceId, entry.userId);
   }
 }
 

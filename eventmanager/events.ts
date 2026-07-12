@@ -82,6 +82,7 @@ export interface EventDetail {
   scoringType: number;
   scoringTypeLabel: string;
   classRestriction: ClassTier | null;
+  granularParticipation: boolean;
   raceEvents: RaceEventView[];
   members: EventMemberView[];
   schedules: EventScheduleView[];
@@ -100,6 +101,7 @@ interface CreateEventParams {
   ownerUserId?: string | null;
   scoringType: ScoringType;
   classRestriction?: ClassTier | null;
+  granularParticipation?: boolean;
 }
 
 // Creates an event owned by either an organization or a single user (issue #4).
@@ -157,6 +159,7 @@ export const createEvent = api(
         ownerUserId,
         scoringType: params.scoringType,
         classRestriction: params.classRestriction ?? null,
+        granularParticipation: params.granularParticipation ?? false,
       },
     });
 
@@ -208,6 +211,7 @@ interface UpdateEventParams {
   name?: string;
   description?: string | null;
   classRestriction?: ClassTier | null;
+  granularParticipation?: boolean;
 }
 
 // Updates an event's editable fields (scoring type is immutable once set).
@@ -228,6 +232,8 @@ export const updateEvent = api(
         description: params.description === undefined ? undefined : params.description,
         classRestriction:
           params.classRestriction === undefined ? undefined : params.classRestriction,
+        granularParticipation:
+          params.granularParticipation === undefined ? undefined : params.granularParticipation,
       },
     });
 
@@ -563,6 +569,7 @@ async function loadEvent(id: string): Promise<EventDetail> {
     scoringType: event.scoringType,
     scoringTypeLabel: SCORING_LABELS[event.scoringType] ?? "unknown",
     classRestriction: event.classRestriction,
+    granularParticipation: event.granularParticipation,
     raceEvents: event.raceEvents.map((race) => ({
       id: race.id,
       name: race.name,

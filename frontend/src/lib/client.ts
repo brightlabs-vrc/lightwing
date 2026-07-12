@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-efiqq.encr.app`
+    return `https://${name}-46h8a.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the efiqq Encore application.
+ * Client is an API client for the 46h8a Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -226,6 +226,11 @@ export namespace eventmanager {
         userId: string
     }
 
+    export interface AddRaceMemberParams {
+        authorization: string
+        userId: string
+    }
+
     export interface AddScheduleParams {
         authorization: string
         title?: string | null
@@ -269,6 +274,7 @@ export namespace eventmanager {
         ownerUserId?: string | null
         scoringType: ScoringType
         classRestriction?: ClassTier | null
+        granularParticipation?: boolean
     }
 
     export interface CreateRaceEventParams {
@@ -314,6 +320,7 @@ export namespace eventmanager {
         scoringType: number
         scoringTypeLabel: string
         classRestriction: ClassTier | null
+        granularParticipation: boolean
         raceEvents: RaceEventView[]
         members: EventMemberView[]
         schedules: EventScheduleView[]
@@ -398,6 +405,13 @@ export namespace eventmanager {
         endsAt: string | null
         createdAt: string
         updatedAt: string
+        members: RaceEventMemberView[]
+    }
+
+    export interface RaceEventMemberView {
+        userId: string
+        name: string
+        classTier: ClassTier | null
     }
 
     export interface RaceEventView {
@@ -452,6 +466,10 @@ export namespace eventmanager {
         authorization: string
     }
 
+    export interface RemoveRaceMemberParams {
+        authorization: string
+    }
+
     export interface ReplaceRaceResultsParams {
         authorization: string
         results: RaceResultInput[]
@@ -480,6 +498,7 @@ export namespace eventmanager {
         name?: string
         description?: string | null
         classRestriction?: ClassTier | null
+        granularParticipation?: boolean
     }
 
     export interface UpdateRaceEventParams {
@@ -502,6 +521,7 @@ export namespace eventmanager {
             this.baseClient = baseClient
             this.addEventMember = this.addEventMember.bind(this)
             this.addEventSchedule = this.addEventSchedule.bind(this)
+            this.addRaceEventMember = this.addRaceEventMember.bind(this)
             this.assignRaceResult = this.assignRaceResult.bind(this)
             this.createEvent = this.createEvent.bind(this)
             this.createRaceEvent = this.createRaceEvent.bind(this)
@@ -513,11 +533,13 @@ export namespace eventmanager {
             this.listClassTiers = this.listClassTiers.bind(this)
             this.listEligibleEvents = this.listEligibleEvents.bind(this)
             this.listEvents = this.listEvents.bind(this)
+            this.listRaceEventMembers = this.listRaceEventMembers.bind(this)
             this.listRaceEvents = this.listRaceEvents.bind(this)
             this.listRaceResults = this.listRaceResults.bind(this)
             this.mergeRaceResults = this.mergeRaceResults.bind(this)
             this.recordLadderMatch = this.recordLadderMatch.bind(this)
             this.removeEventMember = this.removeEventMember.bind(this)
+            this.removeRaceEventMember = this.removeRaceEventMember.bind(this)
             this.replaceRaceResults = this.replaceRaceResults.bind(this)
             this.setEventPoints = this.setEventPoints.bind(this)
             this.setEventStatus = this.setEventStatus.bind(this)
@@ -569,6 +591,25 @@ export namespace eventmanager {
         }
 
         /**
+         * Registers a participant for a specific race.
+         */
+        public async addRaceEventMember(eventId: string, raceId: string, params: AddRaceMemberParams): Promise<RaceEventDetail> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                userId: params.userId,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members`, JSON.stringify(body), {headers})
+            return await resp.json() as RaceEventDetail
+        }
+
+        /**
          * Assigns (or updates) a participant's result on a race. Gated by event-update
          * permission on the parent event (event admins, with site-admin override).
          */
@@ -608,13 +649,14 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                classRestriction: params.classRestriction,
-                description:      params.description,
-                name:             params.name,
-                organizationId:   params.organizationId,
-                ownerType:        params.ownerType,
-                ownerUserId:      params.ownerUserId,
-                scoringType:      params.scoringType,
+                classRestriction:      params.classRestriction,
+                description:           params.description,
+                granularParticipation: params.granularParticipation,
+                name:                  params.name,
+                organizationId:        params.organizationId,
+                ownerType:             params.ownerType,
+                ownerUserId:           params.ownerUserId,
+                scoringType:           params.scoringType,
             }
 
             // Now make the actual call to the API
@@ -772,6 +814,19 @@ export namespace eventmanager {
         }
 
         /**
+         * Lists the registered participants for a specific race.
+         */
+        public async listRaceEventMembers(eventId: string, raceId: string): Promise<{
+    members: RaceEventMemberView[]
+}> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members`)
+            return await resp.json() as {
+    members: RaceEventMemberView[]
+}
+        }
+
+        /**
          * Lists the races within an event, ordered by their sequence.
          */
         public async listRaceEvents(eventId: string): Promise<{
@@ -860,6 +915,20 @@ export namespace eventmanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
             return await resp.json() as EventDetail
+        }
+
+        /**
+         * Removes a participant from a specific race.
+         */
+        public async removeRaceEventMember(eventId: string, raceId: string, userId: string, params: RemoveRaceMemberParams): Promise<RaceEventDetail> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
+            return await resp.json() as RaceEventDetail
         }
 
         /**
@@ -969,9 +1038,10 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                classRestriction: params.classRestriction,
-                description:      params.description,
-                name:             params.name,
+                classRestriction:      params.classRestriction,
+                description:           params.description,
+                granularParticipation: params.granularParticipation,
+                name:                  params.name,
             }
 
             // Now make the actual call to the API
@@ -1375,7 +1445,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "efiqq-Generated-TS-Client (Encore/v1.57.9)";
+            this.headers["User-Agent"] = "46h8a-Generated-TS-Client (Encore/v1.57.9)";
         }
 
         this.requestInit = options.requestInit ?? {};

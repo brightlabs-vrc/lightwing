@@ -48,6 +48,7 @@ model User {
   members      Member[]
   invitations  Invitation[] @relation("InvitationInviter")
   eventMembers   EventMember[]
+  raceEventMembers RaceEventMember[]
   eventPoints    EventPointsEntry[]
   eventLadder    EventLadderEntry[]
   ownedEvents    Event[]      @relation("EventOwner")
@@ -163,6 +164,7 @@ model Event {
   status           EventStatus    @default(UNOFFICIAL)
   scoringType      Int            @db.SmallInt
   classRestriction ClassTier?
+  granularParticipation Boolean @default(false)
   createdAt        DateTime       @default(now()) @db.Timestamp(6)
   updatedAt        DateTime       @updatedAt @db.Timestamp(6)
   organization     Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -195,9 +197,24 @@ model RaceEvent {
   updatedAt        DateTime   @updatedAt @db.Timestamp(6)
   event            Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   results          RaceResult[]
+  raceMembers      RaceEventMember[]
 
   @@index([eventId])
   @@map("race_event")
+}
+
+model RaceEventMember {
+  id             String    @id @db.Text
+  raceEventId    String    @db.Text
+  userId         String    @db.Text
+  createdAt      DateTime  @default(now()) @db.Timestamp(6)
+  raceEvent      RaceEvent @relation(fields: [raceEventId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raceEventId, userId])
+  @@index([raceEventId])
+  @@index([userId])
+  @@map("race_event_member")
 }
 
 model RaceResult {

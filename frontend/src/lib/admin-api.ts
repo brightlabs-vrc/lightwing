@@ -79,6 +79,16 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
   ],
 ])
 
+let mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
+  [
+    'race_mock_102',
+    [
+      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+    ],
+  ],
+])
+
 let mockEvents: eventmanager.EventDetail[] = [
   {
     id: 'evt_mock_001',
@@ -91,6 +101,7 @@ let mockEvents: eventmanager.EventDetail[] = [
     scoringType: 1,
     scoringTypeLabel: 'points-based',
     classRestriction: 'OP',
+    granularParticipation: false,
     raceEvents: mockRaceEventsList,
     members: mockEventMembers,
     schedules: [],
@@ -114,6 +125,7 @@ let mockEvents: eventmanager.EventDetail[] = [
     scoringType: 2,
     scoringTypeLabel: 'ladder-elo',
     classRestriction: null,
+    granularParticipation: false,
     raceEvents: [],
     members: [
       { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
@@ -248,6 +260,44 @@ export async function updateAdminEventStatus(
   return updated
 }
 
+export async function updateAdminEvent(
+  eventId: string,
+  params: {
+    name?: string
+    description?: string | null
+    classRestriction?: eventmanager.ClassTier | null
+    granularParticipation?: boolean
+  },
+  authorization: string,
+): Promise<eventmanager.EventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.updateEvent({
+      id: eventId,
+      authorization,
+      name: params.name,
+      description: params.description,
+      classRestriction: params.classRestriction,
+      granularParticipation: params.granularParticipation,
+    })
+  }
+
+  mockEvents = mockEvents.map((evt) => {
+    if (evt.id === eventId) {
+      return {
+        ...evt,
+        name: params.name ?? evt.name,
+        description: params.description !== undefined ? params.description : evt.description,
+        classRestriction: params.classRestriction !== undefined ? params.classRestriction : evt.classRestriction,
+        granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : evt.granularParticipation,
+        updatedAt: new Date().toISOString(),
+      }
+    }
+    return evt
+  })
+
+  return getAdminEvent(eventId)
+}
+
 export async function createAdminEvent(
   params: {
     name: string
@@ -257,6 +307,7 @@ export async function createAdminEvent(
     ownerUserId?: string | null
     scoringType: number
     classRestriction?: eventmanager.ClassTier | null
+    granularParticipation?: boolean
   },
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
@@ -270,6 +321,7 @@ export async function createAdminEvent(
       ownerUserId: params.ownerUserId,
       scoringType: params.scoringType as any,
       classRestriction: params.classRestriction,
+      granularParticipation: params.granularParticipation,
     })
   }
 
@@ -285,6 +337,7 @@ export async function createAdminEvent(
     scoringType: params.scoringType,
     scoringTypeLabel: params.scoringType === 1 ? 'points-based' : 'ladder-elo',
     classRestriction: params.classRestriction ?? null,
+    granularParticipation: params.granularParticipation ?? false,
     raceEvents: [],
     members: [],
     schedules: [],
@@ -326,6 +379,7 @@ export async function listRaceEvents(eventId: string): Promise<{ races: eventman
     endsAt: race.endsAt,
     createdAt: now,
     updatedAt: now,
+    members: mockRaceMembersMap.get(race.id) ?? [],
   }))
 
   return { races: mappedRaces }
@@ -390,6 +444,7 @@ export async function createRaceEvent(
     eventId,
     createdAt: now,
     updatedAt: now,
+    members: [],
   }
 }
 
@@ -456,6 +511,7 @@ export async function updateRaceEvent(
     eventId,
     createdAt: now,
     updatedAt: now,
+    members: mockRaceMembersMap.get(raceId) ?? [],
   }
 }
 
@@ -723,6 +779,119 @@ export async function removeEventMember(
 
   recomputeMockOverview(eventId)
   return getAdminEvent(eventId)
+}
+
+// -----------------------------------------------------------------------------
+// RACE EVENT MEMBER METHODS
+// -----------------------------------------------------------------------------
+
+export async function addRaceEventMember(
+  eventId: string,
+  raceId: string,
+  userId: string,
+  authorization: string,
+): Promise<eventmanager.RaceEventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.addRaceEventMember(eventId, raceId, {
+      authorization,
+      userId,
+    })
+  }
+
+  const userProfile = mockUserProfiles.get(userId)
+  if (!userProfile) {
+    throw new Error('Mock user not found')
+  }
+
+  const existing = mockRaceMembersMap.get(raceId) ?? []
+  if (!existing.some((m) => m.userId === userId)) {
+    const nextMembers = [
+      ...existing,
+      { userId: userProfile.id, name: userProfile.name, classTier: userProfile.classTier },
+    ]
+    mockRaceMembersMap.set(raceId, nextMembers)
+  }
+
+  const event = mockEvents.find((evt) => evt.id === eventId)
+  if (!event) {
+    throw new Error('Mock event not found')
+  }
+  const race = event.raceEvents.find((r) => r.id === raceId)
+  if (!race) {
+    throw new Error('Mock race not found')
+  }
+
+  return {
+    id: race.id,
+    eventId,
+    name: race.name,
+    sequence: race.sequence,
+    distanceMeters: race.distanceMeters,
+    trackType: race.trackType,
+    location: race.location,
+    scoringType: race.scoringType,
+    classRestriction: race.classRestriction,
+    startsAt: race.startsAt,
+    endsAt: race.endsAt,
+    createdAt: now,
+    updatedAt: now,
+    members: mockRaceMembersMap.get(raceId) ?? [],
+  }
+}
+
+export async function removeRaceEventMember(
+  eventId: string,
+  raceId: string,
+  userId: string,
+  authorization: string,
+): Promise<eventmanager.RaceEventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.removeRaceEventMember(eventId, raceId, userId, {
+      authorization,
+    })
+  }
+
+  const existing = mockRaceMembersMap.get(raceId) ?? []
+  const filtered = existing.filter((m) => m.userId !== userId)
+  mockRaceMembersMap.set(raceId, filtered)
+
+  const event = mockEvents.find((evt) => evt.id === eventId)
+  if (!event) {
+    throw new Error('Mock event not found')
+  }
+  const race = event.raceEvents.find((r) => r.id === raceId)
+  if (!race) {
+    throw new Error('Mock race not found')
+  }
+
+  return {
+    id: race.id,
+    eventId,
+    name: race.name,
+    sequence: race.sequence,
+    distanceMeters: race.distanceMeters,
+    trackType: race.trackType,
+    location: race.location,
+    scoringType: race.scoringType,
+    classRestriction: race.classRestriction,
+    startsAt: race.startsAt,
+    endsAt: race.endsAt,
+    createdAt: now,
+    updatedAt: now,
+    members: mockRaceMembersMap.get(raceId) ?? [],
+  }
+}
+
+export async function listRaceEventMembers(
+  eventId: string,
+  raceId: string,
+): Promise<{ members: eventmanager.RaceEventMemberView[] }> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.listRaceEventMembers(eventId, raceId)
+  }
+
+  const members = mockRaceMembersMap.get(raceId) ?? []
+  return { members }
 }
 
 // Helper to compute overall totals for mock event views
