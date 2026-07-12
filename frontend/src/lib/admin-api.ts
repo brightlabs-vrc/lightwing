@@ -271,8 +271,7 @@ export async function updateAdminEvent(
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.updateEvent({
-      id: eventId,
+    return appClient.eventmanager.updateEvent(eventId, {
       authorization,
       name: params.name,
       description: params.description,
