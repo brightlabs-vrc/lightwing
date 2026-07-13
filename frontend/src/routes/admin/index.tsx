@@ -58,7 +58,7 @@ function AdminPage() {
         </div>
 
         {/* Section Cards */}
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4 slds-m-bottom_medium">
+        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
           <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
@@ -87,7 +87,7 @@ function AdminPage() {
           </article>
         </div>
 
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4 slds-m-bottom_medium">
+        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
           <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
@@ -116,7 +116,7 @@ function AdminPage() {
           </article>
         </div>
 
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4 slds-m-bottom_medium">
+        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
           <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
@@ -140,35 +140,6 @@ function AdminPage() {
             <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
               <Link to="/admin/teams" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
                 Manage Teams
-              </Link>
-            </footer>
-          </article>
-        </div>
-
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4 slds-m-bottom_medium">
-          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-dataset" style={{ fontSize: '20px' }}>📊</span>
-                </div>
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                      Dataset Records
-                    </span>
-                  </h2>
-                </div>
-              </header>
-            </div>
-            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
-              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
-                Monitor CSV/JSON pipeline records and manual data imports. Retry, approve, or mark ingest pipeline tasks done.
-              </p>
-            </div>
-            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
-              <Link to="/admin/datasets" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
-                View Datasets
               </Link>
             </footer>
           </article>

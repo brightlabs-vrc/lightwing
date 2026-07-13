@@ -249,6 +249,18 @@ function AdminEventDetailPage() {
                   Races & Tracks ({races.length})
                 </button>
               </li>
+              <li className={`slds-tabs_default__item ${activeTab === 'datasets' ? 'slds-is-active' : ''}`} role="presentation" style={{ borderBottom: activeTab === 'datasets' ? '3px solid #0176d3' : 'none' }}>
+                <button
+                  className="slds-tabs_default__link"
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('datasets')
+                  }}
+                  style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'datasets' ? 'bold' : 'normal', color: activeTab === 'datasets' ? '#0176d3' : '#180505' }}
+                >
+                  Datasets
+                </button>
+              </li>
             </ul>
 
             {/* Tab 1: Summary Info */}
@@ -789,6 +801,18 @@ function AdminEventDetailPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Tab 4: Datasets (Disabled Placeholder) */}
+            {activeTab === 'datasets' && (
+              <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
+                <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
+                  <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>Importing records is coming soon</p>
+                  <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
+                    Dataset import formats are still being finalized.
+                  </p>
+                </div>
               </div>
             )}
           </div>

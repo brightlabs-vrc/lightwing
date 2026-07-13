@@ -14,7 +14,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminEventsRouteImport } from './routes/admin/events'
-import { Route as AdminDatasetsRouteImport } from './routes/admin/datasets'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 import { Route as AdminTeamsIndexRouteImport } from './routes/admin/teams/index'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
@@ -44,11 +43,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminEventsRoute = AdminEventsRouteImport.update({
   id: '/admin/events',
   path: '/admin/events',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminDatasetsRoute = AdminDatasetsRouteImport.update({
-  id: '/admin/datasets',
-  path: '/admin/datasets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
@@ -81,7 +75,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
-  '/admin/datasets': typeof AdminDatasetsRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
@@ -94,7 +87,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
-  '/admin/datasets': typeof AdminDatasetsRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/admin': typeof AdminIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
@@ -108,7 +100,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
-  '/admin/datasets': typeof AdminDatasetsRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
@@ -123,7 +114,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
-    | '/admin/datasets'
     | '/admin/events'
     | '/admin/'
     | '/admin/events/$eventId'
@@ -136,7 +126,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
-    | '/admin/datasets'
     | '/admin/events'
     | '/admin'
     | '/admin/events/$eventId'
@@ -149,7 +138,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
-    | '/admin/datasets'
     | '/admin/events'
     | '/admin/'
     | '/admin/events/$eventId'
@@ -163,7 +151,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRoute
-  AdminDatasetsRoute: typeof AdminDatasetsRoute
   AdminEventsRoute: typeof AdminEventsRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
   AdminTeamsTeamIdRoute: typeof AdminTeamsTeamIdRoute
@@ -207,13 +194,6 @@ declare module '@tanstack/react-router' {
       path: '/admin/events'
       fullPath: '/admin/events'
       preLoaderRoute: typeof AdminEventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/datasets': {
-      id: '/admin/datasets'
-      path: '/admin/datasets'
-      fullPath: '/admin/datasets'
-      preLoaderRoute: typeof AdminDatasetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/users/': {
@@ -270,7 +250,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRoute,
-  AdminDatasetsRoute: AdminDatasetsRoute,
   AdminEventsRoute: AdminEventsRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
   AdminTeamsTeamIdRoute: AdminTeamsTeamIdRoute,

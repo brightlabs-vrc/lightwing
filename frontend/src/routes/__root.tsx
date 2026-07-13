@@ -1,6 +1,15 @@
+import React, { Suspense } from 'react'
 import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import { useAuth } from '../hooks/useAuth'
+
+const TanStackRouterDevtools =
+  import.meta.env.PROD
+    ? () => null
+    : React.lazy(() =>
+        import('@tanstack/router-devtools').then((res) => ({
+          default: res.TanStackRouterDevtools,
+        })),
+      )
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -17,7 +26,9 @@ function RootLayout() {
     return (
       <>
         <Outlet />
-        <TanStackRouterDevtools position='bottom-right' />
+        <Suspense>
+          <TanStackRouterDevtools position='bottom-right' />
+        </Suspense>
       </>
     )
   }
@@ -28,7 +39,9 @@ function RootLayout() {
         <div className='min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_28%,_#f8fafc_62%,_#ffffff_100%)] text-slate-900'>
           <Outlet />
         </div>
-        <TanStackRouterDevtools position='bottom-right' />
+        <Suspense>
+          <TanStackRouterDevtools position='bottom-right' />
+        </Suspense>
       </>
     )
   }
@@ -65,7 +78,9 @@ function RootLayout() {
         TanStack Router + Vite file-based routing
       </footer>
       </div>
-      <TanStackRouterDevtools position='bottom-right' />
+      <Suspense>
+        <TanStackRouterDevtools position='bottom-right' />
+      </Suspense>
     </>
   )
 }
