@@ -61,7 +61,7 @@ export function StandingsEditor({
               </span>
             </h2>
             <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px' }}>
-              Assign finishes for registered event participants. Status: {isRaceNotStarted ? 'Not Started' : isRaceOngoing ? 'Ongoing (Live)' : 'Concluded'}
+              Assign finishes for registered event participants. Status: {isRaceNotStarted ? 'Not Started' : isRaceOngoing ? 'Ongoing (Live - Provisional Saving Allowed)' : 'Concluded'}
             </p>
           </div>
         </header>
@@ -114,10 +114,10 @@ export function StandingsEditor({
             <button
               type="button"
               onClick={onSave}
-              disabled={savingBatch || loadingResults || isRaceOngoing || changeSummary.totalCount === 0}
-              className={`slds-button ${changeSummary.totalCount > 0 && !isRaceOngoing ? 'slds-button_brand' : 'slds-button_neutral'}`}
+              disabled={savingBatch || loadingResults || changeSummary.totalCount === 0}
+              className={`slds-button ${changeSummary.totalCount > 0 ? 'slds-button_brand' : 'slds-button_neutral'}`}
               style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
-              title={isRaceOngoing ? 'Conclude the race first to save standings.' : ''}
+              title={isRaceOngoing ? 'Save provisional standings' : 'Save final standings'}
             >
               {savingBatch ? 'Saving...' : `💾 Save (${changeSummary.totalCount})`}
             </button>
@@ -163,7 +163,7 @@ export function StandingsEditor({
                   }
                 >
                   <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
-                    🔴 Race is currently Ongoing (Live). You can draft and stage competitor results below, but they can only be saved once the race has concluded.
+                    🔴 Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
                   </span>
                 </AlertBanner>
               </div>

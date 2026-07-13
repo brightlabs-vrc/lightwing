@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { AdminLayout } from '../-AdminLayout'
 import { useEventDetail } from '../../../hooks/useEventDetail'
-import { isRaceNotStarted, isRaceOngoing } from '../../../lib/raceStatus'
+import { isRaceNotStarted, isRaceOngoing, isRaceConcluded } from '../../../lib/raceStatus'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { LoadingBox } from '../../../components/LoadingBox'
 import { StandingsEditor } from '../../../components/StandingsEditor'
@@ -41,6 +41,9 @@ function AdminEventDetailPage() {
     changeSummary,
     loadingResults,
     savingBatch,
+    ongoingRaces,
+    concludedRaces,
+    notStartedRaces,
     handleUpdateEventStatus,
     handleUpdateEventDetails,
     handleAddMember,
@@ -235,6 +238,16 @@ function AdminEventDetailPage() {
                   style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'races' ? 'bold' : 'normal', color: activeTab === 'races' ? '#0176d3' : '#180505' }}
                 >
                   Races & Tracks ({races.length})
+                </button>
+              </li>
+              <li className={`slds-tabs_default__item ${activeTab === 'results' ? 'slds-is-active' : ''}`} role="presentation" style={{ borderBottom: activeTab === 'results' ? '3px solid #0176d3' : 'none' }}>
+                <button
+                  className="slds-tabs_default__link"
+                  type="button"
+                  onClick={() => setActiveTab('results')}
+                  style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'results' ? 'bold' : 'normal', color: activeTab === 'results' ? '#0176d3' : '#180505' }}
+                >
+                  Post Results
                 </button>
               </li>
             </ul>
@@ -529,122 +542,277 @@ function AdminEventDetailPage() {
                 )}
               </div>
             )}
-          </div>
 
-          {/* Race-Specific Competitors Section (reuses the member-add form pattern) */}
-          {selectedRaceId && selectedRace && selectedEvent.granularParticipation && (
-            <div className="slds-box slds-m-top_large" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '1.25rem' }}>
-              <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold' }}>
-                🏇 Race-Specific Competitors: {selectedRace.name}
-              </h3>
+            {/* Tab 4: Post Results */}
+            {activeTab === 'results' && (
+              <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
+                {races.length === 0 ? (
+                  <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
+                    <span style={{ fontSize: '48px', marginBottom: '12px', display: 'block' }}>🏁</span>
+                    <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>No Races Configured</p>
+                    <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
+                      You need to configure at least one race track to record results.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('races')}
+                      className="slds-button slds-button_brand slds-m-top_medium"
+                    >
+                      Go to Races & Tracks
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    {/* Left Sidebar: Race Selector */}
+                    <div style={{ flex: '1 1 300px', maxWidth: '360px', background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
+                      <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_medium" style={{ fontWeight: 'bold' }}>
+                        Select a Race
+                      </h3>
 
-              {/* Add Race Member Quick Form */}
-              <div className="slds-box slds-m-bottom_medium" style={{ background: '#f3f2f1', border: '1px solid #dddbda' }}>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void handleAddRaceMember(selectedRace.id, newRaceMemberUserId);
-                  }}
-                  className="slds-grid slds-wrap slds-grid_vertical-align-center"
-                  style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}
-                >
-                  <div className="slds-form-element" style={{ flexGrow: 1, minWidth: '240px' }}>
-                    <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }}>
-                      Register Competitor for this Race (Must be an Event Member first)
-                    </label>
-                    <div className="slds-form-element__control">
-                      <select
-                        value={newRaceMemberUserId}
-                        onChange={(e) => setNewRaceMemberUserId(e.target.value)}
-                        className="slds-select"
-                        style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', background: '#fff' }}
-                      >
-                        <option value="">-- Select Event Member --</option>
-                        {selectedEvent.members
-                          .filter((em) => !selectedRace.members.some((rm) => rm.userId === em.userId))
-                          .map((em) => (
-                            <option key={em.userId} value={em.userId}>
-                              {em.name} ({em.classTier ?? 'PRE_OP'})
-                            </option>
-                          ))}
-                      </select>
+                      {/* Group: Ongoing */}
+                      {ongoingRaces.length > 0 && (
+                        <div className="slds-m-bottom_medium">
+                          <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
+                            🔴 Ongoing / Live ({ongoingRaces.length})
+                          </h4>
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                            {ongoingRaces.map((race) => (
+                              <li key={race.id} className="slds-m-bottom_xx-small">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSelectRace(race, false)}
+                                  className="slds-button slds-button_neutral"
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    padding: '8px 12px',
+                                    background: selectedRaceId === race.id ? '#0176d3' : '#ffffff',
+                                    color: selectedRaceId === race.id ? '#ffffff' : '#0176d3',
+                                    fontWeight: selectedRaceId === race.id ? 'bold' : 'normal',
+                                    border: selectedRaceId === race.id ? '1px solid #0176d3' : '1px solid #dddbda',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                  }}
+                                >
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    #{race.sequence}. {race.name}
+                                  </span>
+                                  <span style={{ fontSize: '10px', opacity: 0.85 }}>Live</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Group: Concluded */}
+                      {concludedRaces.length > 0 && (
+                        <div className="slds-m-bottom_medium">
+                          <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
+                            🏁 Concluded ({concludedRaces.length})
+                          </h4>
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                            {concludedRaces.map((race) => (
+                              <li key={race.id} className="slds-m-bottom_xx-small">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSelectRace(race, false)}
+                                  className="slds-button slds-button_neutral"
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    padding: '8px 12px',
+                                    background: selectedRaceId === race.id ? '#0176d3' : '#ffffff',
+                                    color: selectedRaceId === race.id ? '#ffffff' : '#0176d3',
+                                    fontWeight: selectedRaceId === race.id ? 'bold' : 'normal',
+                                    border: selectedRaceId === race.id ? '1px solid #0176d3' : '1px solid #dddbda',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                  }}
+                                >
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    #{race.sequence}. {race.name}
+                                  </span>
+                                  <span style={{ fontSize: '10px', opacity: 0.85 }}>Done</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Group: Not Started */}
+                      {notStartedRaces.length > 0 && (
+                        <div>
+                          <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
+                            ⏳ Not Started ({notStartedRaces.length})
+                          </h4>
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                            {notStartedRaces.map((race) => (
+                              <li key={race.id} className="slds-m-bottom_xx-small">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSelectRace(race, false)}
+                                  className="slds-button slds-button_neutral"
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    padding: '8px 12px',
+                                    background: selectedRaceId === race.id ? '#0176d3' : '#ffffff',
+                                    color: selectedRaceId === race.id ? '#ffffff' : '#0176d3',
+                                    fontWeight: selectedRaceId === race.id ? 'bold' : 'normal',
+                                    border: selectedRaceId === race.id ? '1px solid #0176d3' : '1px solid #dddbda',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                  }}
+                                >
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    #{race.sequence}. {race.name}
+                                  </span>
+                                  <span style={{ fontSize: '10px', opacity: 0.85 }}>Ready</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Pane: focused StandingsEditor or guidance state */}
+                    <div style={{ flex: '2 1 500px', minWidth: '0' }}>
+                      {selectedRaceId && selectedRace ? (
+                        <div>
+                          {/* Race-Specific Competitors block if granular participation is enabled */}
+                          {selectedEvent.granularParticipation && (
+                            <div className="slds-box slds-m-bottom_medium" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '1rem' }}>
+                              <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>🏇 Competitor Lineup: {selectedRace.name}</span>
+                                <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '10px' }}>
+                                  {selectedRace.members.length} Registered
+                                </span>
+                              </h3>
+
+                              <div className="slds-box slds-m-bottom_small" style={{ background: '#f3f2f1', border: '1px solid #dddbda', padding: '8px 12px' }}>
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    void handleAddRaceMember(selectedRace.id, newRaceMemberUserId);
+                                  }}
+                                  className="slds-grid slds-wrap"
+                                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                >
+                                  <div style={{ flexGrow: 1, minWidth: '180px' }}>
+                                    <select
+                                      value={newRaceMemberUserId}
+                                      onChange={(e) => setNewRaceMemberUserId(e.target.value)}
+                                      className="slds-select"
+                                      style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px', background: '#fff', fontSize: '12px' }}
+                                    >
+                                      <option value="">-- Add Competitor from Event Members --</option>
+                                      {selectedEvent.members
+                                        .filter((em) => !selectedRace.members.some((rm) => rm.userId === em.userId))
+                                        .map((em) => (
+                                          <option key={em.userId} value={em.userId}>
+                                            {em.name} ({em.classTier ?? 'PRE_OP'})
+                                          </option>
+                                        ))}
+                                    </select>
+                                  </div>
+                                  <button
+                                    type="submit"
+                                    className="slds-button slds-button_brand"
+                                    style={{ padding: '4px 12px', height: '30px', fontSize: '12px' }}
+                                    disabled={!newRaceMemberUserId}
+                                  >
+                                    Add
+                                  </button>
+                                </form>
+                              </div>
+
+                              {selectedRace.members.length === 0 ? (
+                                <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: 0 }}>No competitors registered specifically for this race yet.</p>
+                              ) : (
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                  {selectedRace.members.map((m) => (
+                                    <span
+                                      key={m.userId}
+                                      className="slds-badge slds-theme_light"
+                                      style={{
+                                        padding: '2px 8px',
+                                        fontSize: '11px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        border: '1px solid #dddbda',
+                                        background: '#f8fafc',
+                                      }}
+                                    >
+                                      <strong>{m.name}</strong>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleRemoveRaceMember(selectedRace.id, m.userId)}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          color: '#d32f2f',
+                                          cursor: 'pointer',
+                                          fontWeight: 'bold',
+                                          padding: 0,
+                                        }}
+                                        title="Remove competitor"
+                                      >
+                                        ✕
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <StandingsEditor
+                            raceName={selectedRace.name}
+                            isRaceOngoing={isRaceOngoing(selectedRace)}
+                            isRaceNotStarted={isRaceNotStarted(selectedRace)}
+                            loadingResults={loadingResults}
+                            memberCount={selectedEvent.granularParticipation ? selectedRace.members.length : selectedEvent.members.length}
+                            rows={derivedStates}
+                            changeSummary={changeSummary}
+                            savingBatch={savingBatch}
+                            onStartRace={() => void handleStartRace(selectedRace.id)}
+                            onEndRace={() => void handleEndRace(selectedRace.id)}
+                            onInferTimes={handleInferFinishTimes}
+                            onCancel={handleCancelStandingsEdit}
+                            onSave={handleUnifiedSave}
+                            onResetAll={resetStandingsDraft}
+                            onResultChange={handleResultChange}
+                            onTogglePendingDeletion={togglePendingDeletion}
+                            onUndoRow={handleUndoRow}
+                          />
+                        </div>
+                      ) : (
+                        <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '2rem' }}>
+                          <span style={{ fontSize: '48px', marginBottom: '16px' }}>👈</span>
+                          <h3 className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold' }}>
+                            No Race Selected
+                          </h3>
+                          <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small" style={{ maxWidth: '360px' }}>
+                            Please select a race from the sidebar to view, manage, and post its results.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <button
-                    type="submit"
-                    className="slds-button slds-button_brand"
-                    style={{ padding: '6px 16px', height: '36px' }}
-                    disabled={!newRaceMemberUserId}
-                  >
-                    Register Competitor
-                  </button>
-                </form>
+                )}
               </div>
-
-              {/* List Race Members */}
-              {selectedRace.members.length === 0 ? (
-                <p className="slds-text-body_small text-slate-500">No competitors are currently registered specifically for this race.</p>
-              ) : (
-                <div className="slds-grid slds-wrap" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {selectedRace.members.map((m) => (
-                    <span
-                      key={m.userId}
-                      className="slds-badge slds-theme_light"
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '11px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        border: '1px solid #dddbda',
-                        background: '#ffffff',
-                      }}
-                    >
-                      <strong>{m.name}</strong> <span style={{ color: '#666' }}>({m.classTier ?? 'PRE_OP'})</span>
-                      <button
-                        type="button"
-                        onClick={() => void handleRemoveRaceMember(selectedRace.id, m.userId)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#d32f2f',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          padding: '0 2px',
-                        }}
-                        title="Remove from race"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Results Editor Pane - Dynamic Standings Entry */}
-          {selectedRaceId && selectedRace && (
-            <StandingsEditor
-              raceName={selectedRace.name}
-              isRaceOngoing={isRaceOngoing(selectedRace)}
-              isRaceNotStarted={isRaceNotStarted(selectedRace)}
-              loadingResults={loadingResults}
-              memberCount={selectedEvent.granularParticipation ? selectedRace.members.length : selectedEvent.members.length}
-              rows={derivedStates}
-              changeSummary={changeSummary}
-              savingBatch={savingBatch}
-              onStartRace={() => void handleStartRace(selectedRace.id)}
-              onEndRace={() => void handleEndRace(selectedRace.id)}
-              onInferTimes={handleInferFinishTimes}
-              onCancel={handleCancelStandingsEdit}
-              onSave={handleUnifiedSave}
-              onResetAll={resetStandingsDraft}
-              onResultChange={handleResultChange}
-              onTogglePendingDeletion={togglePendingDeletion}
-              onUndoRow={handleUndoRow}
-            />
-          )}
+            )}
+          </div>
         </div>
       ) : (
         <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
