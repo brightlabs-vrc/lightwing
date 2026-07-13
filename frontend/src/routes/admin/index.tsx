@@ -135,12 +135,12 @@ function AdminPage() {
             </div>
             <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
               <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
-                Monitor CSV/JSON pipeline records and manual data imports. Retry, approve, or mark ingest pipeline tasks done.
+                Per-event dataset imports are being finalized. Open an event and use its Datasets tab to track record ingestion once available.
               </p>
             </div>
             <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
-              <Link to="/admin/datasets" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
-                View Datasets
+              <Link to="/admin/events" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+                Manage Events
               </Link>
             </footer>
           </article>

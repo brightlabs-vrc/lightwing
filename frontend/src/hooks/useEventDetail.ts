@@ -29,7 +29,7 @@ import {
 const STATUS_OPTIONS: eventmanager.EventStatus[] = ['DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'CONCLUDED']
 const CLASS_TIER_OPTIONS = ['PRE_OP', 'OP', 'G3', 'G2', 'G1']
 
-export type ActiveTab = 'details' | 'members' | 'races'
+export type ActiveTab = 'details' | 'members' | 'races' | 'datasets'
 
 export interface NewRaceForm {
   name: string

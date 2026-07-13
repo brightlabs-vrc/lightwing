@@ -26,6 +26,13 @@ enum EventStatus {
   CONCLUDED
 }
 
+enum DatasetStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
 enum SiteRole {
   USER
   SITE_ADMIN
@@ -173,6 +180,7 @@ model Event {
   schedules        EventSchedule[]
   pointsEntries    EventPointsEntry[]
   ladderEntries    EventLadderEntry[]
+  datasets         Dataset[]
 
   @@index([organizationId])
   @@index([ownerUserId])
@@ -314,4 +322,19 @@ model ScoreCalcTask {
   @@index([nextRunAt])
   @@index([createdAt])
   @@map("score_calc_task")
+}
+
+model Dataset {
+  id         String        @id @db.Text
+  eventId    String        @db.Text
+  source     String        @db.Text
+  rows       Int           @default(0)
+  status     DatasetStatus @default(PENDING)
+  importedAt DateTime?     @db.Timestamp(6)
+  createdAt  DateTime      @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime      @updatedAt @db.Timestamp(6)
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("dataset")
 }

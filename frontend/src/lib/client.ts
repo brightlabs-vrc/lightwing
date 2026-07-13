@@ -325,6 +325,12 @@ export namespace eventmanager {
         rank: number
     }
 
+    export interface CreateDatasetParams {
+        authorization: string
+        source: string
+        rows?: number
+    }
+
     export interface CreateEventParams {
         authorization: string
         name: string
@@ -347,6 +353,28 @@ export namespace eventmanager {
         classRestriction?: ClassTier | null
         startsAt?: string | null
         endsAt?: string | null
+    }
+
+    /**
+     * API-facing string union mirroring the Prisma DatasetStatus enum. Encore's
+     * schema parser cannot use Prisma's runtime enum object as a type, so this is
+     * declared as a plain literal union with byte-identical values.
+     */
+    export type DatasetStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED"
+
+    export interface DatasetView {
+        id: string
+        eventId: string
+        source: string
+        rows: number
+        status: DatasetStatus
+        importedAt: string | null
+        createdAt: string
+        updatedAt: string
+    }
+
+    export interface DeleteDatasetParams {
+        authorization: string
     }
 
     export interface DeleteEventParams {
@@ -540,6 +568,11 @@ export namespace eventmanager {
         classTier: ClassTier | null
     }
 
+    export interface UpdateDatasetStatusParams {
+        authorization: string
+        status: DatasetStatus
+    }
+
     export interface UpdateEventParams {
         authorization: string
         name?: string
@@ -568,14 +601,17 @@ export namespace eventmanager {
             this.addEventMember = this.addEventMember.bind(this)
             this.addEventSchedule = this.addEventSchedule.bind(this)
             this.assignRaceResult = this.assignRaceResult.bind(this)
+            this.createDataset = this.createDataset.bind(this)
             this.createEvent = this.createEvent.bind(this)
             this.createRaceEvent = this.createRaceEvent.bind(this)
+            this.deleteDataset = this.deleteDataset.bind(this)
             this.deleteEvent = this.deleteEvent.bind(this)
             this.deleteRaceEvent = this.deleteRaceEvent.bind(this)
             this.deleteRaceResult = this.deleteRaceResult.bind(this)
             this.getEvent = this.getEvent.bind(this)
             this.getRaceEvent = this.getRaceEvent.bind(this)
             this.listClassTiers = this.listClassTiers.bind(this)
+            this.listDatasets = this.listDatasets.bind(this)
             this.listEligibleEvents = this.listEligibleEvents.bind(this)
             this.listEvents = this.listEvents.bind(this)
             this.listRaceEvents = this.listRaceEvents.bind(this)
@@ -587,6 +623,7 @@ export namespace eventmanager {
             this.setEventPoints = this.setEventPoints.bind(this)
             this.setEventStatus = this.setEventStatus.bind(this)
             this.setUserClass = this.setUserClass.bind(this)
+            this.updateDatasetStatus = this.updateDatasetStatus.bind(this)
             this.updateEvent = this.updateEvent.bind(this)
             this.updateRaceEvent = this.updateRaceEvent.bind(this)
         }
@@ -660,6 +697,28 @@ export namespace eventmanager {
         }
 
         /**
+         * Registers a new dataset import record against an event. The dataset starts in
+         * the PENDING state; the actual ingest pipeline is not yet wired up, so this
+         * only records the intent to import `source`.
+         */
+        public async createDataset(eventId: string, params: CreateDatasetParams): Promise<DatasetView> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                rows:   params.rows,
+                source: params.source,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/datasets`, JSON.stringify(body), {headers})
+            return await resp.json() as DatasetView
+        }
+
+        /**
          * Creates an event owned by either an organization or a single user (issue #4).
          * Org-owned events require event-create permission in the organization (or site
          * admin). User-owned events may be created by any authenticated user for
@@ -712,6 +771,24 @@ export namespace eventmanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/races`, JSON.stringify(body), {headers})
             return await resp.json() as RaceEventDetail
+        }
+
+        /**
+         * Deletes a dataset import record from an event.
+         */
+        public async deleteDataset(eventId: string, datasetId: string, params: DeleteDatasetParams): Promise<{
+    deleted: boolean
+}> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(eventId)}/datasets/${encodeURIComponent(datasetId)}`, undefined, {headers})
+            return await resp.json() as {
+    deleted: boolean
+}
         }
 
         /**
@@ -800,6 +877,19 @@ export namespace eventmanager {
             const resp = await this.baseClient.callTypedAPI("GET", `/classes`)
             return await resp.json() as {
     tiers: ClassTierInfo[]
+}
+        }
+
+        /**
+         * Lists the dataset import records scoped to a single event, newest first.
+         */
+        public async listDatasets(eventId: string): Promise<{
+    datasets: DatasetView[]
+}> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/datasets`)
+            return await resp.json() as {
+    datasets: DatasetView[]
 }
         }
 
@@ -1021,6 +1111,26 @@ export namespace eventmanager {
     userId: string
     classTier: ClassTier | null
 }
+        }
+
+        /**
+         * Mutates a dataset's ingest status (e.g. PENDING -> RUNNING -> DONE/FAILED).
+         * Transitioning to DONE stamps `importedAt`; clearing it resets the timestamp.
+         */
+        public async updateDatasetStatus(eventId: string, datasetId: string, params: UpdateDatasetStatusParams): Promise<DatasetView> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                status: params.status,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("PUT", `/events/${encodeURIComponent(eventId)}/datasets/${encodeURIComponent(datasetId)}/status`, JSON.stringify(body), {headers})
+            return await resp.json() as DatasetView
         }
 
         /**

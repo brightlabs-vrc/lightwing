@@ -65,7 +65,7 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
         <div className="slds-context-bar" style={{ borderBottom: '1px solid #dddbda', background: '#ffffff' }}>
           <nav className="slds-context-bar__secondary" role="navigation" style={{ width: '100%' }}>
             <ul className="slds-grid" style={{ display: 'flex', margin: 0, padding: 0, listStyle: 'none' }}>
-              <li className={`slds-context-bar__item ${isCurrent('/admin') && !isCurrent('/admin/events') && !isCurrent('/admin/users') && !isCurrent('/admin/datasets') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
+              <li className={`slds-context-bar__item ${isCurrent('/admin') && !isCurrent('/admin/events') && !isCurrent('/admin/users') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
                 <Link to="/admin" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
                   <span className="slds-truncate">Home</span>
                 </Link>
@@ -78,11 +78,6 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
               <li className={`slds-context-bar__item ${isCurrent('/admin/users') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
                 <Link to="/admin/users" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
                   <span className="slds-truncate">Users</span>
-                </Link>
-              </li>
-              <li className={`slds-context-bar__item ${isCurrent('/admin/datasets') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
-                <Link to="/admin/datasets" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
-                  <span className="slds-truncate">Datasets</span>
                 </Link>
               </li>
               <li className="slds-context-bar__item" style={{ display: 'inline-flex', marginLeft: 'auto' }}>

@@ -196,6 +196,16 @@ function AdminEventDetailPage() {
                   Races & Tracks ({races.length})
                 </button>
               </li>
+              <li className={`slds-tabs_default__item ${activeTab === 'datasets' ? 'slds-is-active' : ''}`} role="presentation" style={{ borderBottom: activeTab === 'datasets' ? '3px solid #0176d3' : 'none' }}>
+                <button
+                  className="slds-tabs_default__link"
+                  type="button"
+                  onClick={() => setActiveTab('datasets')}
+                  style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'datasets' ? 'bold' : 'normal', color: activeTab === 'datasets' ? '#0176d3' : '#180505' }}
+                >
+                  Datasets
+                </button>
+              </li>
             </ul>
 
             {/* Tab 1: Summary Info */}
@@ -486,6 +496,24 @@ function AdminEventDetailPage() {
                 )}
               </div>
             )}
+
+            {/* Tab 4: Datasets (placeholder — import formats not finalized yet) */}
+            {activeTab === 'datasets' && (
+              <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
+                <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '240px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <div className="slds-text-align_center">
+                    <SldsIcon category="utility" name="dataset" size={48} />
+                    <p className="slds-text-heading_medium font-bold text-slate-700 slds-m-top_medium" style={{ fontWeight: 'bold' }}>
+                      Importing records is coming soon
+                    </p>
+                    <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
+                      Dataset import formats are still being finalized.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* Results Editor Pane - Dynamic Standings Entry */}
