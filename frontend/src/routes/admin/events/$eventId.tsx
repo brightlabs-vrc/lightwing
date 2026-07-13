@@ -589,96 +589,28 @@ function AdminEventDetailPage() {
                       )}
                     </div>
 
-                    {/* Right Pane: All Races Overview OR focused Race details and StandingsEditor */}
+                    {/* Right Pane: Focused Race details / StandingsEditor OR clean placeholder state */}
                     <div style={{ flex: '2 1 500px', minWidth: '0' }}>
                       {selectedRaceId === null || !selectedRace ? (
-                        /* Case A: Show complete overview table */
-                        <article className="slds-card" style={{ border: '1px solid #dddbda', borderRadius: '4px', background: '#ffffff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                          <div className="slds-card__header slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #dddbda' }}>
-                            <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                              <div className="slds-media__body">
-                                <h2 className="slds-card__header-title">
-                                  <span className="slds-truncate font-bold text-slate-800" style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-                                    Event Races Overview
-                                  </span>
-                                </h2>
-                                <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px' }}>
-                                  Total Configured Tracks: {races.length} ({ongoingRaces.length} active, {concludedRaces.length} concluded)
-                                </p>
-                              </div>
-                            </header>
+                        /* Case A: Show elegant, clean placeholder state box */
+                        <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center', textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                          <div style={{ padding: '2rem' }}>
+                            <p className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
+                              No Race Track Selected
+                            </p>
+                            <p className="slds-text-body_regular text-slate-500 slds-m-top_small" style={{ fontSize: '14px', maxWidth: '360px', margin: '8px auto 0 auto', lineHeight: '1.5' }}>
+                              Select a race track from the left panel to begin managing competitors, recording standings, and starting or concluding races.
+                            </p>
                             <button
                               type="button"
                               onClick={() => setShowCreateRaceModal(true)}
-                              className="slds-button slds-button_brand"
-                              style={{ padding: '6px 12px', fontSize: '12px' }}
+                              className="slds-button slds-button_brand slds-m-top_large"
+                              style={{ padding: '6px 16px' }}
                             >
                               Create Race Track
                             </button>
                           </div>
-
-                          <div className="slds-card__body" style={{ padding: '16px' }}>
-                            <div className="slds-scrollable_x">
-                              <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
-                                <thead>
-                                  <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Seq</div></th>
-                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Race Name</div></th>
-                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Track & Distance</div></th>
-                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Location</div></th>
-                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status / Schedule</div></th>
-                                    <th scope="col" style={{ fontWeight: 'bold', width: '220px' }}><div className="slds-truncate">Actions</div></th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {races.map((race) => (
-                                    <tr key={race.id} className="slds-hint-parent">
-                                      <td><strong>#{race.sequence}</strong></td>
-                                      <td><span className="font-bold text-slate-900" style={{ fontWeight: 'bold' }}>{race.name}</span></td>
-                                      <td>{race.trackType} ({race.distanceMeters}m)</td>
-                                      <td>{race.location}</td>
-                                      <td>
-                                        {isRaceNotStarted(race) ? (
-                                          <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', borderRadius: '4px', background: '#e0e0e0', color: '#333' }}>
-                                            Not Started
-                                          </span>
-                                        ) : isRaceOngoing(race) ? (
-                                          <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', borderRadius: '4px', background: '#ff9800', color: '#fff' }}>
-                                            Ongoing
-                                          </span>
-                                        ) : (
-                                          <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
-                                            Concluded
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td>
-                                        <div className="slds-grid slds-wrap" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                          <button
-                                            type="button"
-                                            onClick={() => void handleSelectRace(race, false)}
-                                            className="slds-button slds-button_brand"
-                                            style={{ padding: '2px 8px', fontSize: '11px' }}
-                                          >
-                                            Manage Results
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => void handleDeleteRace(race.id)}
-                                            className="slds-button slds-button_neutral"
-                                            style={{ padding: '2px 8px', fontSize: '11px', color: '#d32f2f' }}
-                                          >
-                                            Delete
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </article>
+                        </div>
                       ) : (
                         /* Case B: Specific Race is selected — render management controls, lineup and StandingsEditor */
                         <div>
