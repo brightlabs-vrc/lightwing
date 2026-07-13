@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { AdminLayout } from '../-AdminLayout'
 import { useEventDetail } from '../../../hooks/useEventDetail'
@@ -29,6 +29,8 @@ function AdminEventDetailPage() {
     selectedRace,
     newMemberUserId,
     setNewMemberUserId,
+    newRaceMemberUserId,
+    setNewRaceMemberUserId,
     newRaceForm,
     setNewRaceForm,
     loadingEventDetail,
@@ -40,8 +42,11 @@ function AdminEventDetailPage() {
     loadingResults,
     savingBatch,
     handleUpdateEventStatus,
+    handleUpdateEventDetails,
     handleAddMember,
     handleRemoveMember,
+    handleAddRaceMember,
+    handleRemoveRaceMember,
     handleCreateRace,
     handleStartRace,
     handleEndRace,
@@ -57,6 +62,33 @@ function AdminEventDetailPage() {
   } = useEventDetail(eventId)
 
   const [showCreateRaceModal, setShowCreateRaceModal] = useState(false)
+  const [showEditEventModal, setShowEditEventModal] = useState(false)
+
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editClassRestriction, setEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
+  const [editGranularParticipation, setEditGranularParticipation] = useState(false)
+
+  // Set edit values when modal is toggled or event loads
+  useEffect(() => {
+    if (selectedEvent) {
+      setEditName(selectedEvent.name)
+      setEditDescription(selectedEvent.description ?? '')
+      setEditClassRestriction(selectedEvent.classRestriction)
+      setEditGranularParticipation(selectedEvent.granularParticipation)
+    }
+  }, [showEditEventModal, selectedEvent])
+
+  const onEditEventSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await handleUpdateEventDetails({
+      name: editName,
+      description: editDescription || null,
+      classRestriction: editClassRestriction || null,
+      granularParticipation: editGranularParticipation,
+    })
+    setShowEditEventModal(false)
+  }
 
   const onCreateRaceSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,7 +169,17 @@ function AdminEventDetailPage() {
         <div className="slds-box bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', padding: '1.5rem' }}>
           <div className="slds-grid slds-grid_align-spread slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #dddbda', paddingBottom: '1rem' }}>
             <div>
-              <h2 className="slds-text-heading_medium font-bold text-slate-900" style={{ fontSize: '1.35rem', fontWeight: 'bold' }}>{selectedEvent.name}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <h2 className="slds-text-heading_medium font-bold text-slate-900" style={{ fontSize: '1.35rem', fontWeight: 'bold', margin: 0 }}>{selectedEvent.name}</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowEditEventModal(true)}
+                  className="slds-button slds-button_neutral"
+                  style={{ padding: '2px 8px', fontSize: '11px' }}
+                >
+                  ✏️ Edit Details
+                </button>
+              </div>
               <p className="slds-text-body_small text-slate-500">ID: {selectedEvent.id}</p>
             </div>
 
@@ -224,6 +266,12 @@ function AdminEventDetailPage() {
                     <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Class restriction</p>
                     <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
                       Tier Restriction: <strong>{selectedEvent.classRestriction ?? 'PRE_OP (Any tier eligibility)'}</strong>
+                    </p>
+                  </div>
+                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
+                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Participation Model</p>
+                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
+                      Granular Per-Race Participation: <strong>{selectedEvent.granularParticipation ? 'Enabled (Per-Race registration required)' : 'Disabled (Event-wide registration)'}</strong>
                     </p>
                   </div>
                 </div>
@@ -483,6 +531,98 @@ function AdminEventDetailPage() {
             )}
           </div>
 
+          {/* Race-Specific Competitors Section (reuses the member-add form pattern) */}
+          {selectedRaceId && selectedRace && selectedEvent.granularParticipation && (
+            <div className="slds-box slds-m-top_large" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '1.25rem' }}>
+              <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold' }}>
+                🏇 Race-Specific Competitors: {selectedRace.name}
+              </h3>
+
+              {/* Add Race Member Quick Form */}
+              <div className="slds-box slds-m-bottom_medium" style={{ background: '#f3f2f1', border: '1px solid #dddbda' }}>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleAddRaceMember(selectedRace.id, newRaceMemberUserId);
+                  }}
+                  className="slds-grid slds-wrap slds-grid_vertical-align-center"
+                  style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}
+                >
+                  <div className="slds-form-element" style={{ flexGrow: 1, minWidth: '240px' }}>
+                    <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }}>
+                      Register Competitor for this Race (Must be an Event Member first)
+                    </label>
+                    <div className="slds-form-element__control">
+                      <select
+                        value={newRaceMemberUserId}
+                        onChange={(e) => setNewRaceMemberUserId(e.target.value)}
+                        className="slds-select"
+                        style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', background: '#fff' }}
+                      >
+                        <option value="">-- Select Event Member --</option>
+                        {selectedEvent.members
+                          .filter((em) => !selectedRace.members.some((rm) => rm.userId === em.userId))
+                          .map((em) => (
+                            <option key={em.userId} value={em.userId}>
+                              {em.name} ({em.classTier ?? 'PRE_OP'})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="slds-button slds-button_brand"
+                    style={{ padding: '6px 16px', height: '36px' }}
+                    disabled={!newRaceMemberUserId}
+                  >
+                    Register Competitor
+                  </button>
+                </form>
+              </div>
+
+              {/* List Race Members */}
+              {selectedRace.members.length === 0 ? (
+                <p className="slds-text-body_small text-slate-500">No competitors are currently registered specifically for this race.</p>
+              ) : (
+                <div className="slds-grid slds-wrap" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {selectedRace.members.map((m) => (
+                    <span
+                      key={m.userId}
+                      className="slds-badge slds-theme_light"
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        border: '1px solid #dddbda',
+                        background: '#ffffff',
+                      }}
+                    >
+                      <strong>{m.name}</strong> <span style={{ color: '#666' }}>({m.classTier ?? 'PRE_OP'})</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveRaceMember(selectedRace.id, m.userId)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#d32f2f',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          padding: '0 2px',
+                        }}
+                        title="Remove from race"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Results Editor Pane - Dynamic Standings Entry */}
           {selectedRaceId && selectedRace && (
             <StandingsEditor
@@ -490,7 +630,7 @@ function AdminEventDetailPage() {
               isRaceOngoing={isRaceOngoing(selectedRace)}
               isRaceNotStarted={isRaceNotStarted(selectedRace)}
               loadingResults={loadingResults}
-              memberCount={selectedEvent.members.length}
+              memberCount={selectedEvent.granularParticipation ? selectedRace.members.length : selectedEvent.members.length}
               rows={derivedStates}
               changeSummary={changeSummary}
               savingBatch={savingBatch}
@@ -692,6 +832,143 @@ function AdminEventDetailPage() {
                     className="slds-button slds-button_brand"
                   >
                     Create Race Track
+                  </button>
+                </footer>
+              </form>
+            </div>
+          </section>
+          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }} />
+        </div>
+      )}
+
+      {/* EDIT EVENT DETAILS DIALOG MODAL */}
+      {showEditEventModal && (
+        <div className="slds-scope">
+          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
+            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
+              <header className="slds-modal__header">
+                <button
+                  className="slds-button slds-button_icon slds-modal__close"
+                  title="Close"
+                  onClick={() => setShowEditEventModal(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    right: '1.5rem',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                    color: '#747474',
+                  }}
+                >
+                  ✕
+                </button>
+                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  Edit Event Details
+                </h2>
+              </header>
+
+              <form onSubmit={onEditEventSubmit}>
+                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                  <div className="slds-form slds-form_stacked">
+                    {/* Event Name */}
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-event-name">
+                        Event Name <span className="text-red-500">*</span>
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="edit-event-name"
+                          type="text"
+                          required
+                          placeholder="e.g. Winter Derby Championship"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-event-desc">
+                        Description
+                      </label>
+                      <div className="slds-form-element__control">
+                        <textarea
+                          id="edit-event-desc"
+                          placeholder="Brief description..."
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          className="slds-textarea"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%', minHeight: '80px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-class-tier">
+                            Class Tier Eligibility
+                          </label>
+                          <div className="slds-form-element__control">
+                            <select
+                              id="edit-class-tier"
+                              value={editClassRestriction || ''}
+                              onChange={(e) => setEditClassRestriction(e.target.value ? e.target.value as eventmanager.ClassTier : null)}
+                              className="slds-select"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            >
+                              <option value="">Any Tier Eligibility (None)</option>
+                              <option value="PRE_OP">PRE_OP</option>
+                              <option value="OP">OP</option>
+                              <option value="G3">G3</option>
+                              <option value="G2">G2</option>
+                              <option value="G1">G1</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                        <div className="slds-form-element" style={{ marginTop: '24px' }}>
+                          <div className="slds-form-element__control">
+                            <div className="slds-checkbox">
+                              <input
+                                type="checkbox"
+                                id="edit-granular-participation"
+                                checked={editGranularParticipation}
+                                onChange={(e) => setEditGranularParticipation(e.target.checked)}
+                                style={{ marginRight: '8px' }}
+                              />
+                              <label className="slds-checkbox__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-granular-participation">
+                                <span className="slds-checkbox_faux"></span>
+                                <span className="slds-form-element__label">Enable Granular Participation</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditEventModal(false)}
+                    className="slds-button slds-button_neutral"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="slds-button slds-button_brand"
+                  >
+                    Save Changes
                   </button>
                 </footer>
               </form>

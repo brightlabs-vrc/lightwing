@@ -3,6 +3,7 @@ import { useAuth } from './useAuth'
 import {
   getAdminEvent,
   updateAdminEventStatus,
+  updateAdminEvent,
   createRaceEvent,
   updateRaceEvent,
   deleteRaceEvent,
@@ -13,6 +14,8 @@ import {
   deleteRaceResult,
   addEventMember,
   removeEventMember,
+  addRaceEventMember,
+  removeRaceEventMember,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
 import {
@@ -57,6 +60,7 @@ export function useEventDetail(eventId: string) {
 
   // Form States
   const [newMemberUserId, setNewMemberUserId] = useState('')
+  const [newRaceMemberUserId, setNewRaceMemberUserId] = useState('')
   const [newRaceForm, setNewRaceForm] = useState<NewRaceForm>({
     name: '',
     sequence: 1,
@@ -140,6 +144,27 @@ export function useEventDetail(eventId: string) {
     [authHeader, eventId],
   )
 
+  const handleUpdateEventDetails = useCallback(
+    async (params: {
+      name: string
+      description: string | null
+      classRestriction: eventmanager.ClassTier | null
+      granularParticipation: boolean
+    }) => {
+      if (!authHeader) return
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updated = await updateAdminEvent(eventId, params, authHeader)
+        setSelectedEvent(updated)
+        setGlobalSuccess('Successfully updated event details.')
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to update event details')
+      }
+    },
+    [authHeader, eventId],
+  )
+
   // Add Member
   const handleAddMember = useCallback(
     async (evt: React.FormEvent) => {
@@ -177,6 +202,48 @@ export function useEventDetail(eventId: string) {
       }
     },
     [authHeader, eventId],
+  )
+
+  // Add Race Member
+  const handleAddRaceMember = useCallback(
+    async (raceId: string, userId: string) => {
+      if (!userId.trim() || !authHeader) return
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updatedRace = await addRaceEventMember(eventId, raceId, userId.trim(), authHeader)
+        setRaces((current) => current.map((r) => (r.id === raceId ? updatedRace : r)))
+        if (selectedRaceId === raceId) {
+          setSelectedRace(updatedRace)
+        }
+        setNewRaceMemberUserId('')
+        setGlobalSuccess(`Successfully registered competitor "${userId}" for the race.`)
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to register race member')
+      }
+    },
+    [authHeader, eventId, selectedRaceId],
+  )
+
+  // Remove Race Member
+  const handleRemoveRaceMember = useCallback(
+    async (raceId: string, userId: string) => {
+      if (!authHeader) return
+      if (!confirm('Are you sure you want to unregister this competitor from this race?')) return
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updatedRace = await removeRaceEventMember(eventId, raceId, userId, authHeader)
+        setRaces((current) => current.map((r) => (r.id === raceId ? updatedRace : r)))
+        if (selectedRaceId === raceId) {
+          setSelectedRace(updatedRace)
+        }
+        setGlobalSuccess('Successfully unregistered competitor from the race.')
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to unregister race member')
+      }
+    },
+    [authHeader, eventId, selectedRaceId],
   )
 
   // Create Race Event
@@ -350,8 +417,9 @@ export function useEventDetail(eventId: string) {
 
   const derivedStates: DerivedRow[] = useMemo(() => {
     if (!selectedEvent) return []
-    return deriveRows(selectedEvent.members, results, editedResults, pendingDeletions)
-  }, [selectedEvent, results, editedResults, pendingDeletions])
+    const membersToUse = (selectedEvent.granularParticipation && selectedRace) ? selectedRace.members : selectedEvent.members
+    return deriveRows(membersToUse, results, editedResults, pendingDeletions)
+  }, [selectedEvent, selectedRace, results, editedResults, pendingDeletions])
 
   const changeSummary: ChangeSummary = useMemo(() => summarizeChanges(derivedStates), [derivedStates])
 
@@ -518,6 +586,8 @@ export function useEventDetail(eventId: string) {
     pendingDeletions,
     newMemberUserId,
     setNewMemberUserId,
+    newRaceMemberUserId,
+    setNewRaceMemberUserId,
     newRaceForm,
     setNewRaceForm,
     loadingEventDetail,
@@ -531,8 +601,11 @@ export function useEventDetail(eventId: string) {
     changeSummary,
     // actions
     handleUpdateEventStatus,
+    handleUpdateEventDetails,
     handleAddMember,
     handleRemoveMember,
+    handleAddRaceMember,
+    handleRemoveRaceMember,
     handleCreateRace,
     handleStartRace,
     handleEndRace,
