@@ -109,7 +109,7 @@ function AdminEventDetailPage() {
           className="slds-button slds-button_neutral"
           style={{ padding: '4px 12px', fontSize: '12px' }}
         >
-          ← Back to Events
+          &larr; Back to Events
         </Link>
       }
     >
@@ -126,7 +126,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'DRAFT' && (
             <AlertBanner variant="warning">
               <div style={{ textAlign: 'left' }}>
-                <strong>🛠️ Event Status: DRAFT (Setup Mode)</strong>
+                <strong>Event Status: DRAFT (Setup Mode)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7c2d12' }}>
                   This event is in private preparation. <strong>Next steps:</strong> Register participants under the "Event Members" tab, create race tracks under the "Races & Tracks" tab, and set Lifecycle Status to <strong>UNOFFICIAL</strong> to publish it.
                 </p>
@@ -136,7 +136,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'UNOFFICIAL' && (
             <AlertBanner variant="warning">
               <div style={{ textAlign: 'left' }}>
-                <strong>🚀 Event Status: UNOFFICIAL (Live / Staging)</strong>
+                <strong>Event Status: UNOFFICIAL (Live / Staging)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7c2d12' }}>
                   This event is visible to participants. <strong>Next steps:</strong> Start and end configured races from the "Races & Tracks" tab, record standings, and set status to <strong>OFFICIAL</strong> (admins only) or <strong>CONCLUDED</strong> to finalize.
                 </p>
@@ -146,7 +146,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'OFFICIAL' && (
             <AlertBanner variant="success">
               <div style={{ textAlign: 'left' }}>
-                <strong>🏆 Event Status: OFFICIAL (Validated)</strong>
+                <strong>Event Status: OFFICIAL (Validated)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#ffffff' }}>
                   Results and overall points have been approved by Site Administrators. Real-time scores and standings are finalized.
                 </p>
@@ -156,7 +156,7 @@ function AdminEventDetailPage() {
           {selectedEvent.status === 'CONCLUDED' && (
             <AlertBanner variant="warning">
               <div style={{ textAlign: 'left' }}>
-                <strong>🏁 Event Status: CONCLUDED (Locked)</strong>
+                <strong>Event Status: CONCLUDED (Locked)</strong>
                 <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7c2d12' }}>
                   This competition has finished. Historical standings are locked and archived.
                 </p>
@@ -180,7 +180,7 @@ function AdminEventDetailPage() {
                   className="slds-button slds-button_neutral"
                   style={{ padding: '2px 8px', fontSize: '11px' }}
                 >
-                  ✏️ Edit Details
+                  Edit Details
                 </button>
               </div>
               <p className="slds-text-body_small text-slate-500">ID: {selectedEvent.id}</p>
@@ -439,7 +439,7 @@ function AdminEventDetailPage() {
                     className="slds-button slds-button_brand"
                     style={{ padding: '6px 12px', fontSize: '12px' }}
                   >
-                    ➕ Create Race Track
+                    Create Race Track
                   </button>
                 </div>
                 {races.length === 0 ? (
@@ -478,7 +478,7 @@ function AdminEventDetailPage() {
                                 </span>
                               ) : isRaceOngoing(race) ? (
                                 <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', borderRadius: '4px', background: '#ff9800', color: '#fff', animation: 'pulse 2s infinite' }}>
-                                  🔴 Ongoing / Live
+                                  Ongoing
                                 </span>
                               ) : (
                                 <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
@@ -500,7 +500,7 @@ function AdminEventDetailPage() {
                                     className="slds-button slds-button_success"
                                     style={{ padding: '2px 8px', fontSize: '11px', background: '#2e7d32', color: '#fff' }}
                                   >
-                                    🚀 Start
+                                    Start
                                   </button>
                                 )}
                                 {/* End Race */}
@@ -511,7 +511,7 @@ function AdminEventDetailPage() {
                                     className="slds-button slds-button_destructive"
                                     style={{ padding: '2px 8px', fontSize: '11px', background: '#d32f2f', color: '#fff' }}
                                   >
-                                    🏁 End
+                                    End
                                   </button>
                                 )}
                                 {/* Edit Standings/Results */}
@@ -521,7 +521,7 @@ function AdminEventDetailPage() {
                                   className="slds-button slds-button_brand"
                                   style={{ padding: '2px 8px', fontSize: '11px' }}
                                 >
-                                  🎯 Edit Results
+                                  Edit Results
                                 </button>
                                 {/* Delete */}
                                 <button
@@ -530,7 +530,7 @@ function AdminEventDetailPage() {
                                   className="slds-button slds-button_neutral"
                                   style={{ padding: '2px 8px', fontSize: '11px', color: '#d32f2f' }}
                                 >
-                                  🗑️ Delete
+                                  Delete
                                 </button>
                               </div>
                             </td>
@@ -548,7 +548,6 @@ function AdminEventDetailPage() {
               <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
                 {races.length === 0 ? (
                   <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-                    <span style={{ fontSize: '48px', marginBottom: '12px', display: 'block' }}>🏁</span>
                     <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>No Races Configured</p>
                     <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
                       You need to configure at least one race track to record results.
@@ -573,7 +572,7 @@ function AdminEventDetailPage() {
                       {ongoingRaces.length > 0 && (
                         <div className="slds-m-bottom_medium">
                           <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
-                            🔴 Ongoing / Live ({ongoingRaces.length})
+                            Ongoing ({ongoingRaces.length})
                           </h4>
                           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                             {ongoingRaces.map((race) => (
@@ -611,7 +610,7 @@ function AdminEventDetailPage() {
                       {concludedRaces.length > 0 && (
                         <div className="slds-m-bottom_medium">
                           <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
-                            🏁 Concluded ({concludedRaces.length})
+                            Concluded ({concludedRaces.length})
                           </h4>
                           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                             {concludedRaces.map((race) => (
@@ -649,7 +648,7 @@ function AdminEventDetailPage() {
                       {notStartedRaces.length > 0 && (
                         <div>
                           <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
-                            ⏳ Not Started ({notStartedRaces.length})
+                            Not Started ({notStartedRaces.length})
                           </h4>
                           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                             {notStartedRaces.map((race) => (
@@ -692,7 +691,7 @@ function AdminEventDetailPage() {
                           {selectedEvent.granularParticipation && (
                             <div className="slds-box slds-m-bottom_medium" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '1rem' }}>
                               <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>🏇 Competitor Lineup: {selectedRace.name}</span>
+                                <span>Competitor Lineup: {selectedRace.name}</span>
                                 <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '10px' }}>
                                   {selectedRace.members.length} Registered
                                 </span>
@@ -799,7 +798,6 @@ function AdminEventDetailPage() {
                         </div>
                       ) : (
                         <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '2rem' }}>
-                          <span style={{ fontSize: '48px', marginBottom: '16px' }}>👈</span>
                           <h3 className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold' }}>
                             No Race Selected
                           </h3>
@@ -818,7 +816,6 @@ function AdminEventDetailPage() {
       ) : (
         <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div className="slds-text-align_center">
-            <span style={{ fontSize: '48px' }}>🏁</span>
             <p className="slds-text-heading_medium font-bold text-slate-700 slds-m-top_medium" style={{ fontWeight: 'bold' }}>
               Event Not Found
             </p>
@@ -830,7 +827,7 @@ function AdminEventDetailPage() {
               className="slds-button slds-button_brand slds-m-top_medium"
               style={{ padding: '6px 16px' }}
             >
-              ← Back to Events
+              &larr; Back to Events
             </Link>
           </div>
         </div>

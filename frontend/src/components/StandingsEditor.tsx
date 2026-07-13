@@ -53,9 +53,6 @@ export function StandingsEditor({
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f1f5f9', padding: '12px 16px', borderBottom: '1px solid #dddbda' }}
       >
         <header className="slds-media slds-media_center slds-has-flexi-truncate">
-          <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-            <span className="slds-icon_container" style={{ fontSize: '18px' }}>🎯</span>
-          </div>
           <div className="slds-media__body">
             <h2 className="slds-card__header-title">
               <span className="slds-card__header-link slds-truncate font-bold text-slate-800" style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
@@ -77,7 +74,7 @@ export function StandingsEditor({
               className="slds-button slds-button_destructive"
               style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold', background: '#dc2626', color: '#fff' }}
             >
-              🏁 Conclude Race
+              Conclude Race
             </button>
           )}
           {isRaceNotStarted && (
@@ -88,7 +85,7 @@ export function StandingsEditor({
               className="slds-button slds-button_success"
               style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold', background: '#16a34a', color: '#fff' }}
             >
-              🚀 Start Race
+              Start Race
             </button>
           )}
           {!isRaceNotStarted && !isRaceOngoing && (
@@ -100,7 +97,7 @@ export function StandingsEditor({
               style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
               title="Fill in missing finish times from the leader's time plus each horse's margin/length"
             >
-              ⏱️ Infer Times
+              Infer Times
             </button>
           )}
           <button
@@ -121,7 +118,7 @@ export function StandingsEditor({
               style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
               title={isRaceOngoing ? 'Save provisional standings' : 'Save final standings'}
             >
-              {savingBatch ? 'Saving...' : `💾 Save (${changeSummary.totalCount})`}
+              {savingBatch ? 'Saving...' : `Save (${changeSummary.totalCount})`}
             </button>
           )}
         </div>
@@ -130,7 +127,6 @@ export function StandingsEditor({
       <div className="slds-card__body" style={{ padding: '16px' }}>
         {isRaceNotStarted ? (
           <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '200px', textAlign: 'center' }}>
-            <span style={{ fontSize: '48px', marginBottom: '12px' }}>🏇</span>
             <h3 className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>
               Race Has Not Started Yet
             </h3>
@@ -144,7 +140,7 @@ export function StandingsEditor({
               className="slds-button slds-button_success"
               style={{ padding: '8px 24px', fontSize: '14px', fontWeight: 'bold', background: '#16a34a', color: '#fff' }}
             >
-              🚀 Start Race Now
+              Start Race Now
             </button>
           </div>
         ) : (
@@ -160,12 +156,12 @@ export function StandingsEditor({
                       className="slds-button slds-button_destructive"
                       style={{ padding: '4px 12px', fontSize: '11px', background: '#dc2626', color: '#fff' }}
                     >
-                      🏁 Conclude Race
+                      Conclude Race
                     </button>
                   }
                 >
                   <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
-                    🔴 Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
+                    Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
                   </span>
                 </AlertBanner>
               </div>
@@ -394,7 +390,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
                         className="slds-button slds-button_neutral"
                         style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
                       >
-                        ↩️ Restore
+                        Restore
                       </button>
                     ) : isModified || isNew ? (
                       <>
@@ -404,7 +400,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
                           className="slds-button slds-button_neutral"
                           style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
                         >
-                          ↩️ Reset
+                          Reset
                         </button>
                         {savedResult && (
                           <button
@@ -413,7 +409,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
                             className="slds-button slds-button_destructive"
                             style={{ padding: '2px 8px', fontSize: '11px', background: '#dc2626', color: '#fff' }}
                           >
-                            🗑️ Remove
+                            Remove
                           </button>
                         )}
                       </>
@@ -424,7 +420,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
                         className="slds-button slds-button_destructive"
                         style={{ padding: '2px 8px', fontSize: '11px', background: '#dc2626', color: '#fff', flexGrow: 1 }}
                       >
-                        🗑️ Remove
+                        Remove
                       </button>
                     ) : (
                       <span style={{ fontSize: '11px', color: '#888', fontStyle: 'italic', padding: '2px 8px' }}>
@@ -440,7 +436,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
       </table>
 
       <div className="slds-m-top_medium slds-box" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '12px' }}>
-        <h4 className="font-bold text-slate-800" style={{ fontWeight: 'bold' }}>💡 Explanation of Standings update actions</h4>
+        <h4 className="font-bold text-slate-800" style={{ fontWeight: 'bold' }}>Explanation of Standings update actions</h4>
         <ul style={{ paddingLeft: '1.25rem', marginTop: '4px' }}>
           <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Staging Changes</strong> - Edits to the standings are compiled locally. Highlighting shows which rows have modified values or are pending deletion.</li>
           <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Smart Save Standings</strong> - The system analyzes your edits and executes the safest, most performant update automatically:
