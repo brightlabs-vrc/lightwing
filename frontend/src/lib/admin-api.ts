@@ -1159,9 +1159,8 @@ export async function updateAdminTeamMemberRole(
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.updateTeamMemberRole(teamId, {
+    return appClient.teammanager.updateTeamMemberRole(teamId, userId, {
       authorization,
-      userId,
       role,
     })
   }

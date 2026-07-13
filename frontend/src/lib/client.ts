@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-vgvds.encr.app`
+    return `https://${name}-7xfs6.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the vgvds Encore application.
+ * Client is an API client for the 7xfs6 Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -1590,7 +1590,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "vgvds-Generated-TS-Client (Encore/v1.57.9)";
+            this.headers["User-Agent"] = "7xfs6-Generated-TS-Client (Encore/v1.57.9)";
         }
 
         this.requestInit = options.requestInit ?? {};
