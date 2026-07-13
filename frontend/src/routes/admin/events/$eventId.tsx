@@ -794,6 +794,7 @@ function AdminEventDetailPage() {
                             onResultChange={handleResultChange}
                             onTogglePendingDeletion={togglePendingDeletion}
                             onUndoRow={handleUndoRow}
+                            noTopMargin={true}
                           />
                         </div>
                       ) : (

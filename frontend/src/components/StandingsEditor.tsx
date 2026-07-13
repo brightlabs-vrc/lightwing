@@ -20,6 +20,7 @@ interface StandingsEditorProps {
   onResultChange: (userId: string, field: keyof EditedResult, value: string) => void
   onTogglePendingDeletion: (userId: string) => void
   onUndoRow: (userId: string) => void
+  noTopMargin?: boolean
 }
 
 export function StandingsEditor({
@@ -40,10 +41,11 @@ export function StandingsEditor({
   onResultChange,
   onTogglePendingDeletion,
   onUndoRow,
+  noTopMargin = false,
 }: StandingsEditorProps) {
   return (
     <article
-      className="slds-card slds-m-top_large"
+      className={`slds-card ${noTopMargin ? '' : 'slds-m-top_large'}`}
       style={{ border: '2px solid #0176d3', borderRadius: '4px', background: '#f8fafc', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}
     >
       <div
