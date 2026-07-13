@@ -28,11 +28,6 @@ import {
   type DerivedRow,
   type EditedResult,
 } from '../lib/standings'
-import {
-  isRaceOngoing,
-  isRaceConcluded,
-  isRaceNotStarted,
-} from '../lib/raceStatus'
 
 const STATUS_OPTIONS: eventmanager.EventStatus[] = ['DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'CONCLUDED']
 const CLASS_TIER_OPTIONS = ['PRE_OP', 'OP', 'G3', 'G2', 'G1']
@@ -277,33 +272,6 @@ export function useEventDetail(eventId: string) {
     [authHeader, eventId, newRaceForm, races.length, reloadCurrentEvent],
   )
 
-  // Select Race to load results
-  const handleSelectRace = useCallback(
-    async (race: eventmanager.RaceEventDetail, switchTab = true) => {
-      setSelectedRaceId(race.id)
-      setSelectedRace(race)
-      setLoadingResults(true)
-      setGlobalError(null)
-      setGlobalSuccess(null)
-      setEditedResults({})
-      setPendingDeletions(new Set())
-      if (switchTab) {
-        setActiveTab('races')
-      }
-      try {
-        const response = await listRaceResults(eventId, race.id)
-        setResults(response.results)
-        setEditedResults(editsFromResults(response.results))
-      } catch (cause) {
-        setGlobalError(cause instanceof Error ? cause.message : 'Unable to load race results')
-        setResults([])
-      } finally {
-        setLoadingResults(false)
-      }
-    },
-    [eventId],
-  )
-
   // Start Race (Manual startsAt)
   const handleStartRace = useCallback(
     async (raceId: string) => {
@@ -335,16 +303,15 @@ export function useEventDetail(eventId: string) {
         const nowString = new Date().toISOString()
         const updated = await updateRaceEvent(eventId, raceId, { endsAt: nowString }, authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updated : r)))
-
-        // Auto-select the race and guide the user to the Post Results tab (now inside races)
-        await handleSelectRace(updated, true)
-
-        setGlobalSuccess(`Race manually ended at ${new Date(nowString).toLocaleTimeString()}. Guided to results entry.`)
+        if (selectedRaceId === raceId) {
+          setSelectedRace(updated)
+        }
+        setGlobalSuccess(`Race manually ended at ${new Date(nowString).toLocaleTimeString()}.`)
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to end race')
       }
     },
-    [authHeader, eventId, handleSelectRace],
+    [authHeader, eventId, selectedRaceId],
   )
 
   // Delete Race
@@ -370,6 +337,30 @@ export function useEventDetail(eventId: string) {
       }
     },
     [authHeader, eventId, reloadCurrentEvent, selectedRaceId],
+  )
+
+  // Select Race to load results
+  const handleSelectRace = useCallback(
+    async (race: eventmanager.RaceEventDetail) => {
+      setSelectedRaceId(race.id)
+      setSelectedRace(race)
+      setLoadingResults(true)
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      setEditedResults({})
+      setPendingDeletions(new Set())
+      try {
+        const response = await listRaceResults(eventId, race.id)
+        setResults(response.results)
+        setEditedResults(editsFromResults(response.results))
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to load race results')
+        setResults([])
+      } finally {
+        setLoadingResults(false)
+      }
+    },
+    [eventId],
   )
 
   // Handle single result input change
@@ -429,10 +420,6 @@ export function useEventDetail(eventId: string) {
     const membersToUse = (selectedEvent.granularParticipation && selectedRace) ? selectedRace.members : selectedEvent.members
     return deriveRows(membersToUse, results, editedResults, pendingDeletions)
   }, [selectedEvent, selectedRace, results, editedResults, pendingDeletions])
-
-  const ongoingRaces = useMemo(() => races.filter(isRaceOngoing), [races])
-  const concludedRaces = useMemo(() => races.filter(isRaceConcluded), [races])
-  const notStartedRaces = useMemo(() => races.filter(isRaceNotStarted), [races])
 
   const changeSummary: ChangeSummary = useMemo(() => summarizeChanges(derivedStates), [derivedStates])
 
@@ -593,8 +580,6 @@ export function useEventDetail(eventId: string) {
     setActiveTab,
     races,
     selectedRaceId,
-    setSelectedRaceId,
-    setSelectedRace,
     selectedRace,
     results,
     editedResults,
@@ -614,9 +599,6 @@ export function useEventDetail(eventId: string) {
     globalSuccess,
     derivedStates,
     changeSummary,
-    ongoingRaces,
-    concludedRaces,
-    notStartedRaces,
     // actions
     handleUpdateEventStatus,
     handleUpdateEventDetails,

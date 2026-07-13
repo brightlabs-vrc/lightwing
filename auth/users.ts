@@ -1,4 +1,4 @@
-import { api, APIError, Header } from "encore.dev/api";
+import { api, APIError, Header, Query } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireSiteAdmin, resolveActor } from "./rbac";
 import type { SiteRoleName } from "./permissions";
@@ -172,3 +172,55 @@ function toProfile(user: UserWithMembers): UserProfile {
     updatedAt: user.updatedAt.toISOString(),
   };
 }
+
+interface ListUsersParams {
+  authorization: Header<"Authorization">;
+  search?: Query<string>;
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface ListUsersResponse {
+  users: UserProfile[];
+  total: number;
+}
+
+// Lists all user profiles. Gated by requirement of being a site administrator.
+export const listUsers = api(
+  { expose: true, method: "GET", path: "/users" },
+  async ({
+    authorization,
+    search,
+    limit,
+    offset,
+  }: ListUsersParams): Promise<ListUsersResponse> => {
+    await requireSiteAdmin(prisma, authorization);
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const total = await prisma.user.count({ where });
+
+    const users = await prisma.user.findMany({
+      where,
+      take: limit ?? undefined,
+      skip: offset ?? undefined,
+      include: {
+        members: {
+          include: { organization: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return {
+      users: users.map(toProfile),
+      total,
+    };
+  }
+);

@@ -1,8 +1,8 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
-import { getAdminUserProfile, updateAdminUserSiteRole } from '../../../lib/admin-api'
+import { listAdminUsers } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import type { auth } from '../../../lib/client'
@@ -17,157 +17,48 @@ export const Route = createFileRoute('/admin/users/')({
 function AdminUsersPage() {
   const navigate = useNavigate()
   const { session } = useAuth()
-  const [selectedUserId, setSelectedUserId] = useState('')
-  const [profile, setProfile] = useState<auth.UserProfile | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [updatingRole, setUpdatingRole] = useState(false)
+  const [search, setSearch] = useState('')
+  const [users, setUsers] = useState<auth.UserProfile[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   const authHeader = useMemo(() => {
     const token = session?.session.token
     return token ? `Bearer ${token}` : null
   }, [session?.session.token])
 
-  const currentUserId = session?.user.id ?? ''
-
-  const users = [
-    {
-      id: currentUserId,
-      role: session?.user.siteRole ?? 'USER',
-      label: `${session?.user.name ?? 'Current user'} (you)`,
-    },
-    {
-      id: 'mock-user-1',
-      role: 'USER',
-      label: 'Thunder Bolt (Competitor)',
-    },
-    {
-      id: 'mock-user-2',
-      role: 'USER',
-      label: 'Shadow Runner (Competitor)',
-    },
-    {
-      id: 'mock-user-3',
-      role: 'USER',
-      label: 'Swift Galloper (Competitor)',
-    },
-  ].filter((user) => user.id)
-
-  async function lookupUser() {
-    if (!selectedUserId.trim()) {
-      setError('Enter a user ID to continue.')
-      setSuccess(null)
-      return
-    }
-
+  async function fetchUsers() {
+    if (!authHeader) return
     setLoading(true)
     setError(null)
-    setSuccess(null)
     try {
-      const loaded = await getAdminUserProfile(selectedUserId.trim())
-      setProfile(loaded)
+      const response = await listAdminUsers(authHeader, search)
+      setUsers(response.users)
     } catch (cause) {
-      setProfile(null)
-      setError(cause instanceof Error ? cause.message : 'Unable to fetch user profile')
+      setError(cause instanceof Error ? cause.message : 'Unable to load user list')
     } finally {
       setLoading(false)
     }
   }
 
-  async function setSiteRole(siteRole: auth.SiteRoleName) {
-    if (!profile) {
-      return
-    }
-
-    if (!authHeader) {
-      setError('Missing auth session token. Re-authenticate from /auth and try again.')
-      setSuccess(null)
-      return
-    }
-
-    setUpdatingRole(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      const updated = await updateAdminUserSiteRole(profile.id, siteRole, authHeader)
-      setProfile(updated)
-      setSuccess(`Successfully updated ${profile.name}'s role to ${siteRole}.`)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update site role')
-    } finally {
-      setUpdatingRole(false)
-    }
-  }
+  useEffect(() => {
+    void fetchUsers()
+  }, [authHeader, search])
 
   return (
     <AdminLayout
-      title="User Account Management"
-      subtitle="Verify system competitor profiles, review active team memberships, and adjust administrative site roles."
+      title="User Account Directory"
+      subtitle="Verify system competitor profiles, review site role authorization levels, and manage global system privileges."
     >
       <div className="slds-grid slds-wrap slds-gutters">
-        {/* Quick access list cards */}
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
-          <article className="slds-card" style={{ border: '1px solid #dddbda', height: '100%' }}>
+        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
+          <article className="slds-card" style={{ border: '1px solid #dddbda' }}>
             <div className="slds-card__header slds-grid">
               <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-people" style={{ fontSize: '18px' }}>👥</span>
-                </div>
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
                     <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Quick Access Users
-                    </span>
-                  </h2>
-                </div>
-              </header>
-            </div>
-
-            <div className="slds-card__body slds-card__body_inner">
-              <p className="slds-text-body_small text-slate-500 slds-m-bottom_medium" style={{ fontSize: '12px' }}>
-                Quickly jump to detailed profiling dashboards for active administrative or mock user records:
-              </p>
-              <ul className="slds-has-dividers_around-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                {users.map((user) => (
-                  <li key={user.id} className="slds-item" style={{ padding: '8px', border: '1px solid #dddbda', borderRadius: '4px', marginBottom: '6px', background: '#f8fafc' }}>
-                    <div className="slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate({
-                            to: '/admin/users/$userId',
-                            params: { userId: user.id },
-                          })
-                        }
-                        className="font-bold text-blue-600 hover:underline"
-                        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontWeight: 'bold' }}
-                      >
-                        {user.label}
-                      </button>
-                      <span className="slds-badge slds-theme_light" style={{ fontSize: '10px', padding: '1px 6px' }}>
-                        {user.role}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </article>
-        </div>
-
-        {/* User Lookup Controls */}
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_2-of-3 slds-m-bottom_medium">
-          <article className="slds-card" style={{ border: '1px solid #dddbda', height: '100%' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-contact" style={{ fontSize: '18px' }}>🔍</span>
-                </div>
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Lookup & Access Controls
+                      Registered System Competitors
                     </span>
                   </h2>
                 </div>
@@ -175,107 +66,123 @@ function AdminUsersPage() {
             </div>
 
             <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-              <div className="slds-form slds-m-bottom_large">
-                <div className="slds-form-element">
-                  <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="user-lookup-input">
-                    Query User by Unique Identifier
-                  </label>
-                  <div className="slds-form-element__control slds-grid" style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      id="user-lookup-input"
-                      value={selectedUserId}
-                      onChange={(evt) => setSelectedUserId(evt.target.value)}
-                      placeholder="e.g. mock-admin-1 or mock-user-1"
-                      className="slds-input"
-                      style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', flexGrow: 1 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void lookupUser()
-                      }}
-                      disabled={loading}
-                      className="slds-button slds-button_brand"
-                      style={{ padding: '6px 20px', height: '36px' }}
-                    >
-                      {loading ? 'Searching...' : 'Search Profile'}
-                    </button>
-                  </div>
+              {/* Search Control */}
+              <div className="slds-form-element slds-m-bottom_large" style={{ maxWidth: '400px' }}>
+                <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="user-search-input">
+                  Search by Name or Email Address
+                </label>
+                <div className="slds-form-element__control">
+                  <input
+                    id="user-search-input"
+                    value={search}
+                    onChange={(evt) => setSearch(evt.target.value)}
+                    placeholder="Search competitors..."
+                    className="slds-input"
+                    style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                  />
                 </div>
               </div>
 
               {error && (
-                <AlertBanner variant="error">{error}</AlertBanner>
+                <div className="slds-m-bottom_medium">
+                  <AlertBanner variant="error">{error}</AlertBanner>
+                </div>
               )}
-              {success && (
-                <AlertBanner variant="success">{success}</AlertBanner>
-              )}
 
-              {profile ? (
-                <div className="slds-box slds-theme_shade" style={{ background: '#f3f2f1', border: '1px solid #dddbda', borderRadius: '4px', padding: '1.5rem' }}>
-                  <h3 className="slds-text-heading_small font-bold slds-m-bottom_medium text-slate-900" style={{ fontWeight: 'bold', borderBottom: '1px solid #dddbda', paddingBottom: '6px' }}>
-                    Account Profile Results
-                  </h3>
-
-                  <div className="slds-grid slds-wrap slds-gutters slds-m-bottom_large">
-                    <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                      <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Full Name</p>
-                      <p className="slds-text-body_regular font-bold" style={{ fontWeight: 'bold' }}>{profile.name}</p>
-                    </div>
-                    <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                      <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Email Address</p>
-                      <p className="slds-text-body_regular">{profile.email}</p>
-                    </div>
-                    <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                      <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Global Site Role</p>
-                      <span className={`slds-badge ${profile.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px', background: profile.siteRole === 'SITE_ADMIN' ? '#2e7d32' : '#e0e0e0', color: profile.siteRole === 'SITE_ADMIN' ? '#fff' : '#000' }}>
-                        {profile.siteRole}
-                      </span>
-                    </div>
-                    <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                      <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Skill Class Tier</p>
-                      <p className="slds-text-body_regular"><strong>{profile.classTier ?? 'PRE_OP (Default)'}</strong></p>
-                    </div>
-                  </div>
-
-                  <div className="slds-m-bottom_large">
-                    <p className="slds-text-title text-slate-500 slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Career Biography</p>
-                    <p className="slds-text-body_regular" style={{ background: '#fff', padding: '10px', borderRadius: '4px', border: '1px solid #dddbda' }}>
-                      {profile.biography ?? 'No biography details provided.'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="slds-text-title text-slate-500 slds-m-bottom_small" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Adjust Administrative Access</p>
-                    <div className="slds-grid slds-wrap" style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void setSiteRole('SITE_ADMIN')
-                        }}
-                        disabled={updatingRole || profile.siteRole === 'SITE_ADMIN'}
-                        className="slds-button slds-button_success"
-                        style={{ padding: '6px 16px', background: '#2e7d32', color: '#fff' }}
-                      >
-                        Grant SITE_ADMIN
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void setSiteRole('USER')
-                        }}
-                        disabled={updatingRole || profile.siteRole === 'USER'}
-                        className="slds-button slds-button_destructive"
-                        style={{ padding: '6px 16px', background: '#d32f2f', color: '#fff' }}
-                      >
-                        Revoke to USER
-                      </button>
-                    </div>
-                  </div>
+              {loading ? (
+                <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
+                  <p>Loading competitor records...</p>
+                </div>
+              ) : users.length > 0 ? (
+                <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
+                  <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Competitors Directory Table" style={{ width: '100%' }}>
+                    <thead>
+                      <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
+                        <th scope="col" style={{ width: '250px' }}>
+                          <div className="slds-truncate font-bold" title="Full Name" style={{ fontWeight: 'bold' }}>Full Name</div>
+                        </th>
+                        <th scope="col" style={{ width: '250px' }}>
+                          <div className="slds-truncate font-bold" title="Email Address" style={{ fontWeight: 'bold' }}>Email Address</div>
+                        </th>
+                        <th scope="col" style={{ width: '150px' }}>
+                          <div className="slds-truncate font-bold" title="Site Role" style={{ fontWeight: 'bold' }}>Site Role</div>
+                        </th>
+                        <th scope="col" style={{ width: '150px' }}>
+                          <div className="slds-truncate font-bold" title="Class Tier" style={{ fontWeight: 'bold' }}>Class Tier</div>
+                        </th>
+                        <th scope="col">
+                          <div className="slds-truncate font-bold" title="Team Affiliations" style={{ fontWeight: 'bold' }}>Team Affiliations</div>
+                        </th>
+                        <th scope="col" style={{ width: '120px' }}>
+                          <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.id} className="slds-hint-parent hover:bg-slate-50">
+                          <th scope="row">
+                            <div className="slds-truncate font-bold" title={user.name}>
+                              <Link
+                                to="/admin/users/$userId"
+                                params={{ userId: user.id }}
+                                className="text-blue-600 hover:underline font-bold"
+                              >
+                                {user.name}
+                              </Link>
+                              {user.id === session?.user.id && (
+                                <span className="slds-badge slds-m-left_small" style={{ fontSize: '10px', padding: '1px 4px' }}>
+                                  You
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <td>
+                            <div className="slds-truncate" title={user.email}>{user.email}</div>
+                          </td>
+                          <td>
+                            <span className={`slds-badge ${user.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
+                              {user.siteRole}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="slds-truncate" title={user.classTier ?? 'PRE_OP'}>
+                              {user.classTier ?? 'PRE_OP'}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="slds-truncate" title={user.teams.map((t) => `${t.name} (${t.role})`).join(', ')}>
+                              {user.teams.length > 0 ? (
+                                <div className="slds-grid slds-wrap" style={{ gap: '4px' }}>
+                                  {user.teams.map((t) => (
+                                    <span key={t.organizationId} className="slds-badge slds-theme_light" style={{ fontSize: '11px', padding: '1px 6px' }}>
+                                      {t.name} ({t.role})
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">None</span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => navigate({ to: '/admin/users/$userId', params: { userId: user.id } })}
+                              className="slds-button slds-button_neutral"
+                              style={{ fontSize: '12px', padding: '2px 10px' }}
+                            >
+                              Manage
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                  <p>Enter a User ID in the input box above and click "Search Profile" to inspect records.</p>
+                  <p>No competitor accounts match the current query filter.</p>
                 </div>
               )}
             </div>
