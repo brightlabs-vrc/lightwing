@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-46h8a.encr.app`
+    return `https://${name}-7xfs6.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the 46h8a Encore application.
+ * Client is an API client for the 7xfs6 Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -98,6 +98,18 @@ export namespace auth {
         authorization: string
     }
 
+    export interface ListUsersParams {
+        authorization: string
+        search?: string
+        limit?: number
+        offset?: number
+    }
+
+    export interface ListUsersResponse {
+        users: UserProfile[]
+        total: number
+    }
+
     export interface SetSiteRoleParams {
         authorization: string
         siteRole: SiteRoleName
@@ -150,6 +162,7 @@ export namespace auth {
             this.baseClient = baseClient
             this.authHandler = this.authHandler.bind(this)
             this.getUserProfile = this.getUserProfile.bind(this)
+            this.listUsers = this.listUsers.bind(this)
             this.setUserSiteRole = this.setUserSiteRole.bind(this)
             this.updateUserProfile = this.updateUserProfile.bind(this)
         }
@@ -173,6 +186,26 @@ export namespace auth {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/users/${encodeURIComponent(id)}`)
             return await resp.json() as UserProfile
+        }
+
+        /**
+         * Lists all user profiles. Gated by requirement of being a site administrator.
+         */
+        public async listUsers(params: ListUsersParams): Promise<ListUsersResponse> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            const query = makeRecord<string, string | string[]>({
+                limit:  params.limit === undefined ? undefined : String(params.limit),
+                offset: params.offset === undefined ? undefined : String(params.offset),
+                search: params.search,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/users`, undefined, {headers, query})
+            return await resp.json() as ListUsersResponse
         }
 
         /**
@@ -1137,6 +1170,22 @@ export namespace hello {
 }
 
 export namespace teammanager {
+    export interface AddTeamMemberParams {
+        authorization: string
+        userId: string
+        role?: string
+    }
+
+    export interface CreateTeamParams {
+        authorization: string
+        name: string
+        logo?: string | null
+    }
+
+    export interface RemoveTeamMemberParams {
+        authorization: string
+    }
+
     export interface Team {
         id: string
         name: string
@@ -1165,6 +1214,11 @@ export namespace teammanager {
         averagePointsPerEvent: number | null
     }
 
+    export interface UpdateTeamMemberRoleParams {
+        authorization: string
+        role: string
+    }
+
     export interface UpdateTeamStatsParams {
         authorization: string
         rankingAverage?: number | null
@@ -1178,8 +1232,53 @@ export namespace teammanager {
 
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
+            this.addTeamMember = this.addTeamMember.bind(this)
+            this.createTeam = this.createTeam.bind(this)
             this.getTeam = this.getTeam.bind(this)
+            this.listTeams = this.listTeams.bind(this)
+            this.removeTeamMember = this.removeTeamMember.bind(this)
+            this.updateTeamMemberRole = this.updateTeamMemberRole.bind(this)
             this.updateTeamStats = this.updateTeamStats.bind(this)
+        }
+
+        /**
+         * Registers a participant for a team.
+         */
+        public async addTeamMember(id: string, params: AddTeamMemberParams): Promise<Team> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                role:   params.role,
+                userId: params.userId,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/teams/${encodeURIComponent(id)}/members`, JSON.stringify(body), {headers})
+            return await resp.json() as Team
+        }
+
+        /**
+         * Creates a new team (organization). Gated by site administrator.
+         */
+        public async createTeam(params: CreateTeamParams): Promise<Team> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                logo: params.logo,
+                name: params.name,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/teams`, JSON.stringify(body), {headers})
+            return await resp.json() as Team
         }
 
         /**
@@ -1188,6 +1287,52 @@ export namespace teammanager {
         public async getTeam(id: string): Promise<Team> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/teams/${encodeURIComponent(id)}`)
+            return await resp.json() as Team
+        }
+
+        /**
+         * Lists all teams mapped via toTeam.
+         */
+        public async listTeams(): Promise<{
+    teams: Team[]
+}> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/teams`)
+            return await resp.json() as {
+    teams: Team[]
+}
+        }
+
+        /**
+         * Removes a participant from a team.
+         */
+        public async removeTeamMember(id: string, userId: string, params: RemoveTeamMemberParams): Promise<Team> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
+            return await resp.json() as Team
+        }
+
+        /**
+         * Updates a team member's role.
+         */
+        public async updateTeamMemberRole(id: string, userId: string, params: UpdateTeamMemberRoleParams): Promise<Team> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                role: params.role,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
             return await resp.json() as Team
         }
 
@@ -1445,7 +1590,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "46h8a-Generated-TS-Client (Encore/v1.57.9)";
+            this.headers["User-Agent"] = "7xfs6-Generated-TS-Client (Encore/v1.57.9)";
         }
 
         this.requestInit = options.requestInit ?? {};

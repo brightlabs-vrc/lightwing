@@ -1,6 +1,6 @@
 import { appClient } from './api'
 import { MOCK_MODE } from './mock-mode'
-import type { auth, eventmanager } from './client'
+import type { auth, eventmanager, teammanager } from './client'
 
 const now = new Date().toISOString()
 
@@ -140,6 +140,26 @@ let mockEvents: eventmanager.EventDetail[] = [
     createdAt: now,
     updatedAt: now,
   },
+]
+
+let mockTeamsList: teammanager.Team[] = [
+  {
+    id: 'org_mock_urs',
+    name: 'URS Mock Team',
+    slug: 'urs-mock-team',
+    logo: null,
+    stats: {
+      rankingAverage: 4.5,
+      pointsAverage: 88.0,
+      seasonRank: 2,
+      averagePointsPerEvent: 12.5,
+    },
+    administratorSlotsRemaining: 2,
+    members: [
+      { userId: 'mock-admin-1', name: 'Mock Admin', role: 'administrator' },
+      { userId: 'mock-user-1', name: 'Thunder Bolt', role: 'member' },
+    ],
+  }
 ]
 
 const mockUserProfiles = new Map<string, auth.UserProfile>([
@@ -920,6 +940,36 @@ function recomputeMockOverview(eventId: string) {
 // USER MANAGEMENT METHODS
 // -----------------------------------------------------------------------------
 
+export async function listAdminUsers(
+  authorization: string,
+  search?: string,
+  limit?: number,
+  offset?: number,
+): Promise<{ users: auth.UserProfile[]; total: number }> {
+  if (!MOCK_MODE) {
+    return appClient.auth.listUsers({
+      authorization,
+      search,
+      limit,
+      offset,
+    })
+  }
+
+  let users = Array.from(mockUserProfiles.values())
+  if (search) {
+    const lower = search.toLowerCase()
+    users = users.filter((u) => u.name.toLowerCase().includes(lower) || u.email.toLowerCase().includes(lower))
+  }
+  const total = users.length
+  if (offset !== undefined) {
+    users = users.slice(offset)
+  }
+  if (limit !== undefined) {
+    users = users.slice(0, limit)
+  }
+  return { users, total }
+}
+
 export async function getAdminUserProfile(userId: string): Promise<auth.UserProfile> {
   if (!MOCK_MODE) {
     return appClient.auth.getUserProfile(userId)
@@ -959,4 +1009,224 @@ export async function updateAdminUserSiteRole(
 
   mockUserProfiles.set(userId, updated)
   return updated
+}
+
+// -----------------------------------------------------------------------------
+// TEAM MANAGEMENT METHODS
+// -----------------------------------------------------------------------------
+
+export async function listAdminTeams(): Promise<{ teams: teammanager.Team[] }> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.listTeams()
+  }
+
+  return { teams: mockTeamsList }
+}
+
+export async function getAdminTeam(id: string): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.getTeam(id)
+  }
+
+  const team = mockTeamsList.find((t) => t.id === id)
+  if (!team) {
+    throw new Error('Mock team not found')
+  }
+  return team
+}
+
+export async function updateAdminTeamStats(
+  id: string,
+  params: {
+    rankingAverage?: number | null
+    pointsAverage?: number | null
+    seasonRank?: number | null
+    averagePointsPerEvent?: number | null
+  },
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.updateTeamStats(id, {
+      authorization,
+      ...params,
+    })
+  }
+
+  const teamIndex = mockTeamsList.findIndex((t) => t.id === id)
+  if (teamIndex === -1) throw new Error('Mock team not found')
+  const team = mockTeamsList[teamIndex]
+
+  team.stats = {
+    rankingAverage: params.rankingAverage !== undefined ? params.rankingAverage : team.stats.rankingAverage,
+    pointsAverage: params.pointsAverage !== undefined ? params.pointsAverage : team.stats.pointsAverage,
+    seasonRank: params.seasonRank !== undefined ? params.seasonRank : team.stats.seasonRank,
+    averagePointsPerEvent: params.averagePointsPerEvent !== undefined ? params.averagePointsPerEvent : team.stats.averagePointsPerEvent,
+  }
+
+  return team
+}
+
+export async function createAdminTeam(
+  params: { name: string; logo?: string | null },
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.createTeam({
+      authorization,
+      name: params.name,
+      logo: params.logo,
+    })
+  }
+
+  const slug = params.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+
+  if (mockTeamsList.some((t) => t.slug === slug)) {
+    throw new Error('team with this slug already exists')
+  }
+
+  const id = `org_mock_${Math.floor(Math.random() * 10000)}`
+  const newTeam: teammanager.Team = {
+    id,
+    name: params.name,
+    slug,
+    logo: params.logo ?? null,
+    stats: {
+      rankingAverage: null,
+      pointsAverage: null,
+      seasonRank: null,
+      averagePointsPerEvent: null,
+    },
+    administratorSlotsRemaining: 3,
+    members: [],
+  }
+
+  mockTeamsList.unshift(newTeam)
+  return newTeam
+}
+
+export async function addAdminTeamMember(
+  teamId: string,
+  params: { userId: string; role?: string },
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.addTeamMember(teamId, {
+      authorization,
+      userId: params.userId,
+      role: params.role,
+    })
+  }
+
+  const teamIndex = mockTeamsList.findIndex((t) => t.id === teamId)
+  if (teamIndex === -1) {
+    throw new Error('Mock team not found')
+  }
+
+  const user = mockUserProfiles.get(params.userId)
+  if (!user) {
+    throw new Error('Mock user not found')
+  }
+
+  const team = mockTeamsList[teamIndex]
+  if (team.members.some((m) => m.userId === params.userId)) {
+    throw new Error('user is already a member of this team')
+  }
+
+  const role = params.role ?? 'member'
+  if (role === 'administrator') {
+    const adminsCount = team.members.filter((m) => m.role === 'administrator').length
+    if (adminsCount >= 3) {
+      throw new Error('At most three administrators can belong to an organization.')
+    }
+  }
+
+  team.members.push({ userId: user.id, name: user.name, role })
+  team.administratorSlotsRemaining = Math.max(3 - team.members.filter((m) => m.role === 'administrator').length, 0)
+
+  user.teams = [...user.teams, { organizationId: team.id, name: team.name, slug: team.slug, role }]
+  mockUserProfiles.set(user.id, user)
+
+  return team
+}
+
+export async function updateAdminTeamMemberRole(
+  teamId: string,
+  userId: string,
+  role: string,
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.updateTeamMemberRole(teamId, {
+      authorization,
+      userId,
+      role,
+    })
+  }
+
+  const teamIndex = mockTeamsList.findIndex((t) => t.id === teamId)
+  if (teamIndex === -1) {
+    throw new Error('Mock team not found')
+  }
+  const team = mockTeamsList[teamIndex]
+
+  const memberIndex = team.members.findIndex((m) => m.userId === userId)
+  if (memberIndex === -1) {
+    throw new Error('member not found')
+  }
+
+  const oldRole = team.members[memberIndex].role
+  if (role === 'administrator' && oldRole !== 'administrator') {
+    const adminsCount = team.members.filter((m) => m.role === 'administrator').length
+    if (adminsCount >= 3) {
+      throw new Error('At most three administrators can belong to an organization.')
+    }
+  }
+
+  team.members[memberIndex].role = role
+  team.administratorSlotsRemaining = Math.max(3 - team.members.filter((m) => m.role === 'administrator').length, 0)
+
+  const user = mockUserProfiles.get(userId)
+  if (user) {
+    user.teams = user.teams.map((t) => (t.organizationId === teamId ? { ...t, role } : t))
+    mockUserProfiles.set(userId, user)
+  }
+
+  return team
+}
+
+export async function removeAdminTeamMember(
+  teamId: string,
+  userId: string,
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.removeTeamMember(teamId, userId, {
+      authorization,
+    })
+  }
+
+  const teamIndex = mockTeamsList.findIndex((t) => t.id === teamId)
+  if (teamIndex === -1) {
+    throw new Error('Mock team not found')
+  }
+  const team = mockTeamsList[teamIndex]
+
+  const memberIndex = team.members.findIndex((m) => m.userId === userId)
+  if (memberIndex === -1) {
+    throw new Error('member not found')
+  }
+
+  team.members.splice(memberIndex, 1)
+  team.administratorSlotsRemaining = Math.max(3 - team.members.filter((m) => m.role === 'administrator').length, 0)
+
+  const user = mockUserProfiles.get(userId)
+  if (user) {
+    user.teams = user.teams.filter((t) => t.organizationId !== teamId)
+    mockUserProfiles.set(userId, user)
+  }
+
+  return team
 }
