@@ -147,19 +147,7 @@ export function StandingsEditor({
           <>
             {isRaceOngoing && (
               <div className="slds-m-bottom_medium">
-                <AlertBanner
-                  variant="warning"
-                  action={
-                    <button
-                      type="button"
-                      onClick={onEndRace}
-                      className="slds-button slds-button_destructive"
-                      style={{ padding: '4px 12px', fontSize: '11px', background: '#dc2626', color: '#fff' }}
-                    >
-                      Conclude Race
-                    </button>
-                  }
-                >
+                <AlertBanner variant="warning">
                   <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
                     Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
                   </span>
