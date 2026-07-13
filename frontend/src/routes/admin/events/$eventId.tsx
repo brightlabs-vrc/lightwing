@@ -26,6 +26,8 @@ function AdminEventDetailPage() {
     setActiveTab,
     races,
     selectedRaceId,
+    setSelectedRaceId,
+    setSelectedRace,
     selectedRace,
     newMemberUserId,
     setNewMemberUserId,
@@ -41,6 +43,7 @@ function AdminEventDetailPage() {
     changeSummary,
     loadingResults,
     savingBatch,
+    eventStatusSaving: statusSaving,
     ongoingRaces,
     concludedRaces,
     notStartedRaces,
@@ -214,7 +217,9 @@ function AdminEventDetailPage() {
                 <button
                   className="slds-tabs_default__link"
                   type="button"
-                  onClick={() => setActiveTab('details')}
+                  onClick={() => {
+                    setActiveTab('details')
+                  }}
                   style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'details' ? 'bold' : 'normal', color: activeTab === 'details' ? '#0176d3' : '#180505' }}
                 >
                   Event Summary
@@ -224,7 +229,9 @@ function AdminEventDetailPage() {
                 <button
                   className="slds-tabs_default__link"
                   type="button"
-                  onClick={() => setActiveTab('members')}
+                  onClick={() => {
+                    setActiveTab('members')
+                  }}
                   style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'members' ? 'bold' : 'normal', color: activeTab === 'members' ? '#0176d3' : '#180505' }}
                 >
                   Event Members ({selectedEvent.members.length})
@@ -234,20 +241,12 @@ function AdminEventDetailPage() {
                 <button
                   className="slds-tabs_default__link"
                   type="button"
-                  onClick={() => setActiveTab('races')}
+                  onClick={() => {
+                    setActiveTab('races')
+                  }}
                   style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'races' ? 'bold' : 'normal', color: activeTab === 'races' ? '#0176d3' : '#180505' }}
                 >
                   Races & Tracks ({races.length})
-                </button>
-              </li>
-              <li className={`slds-tabs_default__item ${activeTab === 'results' ? 'slds-is-active' : ''}`} role="presentation" style={{ borderBottom: activeTab === 'results' ? '3px solid #0176d3' : 'none' }}>
-                <button
-                  className="slds-tabs_default__link"
-                  type="button"
-                  onClick={() => setActiveTab('results')}
-                  style={{ border: 'none', background: 'transparent', padding: '12px 16px', cursor: 'pointer', fontWeight: activeTab === 'results' ? 'bold' : 'normal', color: activeTab === 'results' ? '#0176d3' : '#180505' }}
-                >
-                  Post Results
                 </button>
               </li>
             </ul>
@@ -426,146 +425,53 @@ function AdminEventDetailPage() {
               </div>
             )}
 
-            {/* Tab 3: Races & Tracks */}
+            {/* Tab 3: Unified Races & Tracks Experience */}
             {activeTab === 'races' && (
               <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
-                <div className="slds-grid slds-grid_align-spread slds-m-bottom_medium" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
-                    Event Races
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateRaceModal(true)}
-                    className="slds-button slds-button_brand"
-                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                  >
-                    Create Race Track
-                  </button>
-                </div>
                 {races.length === 0 ? (
-                  <p className="slds-text-body_small text-slate-500">No race tracks have been configured under this event yet.</p>
-                ) : (
-                  <div className="slds-scrollable_x">
-                    <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
-                      <thead>
-                        <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Seq</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Race Name</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Track & Distance</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Location</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status / Schedule</div></th>
-                          <th scope="col" style={{ fontWeight: 'bold', width: '220px' }}><div className="slds-truncate">Manual Operations</div></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {races.map((race) => (
-                          <tr
-                            key={race.id}
-                            className="slds-hint-parent"
-                            style={{
-                              background: selectedRaceId === race.id ? '#e0f2fe' : 'transparent',
-                              borderLeft: selectedRaceId === race.id ? '4px solid #0284c7' : 'none',
-                            }}
-                          >
-                            <td><strong>#{race.sequence}</strong></td>
-                            <td><span className="font-bold text-slate-900" style={{ fontWeight: 'bold' }}>{race.name}</span></td>
-                            <td>{race.trackType} ({race.distanceMeters}m)</td>
-                            <td>{race.location}</td>
-                            <td>
-                              {isRaceNotStarted(race) ? (
-                                <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', borderRadius: '4px', background: '#e0e0e0', color: '#333' }}>
-                                  Not Started
-                                </span>
-                              ) : isRaceOngoing(race) ? (
-                                <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', borderRadius: '4px', background: '#ff9800', color: '#fff', animation: 'pulse 2s infinite' }}>
-                                  Ongoing
-                                </span>
-                              ) : (
-                                <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
-                                  Concluded
-                                </span>
-                              )}
-                              <div className="text-slate-500 slds-m-top_xx-small" style={{ fontSize: '10px' }}>
-                                {race.startsAt ? `Started: ${new Date(race.startsAt).toLocaleTimeString()}` : ''} <br />
-                                {race.endsAt ? `Ended: ${new Date(race.endsAt).toLocaleTimeString()}` : ''}
-                              </div>
-                            </td>
-                            <td>
-                              <div className="slds-grid slds-wrap" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {/* Start Race */}
-                                {isRaceNotStarted(race) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleStartRace(race.id)}
-                                    className="slds-button slds-button_success"
-                                    style={{ padding: '2px 8px', fontSize: '11px', background: '#2e7d32', color: '#fff' }}
-                                  >
-                                    Start
-                                  </button>
-                                )}
-                                {/* End Race */}
-                                {isRaceOngoing(race) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleEndRace(race.id)}
-                                    className="slds-button slds-button_destructive"
-                                    style={{ padding: '2px 8px', fontSize: '11px', background: '#d32f2f', color: '#fff' }}
-                                  >
-                                    End
-                                  </button>
-                                )}
-                                {/* Edit Standings/Results */}
-                                <button
-                                  type="button"
-                                  onClick={() => void handleSelectRace(race)}
-                                  className="slds-button slds-button_brand"
-                                  style={{ padding: '2px 8px', fontSize: '11px' }}
-                                >
-                                  Edit Results
-                                </button>
-                                {/* Delete */}
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDeleteRace(race.id)}
-                                  className="slds-button slds-button_neutral"
-                                  style={{ padding: '2px 8px', fontSize: '11px', color: '#d32f2f' }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Tab 4: Post Results */}
-            {activeTab === 'results' && (
-              <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
-                {races.length === 0 ? (
-                  <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
+                  <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
                     <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>No Races Configured</p>
                     <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
-                      You need to configure at least one race track to record results.
+                      Configure your first race track using the wizard.
                     </p>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('races')}
+                      onClick={() => setShowCreateRaceModal(true)}
                       className="slds-button slds-button_brand slds-m-top_medium"
                     >
-                      Go to Races & Tracks
+                      Create Race Track
                     </button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    {/* Left Sidebar: Race Selector */}
+                    {/* Left Sidebar: Race Selector + Overview Button */}
                     <div style={{ flex: '1 1 300px', maxWidth: '360px', background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
+                      {/* Overview Link */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRaceId(null)
+                          setSelectedRace(null)
+                        }}
+                        className="slds-button"
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '10px 12px',
+                          marginBottom: '16px',
+                          background: selectedRaceId === null ? '#0176d3' : '#ffffff',
+                          color: selectedRaceId === null ? '#ffffff' : '#0176d3',
+                          fontWeight: 'bold',
+                          border: '1px solid #0176d3',
+                          borderRadius: '4px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                        }}
+                      >
+                        All Races Overview
+                      </button>
+
                       <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_medium" style={{ fontWeight: 'bold' }}>
-                        Select a Race
+                        Configure / Manage Tracks
                       </h3>
 
                       {/* Group: Ongoing */}
@@ -683,15 +589,165 @@ function AdminEventDetailPage() {
                       )}
                     </div>
 
-                    {/* Right Pane: focused StandingsEditor or guidance state */}
+                    {/* Right Pane: All Races Overview OR focused Race details and StandingsEditor */}
                     <div style={{ flex: '2 1 500px', minWidth: '0' }}>
-                      {selectedRaceId && selectedRace ? (
+                      {selectedRaceId === null || !selectedRace ? (
+                        /* Case A: Show complete overview table */
+                        <article className="slds-card" style={{ border: '1px solid #dddbda', borderRadius: '4px', background: '#ffffff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                          <div className="slds-card__header slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #dddbda' }}>
+                            <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                              <div className="slds-media__body">
+                                <h2 className="slds-card__header-title">
+                                  <span className="slds-truncate font-bold text-slate-800" style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                    Event Races Overview
+                                  </span>
+                                </h2>
+                                <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px' }}>
+                                  Total Configured Tracks: {races.length} ({ongoingRaces.length} active, {concludedRaces.length} concluded)
+                                </p>
+                              </div>
+                            </header>
+                            <button
+                              type="button"
+                              onClick={() => setShowCreateRaceModal(true)}
+                              className="slds-button slds-button_brand"
+                              style={{ padding: '6px 12px', fontSize: '12px' }}
+                            >
+                              Create Race Track
+                            </button>
+                          </div>
+
+                          <div className="slds-card__body" style={{ padding: '16px' }}>
+                            <div className="slds-scrollable_x">
+                              <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
+                                <thead>
+                                  <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
+                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Seq</div></th>
+                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Race Name</div></th>
+                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Track & Distance</div></th>
+                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Location</div></th>
+                                    <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status / Schedule</div></th>
+                                    <th scope="col" style={{ fontWeight: 'bold', width: '220px' }}><div className="slds-truncate">Actions</div></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {races.map((race) => (
+                                    <tr key={race.id} className="slds-hint-parent">
+                                      <td><strong>#{race.sequence}</strong></td>
+                                      <td><span className="font-bold text-slate-900" style={{ fontWeight: 'bold' }}>{race.name}</span></td>
+                                      <td>{race.trackType} ({race.distanceMeters}m)</td>
+                                      <td>{race.location}</td>
+                                      <td>
+                                        {isRaceNotStarted(race) ? (
+                                          <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', borderRadius: '4px', background: '#e0e0e0', color: '#333' }}>
+                                            Not Started
+                                          </span>
+                                        ) : isRaceOngoing(race) ? (
+                                          <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', borderRadius: '4px', background: '#ff9800', color: '#fff' }}>
+                                            Ongoing
+                                          </span>
+                                        ) : (
+                                          <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
+                                            Concluded
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td>
+                                        <div className="slds-grid slds-wrap" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => void handleSelectRace(race, false)}
+                                            className="slds-button slds-button_brand"
+                                            style={{ padding: '2px 8px', fontSize: '11px' }}
+                                          >
+                                            Manage Results
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => void handleDeleteRace(race.id)}
+                                            className="slds-button slds-button_neutral"
+                                            style={{ padding: '2px 8px', fontSize: '11px', color: '#d32f2f' }}
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </article>
+                      ) : (
+                        /* Case B: Specific Race is selected — render management controls, lineup and StandingsEditor */
                         <div>
-                          {/* Race-Specific Competitors block if granular participation is enabled */}
+                          {/* Race Details Header Card */}
+                          <div className="slds-box slds-m-bottom_medium bg-white" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
+                            <div className="slds-grid slds-grid_align-spread slds-grid_vertical-align-center" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                              <div>
+                                <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
+                                  #{selectedRace.sequence}. {selectedRace.name}
+                                </h3>
+                                <p className="text-slate-500 text-xs" style={{ margin: '4px 0 0 0' }}>
+                                  Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> | Location: <strong>{selectedRace.location}</strong>
+                                </p>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                {isRaceNotStarted(selectedRace) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleStartRace(selectedRace.id)}
+                                    className="slds-button slds-button_success"
+                                    style={{ padding: '4px 12px', fontSize: '12px', background: '#2e7d32', color: '#fff' }}
+                                  >
+                                    Start Race
+                                  </button>
+                                )}
+                                {isRaceOngoing(selectedRace) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleEndRace(selectedRace.id)}
+                                    className="slds-button slds-button_destructive"
+                                    style={{ padding: '4px 12px', fontSize: '12px', background: '#d32f2f', color: '#fff' }}
+                                  >
+                                    End Race
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteRace(selectedRace.id)}
+                                  className="slds-button slds-button_neutral"
+                                  style={{ padding: '4px 12px', fontSize: '12px', color: '#d32f2f' }}
+                                >
+                                  Delete Race
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRaceId(null)
+                                    setSelectedRace(null)
+                                  }}
+                                  className="slds-button slds-button_neutral"
+                                  style={{ padding: '4px 12px', fontSize: '12px' }}
+                                >
+                                  Back to Overview
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="text-slate-500 slds-m-top_small" style={{ fontSize: '11px', borderTop: '1px solid #f3f2f1', paddingTop: '8px' }}>
+                              {selectedRace.startsAt ? `Started: ${new Date(selectedRace.startsAt).toLocaleString()}` : 'Race is currently not started'} <br />
+                              {selectedRace.endsAt ? `Ended: ${new Date(selectedRace.endsAt).toLocaleString()}` : ''}
+                            </div>
+                          </div>
+
+                          {/* Granular Participant lineup box */}
                           {selectedEvent.granularParticipation && (
                             <div className="slds-box slds-m-bottom_medium" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '1rem' }}>
                               <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Competitor Lineup: {selectedRace.name}</span>
+                                <span>Competitor Lineup</span>
                                 <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '10px' }}>
                                   {selectedRace.members.length} Registered
                                 </span>
@@ -775,6 +831,7 @@ function AdminEventDetailPage() {
                             </div>
                           )}
 
+                          {/* Dynamic Standings editor grid */}
                           <StandingsEditor
                             raceName={selectedRace.name}
                             isRaceOngoing={isRaceOngoing(selectedRace)}
@@ -795,15 +852,6 @@ function AdminEventDetailPage() {
                             onUndoRow={handleUndoRow}
                             noTopMargin={true}
                           />
-                        </div>
-                      ) : (
-                        <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '2rem' }}>
-                          <h3 className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold' }}>
-                            No Race Selected
-                          </h3>
-                          <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small" style={{ maxWidth: '360px' }}>
-                            Please select a race from the sidebar to view, manage, and post its results.
-                          </p>
                         </div>
                       )}
                     </div>

@@ -37,7 +37,7 @@ import {
 const STATUS_OPTIONS: eventmanager.EventStatus[] = ['DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'CONCLUDED']
 const CLASS_TIER_OPTIONS = ['PRE_OP', 'OP', 'G3', 'G2', 'G1']
 
-export type ActiveTab = 'details' | 'members' | 'races' | 'results'
+export type ActiveTab = 'details' | 'members' | 'races'
 
 export interface NewRaceForm {
   name: string
@@ -288,7 +288,7 @@ export function useEventDetail(eventId: string) {
       setEditedResults({})
       setPendingDeletions(new Set())
       if (switchTab) {
-        setActiveTab('results')
+        setActiveTab('races')
       }
       try {
         const response = await listRaceResults(eventId, race.id)
@@ -336,7 +336,7 @@ export function useEventDetail(eventId: string) {
         const updated = await updateRaceEvent(eventId, raceId, { endsAt: nowString }, authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updated : r)))
 
-        // Auto-select the race and guide the user to the Post Results tab
+        // Auto-select the race and guide the user to the Post Results tab (now inside races)
         await handleSelectRace(updated, true)
 
         setGlobalSuccess(`Race manually ended at ${new Date(nowString).toLocaleTimeString()}. Guided to results entry.`)
@@ -593,6 +593,8 @@ export function useEventDetail(eventId: string) {
     setActiveTab,
     races,
     selectedRaceId,
+    setSelectedRaceId,
+    setSelectedRace,
     selectedRace,
     results,
     editedResults,
