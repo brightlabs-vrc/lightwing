@@ -1,0 +1,12 @@
+
+> @lightwing/frontend@0.1.0 dev /app/frontend
+> vite --host --port 5173
+
+
+  VITE v8.1.4  ready in 1050 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/
+  ➜  Network: http://172.17.0.1:5173/
+12:43:49 PM [vite] (client) [optimizer] bundling dependencies...
+ ELIFECYCLE  Command failed with exit code 143.

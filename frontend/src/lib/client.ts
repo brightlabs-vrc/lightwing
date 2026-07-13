@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-i922w.encr.app`
+    return `https://${name}-os29g.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the i922w Encore application.
+ * Client is an API client for the os29g Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -298,6 +298,13 @@ export namespace eventmanager {
         rank: number
     }
 
+    export interface CreateDatasetParams {
+        authorization: string
+        source: string
+        rows: number
+        status?: DatasetStatus
+    }
+
     export interface CreateEventParams {
         authorization: string
         name: string
@@ -321,6 +328,19 @@ export namespace eventmanager {
         classRestriction?: ClassTier | null
         startsAt?: string | null
         endsAt?: string | null
+    }
+
+    export type DatasetStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED"
+
+    export interface DatasetView {
+        id: string
+        eventId: string
+        source: string
+        rows: number
+        status: DatasetStatus
+        importedAt: string | null
+        createdAt: string
+        updatedAt: string
     }
 
     export interface DeleteEventParams {
@@ -526,6 +546,11 @@ export namespace eventmanager {
         classTier: ClassTier | null
     }
 
+    export interface UpdateDatasetStatusParams {
+        authorization: string
+        status: DatasetStatus
+    }
+
     export interface UpdateEventParams {
         authorization: string
         name?: string
@@ -556,6 +581,7 @@ export namespace eventmanager {
             this.addEventSchedule = this.addEventSchedule.bind(this)
             this.addRaceEventMember = this.addRaceEventMember.bind(this)
             this.assignRaceResult = this.assignRaceResult.bind(this)
+            this.createDataset = this.createDataset.bind(this)
             this.createEvent = this.createEvent.bind(this)
             this.createRaceEvent = this.createRaceEvent.bind(this)
             this.deleteEvent = this.deleteEvent.bind(this)
@@ -564,6 +590,7 @@ export namespace eventmanager {
             this.getEvent = this.getEvent.bind(this)
             this.getRaceEvent = this.getRaceEvent.bind(this)
             this.listClassTiers = this.listClassTiers.bind(this)
+            this.listDatasets = this.listDatasets.bind(this)
             this.listEligibleEvents = this.listEligibleEvents.bind(this)
             this.listEvents = this.listEvents.bind(this)
             this.listRaceEventMembers = this.listRaceEventMembers.bind(this)
@@ -577,6 +604,7 @@ export namespace eventmanager {
             this.setEventPoints = this.setEventPoints.bind(this)
             this.setEventStatus = this.setEventStatus.bind(this)
             this.setUserClass = this.setUserClass.bind(this)
+            this.updateDatasetStatus = this.updateDatasetStatus.bind(this)
             this.updateEvent = this.updateEvent.bind(this)
             this.updateRaceEvent = this.updateRaceEvent.bind(this)
         }
@@ -666,6 +694,27 @@ export namespace eventmanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("PUT", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
             return await resp.json() as RaceResultView
+        }
+
+        /**
+         * Creates a dataset record for an event
+         */
+        public async createDataset(eventId: string, params: CreateDatasetParams): Promise<DatasetView> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                rows:   params.rows,
+                source: params.source,
+                status: params.status,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/datasets`, JSON.stringify(body), {headers})
+            return await resp.json() as DatasetView
         }
 
         /**
@@ -810,6 +859,19 @@ export namespace eventmanager {
             const resp = await this.baseClient.callTypedAPI("GET", `/classes`)
             return await resp.json() as {
     tiers: ClassTierInfo[]
+}
+        }
+
+        /**
+         * Lists datasets scoped by event
+         */
+        public async listDatasets(eventId: string): Promise<{
+    datasets: DatasetView[]
+}> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/datasets`)
+            return await resp.json() as {
+    datasets: DatasetView[]
 }
         }
 
@@ -1058,6 +1120,25 @@ export namespace eventmanager {
     userId: string
     classTier: ClassTier | null
 }
+        }
+
+        /**
+         * Updates a dataset record's processing status
+         */
+        public async updateDatasetStatus(eventId: string, datasetId: string, params: UpdateDatasetStatusParams): Promise<DatasetView> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                status: params.status,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("PUT", `/events/${encodeURIComponent(eventId)}/datasets/${encodeURIComponent(datasetId)}/status`, JSON.stringify(body), {headers})
+            return await resp.json() as DatasetView
         }
 
         /**
@@ -1590,7 +1671,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "i922w-Generated-TS-Client (Encore/v1.57.9)";
+            this.headers["User-Agent"] = "os29g-Generated-TS-Client (Encore/v1.57.9)";
         }
 
         this.requestInit = options.requestInit ?? {};
