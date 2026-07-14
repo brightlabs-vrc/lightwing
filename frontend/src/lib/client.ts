@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-os29g.encr.app`
+    return `https://${name}-p8zbo.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the os29g Encore application.
+ * Client is an API client for the p8zbo Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -1671,7 +1671,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "os29g-Generated-TS-Client (Encore/v1.57.9)";
+            this.headers["User-Agent"] = "p8zbo-Generated-TS-Client (Encore/v1.57.9)";
         }
 
         this.requestInit = options.requestInit ?? {};
