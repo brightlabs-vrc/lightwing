@@ -72,11 +72,33 @@ export function deriveRows(
     } else if (savedResult) {
       const savedPos = savedResult.position !== null ? String(savedResult.position) : ''
       const savedPoints = String(savedResult.points)
-      if (edit.position !== savedPos || edit.points !== savedPoints) {
+      const savedGate = savedResult.gateNumber !== null ? String(savedResult.gateNumber) : ''
+      const savedFinish = savedResult.finishTime ?? ''
+      const savedMargin = savedResult.margin ?? ''
+      const savedPassing = savedResult.passingOrder ?? ''
+      const savedFinal3F = savedResult.final3F ?? ''
+
+      if (
+        edit.position !== savedPos ||
+        edit.points !== savedPoints ||
+        edit.gateNumber !== savedGate ||
+        edit.finishTime !== savedFinish ||
+        edit.margin !== savedMargin ||
+        edit.passingOrder !== savedPassing ||
+        edit.final3F !== savedFinal3F
+      ) {
         rowState = 'modified'
       }
     } else {
-      const isDefault = edit.position === '' && (edit.points === '' || edit.points === '0')
+      const isDefault =
+        edit.position === '' &&
+        (edit.points === '' || edit.points === '0') &&
+        edit.gateNumber === '' &&
+        edit.finishTime === '' &&
+        edit.margin === '' &&
+        edit.passingOrder === '' &&
+        edit.final3F === ''
+
       if (!isDefault) {
         rowState = 'new'
       }
