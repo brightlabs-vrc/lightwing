@@ -12,7 +12,7 @@ const mockEventMembers: eventmanager.EventMemberView[] = [
 ]
 
 // Rich initial mock race events
-const mockRaceEventsList: eventmanager.RaceEventView[] = [
+const mockRaceEventsList: (eventmanager.RaceEventView & { members: eventmanager.RaceEventMemberView[] })[] = [
   {
     id: 'race_mock_101',
     name: 'Inaugural Mile Sprint',
@@ -24,6 +24,7 @@ const mockRaceEventsList: eventmanager.RaceEventView[] = [
     classRestriction: 'OP',
     startsAt: null,
     endsAt: null,
+    members: [],
   },
   {
     id: 'race_mock_102',
@@ -36,6 +37,10 @@ const mockRaceEventsList: eventmanager.RaceEventView[] = [
     classRestriction: 'G1',
     startsAt: now,
     endsAt: null, // Ongoing
+    members: [
+      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+    ],
   },
 ]
 
@@ -101,7 +106,7 @@ let mockEvents: eventmanager.EventDetail[] = [
     scoringType: 1,
     scoringTypeLabel: 'points-based',
     classRestriction: 'OP',
-    granularParticipation: false,
+    granularParticipation: true,
     raceEvents: mockRaceEventsList,
     members: mockEventMembers,
     schedules: [],
@@ -236,12 +241,43 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
   ],
 ])
 
+export function hydrateEventRaceEvents(event: eventmanager.EventDetail): eventmanager.EventDetail {
+  const hydratedRaces = event.raceEvents.map((race) => ({
+    ...race,
+    members: mockRaceMembersMap.get(race.id) ?? [],
+  }))
+  return {
+    ...event,
+    raceEvents: hydratedRaces as any,
+  }
+}
+
+export function hydrateRaceEvent(eventId: string, race: eventmanager.RaceEventView): eventmanager.RaceEventDetail {
+  return {
+    id: race.id,
+    eventId,
+    name: race.name,
+    sequence: race.sequence,
+    distanceMeters: race.distanceMeters,
+    trackType: race.trackType,
+    location: race.location,
+    scoringType: race.scoringType,
+    classRestriction: race.classRestriction,
+    startsAt: race.startsAt,
+    endsAt: race.endsAt,
+    createdAt: now,
+    updatedAt: now,
+    members: mockRaceMembersMap.get(race.id) ?? [],
+  }
+}
+
 export async function listAdminEvents(): Promise<{ events: eventmanager.EventDetail[] }> {
   if (!MOCK_MODE) {
     return appClient.eventmanager.listEvents({})
   }
 
-  return { events: mockEvents }
+  const hydratedEvents = mockEvents.map((evt) => hydrateEventRaceEvents(evt))
+  return { events: hydratedEvents }
 }
 
 export async function getAdminEvent(eventId: string): Promise<eventmanager.EventDetail> {
@@ -253,7 +289,7 @@ export async function getAdminEvent(eventId: string): Promise<eventmanager.Event
   if (!event) {
     throw new Error('Mock event not found')
   }
-  return event
+  return hydrateEventRaceEvents(event)
 }
 
 export async function updateAdminEventStatus(
@@ -384,24 +420,26 @@ export async function listRaceEvents(eventId: string): Promise<{ races: eventman
     throw new Error('Mock event not found')
   }
 
-  const mappedRaces: eventmanager.RaceEventDetail[] = event.raceEvents.map((race) => ({
-    id: race.id,
-    eventId: event.id,
-    name: race.name,
-    sequence: race.sequence,
-    distanceMeters: race.distanceMeters,
-    trackType: race.trackType,
-    location: race.location,
-    scoringType: race.scoringType,
-    classRestriction: race.classRestriction,
-    startsAt: race.startsAt,
-    endsAt: race.endsAt,
-    createdAt: now,
-    updatedAt: now,
-    members: mockRaceMembersMap.get(race.id) ?? [],
-  }))
-
+  const mappedRaces: eventmanager.RaceEventDetail[] = event.raceEvents.map((race) => hydrateRaceEvent(event.id, race))
   return { races: mappedRaces }
+}
+
+export async function getRaceEvent(eventId: string, raceId: string): Promise<eventmanager.RaceEventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.getRaceEvent(eventId, raceId)
+  }
+
+  const event = mockEvents.find((evt) => evt.id === eventId)
+  if (!event) {
+    throw new Error('Mock event not found')
+  }
+
+  const race = event.raceEvents.find((r) => r.id === raceId)
+  if (!race) {
+    throw new Error('Mock race not found')
+  }
+
+  return hydrateRaceEvent(eventId, race)
 }
 
 export async function createRaceEvent(
@@ -458,13 +496,7 @@ export async function createRaceEvent(
     return evt
   })
 
-  return {
-    ...newRace,
-    eventId,
-    createdAt: now,
-    updatedAt: now,
-    members: [],
-  }
+  return hydrateRaceEvent(eventId, newRace)
 }
 
 export async function updateRaceEvent(
@@ -525,13 +557,7 @@ export async function updateRaceEvent(
     throw new Error('Race event not found in mocks')
   }
 
-  return {
-    ...finalRace,
-    eventId,
-    createdAt: now,
-    updatedAt: now,
-    members: mockRaceMembersMap.get(raceId) ?? [],
-  }
+  return hydrateRaceEvent(eventId, finalRace)
 }
 
 export async function deleteRaceEvent(
@@ -840,22 +866,7 @@ export async function addRaceEventMember(
     throw new Error('Mock race not found')
   }
 
-  return {
-    id: race.id,
-    eventId,
-    name: race.name,
-    sequence: race.sequence,
-    distanceMeters: race.distanceMeters,
-    trackType: race.trackType,
-    location: race.location,
-    scoringType: race.scoringType,
-    classRestriction: race.classRestriction,
-    startsAt: race.startsAt,
-    endsAt: race.endsAt,
-    createdAt: now,
-    updatedAt: now,
-    members: mockRaceMembersMap.get(raceId) ?? [],
-  }
+  return hydrateRaceEvent(eventId, race)
 }
 
 export async function removeRaceEventMember(
@@ -883,22 +894,7 @@ export async function removeRaceEventMember(
     throw new Error('Mock race not found')
   }
 
-  return {
-    id: race.id,
-    eventId,
-    name: race.name,
-    sequence: race.sequence,
-    distanceMeters: race.distanceMeters,
-    trackType: race.trackType,
-    location: race.location,
-    scoringType: race.scoringType,
-    classRestriction: race.classRestriction,
-    startsAt: race.startsAt,
-    endsAt: race.endsAt,
-    createdAt: now,
-    updatedAt: now,
-    members: mockRaceMembersMap.get(raceId) ?? [],
-  }
+  return hydrateRaceEvent(eventId, race)
 }
 
 export async function listRaceEventMembers(

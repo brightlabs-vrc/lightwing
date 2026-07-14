@@ -446,7 +446,7 @@ export function useEventDetail(eventId: string) {
 
   const derivedStates: DerivedRow[] = useMemo(() => {
     if (!selectedEvent) return []
-    const membersToUse = (selectedEvent.granularParticipation && selectedRace) ? selectedRace.members : selectedEvent.members
+    const membersToUse = (selectedEvent.granularParticipation && selectedRace) ? (selectedRace.members ?? []) : selectedEvent.members
     return deriveRows(membersToUse, results, editedResults, pendingDeletions)
   }, [selectedEvent, selectedRace, results, editedResults, pendingDeletions])
 
