@@ -56,6 +56,7 @@ function AdminEventDetailPage() {
     handleCreateRace,
     handleStartRace,
     handleEndRace,
+    handleUpdateRace,
     handleDeleteRace,
     handleSelectRace,
     handleResultChange,
@@ -633,51 +634,80 @@ function AdminEventDetailPage() {
                                 <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
                                   #{selectedRace.sequence}. {selectedRace.name}
                                 </h3>
-                                <p className="text-slate-500 text-xs" style={{ margin: '4px 0 0 0' }}>
-                                  Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> | Location: <strong>{selectedRace.location}</strong>
-                                </p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                  <p className="text-slate-500 text-xs" style={{ margin: 0 }}>
+                                    Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> | Location: <strong>{selectedRace.location}</strong>
+                                  </p>
+                                  <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '11px', textTransform: 'none' }}>
+                                    Class Restriction: <strong>{selectedRace.classRestriction ?? 'Any tier'}</strong>
+                                  </span>
+                                </div>
                               </div>
 
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                {isRaceNotStarted(selectedRace) && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0, fontSize: '12px' }} htmlFor="race-class-restriction-select">
+                                    Class Restriction:
+                                  </label>
+                                  <div className="slds-form-element__control">
+                                    <select
+                                      id="race-class-restriction-select"
+                                      value={selectedRace.classRestriction || ''}
+                                      onChange={(e) => void handleUpdateRace(selectedRace.id, e.target.value ? e.target.value as eventmanager.ClassTier : null)}
+                                      className="slds-select"
+                                      style={{ minWidth: '130px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
+                                    >
+                                      <option value="">Any Tier (None)</option>
+                                      {CLASS_TIER_OPTIONS.map((tier) => (
+                                        <option key={tier} value={tier}>
+                                          {tier}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  {isRaceNotStarted(selectedRace) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleStartRace(selectedRace.id)}
+                                      className="slds-button slds-button_success"
+                                      style={{ padding: '4px 12px', fontSize: '12px', background: '#2e7d32', color: '#fff' }}
+                                    >
+                                      Start Race
+                                    </button>
+                                  )}
+                                  {isRaceOngoing(selectedRace) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleEndRace(selectedRace.id)}
+                                      className="slds-button slds-button_destructive"
+                                      style={{ padding: '4px 12px', fontSize: '12px', background: '#d32f2f', color: '#fff' }}
+                                    >
+                                      End Race
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
-                                    onClick={() => void handleStartRace(selectedRace.id)}
-                                    className="slds-button slds-button_success"
-                                    style={{ padding: '4px 12px', fontSize: '12px', background: '#2e7d32', color: '#fff' }}
+                                    onClick={() => void handleDeleteRace(selectedRace.id)}
+                                    className="slds-button slds-button_neutral"
+                                    style={{ padding: '4px 12px', fontSize: '12px', color: '#d32f2f' }}
                                   >
-                                    Start Race
+                                    Delete Race
                                   </button>
-                                )}
-                                {isRaceOngoing(selectedRace) && (
                                   <button
                                     type="button"
-                                    onClick={() => void handleEndRace(selectedRace.id)}
-                                    className="slds-button slds-button_destructive"
-                                    style={{ padding: '4px 12px', fontSize: '12px', background: '#d32f2f', color: '#fff' }}
+                                    onClick={() => {
+                                      setSelectedRaceId(null)
+                                      setSelectedRace(null)
+                                    }}
+                                    className="slds-button slds-button_neutral"
+                                    style={{ padding: '4px 12px', fontSize: '12px' }}
                                   >
-                                    End Race
+                                    Back to Overview
                                   </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDeleteRace(selectedRace.id)}
-                                  className="slds-button slds-button_neutral"
-                                  style={{ padding: '4px 12px', fontSize: '12px', color: '#d32f2f' }}
-                                >
-                                  Delete Race
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedRaceId(null)
-                                    setSelectedRace(null)
-                                  }}
-                                  className="slds-button slds-button_neutral"
-                                  style={{ padding: '4px 12px', fontSize: '12px' }}
-                                >
-                                  Back to Overview
-                                </button>
+                                </div>
                               </div>
                             </div>
 

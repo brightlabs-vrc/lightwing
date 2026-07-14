@@ -73,11 +73,19 @@ export const setUserClass = api(
   },
 );
 
+export interface EligibleRace {
+  id: string;
+  name: string;
+  sequence: number;
+  classRestriction: ClassTier | null;
+}
+
 export interface EligibleEvent {
   id: string;
   name: string;
   organizationId: string | null;
   classRestriction: ClassTier | null;
+  eligibleRaces: EligibleRace[];
 }
 
 interface EligibleEventsParams {
@@ -94,15 +102,42 @@ export const listEligibleEvents = api(
       throw APIError.notFound("user not found");
     }
 
-    const events = await prisma.event.findMany({ orderBy: { createdAt: "desc" } });
-    const eligible = events
-      .filter((event) => isEligible(user.classTier, event.classRestriction))
-      .map((event) => ({
-        id: event.id,
-        name: event.name,
-        organizationId: event.organizationId,
-        classRestriction: event.classRestriction,
-      }));
+    const events = await prisma.event.findMany({
+      include: {
+        raceEvents: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const eligible: EligibleEvent[] = [];
+    for (const event of events) {
+      const isEventEligible = isEligible(user.classTier, event.classRestriction);
+
+      const eligibleRaces: EligibleRace[] = [];
+      for (const race of event.raceEvents) {
+        const effectiveRestriction = race.classRestriction ?? event.classRestriction;
+        if (isEligible(user.classTier, effectiveRestriction)) {
+          eligibleRaces.push({
+            id: race.id,
+            name: race.name,
+            sequence: race.sequence,
+            classRestriction: effectiveRestriction,
+          });
+        }
+      }
+
+      eligibleRaces.sort((a, b) => a.sequence - b.sequence);
+
+      if (isEventEligible || eligibleRaces.length > 0) {
+        eligible.push({
+          id: event.id,
+          name: event.name,
+          organizationId: event.organizationId,
+          classRestriction: event.classRestriction,
+          eligibleRaces,
+        });
+      }
+    }
 
     return { events: eligible };
   },

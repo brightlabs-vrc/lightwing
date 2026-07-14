@@ -347,6 +347,26 @@ export function useEventDetail(eventId: string) {
     [authHeader, eventId, handleSelectRace],
   )
 
+  // Update Race Details (such as classRestriction)
+  const handleUpdateRace = useCallback(
+    async (raceId: string, classRestriction: eventmanager.ClassTier | null) => {
+      if (!authHeader) return
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updated = await updateRaceEvent(eventId, raceId, { classRestriction }, authHeader)
+        setRaces((current) => current.map((r) => (r.id === raceId ? updated : r)))
+        if (selectedRaceId === raceId) {
+          setSelectedRace(updated)
+        }
+        setGlobalSuccess('Race class restriction updated successfully.')
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to update race details')
+      }
+    },
+    [authHeader, eventId, selectedRaceId],
+  )
+
   // Delete Race
   const handleDeleteRace = useCallback(
     async (raceId: string) => {
@@ -627,6 +647,7 @@ export function useEventDetail(eventId: string) {
     handleCreateRace,
     handleStartRace,
     handleEndRace,
+    handleUpdateRace,
     handleDeleteRace,
     handleSelectRace,
     handleResultChange,

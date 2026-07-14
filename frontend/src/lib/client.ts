@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-p8zbo.encr.app`
+    return `https://${name}-v6n5o.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the p8zbo Encore application.
+ * Client is an API client for the v6n5o Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -359,6 +359,14 @@ export namespace eventmanager {
         id: string
         name: string
         organizationId: string | null
+        classRestriction: ClassTier | null
+        eligibleRaces: EligibleRace[]
+    }
+
+    export interface EligibleRace {
+        id: string
+        name: string
+        sequence: number
         classRestriction: ClassTier | null
     }
 
@@ -1671,7 +1679,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "p8zbo-Generated-TS-Client (Encore/v1.57.9)";
+            this.headers["User-Agent"] = "v6n5o-Generated-TS-Client (Encore/v1.57.9)";
         }
 
         this.requestInit = options.requestInit ?? {};
