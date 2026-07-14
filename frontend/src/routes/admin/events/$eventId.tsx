@@ -815,8 +815,6 @@ function AdminEventDetailPage() {
                             rows={derivedStates}
                             changeSummary={changeSummary}
                             savingBatch={savingBatch}
-                            onStartRace={() => void handleStartRace(selectedRace.id)}
-                            onEndRace={() => void handleEndRace(selectedRace.id)}
                             onInferTimes={handleInferFinishTimes}
                             onCancel={handleCancelStandingsEdit}
                             onSave={handleUnifiedSave}

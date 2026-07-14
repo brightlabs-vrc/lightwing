@@ -11,8 +11,6 @@ interface StandingsEditorProps {
   rows: DerivedRow[]
   changeSummary: ChangeSummary
   savingBatch: boolean
-  onStartRace: () => void
-  onEndRace: () => void
   onInferTimes: () => void
   onCancel: () => void
   onSave: () => void
@@ -32,8 +30,6 @@ export function StandingsEditor({
   rows,
   changeSummary,
   savingBatch,
-  onStartRace,
-  onEndRace,
   onInferTimes,
   onCancel,
   onSave,
@@ -66,28 +62,6 @@ export function StandingsEditor({
         </header>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          {isRaceOngoing && (
-            <button
-              type="button"
-              onClick={onEndRace}
-              disabled={savingBatch || loadingResults}
-              className="slds-button slds-button_destructive"
-              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold', background: '#dc2626', color: '#fff' }}
-            >
-              Conclude Race
-            </button>
-          )}
-          {isRaceNotStarted && (
-            <button
-              type="button"
-              onClick={onStartRace}
-              disabled={savingBatch || loadingResults}
-              className="slds-button slds-button_success"
-              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold', background: '#16a34a', color: '#fff' }}
-            >
-              Start Race
-            </button>
-          )}
           {!isRaceNotStarted && !isRaceOngoing && (
             <button
               type="button"
@@ -131,17 +105,8 @@ export function StandingsEditor({
               Race Has Not Started Yet
             </h3>
             <p className="slds-text-body_regular text-slate-500 slds-m-top_small" style={{ maxWidth: '400px', marginBottom: '16px' }}>
-              Standings and finish times can only be recorded once the race has officially started. You can start the race now to begin tracking results.
+              Standings and finish times can only be recorded once the race has officially started. Use the "Start Race" button above in the Race Details card to begin tracking results.
             </p>
-            <button
-              type="button"
-              onClick={onStartRace}
-              disabled={savingBatch || loadingResults}
-              className="slds-button slds-button_success"
-              style={{ padding: '8px 24px', fontSize: '14px', fontWeight: 'bold', background: '#16a34a', color: '#fff' }}
-            >
-              Start Race Now
-            </button>
           </div>
         ) : (
           <>
@@ -203,8 +168,9 @@ interface StandingsTableProps {
 function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoRow }: StandingsTableProps) {
   return (
     <div>
-      <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
-        <thead>
+      <div style={{ overflowX: 'auto', width: '100%' }}>
+        <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda', minWidth: '100%' }}>
+          <thead>
           <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
             <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Competitor Name</div></th>
             <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
@@ -422,6 +388,7 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
           })}
         </tbody>
       </table>
+    </div>
 
       <div className="slds-m-top_medium slds-box" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '12px' }}>
         <h4 className="font-bold text-slate-800" style={{ fontWeight: 'bold' }}>Explanation of Standings update actions</h4>
