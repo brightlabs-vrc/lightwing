@@ -1,0 +1,12 @@
+Already up to date
+Done in 710ms using pnpm v11.9.0
+$ pnpm --dir frontend dev
+$ vite --host --port 5173
+
+  VITE v8.1.4  ready in 1063 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.2:5173/
+  ➜  Network: http://172.17.0.1:5173/
+[ELIFECYCLE] Command failed with exit code 143.
+[ELIFECYCLE] Command failed with exit code 143.
