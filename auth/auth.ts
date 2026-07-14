@@ -57,7 +57,7 @@ function isAdministratorRole(role: string) {
   return role === administratorRole;
 }
 
-async function countAdministrators(excludeMemberId?: string) {
+async function countAdministrators(organizationId: string, excludeMemberId?: string) {
   const excludedMemberClause = excludeMemberId
     ? Prisma.sql`AND "id" <> ${excludeMemberId}`
     : Prisma.empty;
@@ -65,7 +65,7 @@ async function countAdministrators(excludeMemberId?: string) {
   const rows = await prisma.$queryRaw<{ count: bigint }[]>`
     SELECT COUNT(*)::bigint AS count
     FROM "member"
-    WHERE "role" = ${administratorRole}
+    WHERE "organizationId" = ${organizationId} AND "role" = ${administratorRole}
     ${excludedMemberClause}
   `;
 
@@ -229,7 +229,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
             return;
           }
 
-          const currentAdministrators = await countAdministrators();
+          const currentAdministrators = await countAdministrators(member.organizationId);
           if (currentAdministrators >= administratorRoleLimit) {
             throw APIError.fromStatus("BAD_REQUEST", {
               message: "At most three administrators can belong to an organization.",
@@ -241,7 +241,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
             return;
           }
 
-          const currentAdministrators = await countAdministrators();
+          const currentAdministrators = await countAdministrators(invitation.organizationId);
           if (currentAdministrators >= administratorRoleLimit) {
             throw APIError.fromStatus("BAD_REQUEST", {
               message: "At most three administrators can belong to an organization.",
@@ -253,7 +253,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
             return;
           }
 
-          const currentAdministrators = await countAdministrators(member.id);
+          const currentAdministrators = await countAdministrators(member.organizationId, member.id);
           if (currentAdministrators >= administratorRoleLimit) {
             throw APIError.fromStatus("BAD_REQUEST", {
               message: "At most three administrators can belong to an organization.",
