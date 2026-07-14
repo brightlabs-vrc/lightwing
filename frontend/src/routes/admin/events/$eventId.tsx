@@ -723,7 +723,7 @@ function AdminEventDetailPage() {
                               <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span>Competitor Lineup</span>
                                 <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '10px' }}>
-                                  {selectedRace.members.length} Registered
+                                  {(selectedRace.members ?? []).length} Registered
                                 </span>
                               </h3>
 
@@ -745,7 +745,7 @@ function AdminEventDetailPage() {
                                     >
                                       <option value="">-- Add Competitor from Event Members --</option>
                                       {selectedEvent.members
-                                        .filter((em) => !selectedRace.members.some((rm) => rm.userId === em.userId))
+                                        .filter((em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId))
                                         .map((em) => (
                                           <option key={em.userId} value={em.userId}>
                                             {em.name} ({em.classTier ?? 'PRE_OP'})
@@ -764,11 +764,11 @@ function AdminEventDetailPage() {
                                 </form>
                               </div>
 
-                              {selectedRace.members.length === 0 ? (
+                              {(selectedRace.members?.length ?? 0) === 0 ? (
                                 <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: 0 }}>No competitors registered specifically for this race yet.</p>
                               ) : (
                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  {selectedRace.members.map((m) => (
+                                  {(selectedRace.members ?? []).map((m) => (
                                     <span
                                       key={m.userId}
                                       className="slds-badge slds-theme_light"
@@ -811,7 +811,7 @@ function AdminEventDetailPage() {
                             isRaceOngoing={isRaceOngoing(selectedRace)}
                             isRaceNotStarted={isRaceNotStarted(selectedRace)}
                             loadingResults={loadingResults}
-                            memberCount={selectedEvent.granularParticipation ? selectedRace.members.length : selectedEvent.members.length}
+                            memberCount={selectedEvent.granularParticipation ? (selectedRace.members?.length ?? 0) : selectedEvent.members.length}
                             rows={derivedStates}
                             changeSummary={changeSummary}
                             savingBatch={savingBatch}
