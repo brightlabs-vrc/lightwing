@@ -67,7 +67,7 @@ function EventsPage() {
   const publicEvents = data?.events.filter((event) => event.status !== 'DRAFT') || []
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">COMPETITIVE EVENTS</h1>
         <span className="font-pixel text-[10px] bg-retro-surface border-2 border-retro-border px-3 py-1 pxl-corner-sm">

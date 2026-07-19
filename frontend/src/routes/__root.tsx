@@ -50,7 +50,7 @@ function RootLayout() {
     <>
       <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
         <header className="border-b-4 border-retro-border-strong bg-retro-surface p-4">
-          <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+          <nav className="w-full flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
             <Link
               to="/"
               activeProps={{ className: 'bg-retro-primary text-white' }}
@@ -112,11 +112,11 @@ function RootLayout() {
           </nav>
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-8">
+        <main className="w-full px-6 py-8">
           <Outlet />
         </main>
 
-        <footer className="mx-auto max-w-6xl px-4 pb-12 text-center font-pixel text-[10px] text-retro-muted border-t-2 border-retro-border pt-6">
+        <footer className="w-full px-6 pb-12 text-center font-pixel text-[10px] text-retro-muted border-t-2 border-retro-border pt-6">
           Lightwing × PxlKit • 8-Bit Racing Platform
         </footer>
       </div>

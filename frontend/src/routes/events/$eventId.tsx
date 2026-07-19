@@ -61,7 +61,7 @@ function EventDetailPage() {
   const isMember = session && event.members.some((m) => m.userId === session.user.id)
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full">
       <Link
         to="/events"
         className="font-pixel text-[10px] bg-retro-surface text-retro-text border-2 border-retro-border-strong pxl-corner-sm pxl-shadow-hover px-3 py-1.5 mb-6 inline-block hover:bg-retro-card text-center"
@@ -192,7 +192,16 @@ function EventDetailPage() {
       {/* Standings (Points) */}
       {event.pointsOverview && (
         <div className="mt-8">
-          <h2 className="text-sm font-pixel tracking-wider text-retro-primary mb-3">STANDINGS (POINTS)</h2>
+          <div className="flex items-center mb-3 flex-wrap gap-2">
+            <h2 className="text-sm font-pixel tracking-wider text-retro-primary">
+              STANDINGS (POINTS{event.status !== 'CONCLUDED' ? ' - PROVISIONAL' : ''})
+            </h2>
+            {event.status !== 'CONCLUDED' && (
+              <span className="font-pixel text-[9px] bg-retro-gold text-retro-text px-2.5 py-0.5 border-2 border-retro-border-strong pxl-corner-sm pxl-shadow">
+                PROVISIONAL
+              </span>
+            )}
+          </div>
           <div className="border-4 border-retro-border-strong bg-retro-card pxl-corner-sm pxl-shadow">
             <table className="w-full text-xs">
               <thead className="bg-retro-surface">
@@ -233,7 +242,16 @@ function EventDetailPage() {
       {/* Standings (Ladder) */}
       {event.ladderOverview && (
         <div className="mt-8">
-          <h2 className="text-sm font-pixel tracking-wider text-retro-primary mb-3">STANDINGS (LADDER)</h2>
+          <div className="flex items-center mb-3 flex-wrap gap-2">
+            <h2 className="text-sm font-pixel tracking-wider text-retro-primary">
+              STANDINGS (LADDER{event.status !== 'CONCLUDED' ? ' - PROVISIONAL' : ''})
+            </h2>
+            {event.status !== 'CONCLUDED' && (
+              <span className="font-pixel text-[9px] bg-retro-gold text-retro-text px-2.5 py-0.5 border-2 border-retro-border-strong pxl-corner-sm pxl-shadow">
+                PROVISIONAL
+              </span>
+            )}
+          </div>
           <div className="border-4 border-retro-border-strong bg-retro-card pxl-corner-sm pxl-shadow">
             <table className="w-full text-xs">
               <thead className="bg-retro-surface">
