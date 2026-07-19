@@ -16,10 +16,10 @@ import {
 // Store secrets using the Encore CLI:
 //   encore secret set --type dev,local,pr,production AuthSecret
 // Generate a strong value with: openssl rand -base64 32
-const authSecret = secret("AuthSecret");
-const discordClientId = secret("DiscordClientId");
-const discordClientSecret = secret("DiscordClientSecret");
-const discordBotToken = secret("DiscordBotToken");
+const authSecret = secret("BETTER_AUTH_SECRET");
+const discordClientId = secret("DISCORD_AUTH_CLIENT_ID");
+const discordClientSecret = secret("DISCORD_AUTH_CLIENT_SECRET");
+const discordBotToken = secret("DISCORD_BOT_TOKEN");
 
 const ursDiscordGuildId = "1482993434410225739";
 const siteAdminRole = "SITE_ADMIN";
