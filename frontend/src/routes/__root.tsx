@@ -48,39 +48,77 @@ function RootLayout() {
 
   return (
     <>
-      <div className='min-h-screen bg-slate-50 text-slate-900'>
-      <header className='border-b border-slate-200 bg-white/95 backdrop-blur'>
-        <nav className='mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-4 text-sm'>
-          <Link to='/' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Home</Link>
-          <Link to='/events' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Events</Link>
-          <Link to='/dashboard' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Dashboard</Link>
-          <Link to='/auth' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Auth</Link>
-          {!isAdminArea && session ? (
-            <Link to='/profile' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Profile</Link>
-          ) : null}
-          {isSiteAdmin ? (
-            <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>
-              Admin Portal
+      <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
+        <header className="border-b-4 border-retro-border-strong bg-retro-surface p-4">
+          <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+            <Link
+              to="/"
+              activeProps={{ className: 'bg-retro-primary text-white' }}
+              className="px-3 py-1.5 font-pixel text-[11px] tracking-wider text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
+            >
+              HOME
             </Link>
-          ) : null}
-          <div className='ml-auto flex items-center gap-2 text-xs text-slate-600'>
-            {loading ? <span>Checking auth...</span> : null}
-            {!loading && session ? (
-              <>
-                <span>{session.user.name} ({session.user.siteRole ?? 'USER'})</span>
-                <button type='button' onClick={() => void signOutUser('/auth')} className='rounded-md border border-slate-300 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-50'>Sign out</button>
-              </>
+            <Link
+              to="/events"
+              activeProps={{ className: 'bg-retro-primary text-white' }}
+              className="px-3 py-1.5 font-pixel text-[11px] tracking-wider text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
+            >
+              EVENTS
+            </Link>
+            {isSiteAdmin ? (
+              <Link
+                to="/admin"
+                className="px-3 py-1.5 font-pixel text-[11px] tracking-wider bg-retro-gold text-retro-text border-2 border-retro-border-strong pxl-corner-sm hover:bg-retro-secondary transition-all"
+              >
+                ADMIN
+              </Link>
             ) : null}
-            {!loading && !session ? <span>Not signed in</span> : null}
-          </div>
-        </nav>
-      </header>
-      <main className='mx-auto max-w-6xl px-4 py-6'>
-        <Outlet />
-      </main>
-      <footer className='mx-auto max-w-6xl px-4 pb-8 text-sm text-slate-500'>
-        TanStack Router + Vite file-based routing
-      </footer>
+
+            <div className="ml-auto flex items-center gap-3 text-xs">
+              {loading ? <span className="font-pixel text-[9px] text-retro-muted animate-pulse">LOADING...</span> : null}
+
+              {!loading && session ? (
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/profile"
+                    activeProps={{ className: 'border-retro-primary text-retro-primary' }}
+                    className="font-pixel text-[9px] bg-retro-card px-2.5 py-1 border-2 border-retro-border pxl-corner-sm hover:text-retro-primary hover:border-retro-border-strong transition-all"
+                    title="Edit Profile"
+                  >
+                    {session.user.name.toUpperCase()}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void signOutUser('/auth')}
+                    className="font-pixel text-[9px] bg-retro-red text-white px-2.5 py-1 border-2 border-retro-border-strong pxl-corner-sm hover:bg-red-700 active:translate-y-0.5 transition-all cursor-pointer"
+                  >
+                    SIGN OUT
+                  </button>
+                </div>
+              ) : null}
+
+              {!loading && !session ? (
+                <div className="flex items-center gap-3">
+                  <span className="font-pixel text-[9px] text-retro-muted">OFFLINE</span>
+                  <Link
+                    to="/auth"
+                    className="font-pixel text-[9px] bg-retro-primary text-white px-2.5 py-1.5 border-2 border-retro-border-strong pxl-corner-sm hover:bg-indigo-700 active:translate-y-0.5 transition-all cursor-pointer"
+                  >
+                    SIGN IN
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          </nav>
+        </header>
+
+        <main className="mx-auto max-w-6xl px-4 py-8">
+          <Outlet />
+        </main>
+
+        <footer className="mx-auto max-w-6xl px-4 pb-12 text-center font-pixel text-[10px] text-retro-muted border-t-2 border-retro-border pt-6">
+          Lightwing × PxlKit • 8-Bit Racing Platform
+        </footer>
       </div>
       <Suspense>
         <TanStackRouterDevtools position='bottom-right' />

@@ -27,8 +27,8 @@ importers:
         specifier: ^14.26.4
         version: 14.26.4
       encore.dev:
-        specifier: ^1.57.9
-        version: 1.57.9
+        specifier: ^1.57.11
+        version: 1.57.11
     devDependencies:
       '@types/node':
         specifier: ^20.5.7
@@ -890,8 +890,8 @@ packages:
     resolution: {integrity: sha512-i6UzDscO/XfAcNYD75CfICkmfLedpyPDdozrLMmQc5ORaQcdMoc21OnlEylMIqI7U8eniKrPMxxtj8k0vhmJhA==}
     engines: {node: '>=14'}
 
-  encore.dev@1.57.9:
-    resolution: {integrity: sha512-xJkB4NRAj4DWl2UK+dnixAGkz+2ZMAMrIkjuQ98aAIaXmA2e33EQtji389n+F3omSvdY9qCLmX1Xvq/kjoOEYQ==}
+  encore.dev@1.57.11:
+    resolution: {integrity: sha512-LyOcQS2IYwmyAyfgss5bT8fsCOVvQLwtqXiU7lVji67AkpTk0fqjFGkV1OmaqhOf/GU1t4B4dPM2q95PAQaT0A==}
     engines: {node: '>=18.0.0'}
 
   env-paths@3.0.0:
@@ -2249,7 +2249,7 @@ snapshots:
 
   empathic@2.0.0: {}
 
-  encore.dev@1.57.9: {}
+  encore.dev@1.57.11: {}
 
   env-paths@3.0.0: {}
 
