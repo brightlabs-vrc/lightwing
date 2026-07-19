@@ -39,6 +39,7 @@ model User {
   image        String?   @db.Text
   biography      String?  @db.Text
   careerOverview String?  @db.Text
+  vrchatUsername String?  @db.Text
   classTier      ClassTier?
   siteRole       SiteRole  @default(USER)
   createdAt    DateTime  @default(now()) @db.Timestamp(6)

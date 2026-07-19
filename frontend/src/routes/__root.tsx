@@ -1,5 +1,8 @@
 import React, { Suspense } from 'react'
 import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
+import { PixelContainer, PixelStack, PixelButton, PixelBadge } from '@pxlkit/ui-kit'
+import { PxlKitIcon } from '@pxlkit/core'
+import { Trophy } from '@pxlkit/gamification'
 import { useAuth } from '../hooks/useAuth'
 
 const TanStackRouterDevtools =
@@ -48,35 +51,73 @@ function RootLayout() {
 
   return (
     <>
-      <div className='min-h-screen bg-slate-50 text-slate-900'>
-      <header className='border-b border-slate-200 bg-white/95 backdrop-blur'>
-        <nav className='mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-4 text-sm'>
-          <Link to='/' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Home</Link>
-          <Link to='/dashboard' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Dashboard</Link>
-          <Link to='/auth' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Auth</Link>
-          {isSiteAdmin ? (
-            <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>
-              Admin Portal
-            </Link>
-          ) : null}
-          <div className='ml-auto flex items-center gap-2 text-xs text-slate-600'>
-            {loading ? <span>Checking auth...</span> : null}
-            {!loading && session ? (
-              <>
-                <span>{session.user.name} ({session.user.siteRole ?? 'USER'})</span>
-                <button type='button' onClick={() => void signOutUser('/auth')} className='rounded-md border border-slate-300 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-50'>Sign out</button>
-              </>
-            ) : null}
-            {!loading && !session ? <span>Not signed in</span> : null}
-          </div>
-        </nav>
-      </header>
-      <main className='mx-auto max-w-6xl px-4 py-6'>
-        <Outlet />
-      </main>
-      <footer className='mx-auto max-w-6xl px-4 pb-8 text-sm text-slate-500'>
-        TanStack Router + Vite file-based routing
-      </footer>
+      <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
+        <header className="border-b-2 border-retro-border-strong bg-retro-surface">
+          <PixelContainer maxWidth="full" padding="sm">
+            <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
+              <PixelButton asChild variant="ghost" tone="neutral">
+                <Link to="/">
+                  <PixelStack direction="row" gap={2} align="center">
+                    <span className="font-pixel text-sm tracking-wider leading-none">LIGHTWING</span>
+                  </PixelStack>
+                </Link>
+              </PixelButton>
+
+              <PixelStack direction="row" gap={2} align="center" wrap>
+                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
+                  <Link to="/">HOME</Link>
+                </PixelButton>
+                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
+                  <Link to="/events">EVENTS</Link>
+                </PixelButton>
+                {isSiteAdmin ? (
+                  <PixelButton asChild variant="soft" tone="gold" size="sm">
+                    <Link to="/admin">ADMIN</Link>
+                  </PixelButton>
+                ) : null}
+
+                {loading ? (
+                  <PixelBadge tone="neutral">LOADING...</PixelBadge>
+                ) : null}
+
+                {!loading && session ? (
+                  <PixelStack direction="row" gap={2} align="center">
+                    <PixelButton asChild variant="outline" tone="neutral" size="sm">
+                      <Link to="/profile" title="Edit Profile">
+                        {session.user.name.toUpperCase()}
+                      </Link>
+                    </PixelButton>
+                    <PixelButton
+                      variant="solid"
+                      tone="red"
+                      size="sm"
+                      onClick={() => void signOutUser('/auth')}
+                    >
+                      SIGN OUT
+                    </PixelButton>
+                  </PixelStack>
+                ) : null}
+
+                {!loading && !session ? (
+                  <PixelStack direction="row" gap={2} align="center">
+                    <PixelBadge tone="neutral">OFFLINE</PixelBadge>
+                    <PixelButton asChild variant="solid" tone="purple" size="sm">
+                      <Link to="/auth">SIGN IN</Link>
+                    </PixelButton>
+                  </PixelStack>
+                ) : null}
+              </PixelStack>
+            </PixelStack>
+          </PixelContainer>
+        </header>
+
+        <main className="w-full px-6 py-8">
+          <Outlet />
+        </main>
+
+        <footer className="w-full px-6 pb-12 text-center font-pixel text-xs text-retro-muted border-t-2 border-retro-border pt-6">
+          Lightwing Prototype &copy; 2026, Umamusume Racing Society. All rights reserved. Neigh.
+        </footer>
       </div>
       <Suspense>
         <TanStackRouterDevtools position='bottom-right' />

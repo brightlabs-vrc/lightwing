@@ -1,1 +1,19 @@
 @import "tailwindcss";
+@import "@pxlkit/ui-kit/styles.css";
+
+/* Tell Tailwind to scan the pxlkit package for its utility classes */
+@source "../node_modules/@pxlkit/ui-kit";
+
+table {
+  border-collapse: collapse;
+}
+
+td,
+th {
+  border-style: solid;
+}
+
+/* Neutralize the pxlkit pixel-surface offset shadow on buttons (illegible on text) */
+.pxl-btn-flat {
+  filter: none !important;
+}

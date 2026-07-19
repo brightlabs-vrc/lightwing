@@ -9,6 +9,7 @@ export interface AuthUser {
   email: string
   image?: string | null
   siteRole?: SiteRole
+  vrchatUsername?: string | null
 }
 
 export interface AuthSession {
@@ -37,6 +38,7 @@ const defaultMockSession: AuthSession = {
     email: 'mock-admin@lightwing.local',
     image: null,
     siteRole: 'SITE_ADMIN',
+    vrchatUsername: null,
   },
 }
 

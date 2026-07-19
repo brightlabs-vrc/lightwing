@@ -27,6 +27,15 @@ pnpm dev:backend
 pnpm dev:frontend
 ```
 
+### Setting application secrets
+
+Because this application works with OIDC, you will need to set secrets for the authentication provider. You will need the following secrets set for the backend to work properly:
+
+- `BETTER_AUTH_SECRET`: Authentication secret for the BetterAuth OIDC provider. You can generate a random secret using `openssl rand -base64 32`.
+- `DISCORD_AUTH_CLIENT_ID`: The client ID of the OIDC application.
+- `DISCORD_AUTH_CLIENT_SECRET`: The client secret of the OIDC application.
+- `DISCORD_BOT_TOKEN`: The bot token of the Discord bot that will be used by Encore to check for roles automatically. This bot must be added to the server with the `View Channels` and `Read Messages` permissions.
+
 ### Working with the database
 
 As we use Prisma, you can use the Prisma CLI to manage the database. For example, to apply migrations:

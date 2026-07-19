@@ -33,6 +33,12 @@ export async function requireAuth(location: RouteLocation): Promise<AuthSession>
     })
   }
 
+  if (!authSession.user.vrchatUsername && location.pathname !== '/onboarding') {
+    throw redirect({
+      to: '/onboarding',
+    })
+  }
+
   return authSession
 }
 

@@ -21,6 +21,7 @@ export interface UserProfile {
   image: string | null;
   biography: string | null;
   careerOverview: string | null;
+  vrchatUsername: string | null;
   classTier: ClassTier | null;
   siteRole: SiteRoleName;
   teams: TeamAffiliation[];
@@ -60,6 +61,7 @@ interface UpdateUserParams {
   image?: string | null;
   biography?: string | null;
   careerOverview?: string | null;
+  vrchatUsername?: string | null;
 }
 
 // Updates the authenticated user's own profile fields (issue #7). A user may
@@ -73,6 +75,7 @@ export const updateUserProfile = api(
     image,
     biography,
     careerOverview,
+    vrchatUsername,
   }: UpdateUserParams): Promise<UserProfile> => {
     const actor = await resolveActor(prisma, authorization);
     if (actor.userId !== id) {
@@ -91,6 +94,7 @@ export const updateUserProfile = api(
         image: image === undefined ? undefined : image,
         biography: biography === undefined ? undefined : biography,
         careerOverview: careerOverview === undefined ? undefined : careerOverview,
+        vrchatUsername: vrchatUsername === undefined ? undefined : vrchatUsername,
       },
       include: {
         members: {
@@ -142,6 +146,7 @@ type UserWithMembers = {
   image: string | null;
   biography: string | null;
   careerOverview: string | null;
+  vrchatUsername: string | null;
   classTier: ClassTier | null;
   siteRole: string;
   createdAt: Date;
@@ -160,6 +165,7 @@ function toProfile(user: UserWithMembers): UserProfile {
     image: user.image,
     biography: user.biography,
     careerOverview: user.careerOverview,
+    vrchatUsername: user.vrchatUsername,
     classTier: user.classTier,
     siteRole: user.siteRole as SiteRoleName,
     teams: user.members.map((member) => ({
