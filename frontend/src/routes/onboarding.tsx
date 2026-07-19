@@ -35,32 +35,33 @@ function OnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-white/70 bg-white/90 shadow-xl p-8">
-        <h1 className="text-2xl font-bold mb-2">Welcome to Lightwing!</h1>
-        <p className="text-slate-600 mb-6">
+    <div className="flex min-h-screen items-center justify-center px-4 py-10 bg-retro-bg text-retro-text font-sans">
+      <div className="w-full max-w-md border-4 border-retro-border-strong bg-retro-surface p-8 pxl-corner-md pxl-shadow">
+        <h1 className="text-md font-pixel tracking-wider text-retro-primary mb-3">WELCOME TO LIGHTWING!</h1>
+        <p className="font-pixel text-[10px] text-retro-muted mb-6 leading-relaxed">
           Please set your VRChat username to complete your profile.
         </p>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block">
-            <span className="text-slate-700 font-medium">VRChat Username</span>
+            <span className="font-pixel text-[10px] text-retro-text">VRCHAT USERNAME</span>
             <input
               type="text"
-              className="border p-2 w-full mt-1 rounded"
+              className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"
               placeholder="e.g. user123"
               value={vrchatUsername}
               onChange={(e) => setVrchatUsername(e.target.value)}
               autoFocus
+              required
             />
           </label>
           
           <button
             type="submit"
-            className="w-full bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-400"
+            className="font-pixel text-xs tracking-wider bg-retro-green text-white border-2 border-retro-border-strong pxl-corner-sm pxl-shadow-hover hover:bg-green-700 active:translate-y-0.5 px-4 py-2.5 transition-all cursor-pointer w-full text-center mt-2 disabled:opacity-50"
             disabled={updateMutation.isPending}
           >
-            {updateMutation.isPending ? 'Saving...' : 'Continue to Events'}
+            {updateMutation.isPending ? 'SAVING...' : 'CONTINUE TO EVENTS'}
           </button>
         </form>
       </div>
