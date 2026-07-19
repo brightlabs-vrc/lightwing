@@ -53,11 +53,11 @@ function ProfilePage() {
 
   return (
     <div className="max-w-md mx-auto">
-      <h1 className="text-xl font-pixel tracking-wider text-retro-primary mb-6 text-center">EDIT PROFILE</h1>
+      <h1 className="text-2xl font-pixel tracking-wider text-retro-primary mb-6 text-center">EDIT PROFILE</h1>
 
       <div className="border-4 border-retro-border-strong bg-retro-surface p-6 pxl-corner-md pxl-shadow space-y-5">
         <label className="block">
-          <span className="font-pixel text-[10px] text-retro-muted">NAME</span>
+          <span className="font-pixel text-xs text-retro-muted">NAME</span>
           <input
             type="text"
             className="border-2 border-retro-border bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-muted font-sans cursor-not-allowed opacity-75"
@@ -67,7 +67,7 @@ function ProfilePage() {
         </label>
 
         <label className="block">
-          <span className="font-pixel text-[10px] text-retro-text">BIOGRAPHY</span>
+          <span className="font-pixel text-xs text-retro-text">BIOGRAPHY</span>
           <textarea
             className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"
             rows={3}
@@ -78,7 +78,7 @@ function ProfilePage() {
         </label>
 
         <label className="block">
-          <span className="font-pixel text-[10px] text-retro-text">CAREER OVERVIEW</span>
+          <span className="font-pixel text-xs text-retro-text">CAREER OVERVIEW</span>
           <textarea
             className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"
             rows={3}
@@ -89,7 +89,7 @@ function ProfilePage() {
         </label>
 
         <label className="block">
-          <span className="font-pixel text-[10px] text-retro-text">VRCHAT USERNAME</span>
+          <span className="font-pixel text-xs text-retro-text">VRCHAT USERNAME</span>
           <input
             type="text"
             className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"

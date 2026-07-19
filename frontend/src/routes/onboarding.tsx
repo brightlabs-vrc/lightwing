@@ -37,14 +37,14 @@ function OnboardingPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-10 bg-retro-bg text-retro-text font-sans">
       <div className="w-full max-w-md border-4 border-retro-border-strong bg-retro-surface p-8 pxl-corner-md pxl-shadow">
-        <h1 className="text-md font-pixel tracking-wider text-retro-primary mb-3">WELCOME TO LIGHTWING!</h1>
-        <p className="font-pixel text-[10px] text-retro-muted mb-6 leading-relaxed">
+        <h1 className="text-lg font-pixel tracking-wider text-retro-primary mb-3">WELCOME TO LIGHTWING!</h1>
+        <p className="font-pixel text-xs text-retro-muted mb-6 leading-relaxed">
           Please set your VRChat username to complete your profile.
         </p>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block">
-            <span className="font-pixel text-[10px] text-retro-text">VRCHAT USERNAME</span>
+            <span className="font-pixel text-xs text-retro-text">VRCHAT USERNAME</span>
             <input
               type="text"
               className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"

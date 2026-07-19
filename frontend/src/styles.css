@@ -1,1 +1,10 @@
-@import "tailwindcss";
+@import "@pxlkit/ui-kit/styles.css";
+
+table {
+  border-collapse: collapse;
+}
+
+td,
+th {
+  border-style: solid;
+}

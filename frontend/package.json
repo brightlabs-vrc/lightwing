@@ -19,6 +19,7 @@
   "license": "BSD-3-Clause",
   "type": "module",
   "dependencies": {
+    "@pxlkit/ui-kit": "2.1.0",
     "@salesforce-ux/design-system": "^2.22.2",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",

@@ -50,39 +50,48 @@ function RootLayout() {
     <>
       <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
         <header className="border-b-4 border-retro-border-strong bg-retro-surface p-4">
-          <nav className="w-full flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+          <nav className="flex w-full items-center gap-4 text-sm">
             <Link
               to="/"
-              activeProps={{ className: 'bg-retro-primary text-white' }}
-              className="px-3 py-1.5 font-pixel text-[11px] tracking-wider text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
+              className="font-pixel text-sm tracking-wider leading-none text-retro-text hover:text-retro-primary"
             >
-              HOME
+              LIGHTWING
             </Link>
-            <Link
-              to="/events"
-              activeProps={{ className: 'bg-retro-primary text-white' }}
-              className="px-3 py-1.5 font-pixel text-[11px] tracking-wider text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
-            >
-              EVENTS
-            </Link>
-            {isSiteAdmin ? (
-              <Link
-                to="/admin"
-                className="px-3 py-1.5 font-pixel text-[11px] tracking-wider bg-retro-gold text-retro-text border-2 border-retro-border-strong pxl-corner-sm hover:bg-retro-secondary transition-all"
-              >
-                ADMIN
-              </Link>
-            ) : null}
 
-            <div className="ml-auto flex items-center gap-3 text-xs">
-              {loading ? <span className="font-pixel text-[9px] text-retro-muted animate-pulse">LOADING...</span> : null}
+            <div className="flex flex-1 justify-end items-center gap-4 flex-wrap">
+              <Link
+                to="/"
+                activeProps={{ className: 'bg-retro-primary text-white' }}
+                className="px-3 py-1.5 font-pixel text-sm tracking-wider leading-none text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
+              >
+                HOME
+              </Link>
+              <Link
+                to="/events"
+                activeProps={{ className: 'bg-retro-primary text-white' }}
+                className="px-3 py-1.5 font-pixel text-sm tracking-wider leading-none text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
+              >
+                EVENTS
+              </Link>
+              {isSiteAdmin ? (
+                <Link
+                  to="/admin"
+                  className="px-3 py-1.5 font-pixel text-sm tracking-wider leading-none bg-retro-gold text-retro-text border-2 border-retro-border-strong pxl-corner-sm hover:bg-retro-secondary transition-all"
+                >
+                  ADMIN
+                </Link>
+              ) : null}
+
+              <span className="h-2 w-2 border-l-2 border-retro-border-strong flex-shrink-0" />
+
+              {loading ? <span className="font-pixel text-[11px] leading-none text-retro-muted animate-pulse">LOADING...</span> : null}
 
               {!loading && session ? (
                 <div className="flex items-center gap-3">
                   <Link
                     to="/profile"
                     activeProps={{ className: 'border-retro-primary text-retro-primary' }}
-                    className="font-pixel text-[9px] bg-retro-card px-2.5 py-1 border-2 border-retro-border pxl-corner-sm hover:text-retro-primary hover:border-retro-border-strong transition-all"
+                    className="font-pixel text-[11px] leading-none bg-retro-card px-2.5 py-1 border-2 border-retro-border pxl-corner-sm hover:text-retro-primary hover:border-retro-border-strong transition-all"
                     title="Edit Profile"
                   >
                     {session.user.name.toUpperCase()}
@@ -90,7 +99,7 @@ function RootLayout() {
                   <button
                     type="button"
                     onClick={() => void signOutUser('/auth')}
-                    className="font-pixel text-[9px] bg-retro-red text-white px-2.5 py-1 border-2 border-retro-border-strong pxl-corner-sm hover:bg-red-700 active:translate-y-0.5 transition-all cursor-pointer"
+                    className="font-pixel text-[11px] leading-none bg-retro-red text-white px-2.5 py-1 border-2 border-retro-border-strong pxl-corner-sm hover:bg-red-700 active:translate-y-0.5 transition-all cursor-pointer"
                   >
                     SIGN OUT
                   </button>
@@ -99,10 +108,10 @@ function RootLayout() {
 
               {!loading && !session ? (
                 <div className="flex items-center gap-3">
-                  <span className="font-pixel text-[9px] text-retro-muted">OFFLINE</span>
+                  <span className="font-pixel text-[11px] leading-none text-retro-muted">OFFLINE</span>
                   <Link
                     to="/auth"
-                    className="font-pixel text-[9px] bg-retro-primary text-white px-2.5 py-1.5 border-2 border-retro-border-strong pxl-corner-sm hover:bg-indigo-700 active:translate-y-0.5 transition-all cursor-pointer"
+                    className="font-pixel text-[11px] leading-none bg-retro-primary text-white px-2.5 py-1.5 border-2 border-retro-border-strong pxl-corner-sm hover:bg-indigo-700 active:translate-y-0.5 transition-all cursor-pointer"
                   >
                     SIGN IN
                   </Link>
@@ -116,7 +125,7 @@ function RootLayout() {
           <Outlet />
         </main>
 
-        <footer className="w-full px-6 pb-12 text-center font-pixel text-[10px] text-retro-muted border-t-2 border-retro-border pt-6">
+        <footer className="w-full px-6 pb-12 text-center font-pixel text-xs text-retro-muted border-t-2 border-retro-border pt-6">
           Lightwing × PxlKit • 8-Bit Racing Platform
         </footer>
       </div>

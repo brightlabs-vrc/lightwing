@@ -1,7 +1,7 @@
 import { useAuth } from '../../hooks/useAuth'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
-import { listPublicEvents, joinEvent, leaveEvent } from '../../lib/public-api'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { listPublicEvents } from '../../lib/public-api'
 import { LoadingBox } from '../../components/LoadingBox'
 import type { eventmanager } from '../../lib/client'
 
@@ -39,29 +39,14 @@ export const Route = createFileRoute('/events/')({
 function EventsPage() {
   const queryClient = useQueryClient()
   const { session } = useAuth()
-  const navigate = useNavigate()
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-events'],
     queryFn: () => listPublicEvents(),
   })
 
-  const joinMutation = useMutation({
-    mutationFn: (eventId: string) => joinEvent(eventId, `Bearer ${session?.session.token ?? ''}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['public-events'] })
-    },
-  })
-
-  const leaveMutation = useMutation({
-    mutationFn: (eventId: string) => leaveEvent(eventId, `Bearer ${session?.session.token ?? ''}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['public-events'] })
-    },
-  })
-
   if (isLoading) return <LoadingBox message="Loading events..." />
-  if (error) return <div className="p-6 text-retro-red font-pixel text-xs">Error loading events.</div>
+  if (error) return <div className="p-6 text-retro-red font-pixel text-sm">Error loading events.</div>
 
   // Filter events to exclude DRAFT
   const publicEvents = data?.events.filter((event) => event.status !== 'DRAFT') || []
@@ -70,7 +55,7 @@ function EventsPage() {
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">COMPETITIVE EVENTS</h1>
-        <span className="font-pixel text-[10px] bg-retro-surface border-2 border-retro-border px-3 py-1 pxl-corner-sm">
+        <span className="font-pixel text-xs bg-retro-surface border-2 border-retro-border px-3 py-1 pxl-corner-sm">
           {publicEvents.length} ACTIVE
         </span>
       </div>
@@ -84,25 +69,25 @@ function EventsPage() {
           publicEvents.map((event) => {
             const isMember = session && event.members.some((m) => m.userId === session.user.id)
             return (
-              <div
+              <Link
                 key={event.id}
-                className="border-4 border-retro-border-strong bg-retro-surface p-6 pxl-corner-md pxl-shadow-hover hover:border-retro-primary transition-all duration-150"
+                to="/events/$eventId"
+                params={{ eventId: event.id }}
+                className="block border-4 border-retro-border-strong bg-retro-surface p-6 pxl-corner-md pxl-shadow-hover hover:border-retro-primary transition-all duration-150"
               >
                 <div className="flex justify-between items-start gap-4 flex-wrap">
                   <div>
-                    <h2 className="text-lg font-pixel tracking-wide text-retro-text hover:text-retro-primary">
-                      <Link to="/events/$eventId" params={{ eventId: event.id }} className="hover:underline">
-                        {event.name}
-                      </Link>
+                    <h2 className="text-xl font-pixel tracking-wide text-retro-text hover:text-retro-primary">
+                      {event.name}
                     </h2>
                     {event.description && (
-                      <p className="text-sm text-retro-muted mt-2 max-w-2xl font-sans leading-relaxed">
+                      <p className="text-base text-retro-muted mt-2 max-w-2xl font-sans leading-relaxed">
                         {event.description}
                       </p>
                     )}
                   </div>
                   <span
-                    className={`font-pixel text-[10px] px-3 py-1.5 border-2 border-retro-border-strong pxl-corner-sm pxl-shadow ${
+                    className={`font-pixel text-xs px-3 py-1.5 border-2 border-retro-border-strong pxl-corner-sm pxl-shadow ${
                       STATUS_COLORS[event.status]
                     }`}
                   >
@@ -110,7 +95,7 @@ function EventsPage() {
                   </span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-4 text-xs font-pixel text-[10px] text-retro-muted">
+                <div className="mt-4 flex flex-wrap gap-4 text-xs font-pixel text-xs text-retro-muted">
                   <span className="bg-retro-card px-2 py-1 border-2 border-retro-border pxl-corner-sm text-retro-text">
                     SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
                   </span>
@@ -121,39 +106,7 @@ function EventsPage() {
                     MEMBERS: {event.members.length}
                   </span>
                 </div>
-
-                <div className="mt-6 flex gap-3">
-                  <Link
-                    to="/events/$eventId"
-                    params={{ eventId: event.id }}
-                    className="font-pixel text-[11px] bg-retro-surface text-retro-text hover:bg-retro-card border-2 border-retro-border-strong pxl-corner-sm pxl-shadow-hover px-4 py-2 transition-all cursor-pointer text-center"
-                  >
-                    VIEW STANDINGS
-                  </Link>
-
-                  <button
-                    className={`font-pixel text-[11px] px-4 py-2 border-2 border-retro-border-strong pxl-corner-sm pxl-shadow-hover transition-all cursor-pointer text-white ${
-                      !session
-                        ? 'bg-retro-primary hover:bg-indigo-700'
-                        : isMember
-                        ? 'bg-retro-red hover:bg-red-700'
-                        : 'bg-retro-green hover:bg-green-700'
-                    } disabled:opacity-50`}
-                    disabled={joinMutation.isPending || leaveMutation.isPending}
-                    onClick={() => {
-                      if (!session) {
-                        navigate({ to: '/auth', search: { redirect: '/events' } })
-                      } else if (isMember) {
-                        leaveMutation.mutate(event.id)
-                      } else {
-                        joinMutation.mutate(event.id)
-                      }
-                    }}
-                  >
-                    {!session ? 'SIGN IN TO JOIN' : isMember ? 'WITHDRAW' : 'SIGN UP'}
-                  </button>
-                </div>
-              </div>
+              </Link>
             )
           })
         )}
