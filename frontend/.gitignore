@@ -1,2 +1,5 @@
 node_modules/
 dist/
+
+# Local env overrides (must not be committed — would force mock mode in prod builds)
+.env

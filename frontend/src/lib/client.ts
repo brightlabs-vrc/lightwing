@@ -35,7 +35,6 @@ export default class Client {
     public readonly auth: auth.ServiceClient
     public readonly eventmanager: eventmanager.ServiceClient
     public readonly frontend: frontend.ServiceClient
-    public readonly hello: hello.ServiceClient
     public readonly teammanager: teammanager.ServiceClient
     private readonly options: ClientOptions
     private readonly target: string
@@ -54,7 +53,6 @@ export default class Client {
         this.auth = new auth.ServiceClient(base)
         this.eventmanager = new eventmanager.ServiceClient(base)
         this.frontend = new frontend.ServiceClient(base)
-        this.hello = new hello.ServiceClient(base)
         this.teammanager = new teammanager.ServiceClient(base)
     }
 
@@ -186,7 +184,7 @@ export namespace auth {
          */
         public async getUserProfile(id: string): Promise<UserProfile> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/users/${encodeURIComponent(id)}`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/users/${encodeURIComponent(id)}`)
             return await resp.json() as UserProfile
         }
 
@@ -206,7 +204,7 @@ export namespace auth {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/users`, undefined, {headers, query})
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/users`, undefined, {headers, query})
             return await resp.json() as ListUsersResponse
         }
 
@@ -226,7 +224,7 @@ export namespace auth {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PUT", `/users/${encodeURIComponent(id)}/site-role`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PUT", `/api/users/${encodeURIComponent(id)}/site-role`, JSON.stringify(body), {headers})
             return await resp.json() as UserProfile
         }
 
@@ -250,7 +248,7 @@ export namespace auth {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PATCH", `/users/${encodeURIComponent(id)}`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/users/${encodeURIComponent(id)}`, JSON.stringify(body), {headers})
             return await resp.json() as UserProfile
         }
     }
@@ -647,7 +645,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(id)}/members`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(id)}/members`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
         }
 
@@ -669,7 +667,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(id)}/schedules`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(id)}/schedules`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
         }
 
@@ -688,7 +686,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members`, JSON.stringify(body), {headers})
             return await resp.json() as RaceEventDetail
         }
 
@@ -714,7 +712,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PUT", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PUT", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
             return await resp.json() as RaceResultView
         }
 
@@ -735,7 +733,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/datasets`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(eventId)}/datasets`, JSON.stringify(body), {headers})
             return await resp.json() as DatasetView
         }
 
@@ -764,7 +762,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
         }
 
@@ -791,7 +789,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/races`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(eventId)}/races`, JSON.stringify(body), {headers})
             return await resp.json() as RaceEventDetail
         }
 
@@ -807,7 +805,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(id)}`, undefined, {headers})
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(id)}`, undefined, {headers})
             return await resp.json() as {
     deleted: boolean
 }
@@ -825,7 +823,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}`, undefined, {headers})
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}`, undefined, {headers})
             return await resp.json() as {
     deleted: boolean
 }
@@ -845,7 +843,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results/${encodeURIComponent(userId)}`, undefined, {headers})
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results/${encodeURIComponent(userId)}`, undefined, {headers})
             return await resp.json() as {
     deleted: boolean
 }
@@ -857,7 +855,7 @@ export namespace eventmanager {
          */
         public async getEvent(id: string): Promise<EventDetail> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(id)}`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/${encodeURIComponent(id)}`)
             return await resp.json() as EventDetail
         }
 
@@ -866,7 +864,7 @@ export namespace eventmanager {
          */
         public async getRaceEvent(eventId: string, raceId: string): Promise<RaceEventDetail> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}`)
             return await resp.json() as RaceEventDetail
         }
 
@@ -881,7 +879,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(id)}/join`, undefined, {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(id)}/join`, undefined, {headers})
             return await resp.json() as EventDetail
         }
 
@@ -896,7 +894,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(id)}/join`, undefined, {headers})
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(id)}/join`, undefined, {headers})
             return await resp.json() as EventDetail
         }
 
@@ -908,7 +906,7 @@ export namespace eventmanager {
     tiers: ClassTierInfo[]
 }> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/classes`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/classes`)
             return await resp.json() as {
     tiers: ClassTierInfo[]
 }
@@ -921,7 +919,7 @@ export namespace eventmanager {
     datasets: DatasetView[]
 }> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/datasets`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/${encodeURIComponent(eventId)}/datasets`)
             return await resp.json() as {
     datasets: DatasetView[]
 }
@@ -954,7 +952,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events`, undefined, {query})
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events`, undefined, {query})
             return await resp.json() as {
     events: EventDetail[]
 }
@@ -968,7 +966,7 @@ export namespace eventmanager {
     events: EventDetail[]
 }> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events/public`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/public`)
             return await resp.json() as {
     events: EventDetail[]
 }
@@ -981,7 +979,7 @@ export namespace eventmanager {
     members: RaceEventMemberView[]
 }> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members`)
             return await resp.json() as {
     members: RaceEventMemberView[]
 }
@@ -994,7 +992,7 @@ export namespace eventmanager {
     races: RaceEventDetail[]
 }> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/races`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/${encodeURIComponent(eventId)}/races`)
             return await resp.json() as {
     races: RaceEventDetail[]
 }
@@ -1007,7 +1005,7 @@ export namespace eventmanager {
     results: RaceResultView[]
 }> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results`)
             return await resp.json() as {
     results: RaceResultView[]
 }
@@ -1037,7 +1035,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results`, JSON.stringify(body), {headers})
             return await resp.json() as {
     results: RaceResultView[]
 }
@@ -1060,7 +1058,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/events/${encodeURIComponent(id)}/ladder/matches`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(id)}/ladder/matches`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
         }
 
@@ -1074,7 +1072,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
             return await resp.json() as EventDetail
         }
 
@@ -1088,7 +1086,7 @@ export namespace eventmanager {
             })
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("DELETE", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
             return await resp.json() as RaceEventDetail
         }
 
@@ -1113,7 +1111,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PUT", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PUT", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/results`, JSON.stringify(body), {headers})
             return await resp.json() as {
     results: RaceResultView[]
 }
@@ -1134,7 +1132,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PUT", `/events/${encodeURIComponent(id)}/points/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PUT", `/api/events/${encodeURIComponent(id)}/points/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
         }
 
@@ -1155,7 +1153,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PUT", `/events/${encodeURIComponent(id)}/status`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PUT", `/api/events/${encodeURIComponent(id)}/status`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
         }
 
@@ -1181,7 +1179,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PUT", `/users/${encodeURIComponent(userId)}/class`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PUT", `/api/users/${encodeURIComponent(userId)}/class`, JSON.stringify(body), {headers})
             return await resp.json() as {
     userId: string
     classTier: ClassTier | null
@@ -1225,7 +1223,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PATCH", `/events/${encodeURIComponent(id)}`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/events/${encodeURIComponent(id)}`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
         }
 
@@ -1252,7 +1250,7 @@ export namespace eventmanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PATCH", `/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}`, JSON.stringify(body), {headers})
             return await resp.json() as RaceEventDetail
         }
     }
@@ -1277,41 +1275,6 @@ export namespace frontend {
          */
         public async assets(path: string[]): Promise<void> {
             await this.baseClient.callTypedAPI("HEAD", `/${path.map(encodeURIComponent).join("/")}`)
-        }
-    }
-}
-
-/**
- * hello service responds to requests with a personalized greeting.
- */
-export namespace hello {
-    export interface Response {
-        message: string
-    }
-
-    export class ServiceClient {
-        private baseClient: BaseClient
-
-        constructor(baseClient: BaseClient) {
-            this.baseClient = baseClient
-            this.get = this.get.bind(this)
-            this.index = this.index.bind(this)
-        }
-
-        /**
-         * Returns a personalized greeting.
-         */
-        public async get(name: string): Promise<Response> {
-            // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/hello/${encodeURIComponent(name)}`)
-            return await resp.json() as Response
-        }
-
-        /**
-         * Landing page with usage instructions.
-         */
-        public async index(method: "GET", body?: RequestInit["body"], options?: CallParameters): Promise<globalThis.Response> {
-            return this.baseClient.callAPI(method, `/`, body, options)
         }
     }
 }
@@ -1404,7 +1367,7 @@ export namespace teammanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/teams/${encodeURIComponent(id)}/members`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/teams/${encodeURIComponent(id)}/members`, JSON.stringify(body), {headers})
             return await resp.json() as Team
         }
 
@@ -1424,7 +1387,7 @@ export namespace teammanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("POST", `/teams`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/teams`, JSON.stringify(body), {headers})
             return await resp.json() as Team
         }
 
@@ -1433,7 +1396,7 @@ export namespace teammanager {
          */
         public async getTeam(id: string): Promise<Team> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/teams/${encodeURIComponent(id)}`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/teams/${encodeURIComponent(id)}`)
             return await resp.json() as Team
         }
 
@@ -1444,7 +1407,7 @@ export namespace teammanager {
     teams: Team[]
 }> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/teams`)
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/teams`)
             return await resp.json() as {
     teams: Team[]
 }
@@ -1479,7 +1442,7 @@ export namespace teammanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PATCH", `/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, JSON.stringify(body), {headers})
             return await resp.json() as Team
         }
 
@@ -1502,7 +1465,7 @@ export namespace teammanager {
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("PATCH", `/teams/${encodeURIComponent(id)}/stats`, JSON.stringify(body), {headers})
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/teams/${encodeURIComponent(id)}/stats`, JSON.stringify(body), {headers})
             return await resp.json() as Team
         }
     }

@@ -22,7 +22,7 @@ interface ListDatasetsParams {
 
 // Lists datasets scoped by event
 export const listDatasets = api(
-  { expose: true, method: "GET", path: "/events/:eventId/datasets" },
+  { expose: true, method: "GET", path: "/api/events/:eventId/datasets" },
   async ({ eventId }: ListDatasetsParams): Promise<{ datasets: DatasetView[] }> => {
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
@@ -59,7 +59,7 @@ interface CreateDatasetParams {
 
 // Creates a dataset record for an event
 export const createDataset = api(
-  { expose: true, auth: true, method: "POST", path: "/events/:eventId/datasets" },
+  { expose: true, auth: true, method: "POST", path: "/api/events/:eventId/datasets" },
   async (params: CreateDatasetParams): Promise<DatasetView> => {
     const event = await prisma.event.findUnique({ where: { id: params.eventId } });
     if (!event) {

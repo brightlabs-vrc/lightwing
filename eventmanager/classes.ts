@@ -17,7 +17,7 @@ export interface ClassTierInfo {
 // Lists the available skill class tiers (issue #3) ordered from lowest to
 // highest skill.
 export const listClassTiers = api(
-  { expose: true, method: "GET", path: "/classes" },
+  { expose: true, method: "GET", path: "/api/classes" },
   async (): Promise<{ tiers: ClassTierInfo[] }> => {
     return {
       tiers: CLASS_TIER_ORDER.map((tier, index) => ({
@@ -41,7 +41,7 @@ interface SetUserClassParams {
 // role that manages events; site administrators may set a class tier globally
 // (no organization context required).
 export const setUserClass = api(
-  { expose: true, auth: true, method: "PUT", path: "/users/:userId/class" },
+  { expose: true, auth: true, method: "PUT", path: "/api/users/:userId/class" },
   async ({
     userId,
     authorization,

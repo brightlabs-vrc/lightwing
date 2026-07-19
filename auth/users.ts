@@ -35,7 +35,7 @@ interface GetUserParams {
 
 // Returns a participant's public profile including team affiliations.
 export const getUserProfile = api(
-  { expose: true, method: "GET", path: "/users/:id" },
+  { expose: true, method: "GET", path: "/api/users/:id" },
   async ({ id }: GetUserParams): Promise<UserProfile> => {
     const user = await prisma.user.findUnique({
       where: { id },
@@ -67,7 +67,7 @@ interface UpdateUserParams {
 // Updates the authenticated user's own profile fields (issue #7). A user may
 // only edit their own record.
 export const updateUserProfile = api(
-  { expose: true, method: "PATCH", path: "/users/:id" },
+  { expose: true, method: "PATCH", path: "/api/users/:id" },
   async ({
     id,
     authorization,
@@ -116,7 +116,7 @@ interface SetSiteRoleParams {
 // Grants or revokes the global SITE_ADMIN role. Restricted to existing site
 // administrators, the single choke point that bootstraps platform-wide control.
 export const setUserSiteRole = api(
-  { expose: true, method: "PUT", path: "/users/:id/site-role" },
+  { expose: true, method: "PUT", path: "/api/users/:id/site-role" },
   async ({ id, authorization, siteRole }: SetSiteRoleParams): Promise<UserProfile> => {
     await requireSiteAdmin(prisma, authorization);
 
@@ -193,7 +193,7 @@ interface ListUsersResponse {
 
 // Lists all user profiles. Gated by requirement of being a site administrator.
 export const listUsers = api(
-  { expose: true, method: "GET", path: "/users" },
+  { expose: true, method: "GET", path: "/api/users" },
   async ({
     authorization,
     search,

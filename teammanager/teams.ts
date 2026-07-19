@@ -44,7 +44,7 @@ interface GetTeamParams {
 
 // Returns a team with its members and aggregate statistics.
 export const getTeam = api(
-  { expose: true, method: "GET", path: "/teams/:id" },
+  { expose: true, method: "GET", path: "/api/teams/:id" },
   async ({ id }: GetTeamParams): Promise<Team> => {
     const organization = await prisma.organization.findUnique({
       where: { id },
@@ -76,7 +76,7 @@ interface UpdateTeamStatsParams {
 // Updates a team's aggregate statistics. Requires a role with organization
 // update permission (administrator) in the target team.
 export const updateTeamStats = api(
-  { expose: true, auth: true, method: "PATCH", path: "/teams/:id/stats" },
+  { expose: true, auth: true, method: "PATCH", path: "/api/teams/:id/stats" },
   async ({
     id,
     authorization,
@@ -132,7 +132,7 @@ type OrganizationWithMembers = {
 
 // Lists all teams mapped via toTeam.
 export const listTeams = api(
-  { expose: true, method: "GET", path: "/teams" },
+  { expose: true, method: "GET", path: "/api/teams" },
   async (): Promise<{ teams: Team[] }> => {
     const organizations = await prisma.organization.findMany({
       include: {
@@ -156,7 +156,7 @@ interface CreateTeamParams {
 
 // Creates a new team (organization). Gated by site administrator.
 export const createTeam = api(
-  { expose: true, auth: true, method: "POST", path: "/teams" },
+  { expose: true, auth: true, method: "POST", path: "/api/teams" },
   async ({ authorization, name, logo }: CreateTeamParams): Promise<Team> => {
     await requireSiteAdmin(prisma, authorization);
 
@@ -197,7 +197,7 @@ interface AddTeamMemberParams {
 
 // Registers a participant for a team.
 export const addTeamMember = api(
-  { expose: true, auth: true, method: "POST", path: "/teams/:id/members" },
+  { expose: true, auth: true, method: "POST", path: "/api/teams/:id/members" },
   async ({ id, authorization, userId, role }: AddTeamMemberParams): Promise<Team> => {
     await requirePermission(prisma, {
       authorization,
@@ -275,7 +275,7 @@ interface UpdateTeamMemberRoleParams {
 
 // Updates a team member's role.
 export const updateTeamMemberRole = api(
-  { expose: true, auth: true, method: "PATCH", path: "/teams/:id/members/:userId" },
+  { expose: true, auth: true, method: "PATCH", path: "/api/teams/:id/members/:userId" },
   async ({ id, userId, authorization, role }: UpdateTeamMemberRoleParams): Promise<Team> => {
     await requirePermission(prisma, {
       authorization,

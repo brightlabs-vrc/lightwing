@@ -109,7 +109,7 @@ interface CreateEventParams {
 // admin). User-owned events may be created by any authenticated user for
 // themselves; site admins may create one on behalf of any user.
 export const createEvent = api(
-  { expose: true, auth: true, method: "POST", path: "/events" },
+  { expose: true, auth: true, method: "POST", path: "/api/events" },
   async (params: CreateEventParams): Promise<EventDetail> => {
     let organizationId: string | null = null;
     let ownerUserId: string | null = null;
@@ -174,7 +174,7 @@ interface ListEventsParams {
 
 // Lists events, optionally filtered by organization or class restriction.
 export const listEvents = api(
-  { expose: true, method: "GET", path: "/events" },
+  { expose: true, method: "GET", path: "/api/events" },
   async ({
     organizationId,
     classRestriction,
@@ -195,7 +195,7 @@ export const listEvents = api(
 // Lists public events (UNOFFICIAL, OFFICIAL, CONCLUDED) without DRAFT visibility.
 // Used by the public events page.
 export const listPublicEvents = api(
-  { expose: true, method: "GET", path: "/events/public" },
+  { expose: true, method: "GET", path: "/api/events/public" },
   async (): Promise<{ events: EventDetail[] }> => {
     const events = await prisma.event.findMany({
       where: {
@@ -216,7 +216,7 @@ interface EventIdParams {
 // Returns a single event with members, schedules and the scoring overview that
 // matches its scoring type.
 export const getEvent = api(
-  { expose: true, method: "GET", path: "/events/:id" },
+  { expose: true, method: "GET", path: "/api/events/:id" },
   async ({ id }: EventIdParams): Promise<EventDetail> => {
     return loadEvent(id);
   },
@@ -233,7 +233,7 @@ interface UpdateEventParams {
 
 // Updates an event's editable fields (scoring type is immutable once set).
 export const updateEvent = api(
-  { expose: true, auth: true, method: "PATCH", path: "/events/:id" },
+  { expose: true, auth: true, method: "PATCH", path: "/api/events/:id" },
   async (params: UpdateEventParams): Promise<EventDetail> => {
     await requireEvent(params.id);
     await requireEventPermission(prisma, {
@@ -265,7 +265,7 @@ interface DeleteEventParams {
 
 // Deletes an event and its related records.
 export const deleteEvent = api(
-  { expose: true, auth: true, method: "DELETE", path: "/events/:id" },
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:id" },
   async ({ id, authorization }: DeleteEventParams): Promise<{ deleted: boolean }> => {
     await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -288,7 +288,7 @@ interface AddMemberParams {
 // Registers a participant for an event. Enforces the event's class restriction
 // (issue #3) and seeds the scoring record for the event's scoring type.
 export const addEventMember = api(
-  { expose: true, auth: true, method: "POST", path: "/events/:id/members" },
+  { expose: true, auth: true, method: "POST", path: "/api/events/:id/members" },
   async ({ id, authorization, userId }: AddMemberParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -339,7 +339,7 @@ interface RemoveMemberParams {
 
 // Removes a participant from an event.
 export const removeEventMember = api(
-  { expose: true, auth: true, method: "DELETE", path: "/events/:id/members/:userId" },
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:id/members/:userId" },
   async ({ id, userId, authorization }: RemoveMemberParams): Promise<EventDetail> => {
     await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -361,7 +361,7 @@ interface JoinEventParams {
 // Public self-signup endpoint: allows authenticated users to join events
 // in UNOFFICIAL or OFFICIAL status. Does NOT require event permissions.
 export const joinEvent = api(
-  { expose: true, auth: true, method: "POST", path: "/events/:id/join" },
+  { expose: true, auth: true, method: "POST", path: "/api/events/:id/join" },
   async ({ id, authorization }: JoinEventParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
 
@@ -418,7 +418,7 @@ interface LeaveEventParams {
 // Public self-exit endpoint: allows authenticated users to leave events they've joined.
 // Does NOT require event permissions - users can withdraw from their own membership.
 export const leaveEvent = api(
-  { expose: true, auth: true, method: "DELETE", path: "/events/:id/join" },
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:id/join" },
   async ({ id, authorization }: LeaveEventParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
 
@@ -442,7 +442,7 @@ interface AddScheduleParams {
 
 // Adds a schedule slot to an event (issue #4).
 export const addEventSchedule = api(
-  { expose: true, auth: true, method: "POST", path: "/events/:id/schedules" },
+  { expose: true, auth: true, method: "POST", path: "/api/events/:id/schedules" },
   async (params: AddScheduleParams): Promise<EventDetail> => {
     await requireEvent(params.id);
     await requireEventPermission(prisma, {
@@ -475,7 +475,7 @@ interface SetPointsParams {
 
 // Sets a participant's points on a points-based event (points overview).
 export const setEventPoints = api(
-  { expose: true, auth: true, method: "PUT", path: "/events/:id/points/:userId" },
+  { expose: true, auth: true, method: "PUT", path: "/api/events/:id/points/:userId" },
   async ({ id, userId, authorization, points }: SetPointsParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -509,7 +509,7 @@ interface LadderMatchParams {
 // Records a 1v1 result on a ladder-elo event and updates both ratings
 // (ladder overview).
 export const recordLadderMatch = api(
-  { expose: true, auth: true, method: "POST", path: "/events/:id/ladder/matches" },
+  { expose: true, auth: true, method: "POST", path: "/api/events/:id/ladder/matches" },
   async ({ id, authorization, winnerId, loserId }: LadderMatchParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
     await requireEventPermission(prisma, {
@@ -555,7 +555,7 @@ interface SetStatusParams {
 // platform action reserved for site administrators; all other statuses
 // (DRAFT/UNOFFICIAL/CONCLUDED) may be set by anyone who can update the event.
 export const setEventStatus = api(
-  { expose: true, auth: true, method: "PUT", path: "/events/:id/status" },
+  { expose: true, auth: true, method: "PUT", path: "/api/events/:id/status" },
   async ({ id, authorization, status }: SetStatusParams): Promise<EventDetail> => {
     await requireEvent(id);
     if (status === "OFFICIAL") {

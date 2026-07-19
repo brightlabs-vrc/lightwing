@@ -48,7 +48,7 @@ interface CreateRaceEventParams {
 
 // Adds a race to an event. Gated by event-update permission on the parent event.
 export const createRaceEvent = api(
-  { expose: true, auth: true, method: "POST", path: "/events/:eventId/races" },
+  { expose: true, auth: true, method: "POST", path: "/api/events/:eventId/races" },
   async (params: CreateRaceEventParams): Promise<RaceEventDetail> => {
     await requireEventPermission(prisma, {
       authorization: params.authorization,
@@ -82,7 +82,7 @@ interface ListRaceEventsParams {
 
 // Lists the races within an event, ordered by their sequence.
 export const listRaceEvents = api(
-  { expose: true, method: "GET", path: "/events/:eventId/races" },
+  { expose: true, method: "GET", path: "/api/events/:eventId/races" },
   async ({ eventId }: ListRaceEventsParams): Promise<{ races: RaceEventDetail[] }> => {
     const races = await prisma.raceEvent.findMany({
       where: { eventId },
@@ -111,7 +111,7 @@ interface RaceEventIdParams {
 
 // Returns a single race within an event.
 export const getRaceEvent = api(
-  { expose: true, method: "GET", path: "/events/:eventId/races/:raceId" },
+  { expose: true, method: "GET", path: "/api/events/:eventId/races/:raceId" },
   async ({ eventId, raceId }: RaceEventIdParams): Promise<RaceEventDetail> => {
     const race = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(race);
@@ -135,7 +135,7 @@ interface UpdateRaceEventParams {
 
 // Updates a race's editable fields. Gated by event-update permission.
 export const updateRaceEvent = api(
-  { expose: true, auth: true, method: "PATCH", path: "/events/:eventId/races/:raceId" },
+  { expose: true, auth: true, method: "PATCH", path: "/api/events/:eventId/races/:raceId" },
   async (params: UpdateRaceEventParams): Promise<RaceEventDetail> => {
     await requireRaceEvent(params.eventId, params.raceId);
     await requireEventPermission(prisma, {
@@ -183,7 +183,7 @@ interface DeleteRaceEventParams {
 
 // Deletes a race and its results (cascade). Gated by event-delete permission.
 export const deleteRaceEvent = api(
-  { expose: true, auth: true, method: "DELETE", path: "/events/:eventId/races/:raceId" },
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:eventId/races/:raceId" },
   async ({ eventId, raceId, authorization }: DeleteRaceEventParams): Promise<{ deleted: boolean }> => {
     await requireRaceEvent(eventId, raceId);
     await requireEventPermission(prisma, {
@@ -276,7 +276,7 @@ interface AddRaceMemberParams {
 
 // Registers a participant for a specific race.
 export const addRaceEventMember = api(
-  { expose: true, auth: true, method: "POST", path: "/events/:eventId/races/:raceId/members" },
+  { expose: true, auth: true, method: "POST", path: "/api/events/:eventId/races/:raceId/members" },
   async ({ eventId, raceId, authorization, userId }: AddRaceMemberParams): Promise<RaceEventDetail> => {
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
@@ -335,7 +335,7 @@ interface RemoveRaceMemberParams {
 
 // Removes a participant from a specific race.
 export const removeRaceEventMember = api(
-  { expose: true, auth: true, method: "DELETE", path: "/events/:eventId/races/:raceId/members/:userId" },
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:eventId/races/:raceId/members/:userId" },
   async ({ eventId, raceId, userId, authorization }: RemoveRaceMemberParams): Promise<RaceEventDetail> => {
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
@@ -374,7 +374,7 @@ interface ListRaceMembersParams {
 
 // Lists the registered participants for a specific race.
 export const listRaceEventMembers = api(
-  { expose: true, method: "GET", path: "/events/:eventId/races/:raceId/members" },
+  { expose: true, method: "GET", path: "/api/events/:eventId/races/:raceId/members" },
   async ({ eventId, raceId }: ListRaceMembersParams): Promise<{ members: RaceEventMemberView[] }> => {
     await requireRaceEvent(eventId, raceId);
 
