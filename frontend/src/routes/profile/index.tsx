@@ -4,6 +4,17 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { requireAuth } from '../../lib/auth-guard'
 import { getMyProfile, updateMyProfile } from '../../lib/public-api'
+import {
+  PixelContainer,
+  PixelStack,
+  PixelCard,
+  PixelInput,
+  PixelTextarea,
+  PixelButton,
+  PixelSectionHeader,
+  PixelAlert,
+  useToast,
+} from '@pxlkit/ui-kit'
 
 export const Route = createFileRoute('/profile/')({
   beforeLoad: async ({ location }) => {
@@ -14,6 +25,7 @@ export const Route = createFileRoute('/profile/')({
 
 function ProfilePage() {
   const { session } = useAuth()
+  const { toast } = useToast()
   const [biography, setBiography] = useState('')
   const [careerOverview, setCareerOverview] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
@@ -45,70 +57,61 @@ function ProfilePage() {
         `Bearer ${session?.session.token ?? ''}`,
       ),
     onSuccess: () => {
-      alert('Profile updated successfully!')
+      toast({ tone: 'green', title: 'Profile updated successfully!' })
     },
   })
 
-  if (isLoading) return <div className="p-6 font-pixel text-xs text-retro-muted animate-pulse">LOADING PROFILE...</div>
+  if (isLoading) {
+    return (
+      <PixelContainer maxWidth="md" padding="md">
+        <PixelAlert tone="neutral" message="LOADING PROFILE..." />
+      </PixelContainer>
+    )
+  }
 
   return (
-    <div className="max-w-md mx-auto">
-      <h1 className="text-2xl font-pixel tracking-wider text-retro-primary mb-6 text-center">EDIT PROFILE</h1>
+    <PixelContainer maxWidth="md" padding="md">
+      <PixelSectionHeader title="EDIT PROFILE" titleTone="purple" size="lg" className="mb-6" />
 
-      <div className="border-4 border-retro-border-strong bg-retro-surface p-6 pxl-corner-md pxl-shadow space-y-5">
-        <label className="block">
-          <span className="font-pixel text-xs text-retro-muted">NAME</span>
-          <input
-            type="text"
-            className="border-2 border-retro-border bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-muted font-sans cursor-not-allowed opacity-75"
-            value={profile?.name ?? ''}
-            disabled
-          />
-        </label>
+      <PixelCard className="">
+        <PixelStack gap={5}>
+          <PixelInput label="NAME" value={profile?.name ?? ''} disabled />
 
-        <label className="block">
-          <span className="font-pixel text-xs text-retro-text">BIOGRAPHY</span>
-          <textarea
-            className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"
+          <PixelTextarea
+            label="BIOGRAPHY"
             rows={3}
             value={biography}
             onChange={(e) => setBiography(e.target.value)}
             placeholder="Tell us about yourself..."
           />
-        </label>
 
-        <label className="block">
-          <span className="font-pixel text-xs text-retro-text">CAREER OVERVIEW</span>
-          <textarea
-            className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"
+          <PixelTextarea
+            label="CAREER OVERVIEW"
             rows={3}
             value={careerOverview}
             onChange={(e) => setCareerOverview(e.target.value)}
             placeholder="Summarize your competitive career..."
           />
-        </label>
 
-        <label className="block">
-          <span className="font-pixel text-xs text-retro-text">VRCHAT USERNAME</span>
-          <input
-            type="text"
-            className="border-2 border-retro-border-strong bg-retro-card p-3 w-full mt-1.5 pxl-corner-sm text-retro-text font-sans focus:border-retro-primary focus:outline-none"
+          <PixelInput
+            label="VRCHAT USERNAME"
             placeholder="e.g. user123"
             value={vrchatUsername}
             onChange={(e) => setVrchatUsername(e.target.value)}
           />
-        </label>
 
-        <button
-          className="font-pixel text-xs tracking-wider bg-retro-primary text-white border-2 border-retro-border-strong pxl-corner-sm pxl-shadow-hover hover:bg-indigo-700 active:translate-y-0.5 px-4 py-2.5 transition-all cursor-pointer w-full text-center mt-2 disabled:opacity-50"
-          onClick={() =>
-            updateMutation.mutate({ biography, careerOverview, vrchatUsername })
-          }
-          disabled={updateMutation.isPending}
-        >
-          {updateMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}
-        </button>
-      </div>
-    </div>
+          <PixelButton
+            variant="solid"
+            tone="purple"
+            className="w-full"
+            loading={updateMutation.isPending}
+            disabled={updateMutation.isPending}
+            onClick={() => updateMutation.mutate({ biography, careerOverview, vrchatUsername })}
+          >
+            {updateMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}
+          </PixelButton>
+        </PixelStack>
+      </PixelCard>
+    </PixelContainer>
   )
 }

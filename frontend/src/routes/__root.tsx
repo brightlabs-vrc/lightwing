@@ -1,5 +1,8 @@
 import React, { Suspense } from 'react'
 import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
+import { PixelContainer, PixelStack, PixelButton, PixelBadge } from '@pxlkit/ui-kit'
+import { PxlKitIcon } from '@pxlkit/core'
+import { Trophy } from '@pxlkit/gamification'
 import { useAuth } from '../hooks/useAuth'
 
 const TanStackRouterDevtools =
@@ -49,76 +52,63 @@ function RootLayout() {
   return (
     <>
       <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
-        <header className="border-b-4 border-retro-border-strong bg-retro-surface p-4">
-          <nav className="flex w-full items-center gap-4 text-sm">
-            <Link
-              to="/"
-              className="font-pixel text-sm tracking-wider leading-none text-retro-text hover:text-retro-primary"
-            >
-              LIGHTWING
-            </Link>
-
-            <div className="flex flex-1 justify-end items-center gap-4 flex-wrap">
-              <Link
-                to="/"
-                activeProps={{ className: 'bg-retro-primary text-white' }}
-                className="px-3 py-1.5 font-pixel text-sm tracking-wider leading-none text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
-              >
-                HOME
-              </Link>
-              <Link
-                to="/events"
-                activeProps={{ className: 'bg-retro-primary text-white' }}
-                className="px-3 py-1.5 font-pixel text-sm tracking-wider leading-none text-retro-text hover:text-retro-primary border-2 border-transparent hover:border-retro-border-strong pxl-corner-sm transition-all"
-              >
-                EVENTS
-              </Link>
-              {isSiteAdmin ? (
-                <Link
-                  to="/admin"
-                  className="px-3 py-1.5 font-pixel text-sm tracking-wider leading-none bg-retro-gold text-retro-text border-2 border-retro-border-strong pxl-corner-sm hover:bg-retro-secondary transition-all"
-                >
-                  ADMIN
+        <header className="border-b-2 border-retro-border-strong bg-retro-surface">
+          <PixelContainer maxWidth="full" padding="sm">
+            <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
+              <PixelButton asChild variant="ghost" tone="neutral">
+                <Link to="/">
+                  <PixelStack direction="row" gap={2} align="center">
+                    <span className="font-pixel text-sm tracking-wider leading-none">LIGHTWING</span>
+                  </PixelStack>
                 </Link>
-              ) : null}
+              </PixelButton>
 
-              <span className="h-2 w-2 border-l-2 border-retro-border-strong flex-shrink-0" />
+              <PixelStack direction="row" gap={2} align="center" wrap>
+                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
+                  <Link to="/">HOME</Link>
+                </PixelButton>
+                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
+                  <Link to="/events">EVENTS</Link>
+                </PixelButton>
+                {isSiteAdmin ? (
+                  <PixelButton asChild variant="soft" tone="gold" size="sm">
+                    <Link to="/admin">ADMIN</Link>
+                  </PixelButton>
+                ) : null}
 
-              {loading ? <span className="font-pixel text-[11px] leading-none text-retro-muted animate-pulse">LOADING...</span> : null}
+                {loading ? (
+                  <PixelBadge tone="neutral">LOADING...</PixelBadge>
+                ) : null}
 
-              {!loading && session ? (
-                <div className="flex items-center gap-3">
-                  <Link
-                    to="/profile"
-                    activeProps={{ className: 'border-retro-primary text-retro-primary' }}
-                    className="font-pixel text-[11px] leading-none bg-retro-card px-2.5 py-1 border-2 border-retro-border pxl-corner-sm hover:text-retro-primary hover:border-retro-border-strong transition-all"
-                    title="Edit Profile"
-                  >
-                    {session.user.name.toUpperCase()}
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => void signOutUser('/auth')}
-                    className="font-pixel text-[11px] leading-none bg-retro-red text-white px-2.5 py-1 border-2 border-retro-border-strong pxl-corner-sm hover:bg-red-700 active:translate-y-0.5 transition-all cursor-pointer"
-                  >
-                    SIGN OUT
-                  </button>
-                </div>
-              ) : null}
+                {!loading && session ? (
+                  <PixelStack direction="row" gap={2} align="center">
+                    <PixelButton asChild variant="outline" tone="neutral" size="sm">
+                      <Link to="/profile" title="Edit Profile">
+                        {session.user.name.toUpperCase()}
+                      </Link>
+                    </PixelButton>
+                    <PixelButton
+                      variant="solid"
+                      tone="red"
+                      size="sm"
+                      onClick={() => void signOutUser('/auth')}
+                    >
+                      SIGN OUT
+                    </PixelButton>
+                  </PixelStack>
+                ) : null}
 
-              {!loading && !session ? (
-                <div className="flex items-center gap-3">
-                  <span className="font-pixel text-[11px] leading-none text-retro-muted">OFFLINE</span>
-                  <Link
-                    to="/auth"
-                    className="font-pixel text-[11px] leading-none bg-retro-primary text-white px-2.5 py-1.5 border-2 border-retro-border-strong pxl-corner-sm hover:bg-indigo-700 active:translate-y-0.5 transition-all cursor-pointer"
-                  >
-                    SIGN IN
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-          </nav>
+                {!loading && !session ? (
+                  <PixelStack direction="row" gap={2} align="center">
+                    <PixelBadge tone="neutral">OFFLINE</PixelBadge>
+                    <PixelButton asChild variant="solid" tone="purple" size="sm">
+                      <Link to="/auth">SIGN IN</Link>
+                    </PixelButton>
+                  </PixelStack>
+                ) : null}
+              </PixelStack>
+            </PixelStack>
+          </PixelContainer>
         </header>
 
         <main className="w-full px-6 py-8">

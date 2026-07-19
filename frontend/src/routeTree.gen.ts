@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
@@ -27,11 +26,6 @@ import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events/$e
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -98,7 +92,6 @@ const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/dashboard': typeof DashboardRoute
   '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
@@ -114,7 +107,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/dashboard': typeof DashboardRoute
   '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
@@ -131,7 +123,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/dashboard': typeof DashboardRoute
   '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
@@ -149,7 +140,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
-    | '/dashboard'
     | '/onboarding'
     | '/admin/events'
     | '/events/$eventId'
@@ -165,7 +155,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
-    | '/dashboard'
     | '/onboarding'
     | '/admin/events'
     | '/events/$eventId'
@@ -181,7 +170,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth'
-    | '/dashboard'
     | '/onboarding'
     | '/admin/events'
     | '/events/$eventId'
@@ -198,7 +186,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
-  DashboardRoute: typeof DashboardRoute
   OnboardingRoute: typeof OnboardingRoute
   AdminEventsRoute: typeof AdminEventsRouteWithChildren
   EventsEventIdRoute: typeof EventsEventIdRoute
@@ -218,13 +205,6 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -329,7 +309,6 @@ const AdminEventsRouteWithChildren = AdminEventsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
-  DashboardRoute: DashboardRoute,
   OnboardingRoute: OnboardingRoute,
   AdminEventsRoute: AdminEventsRouteWithChildren,
   EventsEventIdRoute: EventsEventIdRoute,

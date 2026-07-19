@@ -2,7 +2,15 @@ import { useAuth } from '../../hooks/useAuth'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { listPublicEvents } from '../../lib/public-api'
-import { LoadingBox } from '../../components/LoadingBox'
+import {
+  PixelContainer,
+  PixelStack,
+  PixelCard,
+  PixelBadge,
+  PixelSectionHeader,
+  PixelSpinner,
+  PixelEmptyState,
+} from '@pxlkit/ui-kit'
 import type { eventmanager } from '../../lib/client'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
@@ -25,11 +33,11 @@ const STATUS_LABELS: Record<eventmanager.EventStatus, string> = {
   CONCLUDED: 'Concluded',
 }
 
-const STATUS_COLORS: Record<eventmanager.EventStatus, string> = {
-  DRAFT: 'bg-retro-muted text-white',
-  UNOFFICIAL: 'bg-retro-cyan text-white',
-  OFFICIAL: 'bg-retro-green text-white',
-  CONCLUDED: 'bg-retro-pink text-white',
+const STATUS_TONE: Record<eventmanager.EventStatus, 'neutral' | 'cyan' | 'green' | 'pink'> = {
+  DRAFT: 'neutral',
+  UNOFFICIAL: 'cyan',
+  OFFICIAL: 'green',
+  CONCLUDED: 'pink',
 }
 
 export const Route = createFileRoute('/events/')({
@@ -45,26 +53,44 @@ function EventsPage() {
     queryFn: () => listPublicEvents(),
   })
 
-  if (isLoading) return <LoadingBox message="Loading events..." />
-  if (error) return <div className="p-6 text-retro-red font-pixel text-sm">Error loading events.</div>
+  if (isLoading) {
+    return (
+      <PixelStack align="center" justify="center" gap={4} className="py-20">
+        <PixelSpinner size="lg" label="Loading events..." />
+      </PixelStack>
+    )
+  }
+  if (error) {
+    return (
+      <PixelContainer maxWidth="md" padding="md">
+        <PixelEmptyState
+          title="Error loading events"
+          description="Something went wrong while fetching the event list."
+        />
+      </PixelContainer>
+    )
+  }
 
   // Filter events to exclude DRAFT
   const publicEvents = data?.events.filter((event) => event.status !== 'DRAFT') || []
 
   return (
-    <div className="w-full">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">COMPETITIVE EVENTS</h1>
-        <span className="font-pixel text-xs bg-retro-surface border-2 border-retro-border px-3 py-1 pxl-corner-sm">
-          {publicEvents.length} ACTIVE
-        </span>
-      </div>
+    <PixelContainer maxWidth="full" padding="md">
+      <PixelSectionHeader
+        title="COMPETITIVE EVENTS"
+        titleTone="purple"
+        size="lg"
+        actions={
+          <PixelBadge tone="neutral">{publicEvents.length} ACTIVE</PixelBadge>
+        }
+      />
 
-      <div className="space-y-6">
+      <PixelStack gap={6} className="mt-6">
         {publicEvents.length === 0 ? (
-          <div className="border-4 border-dashed border-retro-border bg-retro-surface p-8 text-center rounded-xl">
-            <p className="font-pixel text-xs text-retro-muted">No public events active at this moment.</p>
-          </div>
+          <PixelEmptyState
+            title="No public events active"
+            description="There are no public events running at this moment."
+          />
         ) : (
           publicEvents.map((event) => {
             const isMember = session && event.members.some((m) => m.userId === session.user.id)
@@ -73,44 +99,43 @@ function EventsPage() {
                 key={event.id}
                 to="/events/$eventId"
                 params={{ eventId: event.id }}
-                className="block border-4 border-retro-border-strong bg-retro-surface p-6 pxl-corner-md pxl-shadow-hover hover:border-retro-primary transition-all duration-150"
+                className="block"
               >
-                <div className="flex justify-between items-start gap-4 flex-wrap">
-                  <div>
-                    <h2 className="text-xl font-pixel tracking-wide text-retro-text hover:text-retro-primary">
-                      {event.name}
-                    </h2>
-                    {event.description && (
-                      <p className="text-base text-retro-muted mt-2 max-w-2xl font-sans leading-relaxed">
-                        {event.description}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={`font-pixel text-xs px-3 py-1.5 border-2 border-retro-border-strong pxl-corner-sm pxl-shadow ${
-                      STATUS_COLORS[event.status]
-                    }`}
-                  >
-                    {STATUS_LABELS[event.status].toUpperCase()}
-                  </span>
-                </div>
+                <PixelCard className="hover:border-retro-primary transition-all duration-150">
+                  <PixelStack gap={4}>
+                    <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
+                      <PixelStack gap={2}>
+                        <h2 className="text-xl font-pixel tracking-wide text-retro-text">
+                          {event.name}
+                        </h2>
+                        {event.description && (
+                          <p className="text-base text-retro-muted max-w-2xl font-sans leading-relaxed">
+                            {event.description}
+                          </p>
+                        )}
+                      </PixelStack>
+                      <PixelBadge tone={STATUS_TONE[event.status]}>
+                        {STATUS_LABELS[event.status].toUpperCase()}
+                      </PixelBadge>
+                    </PixelStack>
 
-                <div className="mt-4 flex flex-wrap gap-4 text-xs font-pixel text-xs text-retro-muted">
-                  <span className="bg-retro-card px-2 py-1 border-2 border-retro-border pxl-corner-sm text-retro-text">
-                    SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
-                  </span>
-                  <span className="bg-retro-card px-2 py-1 border-2 border-retro-border pxl-corner-sm text-retro-text">
-                    CLASS: {event.classRestriction ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN'}
-                  </span>
-                  <span className="bg-retro-card px-2 py-1 border-2 border-retro-border pxl-corner-sm text-retro-text">
-                    MEMBERS: {event.members.length}
-                  </span>
-                </div>
+                    <PixelStack direction="row" gap={4} wrap>
+                      <PixelBadge tone="neutral">
+                        SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
+                      </PixelBadge>
+                      <PixelBadge tone="neutral">
+                        CLASS: {event.classRestriction ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN'}
+                      </PixelBadge>
+                      <PixelBadge tone="neutral">MEMBERS: {event.members.length}</PixelBadge>
+                      {isMember ? <PixelBadge tone="green">JOINED</PixelBadge> : null}
+                    </PixelStack>
+                  </PixelStack>
+                </PixelCard>
               </Link>
             )
           })
         )}
-      </div>
-    </div>
+      </PixelStack>
+    </PixelContainer>
   )
 }
