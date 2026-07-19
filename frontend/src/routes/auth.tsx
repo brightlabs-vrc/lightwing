@@ -30,9 +30,14 @@ function AuthPage() {
   const redirectPath = sanitizeRedirect(search.redirect)
   const destinationLabel = redirectPath === '/' ? 'home' : redirectPath
 
-  // Once authenticated, return the user to where they were.
+  // Once authenticated, check if onboarding is needed and redirect accordingly.
   useEffect(() => {
     if (!loading && session) {
+      // Check if vrchatUsername is null/empty - if so, redirect to onboarding
+      if (!session.user.vrchatUsername || session.user.vrchatUsername.trim() === '') {
+        void navigate({ to: '/onboarding' })
+        return
+      }
       void navigate({ to: redirectPath })
     }
   }, [loading, session, navigate, redirectPath])

@@ -52,8 +52,12 @@ function RootLayout() {
       <header className='border-b border-slate-200 bg-white/95 backdrop-blur'>
         <nav className='mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-4 text-sm'>
           <Link to='/' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Home</Link>
+          <Link to='/events' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Events</Link>
           <Link to='/dashboard' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Dashboard</Link>
           <Link to='/auth' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Auth</Link>
+          {!isAdminArea && session ? (
+            <Link to='/profile' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>Profile</Link>
+          ) : null}
           {isSiteAdmin ? (
             <Link to='/admin' activeProps={{ className: 'font-semibold text-slate-900' }} className='text-slate-600 hover:text-slate-900'>
               Admin Portal

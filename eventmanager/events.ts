@@ -192,6 +192,23 @@ export const listEvents = api(
   },
 );
 
+// Lists public events (UNOFFICIAL, OFFICIAL, CONCLUDED) without DRAFT visibility.
+// Used by the public events page.
+export const listPublicEvents = api(
+  { expose: true, method: "GET", path: "/events/public" },
+  async (): Promise<{ events: EventDetail[] }> => {
+    const events = await prisma.event.findMany({
+      where: {
+        status: { in: ["UNOFFICIAL", "OFFICIAL", "CONCLUDED"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const detailed = await Promise.all(events.map((event) => loadEvent(event.id)));
+    return { events: detailed };
+  },
+);
+
 interface EventIdParams {
   id: string;
 }
@@ -330,6 +347,84 @@ export const removeEventMember = api(
       eventId: id,
       action: "update",
     });
+
+    await prisma.eventMember.deleteMany({ where: { eventId: id, userId } });
+    return loadEvent(id);
+  },
+);
+
+interface JoinEventParams {
+  id: string;
+  authorization: Header<"Authorization">;
+}
+
+// Public self-signup endpoint: allows authenticated users to join events
+// in UNOFFICIAL or OFFICIAL status. Does NOT require event permissions.
+export const joinEvent = api(
+  { expose: true, auth: true, method: "POST", path: "/events/:id/join" },
+  async ({ id, authorization }: JoinEventParams): Promise<EventDetail> => {
+    const event = await requireEvent(id);
+
+    // Only allow public signups for visible events
+    if (event.status !== "UNOFFICIAL" && event.status !== "OFFICIAL") {
+      throw APIError.failedPrecondition(
+        "event is not open for public signup (must be UNOFFICIAL or OFFICIAL)",
+      );
+    }
+
+    // Resolve the authenticated actor - self-service, no permission check
+    const actor = await resolveActor(prisma, authorization);
+    const userId = actor.userId;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw APIError.notFound("user not found");
+    }
+    if (!isEligible(user.classTier, event.classRestriction)) {
+      throw APIError.failedPrecondition(
+        "participant class tier does not satisfy the event class restriction",
+      );
+    }
+
+    await prisma.eventMember.upsert({
+      where: { eventId_userId: { eventId: id, userId } },
+      create: { id: randomUUID(), eventId: id, userId },
+      update: {},
+    });
+
+    if (event.scoringType === SCORING_POINTS) {
+      await prisma.eventPointsEntry.upsert({
+        where: { eventId_userId: { eventId: id, userId } },
+        create: { id: randomUUID(), eventId: id, userId, points: 0 },
+        update: {},
+      });
+    } else {
+      await prisma.eventLadderEntry.upsert({
+        where: { eventId_userId: { eventId: id, userId } },
+        create: { id: randomUUID(), eventId: id, userId, elo: LADDER_STARTING_ELO },
+        update: {},
+      });
+    }
+
+    return loadEvent(id);
+  },
+);
+
+interface LeaveEventParams {
+  id: string;
+  authorization: Header<"Authorization">;
+}
+
+// Public self-exit endpoint: allows authenticated users to leave events they've joined.
+// Does NOT require event permissions - users can withdraw from their own membership.
+export const leaveEvent = api(
+  { expose: true, auth: true, method: "DELETE", path: "/events/:id/join" },
+  async ({ id, authorization }: LeaveEventParams): Promise<EventDetail> => {
+    const event = await requireEvent(id);
+
+    // Resolve the authenticated actor - self-service, no permission check
+    const actor = await resolveActor(prisma, authorization);
+    const userId = actor.userId;
 
     await prisma.eventMember.deleteMany({ where: { eventId: id, userId } });
     return loadEvent(id);

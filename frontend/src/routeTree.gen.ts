@@ -9,10 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProfileIndexRouteImport } from './routes/profile/index'
+import { Route as EventsIndexRouteImport } from './routes/events/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
 import { Route as AdminEventsRouteImport } from './routes/admin/events'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 import { Route as AdminTeamsIndexRouteImport } from './routes/admin/teams/index'
@@ -20,6 +24,11 @@ import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$user
 import { Route as AdminTeamsTeamIdRouteImport } from './routes/admin/teams/$teamId'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events/$eventId'
 
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -35,9 +44,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileIndexRoute = ProfileIndexRouteImport.update({
+  id: '/profile/',
+  path: '/profile/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsEventIdRoute = EventsEventIdRouteImport.update({
+  id: '/events/$eventId',
+  path: '/events/$eventId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminEventsRoute = AdminEventsRouteImport.update({
@@ -75,8 +99,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
+  '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
+  '/events/$eventId': typeof EventsEventIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/events/': typeof EventsIndexRoute
+  '/profile/': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -87,8 +115,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
+  '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
+  '/events/$eventId': typeof EventsEventIdRoute
   '/admin': typeof AdminIndexRoute
+  '/events': typeof EventsIndexRoute
+  '/profile': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -100,8 +132,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
+  '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
+  '/events/$eventId': typeof EventsEventIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/events/': typeof EventsIndexRoute
+  '/profile/': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -114,8 +150,12 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/onboarding'
     | '/admin/events'
+    | '/events/$eventId'
     | '/admin/'
+    | '/events/'
+    | '/profile/'
     | '/admin/events/$eventId'
     | '/admin/teams/$teamId'
     | '/admin/users/$userId'
@@ -126,8 +166,12 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/onboarding'
     | '/admin/events'
+    | '/events/$eventId'
     | '/admin'
+    | '/events'
+    | '/profile'
     | '/admin/events/$eventId'
     | '/admin/teams/$teamId'
     | '/admin/users/$userId'
@@ -138,8 +182,12 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/onboarding'
     | '/admin/events'
+    | '/events/$eventId'
     | '/admin/'
+    | '/events/'
+    | '/profile/'
     | '/admin/events/$eventId'
     | '/admin/teams/$teamId'
     | '/admin/users/$userId'
@@ -151,8 +199,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRoute
+  OnboardingRoute: typeof OnboardingRoute
   AdminEventsRoute: typeof AdminEventsRouteWithChildren
+  EventsEventIdRoute: typeof EventsEventIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  EventsIndexRoute: typeof EventsIndexRoute
+  ProfileIndexRoute: typeof ProfileIndexRoute
   AdminTeamsTeamIdRoute: typeof AdminTeamsTeamIdRoute
   AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
   AdminTeamsIndexRoute: typeof AdminTeamsIndexRoute
@@ -161,6 +213,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -182,11 +241,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile/': {
+      id: '/profile/'
+      path: '/profile'
+      fullPath: '/profile/'
+      preLoaderRoute: typeof ProfileIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$eventId': {
+      id: '/events/$eventId'
+      path: '/events/$eventId'
+      fullPath: '/events/$eventId'
+      preLoaderRoute: typeof EventsEventIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/events': {
@@ -250,8 +330,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRoute,
+  OnboardingRoute: OnboardingRoute,
   AdminEventsRoute: AdminEventsRouteWithChildren,
+  EventsEventIdRoute: EventsEventIdRoute,
   AdminIndexRoute: AdminIndexRoute,
+  EventsIndexRoute: EventsIndexRoute,
+  ProfileIndexRoute: ProfileIndexRoute,
   AdminTeamsTeamIdRoute: AdminTeamsTeamIdRoute,
   AdminUsersUserIdRoute: AdminUsersUserIdRoute,
   AdminTeamsIndexRoute: AdminTeamsIndexRoute,
