@@ -126,7 +126,7 @@ function RootLayout() {
         </main>
 
         <footer className="w-full px-6 pb-12 text-center font-pixel text-xs text-retro-muted border-t-2 border-retro-border pt-6">
-          Lightwing × PxlKit • 8-Bit Racing Platform
+          Lightwing Prototype &copy; 2026, Umamusume Racing Society. All rights reserved. Neigh.
         </footer>
       </div>
       <Suspense>

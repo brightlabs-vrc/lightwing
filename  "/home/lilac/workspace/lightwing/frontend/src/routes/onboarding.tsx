@@ -1,0 +1,1 @@
+            <span className="font-pixel text-xs text-retro-text">VRCHAT USERNAME</span>
