@@ -46,6 +46,53 @@ afterEach(async () => {
   }
 });
 
+import { updateUserProfile } from "./users";
+
+describe("updateUserProfile endpoint", () => {
+  test("allows self updates", async () => {
+    const userId = await createUser("user-self", "Self Update");
+    const token = await createSession(userId);
+
+    const updated = await updateUserProfile({
+      id: userId,
+      authorization: `Bearer ${token}`,
+      biography: "Self updated bio",
+    });
+
+    expect(updated.biography).toBe("Self updated bio");
+  });
+
+  test("allows site admin updates for another user", async () => {
+    const userId = await createUser("user-other", "Other Update");
+    const adminId = await createUser("user-admin", "Admin Updater", "SITE_ADMIN");
+    const adminToken = await createSession(adminId);
+
+    const updated = await updateUserProfile({
+      id: userId,
+      authorization: `Bearer ${adminToken}`,
+      biography: "Admin updated bio",
+    });
+
+    expect(updated.biography).toBe("Admin updated bio");
+  });
+
+  test("denies non-admin updates for another user", async () => {
+    const targetUserId = await createUser("user-target", "Target User");
+    const regularUserId = await createUser("user-regular", "Regular User");
+    const regularToken = await createSession(regularUserId);
+
+    await expect(
+      updateUserProfile({
+        id: targetUserId,
+        authorization: `Bearer ${regularToken}`,
+        biography: "Hacked bio",
+      })
+    ).rejects.toMatchObject({
+      code: "permission_denied",
+    });
+  });
+});
+
 describe("listUsers endpoint", () => {
   test("returns list of users with organization affiliations for site admin", async () => {
     const userOneId = await createUser("user-one", "Alice User");

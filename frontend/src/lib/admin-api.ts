@@ -1011,6 +1011,70 @@ export async function updateAdminUserSiteRole(
   return updated
 }
 
+export async function updateAdminUserProfile(
+  userId: string,
+  params: {
+    name?: string
+    image?: string | null
+    biography?: string | null
+    careerOverview?: string | null
+    vrchatUsername?: string | null
+  },
+  authorization: string,
+): Promise<auth.UserProfile> {
+  if (!MOCK_MODE) {
+    return appClient.auth.updateUserProfile(userId, {
+      authorization,
+      ...params,
+    })
+  }
+
+  const existing = mockUserProfiles.get(userId)
+  if (!existing) {
+    throw new Error(`User ${userId} was not found in mock records`)
+  }
+
+  const updated: auth.UserProfile = {
+    ...existing,
+    name: params.name !== undefined ? params.name : existing.name,
+    image: params.image !== undefined ? params.image : existing.image,
+    biography: params.biography !== undefined ? params.biography : existing.biography,
+    careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
+    vrchatUsername: params.vrchatUsername !== undefined ? params.vrchatUsername : existing.vrchatUsername,
+    updatedAt: new Date().toISOString(),
+  }
+
+  mockUserProfiles.set(userId, updated)
+  return updated
+}
+
+export async function updateAdminUserClass(
+  userId: string,
+  classTier: eventmanager.ClassTier | null,
+  authorization: string,
+): Promise<{ userId: string; classTier: eventmanager.ClassTier | null }> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.setUserClass(userId, {
+      authorization,
+      classTier,
+    })
+  }
+
+  const existing = mockUserProfiles.get(userId)
+  if (!existing) {
+    throw new Error(`User ${userId} was not found in mock records`)
+  }
+
+  const updated: auth.UserProfile = {
+    ...existing,
+    classTier: classTier,
+    updatedAt: new Date().toISOString(),
+  }
+
+  mockUserProfiles.set(userId, updated)
+  return { userId, classTier }
+}
+
 // -----------------------------------------------------------------------------
 // TEAM MANAGEMENT METHODS
 // -----------------------------------------------------------------------------
