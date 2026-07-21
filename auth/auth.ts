@@ -6,6 +6,7 @@ import { REST, Routes } from "discord.js";
 import type { APIGuildMember, APIRole } from "discord-api-types/v10";
 import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
+import log from "encore.dev/log";
 import { prisma } from "./prisma";
 import {
   administratorRole,
@@ -31,7 +32,25 @@ const staffRoleNames = new Set([
 ]);
 const staffRoleCacheTtlMs = 5 * 60 * 1000;
 
-const discordBotRestClient = new REST({ version: "10" }).setToken(discordBotToken());
+let discordBotRestClient: REST | null = null;
+
+function getDiscordBotRestClient(): REST | null {
+  if (discordBotRestClient) {
+    return discordBotRestClient;
+  }
+  try {
+    const token = discordBotToken();
+    if (!token) {
+      log.warn("Discord bot token is empty");
+      return null;
+    }
+    discordBotRestClient = new REST({ version: "10" }).setToken(token);
+    return discordBotRestClient;
+  } catch (error) {
+    log.error(error, "failed to initialize Discord REST client (secret might be missing)");
+    return null;
+  }
+}
 
 let cachedDiscordStaffRoleIds: { ids: Set<string>; expiresAt: number } | null = null;
 
@@ -81,13 +100,18 @@ async function getDiscordStaffRoleIds() {
     return cachedDiscordStaffRoleIds.ids;
   }
 
+  const client = getDiscordBotRestClient();
+  if (!client) {
+    log.error("Discord bot REST client is not available; returning empty staff roles");
+    return new Set<string>();
+  }
+
   let roles: APIRole[];
   try {
-    roles = (await discordBotRestClient.get(Routes.guildRoles(ursDiscordGuildId))) as APIRole[];
+    roles = (await client.get(Routes.guildRoles(ursDiscordGuildId))) as APIRole[];
   } catch (error) {
-    throw APIError.fromStatus("INTERNAL_SERVER_ERROR", {
-      message: "failed to fetch Discord guild roles",
-    });
+    log.error(error, "failed to fetch Discord guild roles; returning empty staff roles");
+    return new Set<string>();
   }
 
   const ids = resolveStaffRoleIds(roles);
@@ -109,19 +133,8 @@ async function getDiscordGuildMember(accessToken: string): Promise<APIGuildMembe
       Routes.userGuildMember(ursDiscordGuildId),
     )) as APIGuildMember;
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      typeof error.status === "number" &&
-      [401, 403, 404].includes(error.status)
-    ) {
-      return null;
-    }
-
-    throw APIError.fromStatus("INTERNAL_SERVER_ERROR", {
-      message: "failed to verify Discord guild membership",
-    });
+    log.error(error, "failed to verify Discord guild membership");
+    return null;
   }
 }
 

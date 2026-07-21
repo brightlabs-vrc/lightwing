@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './api'
+import { API_BASE_URL, writeStoredSessionToken } from './api'
 import { MOCK_MODE } from './mock-mode'
 
 export type SiteRole = 'USER' | 'SITE_ADMIN'
@@ -87,12 +87,18 @@ export async function getAuthSession(): Promise<AuthSession | null> {
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
+      writeStoredSessionToken(null)
       return null
     }
     throw new Error(`Failed to load auth session (${response.status})`)
   }
 
   const payload = (await response.json()) as AuthSession | null
+  if (payload?.session?.token) {
+    writeStoredSessionToken(payload.session.token)
+  } else {
+    writeStoredSessionToken(null)
+  }
   return payload
 }
 
@@ -147,6 +153,8 @@ export async function signOut(): Promise<void> {
       'Content-Type': 'application/json',
     },
   })
+
+  writeStoredSessionToken(null)
 
   if (!response.ok) {
     throw new Error(`Failed to sign out (${response.status})`)
