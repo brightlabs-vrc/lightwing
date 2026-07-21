@@ -203,6 +203,11 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
         required: false,
         input: false, // do not allow clients to set this via the auth API; it's managed by our database hooks
       },
+      vrchatUsername: {
+        type: "string",
+        required: false,
+        input: false,
+      },
     },
   },
   emailAndPassword: {
