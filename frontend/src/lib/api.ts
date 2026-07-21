@@ -19,4 +19,32 @@ function resolveApiBaseUrl(): string {
 
 export const API_BASE_URL = resolveApiBaseUrl()
 
-export const appClient = new Client(API_BASE_URL)
+const SESSION_TOKEN_KEY = 'lightwing:session:token'
+
+export function getStoredSessionToken(): string | null {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return null
+  }
+  return window.localStorage.getItem(SESSION_TOKEN_KEY)
+}
+
+export function writeStoredSessionToken(token: string | null) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return
+  }
+  if (token) {
+    window.localStorage.setItem(SESSION_TOKEN_KEY, token)
+  } else {
+    window.localStorage.removeItem(SESSION_TOKEN_KEY)
+  }
+}
+
+export const appClient = new Client(API_BASE_URL, {
+  auth: () => {
+    const token = getStoredSessionToken()
+    if (token) {
+      return { authorization: `Bearer ${token}` }
+    }
+    return undefined
+  }
+})
