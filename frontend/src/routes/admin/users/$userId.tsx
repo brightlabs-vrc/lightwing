@@ -193,12 +193,6 @@ function AdminUserDetailPage() {
                         </div>
                       </div>
 
-                      {/* Email Read-only */}
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Email Address</p>
-                        <p className="slds-text-body_regular slds-m-top_xx-small" style={{ fontSize: '1.1rem', padding: '6px 0' }}>{profile.email}</p>
-                      </div>
-
                       {/* VRChat Username Input */}
                       <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
                         <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="vrchat-username">VRChat Username</label>

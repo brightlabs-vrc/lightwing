@@ -69,7 +69,7 @@ function AdminUsersPage() {
               {/* Search Control */}
               <div className="slds-form-element slds-m-bottom_large" style={{ maxWidth: '400px' }}>
                 <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="user-search-input">
-                  Search by Name or Email Address
+                  Search by Name
                 </label>
                 <div className="slds-form-element__control">
                   <input
@@ -100,9 +100,6 @@ function AdminUsersPage() {
                       <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
                         <th scope="col" style={{ width: '250px' }}>
                           <div className="slds-truncate font-bold" title="Full Name" style={{ fontWeight: 'bold' }}>Full Name</div>
-                        </th>
-                        <th scope="col" style={{ width: '250px' }}>
-                          <div className="slds-truncate font-bold" title="Email Address" style={{ fontWeight: 'bold' }}>Email Address</div>
                         </th>
                         <th scope="col" style={{ width: '150px' }}>
                           <div className="slds-truncate font-bold" title="Site Role" style={{ fontWeight: 'bold' }}>Site Role</div>
@@ -137,9 +134,6 @@ function AdminUsersPage() {
                               )}
                             </div>
                           </th>
-                          <td>
-                            <div className="slds-truncate" title={user.email}>{user.email}</div>
-                          </td>
                           <td>
                             <span className={`slds-badge ${user.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
                               {user.siteRole}
