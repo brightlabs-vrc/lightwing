@@ -126,6 +126,7 @@ function EventsPage() {
                       <PixelBadge tone="neutral">
                         CLASS: {event.classRestriction ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN'}
                       </PixelBadge>
+                      <PixelBadge tone="neutral">RACES: {event.raceEvents.length}</PixelBadge>
                       <PixelBadge tone="neutral">MEMBERS: {event.members.length}</PixelBadge>
                       {isMember ? <PixelBadge tone="green">JOINED</PixelBadge> : null}
                     </PixelStack>
