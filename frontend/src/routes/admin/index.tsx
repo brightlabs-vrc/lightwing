@@ -43,10 +43,6 @@ function AdminPage() {
                   <p className="slds-text-body_regular font-medium" style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.name}</p>
                 </div>
                 <div>
-                  <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Email</p>
-                  <p className="slds-text-body_regular" style={{ fontSize: '14px' }}>{session?.user.email}</p>
-                </div>
-                <div>
                   <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Authorization Role</p>
                   <span className="slds-badge slds-theme_success" style={{ padding: '2px 10px', fontSize: '11px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
                     {session?.user.siteRole ?? 'SITE_ADMIN'}

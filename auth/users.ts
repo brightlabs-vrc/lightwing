@@ -64,8 +64,10 @@ interface UpdateUserParams {
   vrchatUsername?: string | null;
 }
 
+import { isSiteAdmin } from "./permissions";
+
 // Updates the authenticated user's own profile fields (issue #7). A user may
-// only edit their own record.
+// only edit their own record or a site admin may edit other profiles.
 export const updateUserProfile = api(
   { expose: true, method: "PATCH", path: "/api/users/:id" },
   async ({
@@ -78,7 +80,7 @@ export const updateUserProfile = api(
     vrchatUsername,
   }: UpdateUserParams): Promise<UserProfile> => {
     const actor = await resolveActor(prisma, authorization);
-    if (actor.userId !== id) {
+    if (actor.userId !== id && !isSiteAdmin(actor.siteRole)) {
       throw APIError.permissionDenied("cannot edit another user's profile");
     }
 

@@ -2,3 +2,5 @@ allowBuilds:
   '@prisma/engines': true
   esbuild: true
   prisma: true
+minimumReleaseAgeExclude:
+  - encore.dev@1.57.12

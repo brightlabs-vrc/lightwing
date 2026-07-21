@@ -590,7 +590,7 @@ function AdminTeamDetailPage() {
                         >
                           {systemUsers.map((u) => (
                             <option key={u.id} value={u.id}>
-                              {u.name} ({u.email})
+                              {u.name}
                             </option>
                           ))}
                         </select>
