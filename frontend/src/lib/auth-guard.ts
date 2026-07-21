@@ -53,7 +53,7 @@ export async function requireSiteAdmin(location: RouteLocation): Promise<AuthSes
     throw redirect({
       to: '/auth',
       search: {
-        redirect: '/',
+        redirect: buildRedirectPath(location),
         error: 'forbidden',
       },
     })
