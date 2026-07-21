@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPublicEvent, joinEvent, leaveEvent } from '../../lib/public-api'
+import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults } from '../../lib/public-api'
 import {
   PixelContainer,
   PixelStack,
@@ -270,6 +270,175 @@ function EventDetailPage() {
           />
         </div>
       )}
+
+      {/* RACES SECTION */}
+      <div className="mt-8">
+        <PixelSectionHeader title="RACES" size="sm" spacing="tight" />
+        <EventRacesList event={event} />
+      </div>
     </PixelContainer>
+  )
+}
+
+function RaceStandingsTable({
+  eventId,
+  raceId,
+  members,
+}: {
+  eventId: string
+  raceId: string
+  members: eventmanager.EventMemberView[]
+}) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['public-race-results', eventId, raceId],
+    queryFn: () => getPublicRaceResults(eventId, raceId),
+  })
+
+  if (isLoading) {
+    return (
+      <PixelStack align="center" justify="center" gap={2} className="py-4">
+        <PixelSpinner size="sm" label="Loading standings..." />
+      </PixelStack>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="text-retro-muted font-pixel text-xs py-2">
+        ERROR LOADING STANDINGS
+      </div>
+    )
+  }
+
+  const results = data.results
+
+  const columns: PixelTableColumn<eventmanager.RaceResultView>[] = [
+    {
+      key: 'position',
+      header: 'POS',
+      width: 64,
+      render: (r) => <span className="font-pixel">{r.position ?? '-'}</span>,
+    },
+    {
+      key: 'gateNumber',
+      header: 'DRAW',
+      width: 64,
+      render: (r) => <span>{r.gateNumber ?? '-'}</span>,
+    },
+    {
+      key: 'participant',
+      header: 'PARTICIPANT',
+      render: (r) => {
+        const member = members.find((m) => m.userId === r.userId)
+        return <span className="font-medium">{member?.name ?? r.userId}</span>
+      },
+    },
+    {
+      key: 'points',
+      header: 'POINTS',
+      align: 'right',
+      width: 96,
+      render: (r) => <span className="text-retro-primary">{r.points}</span>,
+    },
+    {
+      key: 'finishTime',
+      header: 'FINISH TIME',
+      render: (r) => <span>{r.finishTime ?? '-'}</span>,
+    },
+    {
+      key: 'margin',
+      header: 'MARGIN',
+      render: (r) => <span>{r.margin ?? '-'}</span>,
+    },
+    {
+      key: 'passingOrder',
+      header: 'PASSING ORDER',
+      render: (r) => <span>{r.passingOrder ?? '-'}</span>,
+    },
+    {
+      key: 'final3F',
+      header: 'FINAL 3F',
+      render: (r) => <span>{r.final3F ?? '-'}</span>,
+    },
+  ]
+
+  return (
+    <PixelTable
+      columns={columns}
+      data={results}
+      emptyState={
+        <span className="font-pixel text-xs text-retro-muted">NO STANDINGS RECORDED</span>
+      }
+    />
+  )
+}
+
+function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['public-event-races', event.id],
+    queryFn: () => listPublicRaceEvents(event.id),
+  })
+
+  if (isLoading) {
+    return (
+      <PixelStack align="center" justify="center" gap={4} className="py-8">
+        <PixelSpinner size="md" label="Loading races..." />
+      </PixelStack>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <PixelEmptyState
+        title="Error loading races"
+        description="Something went wrong while fetching the race events list."
+      />
+    )
+  }
+
+  const races = data.races
+
+  if (races.length === 0) {
+    return (
+      <PixelEmptyState
+        title="No races scheduled"
+        description="There are no individual race events configured for this competition."
+      />
+    )
+  }
+
+  return (
+    <PixelStack gap={6} className="mt-4">
+      {races.map((race) => (
+        <PixelCard key={race.id}>
+          <PixelStack gap={4}>
+            {/* Race Header Info */}
+            <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
+              <PixelStack gap={2}>
+                <h3 className="text-lg font-pixel tracking-wide text-retro-text">
+                  #{race.sequence}. {race.name}
+                </h3>
+                <div className="text-xs text-retro-muted font-sans flex flex-wrap gap-x-4 gap-y-1">
+                  <span>TRACK: <strong>{race.trackType}</strong> ({race.distanceMeters}m)</span>
+                  <span>LOCATION: <strong>{race.location}</strong></span>
+                </div>
+              </PixelStack>
+              <PixelStack direction="row" gap={2}>
+                <PixelBadge tone="neutral">
+                  CLASS:{' '}
+                  {race.classRestriction ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
+                </PixelBadge>
+              </PixelStack>
+            </PixelStack>
+
+            {/* Standings Table */}
+            <div className="mt-2">
+              <div className="font-pixel text-[11px] text-retro-text mb-2">RACE STANDINGS</div>
+              <RaceStandingsTable eventId={event.id} raceId={race.id} members={event.members} />
+            </div>
+          </PixelStack>
+        </PixelCard>
+      ))}
+    </PixelStack>
   )
 }

@@ -50,6 +50,70 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   }],
 ])
 
+// Mock results for the mock races
+const mockRaceResults: Record<string, eventmanager.RaceResultView[]> = {
+  'race_mock_001': [
+    {
+      id: 'res_mock_001',
+      raceEventId: 'race_mock_001',
+      userId: 'mock-user-1',
+      position: 1,
+      points: 10,
+      gateNumber: 3,
+      finishTime: '1:08.5',
+      margin: null,
+      passingOrder: '2-2-1',
+      final3F: '34.2',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'res_mock_002',
+      raceEventId: 'race_mock_001',
+      userId: 'mock-user-2',
+      position: 2,
+      points: 6,
+      gateNumber: 5,
+      finishTime: '1:08.7',
+      margin: '1 1/4',
+      passingOrder: '1-1-2',
+      final3F: '34.6',
+      createdAt: now,
+      updatedAt: now,
+    },
+  ],
+  'race_mock_002': [
+    {
+      id: 'res_mock_003',
+      raceEventId: 'race_mock_002',
+      userId: 'mock-user-2',
+      position: 1,
+      points: 10,
+      gateNumber: 2,
+      finishTime: '1:37.2',
+      margin: null,
+      passingOrder: '4-3-1',
+      final3F: '36.1',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'res_mock_004',
+      raceEventId: 'race_mock_002',
+      userId: 'mock-user-1',
+      position: 2,
+      points: 6,
+      gateNumber: 8,
+      finishTime: '1:37.3',
+      margin: 'neck',
+      passingOrder: '1-1-2',
+      final3F: '36.5',
+      createdAt: now,
+      updatedAt: now,
+    },
+  ],
+}
+
 // Mock events for public API - excluding DRAFT events
 let mockPublicEvents: eventmanager.EventDetail[] = [
   {
@@ -64,7 +128,46 @@ let mockPublicEvents: eventmanager.EventDetail[] = [
     scoringTypeLabel: 'points-based',
     classRestriction: 'OP',
     granularParticipation: true,
-    raceEvents: [],
+    raceEvents: [
+      {
+        id: 'race_mock_001',
+        eventId: 'evt_mock_001',
+        name: 'Summer Sprint Turf',
+        sequence: 1,
+        distanceMeters: 1200,
+        trackType: 'Turf',
+        location: 'Kyoto Racecourse',
+        scoringType: 1,
+        classRestriction: 'OP',
+        startsAt: now,
+        endsAt: now,
+        createdAt: now,
+        updatedAt: now,
+        members: [
+          { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+          { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+        ],
+      } as any,
+      {
+        id: 'race_mock_002',
+        eventId: 'evt_mock_001',
+        name: 'Summer Sprint Dirt',
+        sequence: 2,
+        distanceMeters: 1600,
+        trackType: 'Dirt',
+        location: 'Hanshin Racecourse',
+        scoringType: 1,
+        classRestriction: null,
+        startsAt: now,
+        endsAt: now,
+        createdAt: now,
+        updatedAt: now,
+        members: [
+          { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+          { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+        ],
+      } as any,
+    ],
     members: [
       { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
       { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
@@ -245,4 +348,40 @@ export async function updateMyProfile(
   }
 
   return updated
+}
+
+export async function listPublicRaceEvents(
+  eventId: string,
+): Promise<{ races: eventmanager.RaceEventDetail[] }> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.listRaceEvents(eventId)
+  }
+  const event = mockPublicEvents.find((e) => e.id === eventId)
+  if (!event) throw new Error('Event not found')
+  return { races: (event.raceEvents ?? []) as eventmanager.RaceEventDetail[] }
+}
+
+export async function getPublicRaceResults(
+  eventId: string,
+  raceId: string,
+): Promise<{ results: eventmanager.RaceResultView[] }> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.listRaceResults(eventId, raceId)
+  }
+  const results = mockRaceResults[raceId] ?? []
+  return { results }
+}
+
+export async function getPublicRaceEvent(
+  eventId: string,
+  raceId: string,
+): Promise<eventmanager.RaceEventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.getRaceEvent(eventId, raceId)
+  }
+  const event = mockPublicEvents.find((e) => e.id === eventId)
+  if (!event) throw new Error('Event not found')
+  const race = (event.raceEvents as eventmanager.RaceEventDetail[] ?? []).find((r) => r.id === raceId)
+  if (!race) throw new Error('Race not found')
+  return race
 }
