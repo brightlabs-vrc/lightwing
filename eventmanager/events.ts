@@ -83,6 +83,7 @@ export interface EventDetail {
   scoringTypeLabel: string;
   classRestriction: ClassTier | null;
   granularParticipation: boolean;
+  signupsLocked: boolean;
   raceEvents: RaceEventView[];
   members: EventMemberView[];
   schedules: EventScheduleView[];
@@ -372,6 +373,12 @@ export const joinEvent = api(
       );
     }
 
+    if (event.signupsLocked) {
+      throw APIError.failedPrecondition(
+        "signups are locked for this event",
+      );
+    }
+
     // Resolve the authenticated actor - self-service, no permission check
     const actor = await resolveActor(prisma, authorization);
     const userId = actor.userId;
@@ -422,11 +429,39 @@ export const leaveEvent = api(
   async ({ id, authorization }: LeaveEventParams): Promise<EventDetail> => {
     const event = await requireEvent(id);
 
+    if (event.signupsLocked) {
+      throw APIError.failedPrecondition(
+        "signups are locked for this event",
+      );
+    }
+
     // Resolve the authenticated actor - self-service, no permission check
     const actor = await resolveActor(prisma, authorization);
     const userId = actor.userId;
 
     await prisma.eventMember.deleteMany({ where: { eventId: id, userId } });
+    return loadEvent(id);
+  },
+);
+
+interface SetSignupsLockedParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  locked: boolean;
+}
+
+// Toggles the event's signup lock state. Gated by event-update permission.
+export const setEventSignupsLocked = api(
+  { expose: true, auth: true, method: "PUT", path: "/api/events/:id/signups-lock" },
+  async ({ id, authorization, locked }: SetSignupsLockedParams): Promise<EventDetail> => {
+    await requireEvent(id);
+    await requireEventPermission(prisma, {
+      authorization,
+      eventId: id,
+      action: "update",
+    });
+
+    await prisma.event.update({ where: { id }, data: { signupsLocked: locked } });
     return loadEvent(id);
   },
 );
@@ -665,6 +700,7 @@ async function loadEvent(id: string): Promise<EventDetail> {
     scoringTypeLabel: SCORING_LABELS[event.scoringType] ?? "unknown",
     classRestriction: event.classRestriction,
     granularParticipation: event.granularParticipation,
+    signupsLocked: event.signupsLocked,
     raceEvents: event.raceEvents.map((race) => ({
       id: race.id,
       name: race.name,

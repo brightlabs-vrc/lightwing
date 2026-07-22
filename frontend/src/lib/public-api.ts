@@ -50,6 +50,23 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   }],
 ])
 
+const mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
+  [
+    'race_mock_001',
+    [
+      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+    ],
+  ],
+  [
+    'race_mock_002',
+    [
+      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+    ],
+  ],
+])
+
 // Mock results for the mock races
 const mockRaceResults: Record<string, eventmanager.RaceResultView[]> = {
   'race_mock_001': [
@@ -114,94 +131,122 @@ const mockRaceResults: Record<string, eventmanager.RaceResultView[]> = {
   ],
 }
 
+const LOCAL_STORAGE_KEY = 'lightwing:mock:public_events'
+
+function loadMockEvents(): eventmanager.EventDetail[] {
+  if (typeof globalThis !== 'undefined' && globalThis.localStorage) {
+    const stored = globalThis.localStorage.getItem(LOCAL_STORAGE_KEY)
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch {
+        // fallback
+      }
+    }
+  }
+  return [
+    {
+      id: 'evt_mock_001',
+      name: 'Summer Sprint Invitational',
+      description: 'Mock event used for public UI layout testing.',
+      ownerType: 'ORGANIZATION',
+      organizationId: 'org_mock_urs',
+      ownerUserId: null,
+      status: 'UNOFFICIAL',
+      scoringType: 1,
+      scoringTypeLabel: 'points-based',
+      classRestriction: 'OP',
+      granularParticipation: true,
+      signupsLocked: false,
+      raceEvents: [
+        {
+          id: 'race_mock_001',
+          eventId: 'evt_mock_001',
+          name: 'Summer Sprint Turf',
+          sequence: 1,
+          distanceMeters: 1200,
+          trackType: 'Turf',
+          location: 'Kyoto Racecourse',
+          scoringType: 1,
+          classRestriction: 'OP',
+          startsAt: now,
+          endsAt: now,
+          createdAt: now,
+          updatedAt: now,
+          members: [
+            { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+            { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+          ],
+        } as any,
+        {
+          id: 'race_mock_002',
+          eventId: 'evt_mock_001',
+          name: 'Summer Sprint Dirt',
+          sequence: 2,
+          distanceMeters: 1600,
+          trackType: 'Dirt',
+          location: 'Hanshin Racecourse',
+          scoringType: 1,
+          classRestriction: null,
+          startsAt: now,
+          endsAt: now,
+          createdAt: now,
+          updatedAt: now,
+          members: [
+            { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+            { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+          ],
+        } as any,
+      ],
+      members: [
+        { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
+        { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+      ],
+      schedules: [],
+      pointsOverview: [
+        { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10 },
+        { userId: 'mock-user-2', name: 'Shadow Runner', points: 6 },
+      ],
+      ladderOverview: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'evt_mock_003',
+      name: 'Archived Championship',
+      description: 'A concluded event visible to the public.',
+      ownerType: 'USER',
+      organizationId: null,
+      ownerUserId: 'mock-user-2',
+      status: 'CONCLUDED',
+      scoringType: 2,
+      scoringTypeLabel: 'ladder-elo',
+      classRestriction: null,
+      granularParticipation: false,
+      signupsLocked: false,
+      raceEvents: [],
+      members: [],
+      schedules: [],
+      pointsOverview: null,
+      ladderOverview: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
+}
+
+export function saveMockEvents(events: eventmanager.EventDetail[]) {
+  console.log("saveMockEvents called w/ length:", events.length);
+  if (typeof window !== 'undefined' && window.localStorage) {
+    console.log("Saving mock events to localStorage:", LOCAL_STORAGE_KEY);
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(events))
+  } else {
+    console.log("window.localStorage not available!");
+  }
+}
+
 // Mock events for public API - excluding DRAFT events
-let mockPublicEvents: eventmanager.EventDetail[] = [
-  {
-    id: 'evt_mock_001',
-    name: 'Summer Sprint Invitational',
-    description: 'Mock event used for public UI layout testing.',
-    ownerType: 'ORGANIZATION',
-    organizationId: 'org_mock_urs',
-    ownerUserId: null,
-    status: 'UNOFFICIAL',
-    scoringType: 1,
-    scoringTypeLabel: 'points-based',
-    classRestriction: 'OP',
-    granularParticipation: true,
-    raceEvents: [
-      {
-        id: 'race_mock_001',
-        eventId: 'evt_mock_001',
-        name: 'Summer Sprint Turf',
-        sequence: 1,
-        distanceMeters: 1200,
-        trackType: 'Turf',
-        location: 'Kyoto Racecourse',
-        scoringType: 1,
-        classRestriction: 'OP',
-        startsAt: now,
-        endsAt: now,
-        createdAt: now,
-        updatedAt: now,
-        members: [
-          { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-          { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
-        ],
-      } as any,
-      {
-        id: 'race_mock_002',
-        eventId: 'evt_mock_001',
-        name: 'Summer Sprint Dirt',
-        sequence: 2,
-        distanceMeters: 1600,
-        trackType: 'Dirt',
-        location: 'Hanshin Racecourse',
-        scoringType: 1,
-        classRestriction: null,
-        startsAt: now,
-        endsAt: now,
-        createdAt: now,
-        updatedAt: now,
-        members: [
-          { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-          { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
-        ],
-      } as any,
-    ],
-    members: [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
-    ],
-    schedules: [],
-    pointsOverview: [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10 },
-      { userId: 'mock-user-2', name: 'Shadow Runner', points: 6 },
-    ],
-    ladderOverview: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'evt_mock_003',
-    name: 'Archived Championship',
-    description: 'A concluded event visible to the public.',
-    ownerType: 'USER',
-    organizationId: null,
-    ownerUserId: 'mock-user-2',
-    status: 'CONCLUDED',
-    scoringType: 2,
-    scoringTypeLabel: 'ladder-elo',
-    classRestriction: null,
-    granularParticipation: false,
-    raceEvents: [],
-    members: [],
-    schedules: [],
-    pointsOverview: null,
-    ladderOverview: [],
-    createdAt: now,
-    updatedAt: now,
-  },
-]
+export let mockPublicEvents: eventmanager.EventDetail[] = loadMockEvents()
 
 function getCurrentMockUserId(): string | null {
   if (!MOCK_MODE) return null
@@ -247,6 +292,10 @@ export async function joinEvent(
     throw new Error('Event is not open for public signup')
   }
 
+  if (event.signupsLocked) {
+    throw new Error('Signups are locked for this event')
+  }
+
   const userId = getCurrentMockUserId()
   if (!userId) throw new Error('Not authenticated')
 
@@ -267,6 +316,7 @@ export async function joinEvent(
     }
   }
 
+  saveMockEvents(mockPublicEvents)
   return mockPublicEvents[eventIndex]
 }
 
@@ -281,15 +331,20 @@ export async function leaveEvent(
   const eventIndex = mockPublicEvents.findIndex((e) => e.id === eventId)
   if (eventIndex === -1) throw new Error('Event not found')
 
+  const event = mockPublicEvents[eventIndex]
+  if (event.signupsLocked) {
+    throw new Error('Signups are locked for this event')
+  }
+
   const userId = getCurrentMockUserId()
   if (!userId) throw new Error('Not authenticated')
 
-  const event = mockPublicEvents[eventIndex]
   mockPublicEvents[eventIndex] = {
     ...event,
     members: event.members.filter((m) => m.userId !== userId),
   }
 
+  saveMockEvents(mockPublicEvents)
   return mockPublicEvents[eventIndex]
 }
 
@@ -358,7 +413,11 @@ export async function listPublicRaceEvents(
   }
   const event = mockPublicEvents.find((e) => e.id === eventId)
   if (!event) throw new Error('Event not found')
-  return { races: (event.raceEvents ?? []) as eventmanager.RaceEventDetail[] }
+  const races = (event.raceEvents ?? []).map((r) => ({
+    ...r,
+    members: mockRaceMembersMap.get(r.id) ?? [],
+  })) as eventmanager.RaceEventDetail[]
+  return { races }
 }
 
 export async function getPublicRaceResults(
@@ -383,5 +442,112 @@ export async function getPublicRaceEvent(
   if (!event) throw new Error('Event not found')
   const race = (event.raceEvents as eventmanager.RaceEventDetail[] ?? []).find((r) => r.id === raceId)
   if (!race) throw new Error('Race not found')
-  return race
+  return {
+    ...race,
+    members: mockRaceMembersMap.get(raceId) ?? [],
+  }
+}
+
+export async function joinRaceEvent(
+  eventId: string,
+  raceId: string,
+  authorization: string,
+): Promise<eventmanager.RaceEventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.with({ auth: { authorization } }).eventmanager.joinRaceEvent(eventId, raceId, { authorization })
+  }
+
+  const eventIndex = mockPublicEvents.findIndex((e) => e.id === eventId)
+  if (eventIndex === -1) throw new Error('Event not found')
+
+  const event = mockPublicEvents[eventIndex]
+  if (event.signupsLocked) {
+    throw new Error('Signups are locked for this event')
+  }
+
+  const raceIndex = event.raceEvents.findIndex((r) => r.id === raceId)
+  if (raceIndex === -1) throw new Error('Race not found')
+
+  const userId = getCurrentMockUserId()
+  if (!userId) throw new Error('Not authenticated')
+
+  const user = mockUserProfileMap.get(userId)
+  if (!user) throw new Error('User not found')
+
+  // Require user to be event member first
+  const isEventMember = event.members.some((m) => m.userId === userId)
+  if (!isEventMember) {
+    throw new Error('User is not a member of this event')
+  }
+
+  const targetRestriction = event.raceEvents[raceIndex].classRestriction ?? event.classRestriction
+  const userTier = user.classTier
+
+  const CLASS_TIER_ORDER: Record<string, number> = {
+    PRE_OP: 0,
+    OP: 1,
+    G3: 2,
+    G2: 3,
+    G1: 4,
+  }
+
+  if (targetRestriction) {
+    const userVal = CLASS_TIER_ORDER[userTier ?? ''] ?? -1
+    const reqVal = CLASS_TIER_ORDER[targetRestriction] ?? -1
+    if (userVal < reqVal) {
+      throw new Error('Participant class tier does not satisfy the race class restriction')
+    }
+  }
+
+  let raceMembers = mockRaceMembersMap.get(raceId) ?? []
+  if (!raceMembers.some((m) => m.userId === userId)) {
+    raceMembers = [...raceMembers, { userId, name: user.name, classTier: userTier }]
+    mockRaceMembersMap.set(raceId, raceMembers)
+  }
+
+  const updatedRace = {
+    ...event.raceEvents[raceIndex],
+    members: raceMembers,
+  } as any
+
+  event.raceEvents[raceIndex] = updatedRace
+
+  return updatedRace
+}
+
+export async function leaveRaceEvent(
+  eventId: string,
+  raceId: string,
+  authorization: string,
+): Promise<eventmanager.RaceEventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.with({ auth: { authorization } }).eventmanager.leaveRaceEvent(eventId, raceId, { authorization })
+  }
+
+  const eventIndex = mockPublicEvents.findIndex((e) => e.id === eventId)
+  if (eventIndex === -1) throw new Error('Event not found')
+
+  const event = mockPublicEvents[eventIndex]
+  if (event.signupsLocked) {
+    throw new Error('Signups are locked for this event')
+  }
+
+  const raceIndex = event.raceEvents.findIndex((r) => r.id === raceId)
+  if (raceIndex === -1) throw new Error('Race not found')
+
+  const userId = getCurrentMockUserId()
+  if (!userId) throw new Error('Not authenticated')
+
+  let raceMembers = mockRaceMembersMap.get(raceId) ?? []
+  raceMembers = raceMembers.filter((m) => m.userId !== userId)
+  mockRaceMembersMap.set(raceId, raceMembers)
+
+  const updatedRace = {
+    ...event.raceEvents[raceIndex],
+    members: raceMembers,
+  } as any
+
+  event.raceEvents[raceIndex] = updatedRace
+
+  return updatedRace
 }

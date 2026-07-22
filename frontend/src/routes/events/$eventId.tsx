@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults } from '../../lib/public-api'
+import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import {
   PixelContainer,
   PixelStack,
@@ -169,23 +169,30 @@ function EventDetailPage() {
                 </Link>
               </PixelButton>
             ) : (
-              <PixelButton
-                variant="solid"
-                tone={isMember ? 'red' : 'green'}
-                className="pxl-btn-flat"
-                disabled={isConcluded || joinMutation.isPending || leaveMutation.isPending}
-                loading={joinMutation.isPending || leaveMutation.isPending}
-                onClick={() => {
-                  if (isConcluded) return
-                  if (isMember) {
-                    leaveMutation.mutate(eventId)
-                  } else {
-                    joinMutation.mutate(eventId)
-                  }
-                }}
-              >
-                {isMember ? 'WITHDRAW FROM EVENT' : 'SIGN UP FOR EVENT'}
-              </PixelButton>
+              <PixelStack gap={2}>
+                <PixelButton
+                  variant="solid"
+                  tone={isMember ? 'red' : 'green'}
+                  className="pxl-btn-flat"
+                  disabled={isConcluded || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending}
+                  loading={joinMutation.isPending || leaveMutation.isPending}
+                  onClick={() => {
+                    if (isConcluded) return
+                    if (isMember) {
+                      leaveMutation.mutate(eventId)
+                    } else {
+                      joinMutation.mutate(eventId)
+                    }
+                  }}
+                >
+                  {isMember ? 'WITHDRAW FROM EVENT' : 'SIGN UP FOR EVENT'}
+                </PixelButton>
+                {event.signupsLocked && (
+                  <div className="text-retro-muted font-pixel text-xs mt-2">
+                    SIGNUPS ARE LOCKED FOR THIS EVENT
+                  </div>
+                )}
+              </PixelStack>
             )}
           </div>
         </PixelStack>
@@ -374,6 +381,28 @@ function RaceStandingsTable({
 }
 
 function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
+  const queryClient = useQueryClient()
+  const { session } = useAuth()
+  const isMember = session && event.members.some((m) => m.userId === session.user.id)
+
+  const joinRaceMutation = useMutation({
+    mutationFn: ({ raceId }: { raceId: string }) =>
+      joinRaceEvent(event.id, raceId, `Bearer ${session?.session.token ?? ''}`),
+    onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+    },
+  })
+
+  const leaveRaceMutation = useMutation({
+    mutationFn: ({ raceId }: { raceId: string }) =>
+      leaveRaceEvent(event.id, raceId, `Bearer ${session?.session.token ?? ''}`),
+    onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+    },
+  })
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-event-races', event.id],
     queryFn: () => listPublicRaceEvents(event.id),
@@ -409,27 +438,48 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
 
   return (
     <PixelStack gap={6} className="mt-4">
-      {races.map((race) => (
-        <PixelCard key={race.id}>
-          <PixelStack gap={4}>
-            {/* Race Header Info */}
-            <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
-              <PixelStack gap={2}>
-                <h3 className="text-lg font-pixel tracking-wide text-retro-text">
-                  #{race.sequence}. {race.name}
-                </h3>
-                <div className="text-xs text-retro-muted font-sans flex flex-wrap gap-x-4 gap-y-1">
-                  <span>TRACK: <strong>{race.trackType}</strong> ({race.distanceMeters}m)</span>
-                  <span>LOCATION: <strong>{race.location}</strong></span>
-                </div>
+      {races.map((race) => {
+        const isRaceMember = session && (race.members ?? []).some((rm) => rm.userId === session.user.id)
+
+        return (
+          <PixelCard key={race.id}>
+            <PixelStack gap={4}>
+              {/* Race Header Info */}
+              <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
+                <PixelStack gap={2}>
+                  <h3 className="text-lg font-pixel tracking-wide text-retro-text">
+                    #{race.sequence}. {race.name}
+                  </h3>
+                  <div className="text-xs text-retro-muted font-sans flex flex-wrap gap-x-4 gap-y-1">
+                    <span>TRACK: <strong>{race.trackType}</strong> ({race.distanceMeters}m)</span>
+                    <span>LOCATION: <strong>{race.location}</strong></span>
+                  </div>
+                </PixelStack>
+                <PixelStack direction="row" gap={2} align="center">
+                  <PixelBadge tone="neutral">
+                    CLASS:{' '}
+                    {race.classRestriction ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
+                  </PixelBadge>
+                  {event.granularParticipation && isMember && (
+                    <PixelButton
+                      variant="solid"
+                      tone={isRaceMember ? 'red' : 'green'}
+                      size="sm"
+                      className="pxl-btn-flat font-pixel text-[10px]"
+                      disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
+                      onClick={() => {
+                        if (isRaceMember) {
+                          leaveRaceMutation.mutate({ raceId: race.id })
+                        } else {
+                          joinRaceMutation.mutate({ raceId: race.id })
+                        }
+                      }}
+                    >
+                      {isRaceMember ? 'WITHDRAW' : 'SIGN UP'}
+                    </PixelButton>
+                  )}
+                </PixelStack>
               </PixelStack>
-              <PixelStack direction="row" gap={2}>
-                <PixelBadge tone="neutral">
-                  CLASS:{' '}
-                  {race.classRestriction ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
-                </PixelBadge>
-              </PixelStack>
-            </PixelStack>
 
             {/* Standings Table */}
             <div className="mt-2">
@@ -438,7 +488,8 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
             </div>
           </PixelStack>
         </PixelCard>
-      ))}
+        )
+      })}
     </PixelStack>
   )
 }

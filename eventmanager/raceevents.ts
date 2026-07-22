@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
-import { requireEventPermission } from "../auth/rbac";
+import { requireEventPermission, resolveActor } from "../auth/rbac";
 import { isEligible, type ClassTier } from "./classtier";
 
 export interface RaceEventMemberView {
@@ -397,5 +397,107 @@ export const listRaceEventMembers = api(
         classTier: m.user.classTier,
       })),
     };
+  }
+);
+
+interface JoinRaceEventParams {
+  eventId: string;
+  raceId: string;
+  authorization: Header<"Authorization">;
+}
+
+// Self-service endpoint to join a race event.
+export const joinRaceEvent = api(
+  { expose: true, auth: true, method: "POST", path: "/api/events/:eventId/races/:raceId/join" },
+  async ({ eventId, raceId, authorization }: JoinRaceEventParams): Promise<RaceEventDetail> => {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    if (event.signupsLocked) {
+      throw APIError.failedPrecondition("signups are locked for this event");
+    }
+
+    const race = await prisma.raceEvent.findUnique({ where: { id: raceId } });
+    if (!race || race.eventId !== eventId) {
+      throw APIError.notFound("race not found");
+    }
+
+    // Resolve actor
+    const actor = await resolveActor(prisma, authorization);
+    const userId = actor.userId;
+
+    // User must be an event member first
+    const member = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    if (!member) {
+      throw APIError.failedPrecondition("user is not a member of this event");
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw APIError.notFound("user not found");
+    }
+
+    // Enforce class restriction
+    const targetRestriction = race.classRestriction ?? event.classRestriction;
+    if (!isEligible(user.classTier, targetRestriction)) {
+      throw APIError.failedPrecondition(
+        "participant class tier does not satisfy the race class restriction",
+      );
+    }
+
+    await prisma.raceEventMember.upsert({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+      create: { id: randomUUID(), raceEventId: raceId, userId },
+      update: {},
+    });
+
+    const updatedRace = await requireRaceEvent(eventId, raceId);
+    return toRaceEventDetail(updatedRace);
+  }
+);
+
+interface LeaveRaceEventParams {
+  eventId: string;
+  raceId: string;
+  authorization: Header<"Authorization">;
+}
+
+// Self-service endpoint to leave a race event.
+export const leaveRaceEvent = api(
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:eventId/races/:raceId/join" },
+  async ({ eventId, raceId, authorization }: LeaveRaceEventParams): Promise<RaceEventDetail> => {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    if (event.signupsLocked) {
+      throw APIError.failedPrecondition("signups are locked for this event");
+    }
+
+    await requireRaceEvent(eventId, raceId);
+
+    // Resolve actor
+    const actor = await resolveActor(prisma, authorization);
+    const userId = actor.userId;
+
+    // User must be an event member first
+    const member = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    if (!member) {
+      throw APIError.failedPrecondition("user is not a member of this event");
+    }
+
+    await prisma.raceEventMember.deleteMany({
+      where: { raceEventId: raceId, userId },
+    });
+
+    const updatedRace = await requireRaceEvent(eventId, raceId);
+    return toRaceEventDetail(updatedRace);
   }
 );

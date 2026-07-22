@@ -37,17 +37,18 @@ function AdminEventDetailPage() {
     setNewRaceForm,
     loadingEventDetail,
     eventStatusSaving,
+    signupsLockedSaving,
     globalError,
     globalSuccess,
     derivedStates,
     changeSummary,
     loadingResults,
     savingBatch,
-    eventStatusSaving: statusSaving,
     ongoingRaces,
     concludedRaces,
     notStartedRaces,
     handleUpdateEventStatus,
+    handleSetSignupsLocked,
     handleUpdateEventDetails,
     handleAddMember,
     handleRemoveMember,
@@ -75,6 +76,7 @@ function AdminEventDetailPage() {
   const [editDescription, setEditDescription] = useState('')
   const [editClassRestriction, setEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
   const [editGranularParticipation, setEditGranularParticipation] = useState(false)
+  const [editSignupsLocked, setEditSignupsLocked] = useState(false)
 
   // Set edit values when modal is toggled or event loads
   useEffect(() => {
@@ -83,6 +85,7 @@ function AdminEventDetailPage() {
       setEditDescription(selectedEvent.description ?? '')
       setEditClassRestriction(selectedEvent.classRestriction)
       setEditGranularParticipation(selectedEvent.granularParticipation)
+      setEditSignupsLocked(selectedEvent.signupsLocked)
     }
   }, [showEditEventModal, selectedEvent])
 
@@ -94,6 +97,9 @@ function AdminEventDetailPage() {
       classRestriction: editClassRestriction || null,
       granularParticipation: editGranularParticipation,
     })
+    if (editSignupsLocked !== selectedEvent.signupsLocked) {
+      await handleSetSignupsLocked(editSignupsLocked)
+    }
     setShowEditEventModal(false)
   }
 
@@ -190,23 +196,48 @@ function AdminEventDetailPage() {
               <p className="slds-text-body_small text-slate-500">ID: {selectedEvent.id}</p>
             </div>
 
-            {/* Status controller */}
-            <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0 }}>Lifecycle Status:</label>
-              <div className="slds-form-element__control">
-                <select
-                  disabled={eventStatusSaving}
-                  value={selectedEvent.status}
-                  onChange={(e) => void handleUpdateEventStatus(e.target.value as eventmanager.EventStatus)}
-                  className="slds-select"
-                  style={{ minWidth: '130px', padding: '4px 28px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              {/* Signups Lock Controller */}
+              <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0 }}>Signups:</label>
+                <button
+                  type="button"
+                  disabled={signupsLockedSaving}
+                  onClick={() => void handleSetSignupsLocked(!selectedEvent.signupsLocked)}
+                  className={`slds-button ${selectedEvent.signupsLocked ? 'slds-button_destructive' : 'slds-button_brand'}`}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    height: '32px',
+                    borderRadius: '4px',
+                    backgroundColor: selectedEvent.signupsLocked ? '#c23934' : '#0176d3',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
-                  {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
+                  {selectedEvent.signupsLocked ? 'Signups Locked' : 'Signups Open'}
+                </button>
+              </div>
+
+              {/* Status controller */}
+              <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0 }}>Lifecycle Status:</label>
+                <div className="slds-form-element__control">
+                  <select
+                    disabled={eventStatusSaving}
+                    value={selectedEvent.status}
+                    onChange={(e) => void handleUpdateEventStatus(e.target.value as eventmanager.EventStatus)}
+                    className="slds-select"
+                    style={{ minWidth: '130px', padding: '4px 28px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -297,6 +328,12 @@ function AdminEventDetailPage() {
                     <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Participation Model</p>
                     <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
                       Granular Per-Race Participation: <strong>{selectedEvent.granularParticipation ? 'Enabled (Per-Race registration required)' : 'Disabled (Event-wide registration)'}</strong>
+                    </p>
+                  </div>
+                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
+                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Signups Status</p>
+                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
+                      Signups Lock: <strong>{selectedEvent.signupsLocked ? 'Locked (Self-service signups disabled)' : 'Open (Self-service signups enabled)'}</strong>
                     </p>
                   </div>
                 </div>
@@ -1131,8 +1168,8 @@ function AdminEventDetailPage() {
                         </div>
                       </div>
 
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                        <div className="slds-form-element" style={{ marginTop: '24px' }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
+                        <div className="slds-form-element">
                           <div className="slds-form-element__control">
                             <div className="slds-checkbox">
                               <input
@@ -1145,6 +1182,24 @@ function AdminEventDetailPage() {
                               <label className="slds-checkbox__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-granular-participation">
                                 <span className="slds-checkbox_faux"></span>
                                 <span className="slds-form-element__label">Enable Granular Participation</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="slds-form-element">
+                          <div className="slds-form-element__control">
+                            <div className="slds-checkbox">
+                              <input
+                                type="checkbox"
+                                id="edit-signups-locked"
+                                checked={editSignupsLocked}
+                                onChange={(e) => setEditSignupsLocked(e.target.checked)}
+                                style={{ marginRight: '8px' }}
+                              />
+                              <label className="slds-checkbox__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-signups-locked">
+                                <span className="slds-checkbox_faux"></span>
+                                <span className="slds-form-element__label">Lock Event Signups</span>
                               </label>
                             </div>
                           </div>

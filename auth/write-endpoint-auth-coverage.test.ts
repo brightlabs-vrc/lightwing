@@ -96,6 +96,13 @@ const MUTATING_ENDPOINTS: EndpointRule[] = [
   },
   {
     file: "eventmanager/events.ts",
+    endpoint: "setEventSignupsLocked",
+    method: "PUT",
+    guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
+  },
+  {
+    file: "eventmanager/events.ts",
     endpoint: "setEventStatus",
     method: "PUT",
     guardPatterns: ["requireEventPermission(", "requireSiteAdmin("],
@@ -106,6 +113,20 @@ const MUTATING_ENDPOINTS: EndpointRule[] = [
     endpoint: "createRaceEvent",
     method: "POST",
     guardPatterns: ["requireEventPermission("],
+    requireAuthOption: true,
+  },
+  {
+    file: "eventmanager/raceevents.ts",
+    endpoint: "joinRaceEvent",
+    method: "POST",
+    guardPatterns: ["resolveActor("],
+    requireAuthOption: true,
+  },
+  {
+    file: "eventmanager/raceevents.ts",
+    endpoint: "leaveRaceEvent",
+    method: "DELETE",
+    guardPatterns: ["resolveActor("],
     requireAuthOption: true,
   },
   {
