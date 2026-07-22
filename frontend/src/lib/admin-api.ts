@@ -107,6 +107,7 @@ let mockEvents: eventmanager.EventDetail[] = [
     scoringTypeLabel: 'points-based',
     classRestriction: 'OP',
     granularParticipation: true,
+    signupsLocked: false,
     raceEvents: mockRaceEventsList,
     members: mockEventMembers,
     schedules: [],
@@ -131,6 +132,7 @@ let mockEvents: eventmanager.EventDetail[] = [
     scoringTypeLabel: 'ladder-elo',
     classRestriction: null,
     granularParticipation: false,
+    signupsLocked: false,
     raceEvents: [],
     members: [
       { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
@@ -488,6 +490,7 @@ export async function createAdminEvent(
     scoringTypeLabel: params.scoringType === 1 ? 'points-based' : 'ladder-elo',
     classRestriction: params.classRestriction ?? null,
     granularParticipation: params.granularParticipation ?? false,
+    signupsLocked: false,
     raceEvents: [],
     members: [],
     schedules: [],

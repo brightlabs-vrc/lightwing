@@ -97,7 +97,7 @@ function AdminEventDetailPage() {
       classRestriction: editClassRestriction || null,
       granularParticipation: editGranularParticipation,
     })
-    if (editSignupsLocked !== selectedEvent.signupsLocked) {
+    if (selectedEvent && editSignupsLocked !== selectedEvent.signupsLocked) {
       await handleSetSignupsLocked(editSignupsLocked)
     }
     setShowEditEventModal(false)
