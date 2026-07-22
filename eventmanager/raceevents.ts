@@ -56,12 +56,19 @@ export const createRaceEvent = api(
       action: "create",
     });
 
+    const maxRace = await prisma.raceEvent.findFirst({
+      where: { eventId: params.eventId },
+      orderBy: { sequence: "desc" },
+      select: { sequence: true },
+    });
+    const nextSequence = maxRace ? maxRace.sequence + 1 : 1;
+
     const race = await prisma.raceEvent.create({
       data: {
         id: randomUUID(),
         eventId: params.eventId,
         name: params.name,
-        sequence: params.sequence ?? 0,
+        sequence: params.sequence !== undefined ? params.sequence : nextSequence,
         distanceMeters: params.distanceMeters,
         trackType: params.trackType,
         location: params.location,
@@ -73,6 +80,91 @@ export const createRaceEvent = api(
     });
 
     return toRaceEventDetail(race);
+  },
+);
+
+interface ReorderRaceEventsParams {
+  eventId: string;
+  authorization: Header<"Authorization">;
+  orderedRaceIds: string[];
+}
+
+// Reorders the races within an event, validating permissions and full coverage.
+export const reorderRaceEvents = api(
+  { expose: true, auth: true, method: "PUT", path: "/api/events/:eventId/races/reorder" },
+  async (params: ReorderRaceEventsParams): Promise<{ races: RaceEventDetail[] }> => {
+    await requireEventPermission(prisma, {
+      authorization: params.authorization,
+      eventId: params.eventId,
+      action: "update",
+    });
+
+    const existingRaces = await prisma.raceEvent.findMany({
+      where: { eventId: params.eventId },
+      orderBy: { sequence: "asc" },
+    });
+
+    const existingIdsSet = new Set(existingRaces.map((r) => r.id));
+    const inputIdsSet = new Set(params.orderedRaceIds);
+
+    // Validate duplicates
+    if (params.orderedRaceIds.length !== inputIdsSet.size) {
+      throw APIError.invalidArgument("duplicate race IDs are not allowed in the payload");
+    }
+
+    // Validate size and coverage
+    if (params.orderedRaceIds.length !== existingRaces.length) {
+      throw APIError.invalidArgument(
+        `payload must contain exactly all ${existingRaces.length} race IDs associated with this event`
+      );
+    }
+
+    // Validate all IDs belong to this event
+    for (const id of params.orderedRaceIds) {
+      if (!existingIdsSet.has(id)) {
+        throw APIError.invalidArgument(`race ID "${id}" does not belong to event "${params.eventId}"`);
+      }
+    }
+
+    // Check if reordering is already in the desired state (idempotency)
+    let needsUpdate = false;
+    for (let i = 0; i < existingRaces.length; i++) {
+      if (existingRaces[i].id !== params.orderedRaceIds[i] || existingRaces[i].sequence !== i + 1) {
+        needsUpdate = true;
+        break;
+      }
+    }
+
+    if (needsUpdate) {
+      await prisma.$transaction(async (tx) => {
+        for (let i = 0; i < params.orderedRaceIds.length; i++) {
+          await tx.raceEvent.update({
+            where: { id: params.orderedRaceIds[i] },
+            data: { sequence: i + 1 },
+          });
+        }
+      });
+    }
+
+    // Fetch and return the updated race list
+    const updatedRaces = await prisma.raceEvent.findMany({
+      where: { eventId: params.eventId },
+      include: {
+        raceMembers: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                classTier: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { sequence: "asc" },
+    });
+
+    return { races: updatedRaces.map(toRaceEventDetail) };
   },
 );
 
