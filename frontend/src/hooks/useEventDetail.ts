@@ -16,6 +16,7 @@ import {
   removeEventMember,
   addRaceEventMember,
   removeRaceEventMember,
+  setEventSignupsLocked,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
 import {
@@ -81,6 +82,7 @@ export function useEventDetail(eventId: string) {
   const [loadingResults, setLoadingResults] = useState(false)
   const [savingBatch, setSavingBatch] = useState(false)
   const [eventStatusSaving, setEventStatusSaving] = useState(false)
+  const [signupsLockedSaving, setSignupsLockedSaving] = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [globalSuccess, setGlobalSuccess] = useState<string | null>(null)
 
@@ -144,6 +146,28 @@ export function useEventDetail(eventId: string) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to update status')
       } finally {
         setEventStatusSaving(false)
+      }
+    },
+    [authHeader, eventId],
+  )
+
+  const handleSetSignupsLocked = useCallback(
+    async (locked: boolean) => {
+      if (!authHeader) {
+        setGlobalError('Authentication token is required.')
+        return
+      }
+      setSignupsLockedSaving(true)
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updated = await setEventSignupsLocked(eventId, locked, authHeader)
+        setSelectedEvent(updated)
+        setGlobalSuccess(`Successfully ${locked ? 'locked' : 'unlocked'} event signups.`)
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to update signups lock state')
+      } finally {
+        setSignupsLockedSaving(false)
       }
     },
     [authHeader, eventId],
@@ -630,6 +654,7 @@ export function useEventDetail(eventId: string) {
     loadingResults,
     savingBatch,
     eventStatusSaving,
+    signupsLockedSaving,
     globalError,
     globalSuccess,
     derivedStates,
@@ -639,6 +664,7 @@ export function useEventDetail(eventId: string) {
     notStartedRaces,
     // actions
     handleUpdateEventStatus,
+    handleSetSignupsLocked,
     handleUpdateEventDetails,
     handleAddMember,
     handleRemoveMember,

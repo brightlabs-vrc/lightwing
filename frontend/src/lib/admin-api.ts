@@ -107,6 +107,7 @@ let mockEvents: eventmanager.EventDetail[] = [
     scoringTypeLabel: 'points-based',
     classRestriction: 'OP',
     granularParticipation: true,
+    signupsLocked: false,
     raceEvents: mockRaceEventsList,
     members: mockEventMembers,
     schedules: [],
@@ -131,6 +132,7 @@ let mockEvents: eventmanager.EventDetail[] = [
     scoringTypeLabel: 'ladder-elo',
     classRestriction: null,
     granularParticipation: false,
+    signupsLocked: false,
     raceEvents: [],
     members: [
       { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
@@ -289,7 +291,21 @@ export async function getAdminEvent(eventId: string): Promise<eventmanager.Event
     return appClient.eventmanager.getEvent(eventId)
   }
 
-  const event = mockEvents.find((evt) => evt.id === eventId)
+  const stored = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('lightwing:mock:public_events') : null
+  let event: eventmanager.EventDetail | undefined
+  if (stored) {
+    try {
+      const publicEvents = JSON.parse(stored)
+      event = publicEvents.find((evt: any) => evt.id === eventId)
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!event) {
+    event = mockEvents.find((evt) => evt.id === eventId)
+  }
+
   if (!event) {
     throw new Error('Mock event not found')
   }
@@ -311,6 +327,56 @@ export async function updateAdminEventStatus(
   mockEvents = mockEvents.map((event) =>
     event.id === eventId ? { ...event, status, updatedAt: new Date().toISOString() } : event,
   )
+
+  const updated = mockEvents.find((event) => event.id === eventId)
+  if (!updated) {
+    throw new Error('Mock event not found')
+  }
+
+  return updated
+}
+
+export async function setEventSignupsLocked(
+  eventId: string,
+  locked: boolean,
+  authorization: string,
+): Promise<eventmanager.EventDetail> {
+  console.log("setEventSignupsLocked called", eventId, locked, "MOCK_MODE:", MOCK_MODE);
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.setEventSignupsLocked(eventId, {
+      authorization,
+      locked,
+    })
+  }
+
+  mockEvents = mockEvents.map((event) =>
+    event.id === eventId ? { ...event, signupsLocked: locked, updatedAt: new Date().toISOString() } : event,
+  )
+
+  let publicEvents = []
+  const stored = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('lightwing:mock:public_events') : null
+  if (stored) {
+    try {
+      publicEvents = JSON.parse(stored)
+    } catch {
+      // ignore
+    }
+  } else {
+    publicEvents = JSON.parse(JSON.stringify(mockEvents))
+  }
+
+  const pubEvtIndex = publicEvents.findIndex((e: any) => e.id === eventId)
+  console.log("pubEvtIndex found in mockPublicEvents stored data:", pubEvtIndex);
+  if (pubEvtIndex !== -1) {
+    publicEvents[pubEvtIndex] = {
+      ...publicEvents[pubEvtIndex],
+      signupsLocked: locked,
+      updatedAt: new Date().toISOString()
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('lightwing:mock:public_events', JSON.stringify(publicEvents))
+    }
+  }
 
   const updated = mockEvents.find((event) => event.id === eventId)
   if (!updated) {
@@ -353,6 +419,33 @@ export async function updateAdminEvent(
     }
     return evt
   })
+
+  let publicEvents = []
+  const stored = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('lightwing:mock:public_events') : null
+  if (stored) {
+    try {
+      publicEvents = JSON.parse(stored)
+    } catch {
+      // ignore
+    }
+  } else {
+    publicEvents = JSON.parse(JSON.stringify(mockEvents))
+  }
+
+  const pubEvtIndex = publicEvents.findIndex((e: any) => e.id === eventId)
+  if (pubEvtIndex !== -1) {
+    publicEvents[pubEvtIndex] = {
+      ...publicEvents[pubEvtIndex],
+      name: params.name ?? publicEvents[pubEvtIndex].name,
+      description: params.description !== undefined ? params.description : publicEvents[pubEvtIndex].description,
+      classRestriction: params.classRestriction !== undefined ? params.classRestriction : publicEvents[pubEvtIndex].classRestriction,
+      granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : publicEvents[pubEvtIndex].granularParticipation,
+      updatedAt: new Date().toISOString()
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('lightwing:mock:public_events', JSON.stringify(publicEvents))
+    }
+  }
 
   return getAdminEvent(eventId)
 }
@@ -397,6 +490,7 @@ export async function createAdminEvent(
     scoringTypeLabel: params.scoringType === 1 ? 'points-based' : 'ladder-elo',
     classRestriction: params.classRestriction ?? null,
     granularParticipation: params.granularParticipation ?? false,
+    signupsLocked: false,
     raceEvents: [],
     members: [],
     schedules: [],

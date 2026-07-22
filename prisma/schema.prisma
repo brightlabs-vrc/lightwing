@@ -166,6 +166,7 @@ model Event {
   scoringType      Int            @db.SmallInt
   classRestriction ClassTier?
   granularParticipation Boolean @default(false)
+  signupsLocked    Boolean        @default(false)
   createdAt        DateTime       @default(now()) @db.Timestamp(6)
   updatedAt        DateTime       @updatedAt @db.Timestamp(6)
   organization     Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)

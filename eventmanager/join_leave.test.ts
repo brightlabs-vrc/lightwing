@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import { prisma } from "./prisma";
-import { joinEvent, leaveEvent, getEvent } from "./events";
+import { joinEvent, leaveEvent, getEvent, addEventMember, removeEventMember } from "./events";
+import { joinRaceEvent, leaveRaceEvent, addRaceEventMember, removeRaceEventMember } from "./raceevents";
 import type { ClassTier } from "./classtier";
 
 const createdUserIds: string[] = [];
@@ -51,6 +52,21 @@ async function createEvent(ownerUserId: string, name: string, status: "DRAFT" | 
     },
   });
   createdEventIds.push(id);
+  return id;
+}
+
+async function createRaceEvent(eventId: string, name: string) {
+  const id = `race-${randomUUID()}`;
+  await prisma.raceEvent.create({
+    data: {
+      id,
+      eventId,
+      name,
+      distanceMeters: 1200,
+      trackType: "Turf",
+      location: "Kyoto",
+    },
+  });
   return id;
 }
 
@@ -142,5 +158,160 @@ describe("joinEvent and leaveEvent public endpoints", () => {
         authorization: `Bearer ${token}`,
       })
     ).rejects.toThrow(/participant class tier does not satisfy the event class restriction/);
+  });
+});
+
+describe("signupsLocked enforcement", () => {
+  test("self-service join/leave event are rejected when signupsLocked is true", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    const eventId = await createEvent(creatorId, "Summer Open", "UNOFFICIAL", "OP");
+
+    // Lock signups
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { signupsLocked: true },
+    });
+
+    // Try to join self-service -> should fail
+    await expect(
+      joinEvent({
+        id: eventId,
+        authorization: `Bearer ${token}`,
+      })
+    ).rejects.toThrow(/signups are locked/);
+
+    // Join via admin bypass (addEventMember) first to test leave
+    const adminToken = await createSession(creatorId);
+    await addEventMember({
+      id: eventId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+
+    // Try to leave self-service -> should fail
+    await expect(
+      leaveEvent({
+        id: eventId,
+        authorization: `Bearer ${token}`,
+      })
+    ).rejects.toThrow(/signups are locked/);
+  });
+
+  test("admin member mutations still succeed when signupsLocked is true", async () => {
+    const creatorId = await createUser("creator", "Creator User", null, "SITE_ADMIN");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const adminToken = await createSession(creatorId);
+    const eventId = await createEvent(creatorId, "Summer Open", "UNOFFICIAL", "OP");
+
+    // Lock signups
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { signupsLocked: true },
+    });
+
+    // Admin adds member -> should succeed
+    const added = await addEventMember({
+      id: eventId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+    expect(added.members.length).toBe(1);
+
+    // Admin removes member -> should succeed
+    const removed = await removeEventMember({
+      id: eventId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+    expect(removed.members.length).toBe(0);
+  });
+
+  test("self-service race join/leave are rejected when signupsLocked is true", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    const adminToken = await createSession(creatorId);
+    const eventId = await createEvent(creatorId, "Summer Open", "UNOFFICIAL", "OP");
+    const raceId = await createRaceEvent(eventId, "Race 1");
+
+    // Make user an event member first
+    await addEventMember({
+      id: eventId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+
+    // Lock signups
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { signupsLocked: true },
+    });
+
+    // Try to join race self-service -> should fail
+    await expect(
+      joinRaceEvent({
+        eventId,
+        raceId,
+        authorization: `Bearer ${token}`,
+      })
+    ).rejects.toThrow(/signups are locked/);
+
+    // Join race via admin bypass (addRaceEventMember) first to test leave
+    await addRaceEventMember({
+      eventId,
+      raceId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+
+    // Try to leave race self-service -> should fail
+    await expect(
+      leaveRaceEvent({
+        eventId,
+        raceId,
+        authorization: `Bearer ${token}`,
+      })
+    ).rejects.toThrow(/signups are locked/);
+  });
+
+  test("admin race-member mutations still succeed when signupsLocked is true", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const adminToken = await createSession(creatorId);
+    const eventId = await createEvent(creatorId, "Summer Open", "UNOFFICIAL", "OP");
+    const raceId = await createRaceEvent(eventId, "Race 1");
+
+    // Make user an event member first
+    await addEventMember({
+      id: eventId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+
+    // Lock signups
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { signupsLocked: true },
+    });
+
+    // Admin adds race member -> should succeed
+    const added = await addRaceEventMember({
+      eventId,
+      raceId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+    expect(added.members.length).toBe(1);
+
+    // Admin removes race member -> should succeed
+    const removed = await removeRaceEventMember({
+      eventId,
+      raceId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+    expect(removed.members.length).toBe(0);
   });
 });
