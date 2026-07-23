@@ -559,6 +559,11 @@ export namespace eventmanager {
         authorization: string
     }
 
+    export interface ReorderRaceEventsParams {
+        authorization: string
+        orderedRaceIds: string[]
+    }
+
     export interface ReplaceRaceResultsParams {
         authorization: string
         results: RaceResultInput[]
@@ -650,6 +655,7 @@ export namespace eventmanager {
             this.recordLadderMatch = this.recordLadderMatch.bind(this)
             this.removeEventMember = this.removeEventMember.bind(this)
             this.removeRaceEventMember = this.removeRaceEventMember.bind(this)
+            this.reorderRaceEvents = this.reorderRaceEvents.bind(this)
             this.replaceRaceResults = this.replaceRaceResults.bind(this)
             this.setEventPoints = this.setEventPoints.bind(this)
             this.setEventSignupsLocked = this.setEventSignupsLocked.bind(this)
@@ -1168,6 +1174,29 @@ export namespace eventmanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(eventId)}/races/${encodeURIComponent(raceId)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
             return await resp.json() as RaceEventDetail
+        }
+
+        /**
+         * Reorders the races within an event, validating permissions and full coverage.
+         */
+        public async reorderRaceEvents(eventId: string, params: ReorderRaceEventsParams): Promise<{
+    races: RaceEventDetail[]
+}> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                orderedRaceIds: params.orderedRaceIds,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("PUT", `/api/events/${encodeURIComponent(eventId)}/races/reorder`, JSON.stringify(body), {headers})
+            return await resp.json() as {
+    races: RaceEventDetail[]
+}
         }
 
         /**

@@ -18,6 +18,7 @@ import {
   removeRaceEventMember,
   setEventSignupsLocked,
   recomputeEventPoints,
+  reorderRaceEvents,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
 import {
@@ -43,7 +44,6 @@ export type ActiveTab = 'details' | 'members' | 'races' | 'datasets'
 
 export interface NewRaceForm {
   name: string
-  sequence: number
   distanceMeters: number
   trackType: string
   location: string
@@ -71,7 +71,6 @@ export function useEventDetail(eventId: string) {
   const [newRaceMemberUserId, setNewRaceMemberUserId] = useState('')
   const [newRaceForm, setNewRaceForm] = useState<NewRaceForm>({
     name: '',
-    sequence: 1,
     distanceMeters: 1200,
     trackType: 'Turf',
     location: '',
@@ -305,7 +304,6 @@ export function useEventDetail(eventId: string) {
         await reloadCurrentEvent()
         setNewRaceForm({
           name: '',
-          sequence: races.length + 1,
           distanceMeters: 1200,
           trackType: 'Turf',
           location: '',
@@ -317,7 +315,7 @@ export function useEventDetail(eventId: string) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to create race event')
       }
     },
-    [authHeader, eventId, newRaceForm, races.length, reloadCurrentEvent],
+    [authHeader, eventId, newRaceForm, reloadCurrentEvent],
   )
 
   // Select Race to load results
@@ -522,6 +520,50 @@ export function useEventDetail(eventId: string) {
     setGlobalSuccess(null)
   }, [])
 
+  const handleReorderRaces = useCallback(
+    async (orderedRaceIds: string[]) => {
+      if (!authHeader) return
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      const originalRaces = [...races]
+      try {
+        const nextRaces = orderedRaceIds
+          .map((id) => races.find((r) => r.id === id))
+          .filter(Boolean) as eventmanager.RaceEventDetail[]
+        const optimisticRaces = nextRaces.map((r, index) => ({
+          ...r,
+          sequence: index + 1,
+        }))
+        setRaces(optimisticRaces)
+        if (selectedRaceId) {
+          const updatedSel = optimisticRaces.find((r) => r.id === selectedRaceId)
+          if (updatedSel) {
+            setSelectedRace(updatedSel)
+          }
+        }
+        const response = await reorderRaceEvents(eventId, orderedRaceIds, authHeader)
+        setRaces(response.races)
+        if (selectedRaceId) {
+          const updatedSel = response.races.find((r) => r.id === selectedRaceId)
+          if (updatedSel) {
+            setSelectedRace(updatedSel)
+          }
+        }
+        setGlobalSuccess('Race order updated successfully.')
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to reorder race events')
+        setRaces(originalRaces)
+        if (selectedRaceId) {
+          const originalSel = originalRaces.find((r) => r.id === selectedRaceId)
+          if (originalSel) {
+            setSelectedRace(originalSel)
+          }
+        }
+      }
+    },
+    [authHeader, eventId, races, selectedRaceId],
+  )
+
   // Unified Save Standings action (smart endpoint selection)
   const handleUnifiedSave = useCallback(async () => {
     if (!selectedRaceId || !authHeader) return
@@ -703,5 +745,6 @@ export function useEventDetail(eventId: string) {
     handleInferFinishTimes,
     handleCancelStandingsEdit,
     handleUnifiedSave,
+    handleReorderRaces,
   }
 }

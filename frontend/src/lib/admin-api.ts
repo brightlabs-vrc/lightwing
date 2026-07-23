@@ -585,11 +585,18 @@ export async function createRaceEvent(
     })
   }
 
+  const event = mockEvents.find((evt) => evt.id === eventId)
+  let nextSeq = 1
+  if (event && event.raceEvents.length > 0) {
+    const maxSeq = Math.max(...event.raceEvents.map((r) => r.sequence))
+    nextSeq = maxSeq + 1
+  }
+
   const id = `race_mock_${Math.floor(Math.random() * 10000)}`
   const newRace: eventmanager.RaceEventView = {
     id,
     name: params.name,
-    sequence: params.sequence ?? 0,
+    sequence: params.sequence !== undefined ? params.sequence : nextSeq,
     distanceMeters: params.distanceMeters,
     trackType: params.trackType,
     location: params.location,
@@ -610,6 +617,45 @@ export async function createRaceEvent(
   })
 
   return hydrateRaceEvent(eventId, newRace)
+}
+
+export async function reorderRaceEvents(
+  eventId: string,
+  orderedRaceIds: string[],
+  authorization: string,
+): Promise<{ races: eventmanager.RaceEventDetail[] }> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.reorderRaceEvents(eventId, {
+      authorization,
+      orderedRaceIds,
+    })
+  }
+
+  const eventIndex = mockEvents.findIndex((evt) => evt.id === eventId)
+  if (eventIndex === -1) {
+    throw new Error('Mock event not found')
+  }
+
+  const event = mockEvents[eventIndex]
+
+  const reordered: eventmanager.RaceEventView[] = []
+  for (let i = 0; i < orderedRaceIds.length; i++) {
+    const raceId = orderedRaceIds[i]
+    const found = event.raceEvents.find((r) => r.id === raceId)
+    if (found) {
+      reordered.push({
+        ...found,
+        sequence: i + 1,
+      })
+    }
+  }
+
+  mockEvents[eventIndex] = {
+    ...event,
+    raceEvents: reordered,
+  }
+
+  return { races: reordered.map((r) => hydrateRaceEvent(eventId, r)) }
 }
 
 export async function updateRaceEvent(
