@@ -315,3 +315,88 @@ describe("signupsLocked enforcement", () => {
     expect(removed.members.length).toBe(0);
   });
 });
+
+describe("Event withdrawal and member removal cleanup", () => {
+  test("withdrawing or removing a member deletes all associated event standings and race participation", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const adminToken = await createSession(creatorId);
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    const eventId = await createEvent(creatorId, "Championship Series", "UNOFFICIAL", "OP");
+    const raceId = await createRaceEvent(eventId, "Race 1");
+
+    // Add user as event member
+    await addEventMember({
+      id: eventId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+
+    // Add user as race member
+    await addRaceEventMember({
+      eventId,
+      raceId,
+      userId,
+      authorization: `Bearer ${adminToken}`,
+    });
+
+    // Record a race result
+    await prisma.raceResult.create({
+      data: {
+        id: `res-${randomUUID()}`,
+        raceEventId: raceId,
+        userId,
+        position: 1,
+        points: 10,
+      },
+    });
+
+    // Verify initial database states
+    const eventMemberBefore = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(eventMemberBefore).not.toBeNull();
+
+    const pointsEntryBefore = await prisma.eventPointsEntry.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(pointsEntryBefore).not.toBeNull();
+
+    const raceMemberBefore = await prisma.raceEventMember.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    expect(raceMemberBefore).not.toBeNull();
+
+    const raceResultBefore = await prisma.raceResult.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    expect(raceResultBefore).not.toBeNull();
+
+    // Leave the event (withdraw)
+    await leaveEvent({
+      id: eventId,
+      authorization: `Bearer ${token}`,
+    });
+
+    // Verify all associated rows are deleted
+    const eventMemberAfter = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(eventMemberAfter).toBeNull();
+
+    const pointsEntryAfter = await prisma.eventPointsEntry.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(pointsEntryAfter).toBeNull();
+
+    const raceMemberAfter = await prisma.raceEventMember.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    expect(raceMemberAfter).toBeNull();
+
+    const raceResultAfter = await prisma.raceResult.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    expect(raceResultAfter).toBeNull();
+  });
+});
