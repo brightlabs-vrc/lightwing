@@ -19,6 +19,9 @@
   "license": "BSD-3-Clause",
   "type": "module",
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@pxlkit/core": "^1.3.4",
     "@pxlkit/feedback": "^1.2.5",
     "@pxlkit/gamification": "^1.2.4",
