@@ -17,6 +17,7 @@ import {
   addRaceEventMember,
   removeRaceEventMember,
   setEventSignupsLocked,
+  recomputeEventPoints,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
 import {
@@ -47,6 +48,7 @@ export interface NewRaceForm {
   trackType: string
   location: string
   classRestriction: eventmanager.ClassTier
+  grade?: string
 }
 
 export function useEventDetail(eventId: string) {
@@ -74,6 +76,7 @@ export function useEventDetail(eventId: string) {
     trackType: 'Turf',
     location: '',
     classRestriction: 'OP',
+    grade: 'OP',
   })
 
   // Global UI States
@@ -179,6 +182,8 @@ export function useEventDetail(eventId: string) {
       description: string | null
       classRestriction: eventmanager.ClassTier | null
       granularParticipation: boolean
+      scoringRulesMode?: string | null
+      customScoringTables?: any | null
     }) => {
       if (!authHeader) return
       setGlobalError(null)
@@ -193,6 +198,19 @@ export function useEventDetail(eventId: string) {
     },
     [authHeader, eventId],
   )
+
+  const handleRecomputeEventPoints = useCallback(async () => {
+    if (!authHeader) return
+    setGlobalError(null)
+    setGlobalSuccess(null)
+    try {
+      await recomputeEventPoints(eventId, authHeader)
+      await reloadCurrentEvent()
+      setGlobalSuccess('Successfully recomputed all results points.')
+    } catch (cause) {
+      setGlobalError(cause instanceof Error ? cause.message : 'Unable to recompute event points')
+    }
+  }, [authHeader, eventId, reloadCurrentEvent])
 
   // Add Member
   const handleAddMember = useCallback(
@@ -292,6 +310,7 @@ export function useEventDetail(eventId: string) {
           trackType: 'Turf',
           location: '',
           classRestriction: 'OP',
+          grade: 'OP',
         })
         setGlobalSuccess(`Successfully created race event "${newRaceForm.name}".`)
       } catch (cause) {
@@ -371,19 +390,19 @@ export function useEventDetail(eventId: string) {
     [authHeader, eventId, handleSelectRace],
   )
 
-  // Update Race Details (such as classRestriction)
+  // Update Race Details (such as classRestriction, grade)
   const handleUpdateRace = useCallback(
-    async (raceId: string, classRestriction: eventmanager.ClassTier | null) => {
+    async (raceId: string, params: { classRestriction?: eventmanager.ClassTier | null, grade?: string | null }) => {
       if (!authHeader) return
       setGlobalError(null)
       setGlobalSuccess(null)
       try {
-        const updated = await updateRaceEvent(eventId, raceId, { classRestriction }, authHeader)
+        const updated = await updateRaceEvent(eventId, raceId, params, authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updated : r)))
         if (selectedRaceId === raceId) {
           setSelectedRace(updated)
         }
-        setGlobalSuccess('Race class restriction updated successfully.')
+        setGlobalSuccess('Race updated successfully.')
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to update race details')
       }
@@ -666,6 +685,7 @@ export function useEventDetail(eventId: string) {
     handleUpdateEventStatus,
     handleSetSignupsLocked,
     handleUpdateEventDetails,
+    handleRecomputeEventPoints,
     handleAddMember,
     handleRemoveMember,
     handleAddRaceMember,

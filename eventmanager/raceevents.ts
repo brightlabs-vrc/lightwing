@@ -3,6 +3,7 @@ import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireEventPermission, resolveActor } from "../auth/rbac";
 import { isEligible, type ClassTier } from "./classtier";
+import { recomputeEventPointsInternal } from "./events";
 
 export interface RaceEventMemberView {
   userId: string;
@@ -24,6 +25,7 @@ export interface RaceEventDetail {
   trackType: string;
   location: string;
   scoringType: number | null;
+  grade: string | null;
   classRestriction: ClassTier | null;
   startsAt: string | null;
   endsAt: string | null;
@@ -41,6 +43,7 @@ interface CreateRaceEventParams {
   trackType: string;
   location: string;
   scoringType?: number | null;
+  grade?: string | null;
   classRestriction?: ClassTier | null;
   startsAt?: string | null;
   endsAt?: string | null;
@@ -66,6 +69,7 @@ export const createRaceEvent = api(
         trackType: params.trackType,
         location: params.location,
         scoringType: params.scoringType ?? null,
+        grade: params.grade ?? null,
         classRestriction: params.classRestriction ?? null,
         startsAt: params.startsAt ? new Date(params.startsAt) : null,
         endsAt: params.endsAt ? new Date(params.endsAt) : null,
@@ -128,6 +132,7 @@ interface UpdateRaceEventParams {
   trackType?: string;
   location?: string;
   scoringType?: number | null;
+  grade?: string | null;
   classRestriction?: ClassTier | null;
   startsAt?: string | null;
   endsAt?: string | null;
@@ -137,12 +142,17 @@ interface UpdateRaceEventParams {
 export const updateRaceEvent = api(
   { expose: true, auth: true, method: "PATCH", path: "/api/events/:eventId/races/:raceId" },
   async (params: UpdateRaceEventParams): Promise<RaceEventDetail> => {
-    await requireRaceEvent(params.eventId, params.raceId);
+    const existing = await requireRaceEvent(params.eventId, params.raceId);
     await requireEventPermission(prisma, {
       authorization: params.authorization,
       eventId: params.eventId,
       action: "update",
     });
+
+    let triggerRecomputation = false;
+    if (params.grade !== undefined && params.grade !== existing.grade) {
+      triggerRecomputation = true;
+    }
 
     await prisma.raceEvent.update({
       where: { id: params.raceId },
@@ -153,6 +163,7 @@ export const updateRaceEvent = api(
         trackType: params.trackType ?? undefined,
         location: params.location ?? undefined,
         scoringType: params.scoringType === undefined ? undefined : params.scoringType,
+        grade: params.grade === undefined ? undefined : params.grade,
         classRestriction:
           params.classRestriction === undefined ? undefined : params.classRestriction,
         startsAt:
@@ -169,6 +180,10 @@ export const updateRaceEvent = api(
               : null,
       },
     });
+
+    if (triggerRecomputation) {
+      await recomputeEventPointsInternal(params.eventId);
+    }
 
     const updated = await requireRaceEvent(params.eventId, params.raceId);
     return toRaceEventDetail(updated);
@@ -228,6 +243,7 @@ type RaceEventRow = {
   trackType: string;
   location: string;
   scoringType: number | null;
+  grade: string | null;
   classRestriction: ClassTier | null;
   startsAt: Date | null;
   endsAt: Date | null;
@@ -252,6 +268,7 @@ function toRaceEventDetail(race: RaceEventRow): RaceEventDetail {
     trackType: race.trackType,
     location: race.location,
     scoringType: race.scoringType,
+    grade: race.grade,
     classRestriction: race.classRestriction,
     startsAt: race.startsAt ? race.startsAt.toISOString() : null,
     endsAt: race.endsAt ? race.endsAt.toISOString() : null,

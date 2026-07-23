@@ -105,6 +105,8 @@ let mockEvents: eventmanager.EventDetail[] = [
     status: 'UNOFFICIAL',
     scoringType: 1,
     scoringTypeLabel: 'points-based',
+    scoringRulesMode: 'STANDARD',
+    customScoringTables: null,
     classRestriction: 'OP',
     granularParticipation: true,
     signupsLocked: false,
@@ -130,6 +132,8 @@ let mockEvents: eventmanager.EventDetail[] = [
     status: 'DRAFT',
     scoringType: 2,
     scoringTypeLabel: 'ladder-elo',
+    scoringRulesMode: null,
+    customScoringTables: null,
     classRestriction: null,
     granularParticipation: false,
     signupsLocked: false,
@@ -393,6 +397,8 @@ export async function updateAdminEvent(
     description?: string | null
     classRestriction?: eventmanager.ClassTier | null
     granularParticipation?: boolean
+    scoringRulesMode?: string | null
+    customScoringTables?: any | null
   },
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
@@ -403,6 +409,8 @@ export async function updateAdminEvent(
       description: params.description,
       classRestriction: params.classRestriction,
       granularParticipation: params.granularParticipation,
+      scoringRulesMode: params.scoringRulesMode,
+      customScoringTables: params.customScoringTables,
     })
   }
 
@@ -414,6 +422,8 @@ export async function updateAdminEvent(
         description: params.description !== undefined ? params.description : evt.description,
         classRestriction: params.classRestriction !== undefined ? params.classRestriction : evt.classRestriction,
         granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : evt.granularParticipation,
+        scoringRulesMode: params.scoringRulesMode !== undefined ? params.scoringRulesMode : evt.scoringRulesMode,
+        customScoringTables: params.customScoringTables !== undefined ? params.customScoringTables : evt.customScoringTables,
         updatedAt: new Date().toISOString(),
       }
     }
@@ -440,6 +450,8 @@ export async function updateAdminEvent(
       description: params.description !== undefined ? params.description : publicEvents[pubEvtIndex].description,
       classRestriction: params.classRestriction !== undefined ? params.classRestriction : publicEvents[pubEvtIndex].classRestriction,
       granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : publicEvents[pubEvtIndex].granularParticipation,
+      scoringRulesMode: params.scoringRulesMode !== undefined ? params.scoringRulesMode : publicEvents[pubEvtIndex].scoringRulesMode,
+      customScoringTables: params.customScoringTables !== undefined ? params.customScoringTables : publicEvents[pubEvtIndex].customScoringTables,
       updatedAt: new Date().toISOString()
     }
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -1222,6 +1234,21 @@ export async function updateAdminTeamStats(
   }
 
   return team
+}
+
+// -----------------------------------------------------------------------------
+// RECOMPUTATION OPERATIONS
+// -----------------------------------------------------------------------------
+
+export async function recomputeEventPoints(
+  eventId: string,
+  authorization: string,
+): Promise<{ success: boolean }> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.recomputeEventPoints(eventId, { authorization })
+  }
+  recomputeMockOverview(eventId)
+  return { success: true }
 }
 
 export async function createAdminTeam(
