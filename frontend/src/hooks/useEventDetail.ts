@@ -187,6 +187,35 @@ export function useEventDetail(eventId: string) {
       if (!authHeader) return
       setGlobalError(null)
       setGlobalSuccess(null)
+
+      // Strict validation for custom scoring rules
+      if (params.scoringRulesMode === 'CUSTOM') {
+        if (!params.customScoringTables) {
+          setGlobalError('Custom scoring tables are required.')
+          return
+        }
+        const grades = ['OP', 'GIII', 'GII', 'GI']
+        for (const grade of grades) {
+          const table = params.customScoringTables[grade]
+          if (!table) {
+            setGlobalError(`Custom table for grade ${grade} is missing.`)
+            return
+          }
+          for (let pos = 1; pos <= 10; pos++) {
+            const val = table[pos]
+            if (val === undefined || val === null || String(val).trim() === '') {
+              setGlobalError(`Custom table for grade ${grade} is missing value for position #${pos}.`)
+              return
+            }
+            const num = Number(val)
+            if (!Number.isInteger(num) || num < 0) {
+              setGlobalError(`Custom table for grade ${grade}, position #${pos} must be a valid non-negative integer.`)
+              return
+            }
+          }
+        }
+      }
+
       try {
         const updated = await updateAdminEvent(eventId, params, authHeader)
         setSelectedEvent(updated)
@@ -388,9 +417,19 @@ export function useEventDetail(eventId: string) {
     [authHeader, eventId, handleSelectRace],
   )
 
-  // Update Race Details (such as classRestriction, grade)
+  // Update Race Details (such as name, distance, trackType, location, classRestriction, grade)
   const handleUpdateRace = useCallback(
-    async (raceId: string, params: { classRestriction?: eventmanager.ClassTier | null, grade?: string | null }) => {
+    async (
+      raceId: string,
+      params: {
+        name?: string
+        distanceMeters?: number
+        trackType?: string
+        location?: string
+        classRestriction?: eventmanager.ClassTier | null
+        grade?: string | null
+      }
+    ) => {
       if (!authHeader) return
       setGlobalError(null)
       setGlobalSuccess(null)

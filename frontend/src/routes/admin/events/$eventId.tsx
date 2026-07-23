@@ -214,6 +214,7 @@ function AdminEventDetailPage() {
     ongoingRaces,
     concludedRaces,
     notStartedRaces,
+    results,
     handleUpdateEventStatus,
     handleSetSignupsLocked,
     handleUpdateEventDetails,
@@ -240,6 +241,7 @@ function AdminEventDetailPage() {
 
   const [showCreateRaceModal, setShowCreateRaceModal] = useState(false)
   const [showEditEventModal, setShowEditEventModal] = useState(false)
+  const [showEditRaceModal, setShowEditRaceModal] = useState(false)
 
   const [isReordering, setIsReordering] = useState(false)
 
@@ -306,6 +308,16 @@ function AdminEventDetailPage() {
     void handleReorderRaces(nextOrderedIds)
   }
 
+  // Race Edit Form States
+  const [raceEditName, setRaceEditName] = useState('')
+  const [raceEditLocation, setRaceEditLocation] = useState('')
+  const [raceEditDistance, setRaceEditDistance] = useState(1200)
+  const [raceEditTrackType, setRaceEditTrackType] = useState('Turf')
+  const [raceEditClassRestriction, setRaceEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
+  const [raceEditGrade, setRaceEditGrade] = useState<string | null>(null)
+  const [showRaceGradeConfirm, setShowRaceGradeConfirm] = useState(false)
+  const [raceEditError, setRaceEditError] = useState<string | null>(null)
+
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editClassRestriction, setEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
@@ -319,6 +331,19 @@ function AdminEventDetailPage() {
     GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
   })
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+
+  // Set race edit values when modal is toggled or race selection changes
+  useEffect(() => {
+    if (selectedRace) {
+      setRaceEditName(selectedRace.name)
+      setRaceEditLocation(selectedRace.location)
+      setRaceEditDistance(selectedRace.distanceMeters)
+      setRaceEditTrackType(selectedRace.trackType)
+      setRaceEditClassRestriction(selectedRace.classRestriction)
+      setRaceEditGrade(selectedRace.grade)
+      setRaceEditError(null)
+    }
+  }, [showEditRaceModal, selectedRace])
 
   // Set edit values when modal is toggled or event loads
   useEffect(() => {
@@ -360,6 +385,30 @@ function AdminEventDetailPage() {
   const onEditEventSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Strict validation
+    if (selectedEvent && selectedEvent.scoringType === 1 && editScoringRulesMode === 'CUSTOM') {
+      const grades = ['OP', 'GIII', 'GII', 'GI']
+      for (const grade of grades) {
+        const table = editCustomScoringTables[grade]
+        if (!table) {
+          window.alert(`Custom table for grade ${grade} is missing.`)
+          return
+        }
+        for (let pos = 1; pos <= 10; pos++) {
+          const val = table[pos]
+          if (val === undefined || val === null || String(val).trim() === '') {
+            window.alert(`Custom table for grade ${grade} is missing value for position #${pos}.`)
+            return
+          }
+          const num = Number(val)
+          if (!Number.isInteger(num) || num < 0) {
+            window.alert(`Custom table for grade ${grade}, position #${pos} must be a valid non-negative integer.`)
+            return
+          }
+        }
+      }
+    }
+
     const scoringRulesChanged = selectedEvent && selectedEvent.scoringType === 1 && (
       selectedEvent.scoringRulesMode !== editScoringRulesMode ||
       (editScoringRulesMode === 'CUSTOM' && JSON.stringify(selectedEvent.customScoringTables) !== JSON.stringify(editCustomScoringTables))
@@ -369,6 +418,56 @@ function AdminEventDetailPage() {
       setShowConfirmModal(true)
     } else {
       await performSaveEventDetails()
+    }
+  }
+
+  const performSaveRaceDetails = async () => {
+    if (!selectedRace) return
+    await handleUpdateRace(selectedRace.id, {
+      name: raceEditName.trim(),
+      location: raceEditLocation.trim(),
+      distanceMeters: raceEditDistance,
+      trackType: raceEditTrackType.trim(),
+      classRestriction: raceEditClassRestriction,
+      grade: raceEditGrade,
+    })
+    setShowEditRaceModal(false)
+  }
+
+  const onEditRaceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setRaceEditError(null)
+
+    // Robust frontend validation
+    const trimmedName = raceEditName.trim()
+    const trimmedLocation = raceEditLocation.trim()
+    const trimmedTrackType = raceEditTrackType.trim()
+
+    if (!trimmedName) {
+      setRaceEditError('Race name is required and cannot be empty.')
+      return
+    }
+    if (!trimmedLocation) {
+      setRaceEditError('Location is required and cannot be empty.')
+      return
+    }
+    if (!trimmedTrackType) {
+      setRaceEditError('Track Type is required and cannot be empty.')
+      return
+    }
+    if (!Number.isInteger(raceEditDistance) || raceEditDistance <= 0) {
+      setRaceEditError('Distance must be a valid integer greater than 0.')
+      return
+    }
+
+    const hasResults = results && results.length > 0
+    const gradeChanged = selectedRace && selectedRace.grade !== raceEditGrade
+    const isPointsBased = selectedEvent && selectedEvent.scoringType === 1
+
+    if (isPointsBased && hasResults && gradeChanged) {
+      setShowRaceGradeConfirm(true)
+    } else {
+      await performSaveRaceDetails()
     }
   }
 
@@ -786,7 +885,7 @@ function AdminEventDetailPage() {
               <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
                 {races.length === 0 ? (
                   <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
-                    <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>No Races Configured</p>
+                    <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>No races yet</p>
                     <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
                       Configure your first race track using the wizard.
                     </p>
@@ -800,32 +899,8 @@ function AdminEventDetailPage() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    {/* Left Sidebar: Race Selector + Overview Button */}
+                    {/* Left Sidebar: Race Selector */}
                     <div style={{ flex: '1 1 300px', maxWidth: '360px', background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
-                      {/* Overview Link */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedRaceId(null)
-                          setSelectedRace(null)
-                        }}
-                        className="slds-button"
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '10px 12px',
-                          marginBottom: '16px',
-                          background: selectedRaceId === null ? '#0176d3' : '#ffffff',
-                          color: selectedRaceId === null ? '#ffffff' : '#0176d3',
-                          fontWeight: 'bold',
-                          border: '1px solid #0176d3',
-                          borderRadius: '4px',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                        }}
-                      >
-                        All Races Overview
-                      </button>
-
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
                           Configure / Manage Tracks
@@ -1001,7 +1076,7 @@ function AdminEventDetailPage() {
                         <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center', textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                           <div style={{ padding: '2rem' }}>
                             <p className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
-                              No Race Track Selected
+                              No race selected
                             </p>
                             <p className="slds-text-body_regular text-slate-500 slds-m-top_small" style={{ fontSize: '14px', maxWidth: '360px', margin: '8px auto 0 auto', lineHeight: '1.5' }}>
                               Select a race track from the left panel to begin managing competitors, recording standings, and starting or concluding races.
@@ -1083,6 +1158,14 @@ function AdminEventDetailPage() {
                                 )}
 
                                 <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowEditRaceModal(true)}
+                                    className="slds-button slds-button_neutral"
+                                    style={{ padding: '4px 12px', fontSize: '12px' }}
+                                  >
+                                    Edit Race
+                                  </button>
                                   {isRaceNotStarted(selectedRace) && (
                                     <button
                                       type="button"
@@ -1120,7 +1203,7 @@ function AdminEventDetailPage() {
                                     className="slds-button slds-button_neutral"
                                     style={{ padding: '4px 12px', fontSize: '12px' }}
                                   >
-                                    Back to Overview
+                                    Clear Selection
                                   </button>
                                 </div>
                               </div>
@@ -1726,6 +1809,262 @@ function AdminEventDetailPage() {
                   onClick={async () => {
                     setShowConfirmModal(false)
                     await performSaveEventDetails()
+                  }}
+                  className="slds-button slds-button_brand"
+                  style={{ backgroundColor: '#0176d3', color: '#fff' }}
+                >
+                  Confirm & Save
+                </button>
+              </footer>
+            </div>
+          </section>
+          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 10000 }} />
+        </div>
+      )}
+
+      {/* EDIT RACE DIALOG MODAL */}
+      {showEditRaceModal && selectedRace && (
+        <div className="slds-scope">
+          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
+            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
+              <header className="slds-modal__header">
+                <button
+                  className="slds-button slds-button_icon slds-modal__close"
+                  title="Close"
+                  onClick={() => setShowEditRaceModal(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    right: '1.5rem',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                    color: '#747474',
+                  }}
+                >
+                  ✕
+                </button>
+                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  Edit Race Details
+                </h2>
+              </header>
+
+              <form onSubmit={onEditRaceSubmit}>
+                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                  {raceEditError && (
+                    <div className="slds-m-bottom_medium">
+                      <AlertBanner variant="error">{raceEditError}</AlertBanner>
+                    </div>
+                  )}
+
+                  <div className="slds-form slds-form_stacked">
+                    {/* Race Name */}
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-race-name">
+                        Race Name <span className="text-red-500">*</span>
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="edit-race-name"
+                          type="text"
+                          required
+                          placeholder="e.g. Kyoto Derby"
+                          value={raceEditName}
+                          onChange={(e) => setRaceEditName(e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
+                      <div className="slds-col slds-size_1-of-1" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-race-distance">
+                            Distance (Meters) <span className="text-red-500">*</span>
+                          </label>
+                          <div className="slds-form-element__control">
+                            <input
+                              id="edit-race-distance"
+                              type="number"
+                              required
+                              value={raceEditDistance}
+                              onChange={(e) => setRaceEditDistance(Number(e.target.value) || 0)}
+                              className="slds-input"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-4" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-race-track">
+                            Track Type <span className="text-red-500">*</span>
+                          </label>
+                          <div className="slds-form-element__control">
+                            <input
+                              id="edit-race-track"
+                              type="text"
+                              required
+                              placeholder="e.g. Turf, Dirt"
+                              value={raceEditTrackType}
+                              onChange={(e) => setRaceEditTrackType(e.target.value)}
+                              className="slds-input"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-4" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-race-loc">
+                            Location <span className="text-red-500">*</span>
+                          </label>
+                          <div className="slds-form-element__control">
+                            <input
+                              id="edit-race-loc"
+                              type="text"
+                              required
+                              placeholder="e.g. Kyoto Racecourse"
+                              value={raceEditLocation}
+                              onChange={(e) => setRaceEditLocation(e.target.value)}
+                              className="slds-input"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-4" style={{ flex: 1 }}>
+                        <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-race-restriction">
+                            Class Restriction
+                          </label>
+                          <div className="slds-form-element__control">
+                            <select
+                              id="edit-race-restriction"
+                              value={raceEditClassRestriction || ''}
+                              onChange={(e) => setRaceEditClassRestriction(e.target.value ? e.target.value as eventmanager.ClassTier : null)}
+                              className="slds-select"
+                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            >
+                              <option value="">Any Tier Eligibility (None)</option>
+                              {CLASS_TIER_OPTIONS.map((tier) => (
+                                <option key={tier} value={tier}>{tier}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {selectedEvent && selectedEvent.scoringType === 1 && (
+                        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-4" style={{ flex: 1 }}>
+                          <div className="slds-form-element">
+                            <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-race-grade">
+                              Race Grade
+                            </label>
+                            <div className="slds-form-element__control">
+                              <select
+                                id="edit-race-grade"
+                                value={raceEditGrade || ''}
+                                onChange={(e) => setRaceEditGrade(e.target.value || null)}
+                                className="slds-select"
+                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                              >
+                                <option value="">-- Choose Grade --</option>
+                                <option value="OP">OP</option>
+                                <option value="GIII">GIII</option>
+                                <option value="GII">GII</option>
+                                <option value="GI">GI</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditRaceModal(false)}
+                    className="slds-button slds-button_neutral"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="slds-button slds-button_brand"
+                  >
+                    Save Changes
+                  </button>
+                </footer>
+              </form>
+            </div>
+          </section>
+          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }} />
+        </div>
+      )}
+
+      {/* CONFIRM RACE GRADE CHANGE RECOMPUTE WARNING DIALOG MODAL */}
+      {showRaceGradeConfirm && (
+        <div className="slds-scope">
+          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 10001 }}>
+            <div className="slds-modal__container" style={{ maxWidth: '30rem', width: '90%' }}>
+              <header className="slds-modal__header slds-theme_warning slds-theme_alert-texture" style={{ backgroundColor: '#f57c00', color: '#fff' }}>
+                <button
+                  className="slds-button slds-button_icon slds-modal__close"
+                  title="Close"
+                  onClick={() => setShowRaceGradeConfirm(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    right: '1.5rem',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                    color: '#fff',
+                  }}
+                >
+                  ✕
+                </button>
+                <h2 className="slds-modal__title slds-hyphenate font-bold text-white" style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>
+                  Recalculate Race Points Warning
+                </h2>
+              </header>
+
+              <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                <p style={{ fontSize: '14px', lineHeight: '1.5', color: '#1e293b' }}>
+                  Changing this race's grade will trigger an <strong>automatic recomputation of points</strong> for all recorded results in this specific race.
+                </p>
+                <p className="slds-m-top_small" style={{ fontSize: '13px', lineHeight: '1.5', color: '#e11d48', fontWeight: 'bold' }}>
+                  ⚠️ Existing results will be immediately recalculated based on the new grade's scoring table.
+                </p>
+                <p className="slds-m-top_small" style={{ fontSize: '14px', lineHeight: '1.5', color: '#1e293b' }}>
+                  Are you sure you want to proceed and update the race grade?
+                </p>
+              </div>
+
+              <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowRaceGradeConfirm(false)}
+                  className="slds-button slds-button_neutral"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowRaceGradeConfirm(false)
+                    await performSaveRaceDetails()
                   }}
                   className="slds-button slds-button_brand"
                   style={{ backgroundColor: '#0176d3', color: '#fff' }}

@@ -473,6 +473,8 @@ export async function createAdminEvent(
     scoringType: number
     classRestriction?: eventmanager.ClassTier | null
     granularParticipation?: boolean
+    scoringRulesMode?: string | null
+    customScoringTables?: any | null
   },
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
@@ -487,6 +489,8 @@ export async function createAdminEvent(
       scoringType: params.scoringType as any,
       classRestriction: params.classRestriction,
       granularParticipation: params.granularParticipation,
+      scoringRulesMode: params.scoringRulesMode,
+      customScoringTables: params.customScoringTables,
     })
   }
 
@@ -501,8 +505,8 @@ export async function createAdminEvent(
     status: 'DRAFT',
     scoringType: params.scoringType,
     scoringTypeLabel: params.scoringType === 1 ? 'points-based' : 'ladder-elo',
-    scoringRulesMode: params.scoringType === 1 ? 'STANDARD' : null,
-    customScoringTables: null,
+    scoringRulesMode: params.scoringType === 1 ? (params.scoringRulesMode ?? 'STANDARD') : null,
+    customScoringTables: params.scoringType === 1 ? (params.customScoringTables ?? null) : null,
     classRestriction: params.classRestriction ?? null,
     granularParticipation: params.granularParticipation ?? false,
     signupsLocked: false,
@@ -567,6 +571,7 @@ export async function createRaceEvent(
     endsAt?: string | null
     classRestriction?: eventmanager.ClassTier | null
     scoringType?: number | null
+    grade?: string | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
@@ -582,6 +587,7 @@ export async function createRaceEvent(
       endsAt: params.endsAt,
       classRestriction: params.classRestriction,
       scoringType: params.scoringType,
+      grade: params.grade,
     })
   }
 
@@ -605,6 +611,7 @@ export async function createRaceEvent(
     classRestriction: params.classRestriction ?? null,
     scoringType: params.scoringType ?? null,
   }
+  ;(newRace as any).grade = params.grade ?? null
 
   mockEvents = mockEvents.map((evt) => {
     if (evt.id === eventId) {
@@ -671,6 +678,7 @@ export async function updateRaceEvent(
     endsAt?: string | null
     classRestriction?: eventmanager.ClassTier | null
     scoringType?: number | null
+    grade?: string | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
@@ -699,6 +707,7 @@ export async function updateRaceEvent(
             classRestriction: params.classRestriction === undefined ? race.classRestriction : params.classRestriction,
             scoringType: params.scoringType === undefined ? race.scoringType : params.scoringType,
           }
+          ;(updatedRace as any).grade = params.grade === undefined ? (race as any).grade : params.grade
           return updatedRace!
         }
         return race
@@ -714,6 +723,24 @@ export async function updateRaceEvent(
   const finalRace = updatedRace as eventmanager.RaceEventView | null
   if (!finalRace) {
     throw new Error('Race event not found in mocks')
+  }
+
+  // Persist updated mock events back to localStorage if available to persist across visual test reloads
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const stored = window.localStorage.getItem('lightwing:mock:public_events')
+    if (stored) {
+      try {
+        const publicEvents = JSON.parse(stored)
+        const idx = publicEvents.findIndex((e: any) => e.id === eventId)
+        if (idx !== -1) {
+          publicEvents[idx].raceEvents = mockEvents.find((e) => e.id === eventId)?.raceEvents ?? []
+          publicEvents[idx].updatedAt = new Date().toISOString()
+          window.localStorage.setItem('lightwing:mock:public_events', JSON.stringify(publicEvents))
+        }
+      } catch {
+        // ignore
+      }
+    }
   }
 
   return hydrateRaceEvent(eventId, finalRace)
