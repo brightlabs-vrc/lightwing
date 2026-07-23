@@ -19,6 +19,10 @@ interface StandingsEditorProps {
   onTogglePendingDeletion: (userId: string) => void
   onUndoRow: (userId: string) => void
   noTopMargin?: boolean
+  scoringType?: number
+  scoringRulesMode?: string | null
+  customScoringTables?: any | null
+  raceGrade?: string | null
 }
 
 export function StandingsEditor({
@@ -38,6 +42,10 @@ export function StandingsEditor({
   onTogglePendingDeletion,
   onUndoRow,
   noTopMargin = false,
+  scoringType,
+  scoringRulesMode,
+  customScoringTables,
+  raceGrade,
 }: StandingsEditorProps) {
   return (
     <article
@@ -149,6 +157,10 @@ export function StandingsEditor({
                 onResultChange={onResultChange}
                 onTogglePendingDeletion={onTogglePendingDeletion}
                 onUndoRow={onUndoRow}
+              scoringType={scoringType}
+              scoringRulesMode={scoringRulesMode}
+              customScoringTables={customScoringTables}
+              raceGrade={raceGrade}
               />
             )}
           </>
@@ -163,9 +175,41 @@ interface StandingsTableProps {
   onResultChange: (userId: string, field: keyof EditedResult, value: string) => void
   onTogglePendingDeletion: (userId: string) => void
   onUndoRow: (userId: string) => void
+  scoringType?: number
+  scoringRulesMode?: string | null
+  customScoringTables?: any | null
+  raceGrade?: string | null
 }
 
-function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoRow }: StandingsTableProps) {
+function StandingsTable({
+  rows,
+  onResultChange,
+  onTogglePendingDeletion,
+  onUndoRow,
+  scoringType,
+  scoringRulesMode,
+  customScoringTables,
+  raceGrade,
+}: StandingsTableProps) {
+  const getPreviewPoints = (positionStr: string): number => {
+    const position = parseInt(positionStr, 10);
+    if (isNaN(position) || position < 1 || position > 10) return 0;
+    if (!raceGrade) return 0;
+
+    const DEFAULT_TABLES: Record<string, Record<number, number>> = {
+      OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+      GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+      GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
+      GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
+    };
+
+    if (scoringRulesMode === 'CUSTOM' && customScoringTables && customScoringTables[raceGrade]) {
+      return customScoringTables[raceGrade][position] ?? 0;
+    }
+
+    return DEFAULT_TABLES[raceGrade]?.[position] ?? 0;
+  };
+
   return (
     <div>
       <div style={{ overflowX: 'auto', width: '100%' }}>
@@ -238,19 +282,25 @@ function StandingsTable({ rows, onResultChange, onTogglePendingDeletion, onUndoR
                   </div>
                 </td>
                 <td>
-                  <div className="slds-form-element">
-                    <div className="slds-form-element__control">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        disabled={isDeleted}
-                        value={edit.points}
-                        onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
-                        className="slds-input"
-                        style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                      />
+                  {scoringType === 1 ? (
+                    <div style={{ fontWeight: 'bold', color: '#0176d3', fontSize: '13px', textAlign: 'center' }}>
+                      {getPreviewPoints(edit.position)} pts <span style={{ fontSize: '9px', color: '#64748b', display: 'block' }}>(Auto)</span>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="slds-form-element">
+                      <div className="slds-form-element__control">
+                        <input
+                          type="number"
+                          placeholder="0"
+                          disabled={isDeleted}
+                          value={edit.points}
+                          onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </td>
                 <td>
                   <div className="slds-form-element">

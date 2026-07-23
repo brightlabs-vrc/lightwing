@@ -164,6 +164,8 @@ model Event {
   ownerUserId      String?        @db.Text
   status           EventStatus    @default(UNOFFICIAL)
   scoringType      Int            @db.SmallInt
+  scoringRulesMode String?        @db.Text
+  customScoringTables Json?
   classRestriction ClassTier?
   granularParticipation Boolean @default(false)
   signupsLocked    Boolean        @default(false)
@@ -193,6 +195,7 @@ model RaceEvent {
   trackType        String     @db.Text
   location         String     @db.Text
   scoringType      Int?       @db.SmallInt
+  grade            String?    @db.Text
   classRestriction ClassTier?
   startsAt         DateTime?  @db.Timestamp(6)
   endsAt           DateTime?  @db.Timestamp(6)

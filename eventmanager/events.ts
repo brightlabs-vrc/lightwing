@@ -9,6 +9,8 @@ import {
 } from "../auth/rbac";
 import { isSiteAdmin } from "../auth/permissions";
 import { type ClassTier, isEligible } from "./classtier";
+import { validateCustomScoringTables, resolvePoints } from "./scoring";
+import { scorecalc } from "~encore/clients";
 
 // API-facing string unions mirroring the Prisma enums. Encore's schema parser
 // cannot use Prisma's runtime enum objects as types, so these are declared as
@@ -81,6 +83,8 @@ export interface EventDetail {
   status: EventStatus;
   scoringType: number;
   scoringTypeLabel: string;
+  scoringRulesMode: string | null;
+  customScoringTables: any | null;
   classRestriction: ClassTier | null;
   granularParticipation: boolean;
   signupsLocked: boolean;
@@ -101,6 +105,8 @@ interface CreateEventParams {
   organizationId?: string | null;
   ownerUserId?: string | null;
   scoringType: ScoringType;
+  scoringRulesMode?: string | null;
+  customScoringTables?: any | null;
   classRestriction?: ClassTier | null;
   granularParticipation?: boolean;
 }
@@ -150,6 +156,22 @@ export const createEvent = api(
       }
     }
 
+    let scoringRulesMode: string | null = null;
+    let customScoringTables: any | null = null;
+
+    if (params.scoringType === SCORING_POINTS) {
+      scoringRulesMode = params.scoringRulesMode ?? "STANDARD";
+      if (scoringRulesMode === "CUSTOM") {
+        if (!params.customScoringTables) {
+          throw APIError.invalidArgument("customScoringTables is required when scoringRulesMode is CUSTOM");
+        }
+        validateCustomScoringTables(params.customScoringTables);
+        customScoringTables = params.customScoringTables;
+      } else {
+        scoringRulesMode = "STANDARD";
+      }
+    }
+
     const event = await prisma.event.create({
       data: {
         id: randomUUID(),
@@ -159,6 +181,8 @@ export const createEvent = api(
         organizationId,
         ownerUserId,
         scoringType: params.scoringType,
+        scoringRulesMode,
+        customScoringTables,
         classRestriction: params.classRestriction ?? null,
         granularParticipation: params.granularParticipation ?? false,
       },
@@ -228,6 +252,8 @@ interface UpdateEventParams {
   authorization: Header<"Authorization">;
   name?: string;
   description?: string | null;
+  scoringRulesMode?: string | null;
+  customScoringTables?: any | null;
   classRestriction?: ClassTier | null;
   granularParticipation?: boolean;
 }
@@ -236,24 +262,63 @@ interface UpdateEventParams {
 export const updateEvent = api(
   { expose: true, auth: true, method: "PATCH", path: "/api/events/:id" },
   async (params: UpdateEventParams): Promise<EventDetail> => {
-    await requireEvent(params.id);
+    const existingEvent = await requireEvent(params.id);
     await requireEventPermission(prisma, {
       authorization: params.authorization,
       eventId: params.id,
       action: "update",
     });
 
+    let updatedScoringRulesMode: string | undefined = undefined;
+    let updatedCustomScoringTables: any | undefined = undefined;
+    let triggerRecomputation = false;
+
+    if (existingEvent.scoringType === SCORING_POINTS) {
+      if (params.scoringRulesMode !== undefined) {
+        updatedScoringRulesMode = params.scoringRulesMode ?? "STANDARD";
+        if (updatedScoringRulesMode === "CUSTOM") {
+          const tables = params.customScoringTables !== undefined ? params.customScoringTables : existingEvent.customScoringTables;
+          if (!tables) {
+            throw APIError.invalidArgument("customScoringTables is required when scoringRulesMode is CUSTOM");
+          }
+          validateCustomScoringTables(tables);
+          updatedCustomScoringTables = tables;
+        } else {
+          updatedCustomScoringTables = null;
+        }
+
+        if (existingEvent.scoringRulesMode !== updatedScoringRulesMode) {
+          triggerRecomputation = true;
+        }
+      }
+
+      if (params.customScoringTables !== undefined && (updatedScoringRulesMode ?? existingEvent.scoringRulesMode) === "CUSTOM") {
+        validateCustomScoringTables(params.customScoringTables);
+        updatedCustomScoringTables = params.customScoringTables;
+
+        if (JSON.stringify(existingEvent.customScoringTables) !== JSON.stringify(updatedCustomScoringTables)) {
+          triggerRecomputation = true;
+        }
+      }
+    }
+
     await prisma.event.update({
       where: { id: params.id },
       data: {
         name: params.name ?? undefined,
         description: params.description === undefined ? undefined : params.description,
+        scoringRulesMode: updatedScoringRulesMode,
+        customScoringTables: updatedCustomScoringTables,
         classRestriction:
           params.classRestriction === undefined ? undefined : params.classRestriction,
         granularParticipation:
           params.granularParticipation === undefined ? undefined : params.granularParticipation,
       },
     });
+
+    if (triggerRecomputation) {
+      await recomputeEventPointsInternal(params.id);
+    }
 
     return loadEvent(params.id);
   },
@@ -698,6 +763,8 @@ async function loadEvent(id: string): Promise<EventDetail> {
     status: event.status as EventStatus,
     scoringType: event.scoringType,
     scoringTypeLabel: SCORING_LABELS[event.scoringType] ?? "unknown",
+    scoringRulesMode: event.scoringRulesMode,
+    customScoringTables: event.customScoringTables,
     classRestriction: event.classRestriction,
     granularParticipation: event.granularParticipation,
     signupsLocked: event.signupsLocked,
@@ -731,3 +798,72 @@ async function loadEvent(id: string): Promise<EventDetail> {
     updatedAt: event.updatedAt.toISOString(),
   };
 }
+
+// Function to recompute all race result points for an event.
+// It is idempotent, safe to call repeatedly, and updates the downstream event-level aggregates.
+export async function recomputeEventPointsInternal(eventId: string): Promise<void> {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: {
+      raceEvents: {
+        include: {
+          results: true,
+        },
+      },
+    },
+  });
+  if (!event) return;
+
+  if (event.scoringType !== SCORING_POINTS) {
+    return;
+  }
+
+  const affectedUserIds = new Set<string>();
+
+  for (const race of event.raceEvents) {
+    for (const result of race.results) {
+      const calculatedPoints = resolvePoints({
+        scoringRulesMode: event.scoringRulesMode,
+        customScoringTables: event.customScoringTables,
+        grade: race.grade,
+        position: result.position,
+      });
+
+      if (result.points !== calculatedPoints) {
+        await prisma.raceResult.update({
+          where: { id: result.id },
+          data: { points: calculatedPoints },
+        });
+      }
+      affectedUserIds.add(result.userId);
+    }
+  }
+
+  if (affectedUserIds.size > 0) {
+    await scorecalc.submitCalc({
+      eventId: eventId,
+      userIds: Array.from(affectedUserIds),
+    });
+  }
+}
+
+interface RecomputePointsParams {
+  id: string;
+  authorization: Header<"Authorization">;
+}
+
+// Recomputes all points-based results for an event. Gated by update permission on the event.
+export const recomputeEventPoints = api(
+  { expose: true, auth: true, method: "POST", path: "/api/events/:id/recompute-points" },
+  async ({ id, authorization }: RecomputePointsParams): Promise<{ success: boolean }> => {
+    await requireEvent(id);
+    await requireEventPermission(prisma, {
+      authorization,
+      eventId: id,
+      action: "update",
+    });
+
+    await recomputeEventPointsInternal(id);
+    return { success: true };
+  },
+);

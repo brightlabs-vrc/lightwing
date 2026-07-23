@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-2pfzm.encr.app`
+    return `https://${name}-cvy5a.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the 2pfzm Encore application.
+ * Client is an API client for the cvy5a Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -276,7 +276,7 @@ export namespace eventmanager {
     export interface AssignRaceResultParams {
         authorization: string
         position?: number | null
-        points: number
+        points?: number | null
         gateNumber?: number | null
         finishTime?: string | null
         margin?: string | null
@@ -314,6 +314,8 @@ export namespace eventmanager {
         organizationId?: string | null
         ownerUserId?: string | null
         scoringType: ScoringType
+        scoringRulesMode?: string | null
+        customScoringTables?: any
         classRestriction?: ClassTier | null
         granularParticipation?: boolean
     }
@@ -326,6 +328,7 @@ export namespace eventmanager {
         trackType: string
         location: string
         scoringType?: number | null
+        grade?: string | null
         classRestriction?: ClassTier | null
         startsAt?: string | null
         endsAt?: string | null
@@ -381,6 +384,8 @@ export namespace eventmanager {
         status: EventStatus
         scoringType: number
         scoringTypeLabel: string
+        scoringRulesMode: string | null
+        customScoringTables: any
         classRestriction: ClassTier | null
         granularParticipation: boolean
         signupsLocked: boolean
@@ -479,6 +484,7 @@ export namespace eventmanager {
         trackType: string
         location: string
         scoringType: number | null
+        grade: string | null
         classRestriction: ClassTier | null
         startsAt: string | null
         endsAt: string | null
@@ -512,7 +518,7 @@ export namespace eventmanager {
     export interface RaceResultInput {
         userId: string
         position?: number | null
-        points: number
+        points?: number | null
         gateNumber?: number | null
         finishTime?: string | null
         margin?: string | null
@@ -539,6 +545,10 @@ export namespace eventmanager {
         final3F: string | null
         createdAt: string
         updatedAt: string
+    }
+
+    export interface RecomputePointsParams {
+        authorization: string
     }
 
     export interface RemoveMemberParams {
@@ -591,6 +601,8 @@ export namespace eventmanager {
         authorization: string
         name?: string
         description?: string | null
+        scoringRulesMode?: string | null
+        customScoringTables?: any
         classRestriction?: ClassTier | null
         granularParticipation?: boolean
     }
@@ -603,6 +615,7 @@ export namespace eventmanager {
         trackType?: string
         location?: string
         scoringType?: number | null
+        grade?: string | null
         classRestriction?: ClassTier | null
         startsAt?: string | null
         endsAt?: string | null
@@ -638,6 +651,7 @@ export namespace eventmanager {
             this.listRaceEvents = this.listRaceEvents.bind(this)
             this.listRaceResults = this.listRaceResults.bind(this)
             this.mergeRaceResults = this.mergeRaceResults.bind(this)
+            this.recomputeEventPoints = this.recomputeEventPoints.bind(this)
             this.recordLadderMatch = this.recordLadderMatch.bind(this)
             this.removeEventMember = this.removeEventMember.bind(this)
             this.removeRaceEventMember = this.removeRaceEventMember.bind(this)
@@ -775,12 +789,14 @@ export namespace eventmanager {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
                 classRestriction:      params.classRestriction,
+                customScoringTables:   params.customScoringTables,
                 description:           params.description,
                 granularParticipation: params.granularParticipation,
                 name:                  params.name,
                 organizationId:        params.organizationId,
                 ownerType:             params.ownerType,
                 ownerUserId:           params.ownerUserId,
+                scoringRulesMode:      params.scoringRulesMode,
                 scoringType:           params.scoringType,
             }
 
@@ -803,6 +819,7 @@ export namespace eventmanager {
                 classRestriction: params.classRestriction,
                 distanceMeters:   params.distanceMeters,
                 endsAt:           params.endsAt,
+                grade:            params.grade,
                 location:         params.location,
                 name:             params.name,
                 scoringType:      params.scoringType,
@@ -1093,6 +1110,24 @@ export namespace eventmanager {
         }
 
         /**
+         * Recomputes all points-based results for an event. Gated by update permission on the event.
+         */
+        public async recomputeEventPoints(id: string, params: RecomputePointsParams): Promise<{
+    success: boolean
+}> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(id)}/recompute-points`, undefined, {headers})
+            return await resp.json() as {
+    success: boolean
+}
+        }
+
+        /**
          * Records a 1v1 result on a ladder-elo event and updates both ratings
          * (ladder overview).
          */
@@ -1310,9 +1345,11 @@ export namespace eventmanager {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
                 classRestriction:      params.classRestriction,
+                customScoringTables:   params.customScoringTables,
                 description:           params.description,
                 granularParticipation: params.granularParticipation,
                 name:                  params.name,
+                scoringRulesMode:      params.scoringRulesMode,
             }
 
             // Now make the actual call to the API
@@ -1334,6 +1371,7 @@ export namespace eventmanager {
                 classRestriction: params.classRestriction,
                 distanceMeters:   params.distanceMeters,
                 endsAt:           params.endsAt,
+                grade:            params.grade,
                 location:         params.location,
                 name:             params.name,
                 scoringType:      params.scoringType,
@@ -1793,7 +1831,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "2pfzm-Generated-TS-Client (Encore/v1.57.12)";
+            this.headers["User-Agent"] = "cvy5a-Generated-TS-Client (Encore/v1.57.12)";
         }
 
         this.requestInit = options.requestInit ?? {};

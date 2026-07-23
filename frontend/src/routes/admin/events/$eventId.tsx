@@ -7,6 +7,8 @@ import { isRaceNotStarted, isRaceOngoing, isRaceConcluded } from '../../../lib/r
 import { AlertBanner } from '../../../components/AlertBanner'
 import { LoadingBox } from '../../../components/LoadingBox'
 import { StandingsEditor } from '../../../components/StandingsEditor'
+import { GradePointsPreview } from '../../../components/GradePointsPreview'
+import { EventScoringTablesEditor } from '../../../components/EventScoringTablesEditor'
 import type { eventmanager } from '../../../lib/client'
 
 import {
@@ -215,6 +217,7 @@ function AdminEventDetailPage() {
     handleUpdateEventStatus,
     handleSetSignupsLocked,
     handleUpdateEventDetails,
+    handleRecomputeEventPoints,
     handleAddMember,
     handleRemoveMember,
     handleAddRaceMember,
@@ -308,6 +311,14 @@ function AdminEventDetailPage() {
   const [editClassRestriction, setEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
   const [editGranularParticipation, setEditGranularParticipation] = useState(false)
   const [editSignupsLocked, setEditSignupsLocked] = useState(false)
+  const [editScoringRulesMode, setEditScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
+  const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>({
+    OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+    GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+    GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
+    GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
+  })
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   // Set edit values when modal is toggled or event loads
   useEffect(() => {
@@ -317,21 +328,48 @@ function AdminEventDetailPage() {
       setEditClassRestriction(selectedEvent.classRestriction)
       setEditGranularParticipation(selectedEvent.granularParticipation)
       setEditSignupsLocked(selectedEvent.signupsLocked)
+      setEditScoringRulesMode((selectedEvent.scoringRulesMode as 'STANDARD' | 'CUSTOM') || 'STANDARD')
+      if (selectedEvent.customScoringTables) {
+        setEditCustomScoringTables(selectedEvent.customScoringTables)
+      } else {
+        setEditCustomScoringTables({
+          OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+          GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+          GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
+          GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
+        })
+      }
     }
   }, [showEditEventModal, selectedEvent])
 
-  const onEditEventSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const performSaveEventDetails = async () => {
     await handleUpdateEventDetails({
       name: editName,
       description: editDescription || null,
       classRestriction: editClassRestriction || null,
       granularParticipation: editGranularParticipation,
+      scoringRulesMode: editScoringRulesMode,
+      customScoringTables: editScoringRulesMode === 'CUSTOM' ? editCustomScoringTables : null,
     })
     if (selectedEvent && editSignupsLocked !== selectedEvent.signupsLocked) {
       await handleSetSignupsLocked(editSignupsLocked)
     }
     setShowEditEventModal(false)
+  }
+
+  const onEditEventSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const scoringRulesChanged = selectedEvent && selectedEvent.scoringType === 1 && (
+      selectedEvent.scoringRulesMode !== editScoringRulesMode ||
+      (editScoringRulesMode === 'CUSTOM' && JSON.stringify(selectedEvent.customScoringTables) !== JSON.stringify(editCustomScoringTables))
+    )
+
+    if (scoringRulesChanged) {
+      setShowConfirmModal(true)
+    } else {
+      await performSaveEventDetails()
+    }
   }
 
   const onCreateRaceSubmit = async (e: React.FormEvent) => {
@@ -423,6 +461,16 @@ function AdminEventDetailPage() {
                 >
                   Edit Details
                 </button>
+                {selectedEvent.scoringType === 1 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRecomputeEventPoints()}
+                    className="slds-button slds-button_neutral"
+                    style={{ padding: '2px 8px', fontSize: '11px' }}
+                  >
+                    Recompute Points
+                  </button>
+                )}
               </div>
               <p className="slds-text-body_small text-slate-500">ID: {selectedEvent.id}</p>
             </div>
@@ -539,7 +587,12 @@ function AdminEventDetailPage() {
                   <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
                     <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Scoring Configuration</p>
                     <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
-                      Scoring Mode: <strong>{selectedEvent.scoringTypeLabel}</strong> ({selectedEvent.scoringType === 1 ? 'Points aggregation' : 'Ladder Rating (ELO)'})
+                      Scoring Mode: <strong>{selectedEvent.scoringTypeLabel}</strong> ({selectedEvent.scoringType === 1 ? 'Points aggregation' : 'Ladder Rating (ELO)'}) <br />
+                      {selectedEvent.scoringType === 1 && (
+                        <>
+                          Rules Source: <strong>{selectedEvent.scoringRulesMode || 'STANDARD'}</strong>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
@@ -568,6 +621,28 @@ function AdminEventDetailPage() {
                     </p>
                   </div>
                 </div>
+
+                {selectedEvent.scoringType === 1 && (
+                  <div className="slds-m-bottom_large" style={{ marginTop: '1.5rem' }}>
+                    <h3 className="slds-text-heading_small font-bold slds-m-bottom_small text-slate-900" style={{ fontWeight: 'bold', fontSize: '14px', borderBottom: '1px solid #f3f2f1', paddingBottom: '4px' }}>
+                      Event Points Scoring Configuration Tables
+                    </h3>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {['OP', 'GIII', 'GII', 'GI'].map((grade) => {
+                        const DEFAULT_TABLES: Record<string, Record<number, number>> = {
+                          OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+                          GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+                          GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
+                          GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
+                        };
+                        const table = (selectedEvent.scoringRulesMode === 'CUSTOM' && selectedEvent.customScoringTables)
+                          ? (selectedEvent.customScoringTables[grade] || DEFAULT_TABLES[grade])
+                          : DEFAULT_TABLES[grade];
+                        return <GradePointsPreview key={grade} grade={grade} table={table} />;
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Standings overview aggregates block */}
                 <div className="slds-m-top_large">
@@ -970,7 +1045,7 @@ function AdminEventDetailPage() {
                                     <select
                                       id="race-class-restriction-select"
                                       value={selectedRace.classRestriction || ''}
-                                      onChange={(e) => void handleUpdateRace(selectedRace.id, e.target.value ? e.target.value as eventmanager.ClassTier : null)}
+                                      onChange={(e) => void handleUpdateRace(selectedRace.id, { classRestriction: e.target.value ? e.target.value as eventmanager.ClassTier : null })}
                                       className="slds-select"
                                       style={{ minWidth: '130px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
                                     >
@@ -983,6 +1058,29 @@ function AdminEventDetailPage() {
                                     </select>
                                   </div>
                                 </div>
+
+                                {selectedEvent.scoringType === 1 && (
+                                  <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0, fontSize: '12px' }} htmlFor="race-grade-select">
+                                      Grade:
+                                    </label>
+                                    <div className="slds-form-element__control">
+                                      <select
+                                        id="race-grade-select"
+                                        value={selectedRace.grade || ''}
+                                        onChange={(e) => void handleUpdateRace(selectedRace.id, { grade: e.target.value || null })}
+                                        className="slds-select"
+                                        style={{ minWidth: '100px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
+                                      >
+                                        <option value="">-- None --</option>
+                                        <option value="OP">OP</option>
+                                        <option value="GIII">GIII</option>
+                                        <option value="GII">GII</option>
+                                        <option value="GI">GI</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
 
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                   {isRaceNotStarted(selectedRace) && (
@@ -1031,8 +1129,27 @@ function AdminEventDetailPage() {
                             <div className="text-slate-500 slds-m-top_small" style={{ fontSize: '11px', borderTop: '1px solid #f3f2f1', paddingTop: '8px' }}>
                               {selectedRace.startsAt ? `Started: ${new Date(selectedRace.startsAt).toLocaleString()}` : 'Race is currently not started'} <br />
                               {selectedRace.endsAt ? `Ended: ${new Date(selectedRace.endsAt).toLocaleString()}` : ''}
+                              {selectedRace.grade && (
+                                <span style={{ float: 'right' }}>
+                                  Scoring Table: <strong>{selectedRace.grade}</strong> | Source: <strong>{selectedEvent.scoringRulesMode === 'CUSTOM' ? 'Event Custom Rules' : 'Event Standard Rules'}</strong>
+                                </span>
+                              )}
                             </div>
                           </div>
+
+                          {/* Warning Banner if points-based event but race has no grade */}
+                          {selectedEvent.scoringType === 1 && !selectedRace.grade && (
+                            <div className="slds-m-bottom_medium">
+                              <AlertBanner variant="error">
+                                <div style={{ textAlign: 'left' }}>
+                                  <strong>Missing Race Grade Configuration</strong>
+                                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7f1d1d' }}>
+                                    This event is points-based, but this race has no grade configured. Points for its results will resolve to <strong>0</strong> until a grade is configured.
+                                  </p>
+                                </div>
+                              </AlertBanner>
+                            </div>
+                          )}
 
                           {/* Granular Participant lineup box */}
                           {selectedEvent.granularParticipation && (
@@ -1140,6 +1257,10 @@ function AdminEventDetailPage() {
                             onTogglePendingDeletion={togglePendingDeletion}
                             onUndoRow={handleUndoRow}
                             noTopMargin={true}
+                            scoringType={selectedEvent.scoringType}
+                            scoringRulesMode={selectedEvent.scoringRulesMode}
+                            customScoringTables={selectedEvent.customScoringTables}
+                            raceGrade={selectedRace.grade}
                           />
                         </div>
                       )}
@@ -1258,7 +1379,7 @@ function AdminEventDetailPage() {
                     </div>
 
                     <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4" style={{ flex: 1 }}>
                         <div className="slds-form-element">
                           <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="race-track">
                             Track Type
@@ -1277,7 +1398,7 @@ function AdminEventDetailPage() {
                         </div>
                       </div>
 
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4" style={{ flex: 1 }}>
                         <div className="slds-form-element">
                           <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="race-loc">
                             Location <span className="text-red-500">*</span>
@@ -1297,7 +1418,7 @@ function AdminEventDetailPage() {
                         </div>
                       </div>
 
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4" style={{ flex: 1 }}>
                         <div className="slds-form-element">
                           <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="race-restriction">
                             Class Restriction
@@ -1317,6 +1438,31 @@ function AdminEventDetailPage() {
                           </div>
                         </div>
                       </div>
+
+                      {selectedEvent && selectedEvent.scoringType === 1 && (
+                        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4" style={{ flex: 1 }}>
+                          <div className="slds-form-element">
+                            <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="race-grade">
+                              Race Grade
+                            </label>
+                            <div className="slds-form-element__control">
+                              <select
+                                id="race-grade"
+                                value={newRaceForm.grade || ''}
+                                onChange={(e) => setNewRaceForm((c) => ({ ...c, grade: e.target.value }))}
+                                className="slds-select"
+                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                              >
+                                <option value="">-- Choose Grade --</option>
+                                <option value="OP">OP</option>
+                                <option value="GIII">GIII</option>
+                                <option value="GII">GII</option>
+                                <option value="GI">GI</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1372,7 +1518,7 @@ function AdminEventDetailPage() {
               </header>
 
               <form onSubmit={onEditEventSubmit}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff', maxHeight: '70vh', overflowY: 'auto' }}>
                   <div className="slds-form slds-form_stacked">
                     {/* Event Name */}
                     <div className="slds-form-element slds-m-bottom_medium">
@@ -1410,7 +1556,36 @@ function AdminEventDetailPage() {
                       </div>
                     </div>
 
-                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
+                    {selectedEvent && selectedEvent.scoringType === 1 && (
+                      <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-scoring-rules-mode">
+                          Points Scoring Rules Source
+                        </label>
+                        <div className="slds-form-element__control">
+                          <select
+                            id="edit-scoring-rules-mode"
+                            value={editScoringRulesMode}
+                            onChange={(e) => setEditScoringRulesMode(e.target.value as 'STANDARD' | 'CUSTOM')}
+                            className="slds-select"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          >
+                            <option value="STANDARD">Standard Default Tables</option>
+                            <option value="CUSTOM">Custom Event Tables (Configure below)</option>
+                          </select>
+                        </div>
+
+                        {editScoringRulesMode === 'CUSTOM' && (
+                          <div className="slds-m-top_medium">
+                            <EventScoringTablesEditor
+                              value={editCustomScoringTables}
+                              onChange={setEditCustomScoringTables}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem', borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
                       <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
                         <div className="slds-form-element">
                           <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-class-tier">
@@ -1495,6 +1670,72 @@ function AdminEventDetailPage() {
             </div>
           </section>
           <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }} />
+        </div>
+      )}
+
+      {/* CONFIRM RECOMPUTE WARNING DIALOG MODAL */}
+      {showConfirmModal && (
+        <div className="slds-scope">
+          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 10001 }}>
+            <div className="slds-modal__container" style={{ maxWidth: '30rem', width: '90%' }}>
+              <header className="slds-modal__header slds-theme_warning slds-theme_alert-texture" style={{ backgroundColor: '#f57c00', color: '#fff' }}>
+                <button
+                  className="slds-button slds-button_icon slds-modal__close"
+                  title="Close"
+                  onClick={() => setShowConfirmModal(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    right: '1.5rem',
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                    color: '#fff',
+                  }}
+                >
+                  ✕
+                </button>
+                <h2 className="slds-modal__title slds-hyphenate font-bold text-white" style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>
+                  Recalculate Points Warning
+                </h2>
+              </header>
+
+              <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                <p style={{ fontSize: '14px', lineHeight: '1.5', color: '#1e293b' }}>
+                  Changing the event's scoring tables will trigger an <strong>automatic background recomputation</strong> of points for all existing race results associated with this event.
+                </p>
+                <p className="slds-m-top_small" style={{ fontSize: '13px', lineHeight: '1.5', color: '#e11d48', fontWeight: 'bold' }}>
+                  ⚠️ This can invalidate previously computed points on recorded standings.
+                </p>
+                <p className="slds-m-top_small" style={{ fontSize: '14px', lineHeight: '1.5', color: '#1e293b' }}>
+                  Are you absolutely sure you want to proceed and save these changes?
+                </p>
+              </div>
+
+              <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  className="slds-button slds-button_neutral"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowConfirmModal(false)
+                    await performSaveEventDetails()
+                  }}
+                  className="slds-button slds-button_brand"
+                  style={{ backgroundColor: '#0176d3', color: '#fff' }}
+                >
+                  Confirm & Save
+                </button>
+              </footer>
+            </div>
+          </section>
+          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 10000 }} />
         </div>
       )}
     </AdminLayout>

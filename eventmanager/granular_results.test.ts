@@ -97,6 +97,7 @@ describe("granular results gating", () => {
       distanceMeters: 1000,
       trackType: "Dirt",
       location: "Tokyo",
+      grade: "OP",
     });
 
     // 4. Register both users as general event members
@@ -125,6 +126,7 @@ describe("granular results gating", () => {
       eventId: event.id,
       raceId: race.id,
       userId: participant1.id,
+      position: 2,
       points: 10,
     });
     expect(r1.userId).toBe(participant1.id);
@@ -190,6 +192,7 @@ describe("granular results gating", () => {
       distanceMeters: 1000,
       trackType: "Dirt",
       location: "Tokyo",
+      grade: "OP",
     });
 
     // Add only participant1 as event member
@@ -205,6 +208,7 @@ describe("granular results gating", () => {
       eventId: event.id,
       raceId: race.id,
       userId: participant1.id,
+      position: 2,
       points: 10,
     });
     expect(r1.userId).toBe(participant1.id);

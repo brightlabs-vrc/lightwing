@@ -3,6 +3,7 @@ import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireEventPermission } from "../auth/rbac";
 import { scorecalc } from "~encore/clients";
+import { resolvePoints } from "./scoring";
 
 // Per-race results. Event admins assign points to participants on a specific
 // RaceEvent; the event-level EventPointsEntry aggregate is then recomputed as
@@ -27,7 +28,7 @@ export interface RaceResultView {
 export interface RaceResultInput {
   userId: string;
   position?: number | null;
-  points: number;
+  points?: number | null;
   gateNumber?: number | null;
   finishTime?: string | null;
   margin?: string | null;
@@ -41,7 +42,7 @@ interface AssignRaceResultParams {
   userId: string;
   authorization: Header<"Authorization">;
   position?: number | null;
-  points: number;
+  points?: number | null;
   gateNumber?: number | null;
   finishTime?: string | null;
   margin?: string | null;
@@ -60,8 +61,25 @@ export const assignRaceResult = api(
       action: "update",
     });
 
-    await requireRace(params.eventId, params.raceId);
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+    });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    const race = await requireRace(params.eventId, params.raceId);
     await requireMembershipForResult(params.eventId, params.raceId, params.userId);
+
+    let pointsToPersist = params.points ?? 0;
+    if (event.scoringType === 1) { // Points-based
+      pointsToPersist = resolvePoints({
+        scoringRulesMode: event.scoringRulesMode,
+        customScoringTables: event.customScoringTables,
+        grade: race.grade,
+        position: params.position ?? null,
+      });
+    }
 
     const result = await prisma.raceResult.upsert({
       where: { raceEventId_userId: { raceEventId: params.raceId, userId: params.userId } },
@@ -70,7 +88,7 @@ export const assignRaceResult = api(
         raceEventId: params.raceId,
         userId: params.userId,
         position: params.position ?? null,
-        points: params.points,
+        points: pointsToPersist,
         gateNumber: params.gateNumber ?? null,
         finishTime: params.finishTime ?? null,
         margin: params.margin ?? null,
@@ -79,7 +97,7 @@ export const assignRaceResult = api(
       },
       update: {
         position: params.position === undefined ? undefined : params.position,
-        points: params.points,
+        points: pointsToPersist,
         gateNumber: params.gateNumber === undefined ? undefined : params.gateNumber,
         finishTime: params.finishTime === undefined ? undefined : params.finishTime,
         margin: params.margin === undefined ? undefined : params.margin,
@@ -115,7 +133,14 @@ export const replaceRaceResults = api(
       action: "update",
     });
 
-    await requireRace(params.eventId, params.raceId);
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+    });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    const race = await requireRace(params.eventId, params.raceId);
     await validateResultInputs(params.eventId, params.raceId, params.results);
 
     const payloadUserIds = new Set(params.results.map((entry) => entry.userId));
@@ -128,6 +153,16 @@ export const replaceRaceResults = api(
       .filter((userId) => !payloadUserIds.has(userId));
 
     for (const entry of params.results) {
+      let pointsToPersist = entry.points ?? 0;
+      if (event.scoringType === 1) { // Points-based
+        pointsToPersist = resolvePoints({
+          scoringRulesMode: event.scoringRulesMode,
+          customScoringTables: event.customScoringTables,
+          grade: race.grade,
+          position: entry.position ?? null,
+        });
+      }
+
       await prisma.raceResult.upsert({
         where: { raceEventId_userId: { raceEventId: params.raceId, userId: entry.userId } },
         create: {
@@ -135,7 +170,7 @@ export const replaceRaceResults = api(
           raceEventId: params.raceId,
           userId: entry.userId,
           position: entry.position ?? null,
-          points: entry.points,
+          points: pointsToPersist,
           gateNumber: entry.gateNumber ?? null,
           finishTime: entry.finishTime ?? null,
           margin: entry.margin ?? null,
@@ -144,7 +179,7 @@ export const replaceRaceResults = api(
         },
         update: {
           position: entry.position === undefined ? undefined : entry.position,
-          points: entry.points,
+          points: pointsToPersist,
           gateNumber: entry.gateNumber === undefined ? undefined : entry.gateNumber,
           finishTime: entry.finishTime === undefined ? undefined : entry.finishTime,
           margin: entry.margin === undefined ? undefined : entry.margin,
@@ -194,10 +229,27 @@ export const mergeRaceResults = api(
       action: "update",
     });
 
-    await requireRace(params.eventId, params.raceId);
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+    });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    const race = await requireRace(params.eventId, params.raceId);
     await validateResultInputs(params.eventId, params.raceId, params.results);
 
     for (const entry of params.results) {
+      let pointsToPersist = entry.points ?? 0;
+      if (event.scoringType === 1) { // Points-based
+        pointsToPersist = resolvePoints({
+          scoringRulesMode: event.scoringRulesMode,
+          customScoringTables: event.customScoringTables,
+          grade: race.grade,
+          position: entry.position ?? null,
+        });
+      }
+
       await prisma.raceResult.upsert({
         where: { raceEventId_userId: { raceEventId: params.raceId, userId: entry.userId } },
         create: {
@@ -205,7 +257,7 @@ export const mergeRaceResults = api(
           raceEventId: params.raceId,
           userId: entry.userId,
           position: entry.position ?? null,
-          points: entry.points,
+          points: pointsToPersist,
           gateNumber: entry.gateNumber ?? null,
           finishTime: entry.finishTime ?? null,
           margin: entry.margin ?? null,
@@ -214,7 +266,7 @@ export const mergeRaceResults = api(
         },
         update: {
           position: entry.position === undefined ? undefined : entry.position,
-          points: entry.points,
+          points: pointsToPersist,
           gateNumber: entry.gateNumber === undefined ? undefined : entry.gateNumber,
           finishTime: entry.finishTime === undefined ? undefined : entry.finishTime,
           margin: entry.margin === undefined ? undefined : entry.margin,
