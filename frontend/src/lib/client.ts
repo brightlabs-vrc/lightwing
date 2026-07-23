@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-cvy5a.encr.app`
+    return `https://${name}-yezi2.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the cvy5a Encore application.
+ * Client is an API client for the yezi2 Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -507,6 +507,7 @@ export namespace eventmanager {
         trackType: string
         location: string
         scoringType: number | null
+        grade: string | null
         classRestriction: ClassTier | null
         startsAt: string | null
         endsAt: string | null
@@ -1831,7 +1832,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "cvy5a-Generated-TS-Client (Encore/v1.57.12)";
+            this.headers["User-Agent"] = "yezi2-Generated-TS-Client (Encore/v1.57.12)";
         }
 
         this.requestInit = options.requestInit ?? {};
