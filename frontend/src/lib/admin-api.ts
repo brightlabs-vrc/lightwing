@@ -21,6 +21,7 @@ const mockRaceEventsList: (eventmanager.RaceEventView & { members: eventmanager.
     trackType: 'Turf',
     location: 'Kyoto Racecourse',
     scoringType: 1,
+    grade: 'OP',
     classRestriction: 'OP',
     startsAt: null,
     endsAt: null,
@@ -34,6 +35,7 @@ const mockRaceEventsList: (eventmanager.RaceEventView & { members: eventmanager.
     trackType: 'Dirt',
     location: 'Tokyo Racecourse',
     scoringType: 1,
+    grade: 'GIII',
     classRestriction: 'G1',
     startsAt: now,
     endsAt: null, // Ongoing
@@ -272,7 +274,7 @@ export function hydrateRaceEvent(eventId: string, race: eventmanager.RaceEventVi
     trackType: race.trackType,
     location: race.location,
     scoringType: race.scoringType,
-    grade: (race as any).grade ?? null,
+    grade: race.grade,
     classRestriction: race.classRestriction,
     startsAt: race.startsAt,
     endsAt: race.endsAt,
@@ -606,12 +608,12 @@ export async function createRaceEvent(
     distanceMeters: params.distanceMeters,
     trackType: params.trackType,
     location: params.location,
+    scoringType: params.scoringType ?? null,
+    grade: params.grade ?? null,
+    classRestriction: params.classRestriction ?? null,
     startsAt: params.startsAt ?? null,
     endsAt: params.endsAt ?? null,
-    classRestriction: params.classRestriction ?? null,
-    scoringType: params.scoringType ?? null,
   }
-  ;(newRace as any).grade = params.grade ?? null
 
   mockEvents = mockEvents.map((evt) => {
     if (evt.id === eventId) {
@@ -706,8 +708,8 @@ export async function updateRaceEvent(
             endsAt: params.endsAt === undefined ? race.endsAt : params.endsAt,
             classRestriction: params.classRestriction === undefined ? race.classRestriction : params.classRestriction,
             scoringType: params.scoringType === undefined ? race.scoringType : params.scoringType,
+            grade: params.grade === undefined ? race.grade : params.grade,
           }
-          ;(updatedRace as any).grade = params.grade === undefined ? (race as any).grade : params.grade
           return updatedRace!
         }
         return race

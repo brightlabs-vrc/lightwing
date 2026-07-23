@@ -68,6 +68,7 @@ export interface RaceEventView {
   trackType: string;
   location: string;
   scoringType: number | null;
+  grade: string | null;
   classRestriction: ClassTier | null;
   startsAt: string | null;
   endsAt: string | null;
@@ -776,6 +777,7 @@ async function loadEvent(id: string): Promise<EventDetail> {
       trackType: race.trackType,
       location: race.location,
       scoringType: race.scoringType,
+      grade: race.grade,
       classRestriction: race.classRestriction,
       startsAt: race.startsAt ? race.startsAt.toISOString() : null,
       endsAt: race.endsAt ? race.endsAt.toISOString() : null,
