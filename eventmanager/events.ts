@@ -398,6 +398,37 @@ export const addEventMember = api(
   },
 );
 
+async function removeMemberFromEventInternal(eventId: string, userId: string): Promise<void> {
+  // 1. Delete EventMember
+  await prisma.eventMember.deleteMany({ where: { eventId, userId } });
+
+  // 2. Delete EventPointsEntry
+  await prisma.eventPointsEntry.deleteMany({ where: { eventId, userId } });
+
+  // 3. Delete EventLadderEntry
+  await prisma.eventLadderEntry.deleteMany({ where: { eventId, userId } });
+
+  // 4. Delete RaceEventMember for races belonging to this event
+  await prisma.raceEventMember.deleteMany({
+    where: {
+      userId,
+      raceEvent: {
+        eventId,
+      },
+    },
+  });
+
+  // 5. Delete RaceResult for races belonging to this event
+  await prisma.raceResult.deleteMany({
+    where: {
+      userId,
+      raceEvent: {
+        eventId,
+      },
+    },
+  });
+}
+
 interface RemoveMemberParams {
   id: string;
   userId: string;
@@ -415,7 +446,7 @@ export const removeEventMember = api(
       action: "update",
     });
 
-    await prisma.eventMember.deleteMany({ where: { eventId: id, userId } });
+    await removeMemberFromEventInternal(id, userId);
     return loadEvent(id);
   },
 );
@@ -505,7 +536,7 @@ export const leaveEvent = api(
     const actor = await resolveActor(prisma, authorization);
     const userId = actor.userId;
 
-    await prisma.eventMember.deleteMany({ where: { eventId: id, userId } });
+    await removeMemberFromEventInternal(id, userId);
     return loadEvent(id);
   },
 );
