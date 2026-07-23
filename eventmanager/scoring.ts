@@ -41,8 +41,8 @@ export function validateCustomScoringTables(input: unknown): EventScoringTables 
       }
 
       const parsed = Number(val);
-      if (!Number.isInteger(parsed)) {
-        throw APIError.invalidArgument(`Custom scoring table for grade ${grade} position ${pos} must be an integer`);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        throw APIError.invalidArgument(`Custom scoring table for grade ${grade} position ${pos} must be a non-negative integer`);
       }
       gradeTable[pos] = parsed;
     }

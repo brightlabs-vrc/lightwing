@@ -5,6 +5,7 @@ import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
+import { EventScoringTablesEditor } from '../../components/EventScoringTablesEditor'
 import type { eventmanager } from '../../lib/client'
 import { MOCK_MODE } from '../../lib/mock-mode'
 
@@ -35,6 +36,13 @@ function AdminEventsListPage() {
   const [formScoringType, setFormScoringType] = useState<number>(1)
   const [formClassRestriction, setFormClassRestriction] = useState<string>('OP')
   const [formGranularParticipation, setFormGranularParticipation] = useState(false)
+  const [formScoringRulesMode, setFormScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
+  const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>({
+    OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+    GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+    GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
+    GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
+  })
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -69,6 +77,13 @@ function AdminEventsListPage() {
       setFormScoringType(1)
       setFormClassRestriction('OP')
       setFormGranularParticipation(false)
+      setFormScoringRulesMode('STANDARD')
+      setFormCustomScoringTables({
+        OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+        GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
+        GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
+        GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
+      })
     }
   }, [showCreateModal, activeUserId, activeOrgId])
 
@@ -77,6 +92,30 @@ function AdminEventsListPage() {
     if (!formName.trim()) {
       setFormError('Event Name is required.')
       return
+    }
+
+    // Strict validation for custom scoring table cells if CUSTOM points rules are selected
+    if (formScoringType === 1 && formScoringRulesMode === 'CUSTOM') {
+      const grades = ['OP', 'GIII', 'GII', 'GI']
+      for (const grade of grades) {
+        const table = formCustomScoringTables[grade]
+        if (!table) {
+          setFormError(`Custom table for grade ${grade} is missing.`)
+          return
+        }
+        for (let pos = 1; pos <= 10; pos++) {
+          const val = table[pos]
+          if (val === undefined || val === null || String(val).trim() === '') {
+            setFormError(`Custom table for grade ${grade} is missing value for position #${pos}.`)
+            return
+          }
+          const num = Number(val)
+          if (!Number.isInteger(num) || num < 0) {
+            setFormError(`Custom table for grade ${grade}, position #${pos} must be a valid non-negative integer.`)
+            return
+          }
+        }
+      }
     }
 
     const token = session?.session.token
@@ -100,6 +139,8 @@ function AdminEventsListPage() {
           scoringType: Number(formScoringType),
           classRestriction: formClassRestriction ? (formClassRestriction as eventmanager.ClassTier) : null,
           granularParticipation: formGranularParticipation,
+          scoringRulesMode: formScoringType === 1 ? formScoringRulesMode : null,
+          customScoringTables: (formScoringType === 1 && formScoringRulesMode === 'CUSTOM') ? formCustomScoringTables : null,
         },
         authHeader,
       )
@@ -345,6 +386,35 @@ function AdminEventsListPage() {
                         </div>
                       </div>
                     </div>
+
+                    {formScoringType === 1 && (
+                      <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="create-scoring-rules-mode">
+                          Points Scoring Rules Source
+                        </label>
+                        <div className="slds-form-element__control">
+                          <select
+                            id="create-scoring-rules-mode"
+                            value={formScoringRulesMode}
+                            onChange={(e) => setFormScoringRulesMode(e.target.value as 'STANDARD' | 'CUSTOM')}
+                            className="slds-select"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          >
+                            <option value="STANDARD">Standard Default Tables</option>
+                            <option value="CUSTOM">Custom Event Tables (Configure below)</option>
+                          </select>
+                        </div>
+
+                        {formScoringRulesMode === 'CUSTOM' && (
+                          <div className="slds-m-top_medium">
+                            <EventScoringTablesEditor
+                              value={formCustomScoringTables}
+                              onChange={setFormCustomScoringTables}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Granular Participation Toggle */}
                     <div className="slds-form-element slds-m-bottom_medium" style={{ display: 'flex', alignItems: 'center' }}>
