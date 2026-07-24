@@ -91,79 +91,75 @@ export function StandingsEditor({
           >
             Cancel
           </button>
-          {!isRaceNotStarted && (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={savingBatch || loadingResults || changeSummary.totalCount === 0}
-              className={`slds-button ${changeSummary.totalCount > 0 ? 'slds-button_brand' : 'slds-button_neutral'}`}
-              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
-              title={isRaceOngoing ? 'Save provisional standings' : 'Save final standings'}
-            >
-              {savingBatch ? 'Saving...' : `Save (${changeSummary.totalCount})`}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={savingBatch || loadingResults || changeSummary.totalCount === 0}
+            className={`slds-button ${changeSummary.totalCount > 0 ? 'slds-button_brand' : 'slds-button_neutral'}`}
+            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+            title={isRaceNotStarted ? 'Save draw numbers' : isRaceOngoing ? 'Save provisional standings' : 'Save final standings'}
+          >
+            {savingBatch ? 'Saving...' : isRaceNotStarted ? `Save Draw Numbers (${changeSummary.totalCount})` : `Save (${changeSummary.totalCount})`}
+          </button>
         </div>
       </div>
 
       <div className="slds-card__body" style={{ padding: '16px' }}>
-        {isRaceNotStarted ? (
-          <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '200px', textAlign: 'center' }}>
-            <h3 className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>
-              Race Has Not Started Yet
-            </h3>
-            <p className="slds-text-body_regular text-slate-500 slds-m-top_small" style={{ maxWidth: '400px', marginBottom: '16px' }}>
-              Standings and finish times can only be recorded once the race has officially started. Use the "Start Race" button above in the Race Details card to begin tracking results.
-            </p>
+        {isRaceNotStarted && (
+          <div className="slds-m-bottom_medium">
+            <AlertBanner variant="warning">
+              <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
+                Race has not started yet. You can set or edit the <strong>Draw (Gate Number)</strong> for each competitor below. Other finish-related fields will be enabled once the race starts.
+              </span>
+            </AlertBanner>
+          </div>
+        )}
+
+        {isRaceOngoing && (
+          <div className="slds-m-bottom_medium">
+            <AlertBanner variant="warning">
+              <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
+                Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
+              </span>
+            </AlertBanner>
+          </div>
+        )}
+
+        {changeSummary.totalCount > 0 && !isRaceOngoing && (
+          <AlertBanner
+            variant="warning"
+            action={
+              <button type="button" onClick={onResetAll} className="slds-button slds-button_neutral" style={{ padding: '2px 8px', fontSize: '10px' }}>
+                Reset All
+              </button>
+            }
+          >
+            <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
+              Unsaved changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
+              {changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}
+              {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save" above to submit.
+            </span>
+          </AlertBanner>
+        )}
+
+        {loadingResults ? (
+          <p className="slds-text-body_medium text-slate-500">Loading race results data...</p>
+        ) : memberCount === 0 ? (
+          <div className="slds-align_absolute-center slds-p-around_large text-slate-500">
+            No registered event participants found. Add participants under "Event Members" tab first.
           </div>
         ) : (
-          <>
-            {isRaceOngoing && (
-              <div className="slds-m-bottom_medium">
-                <AlertBanner variant="warning">
-                  <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
-                    Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
-                  </span>
-                </AlertBanner>
-              </div>
-            )}
-
-            {changeSummary.totalCount > 0 && !isRaceOngoing && (
-              <AlertBanner
-                variant="warning"
-                action={
-                  <button type="button" onClick={onResetAll} className="slds-button slds-button_neutral" style={{ padding: '2px 8px', fontSize: '10px' }}>
-                    Reset All
-                  </button>
-                }
-              >
-                <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
-                  Unsaved changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
-                  {changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}
-                  {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save" above to submit.
-                </span>
-              </AlertBanner>
-            )}
-
-            {loadingResults ? (
-              <p className="slds-text-body_medium text-slate-500">Loading race results data...</p>
-            ) : memberCount === 0 ? (
-              <div className="slds-align_absolute-center slds-p-around_large text-slate-500">
-                No registered event participants found. Add participants under "Event Members" tab first.
-              </div>
-            ) : (
-              <StandingsTable
-                rows={rows}
-                onResultChange={onResultChange}
-                onTogglePendingDeletion={onTogglePendingDeletion}
-                onUndoRow={onUndoRow}
-              scoringType={scoringType}
-              scoringRulesMode={scoringRulesMode}
-              customScoringTables={customScoringTables}
-              raceGrade={raceGrade}
-              />
-            )}
-          </>
+          <StandingsTable
+            rows={rows}
+            onResultChange={onResultChange}
+            onTogglePendingDeletion={onTogglePendingDeletion}
+            onUndoRow={onUndoRow}
+            scoringType={scoringType}
+            scoringRulesMode={scoringRulesMode}
+            customScoringTables={customScoringTables}
+            raceGrade={raceGrade}
+            isRaceNotStarted={isRaceNotStarted}
+          />
         )}
       </div>
     </article>
@@ -179,6 +175,7 @@ interface StandingsTableProps {
   scoringRulesMode?: string | null
   customScoringTables?: any | null
   raceGrade?: string | null
+  isRaceNotStarted?: boolean
 }
 
 function StandingsTable({
@@ -190,6 +187,7 @@ function StandingsTable({
   scoringRulesMode,
   customScoringTables,
   raceGrade,
+  isRaceNotStarted = false,
 }: StandingsTableProps) {
   const getPreviewPoints = (positionStr: string): number => {
     const position = parseInt(positionStr, 10);
@@ -272,7 +270,7 @@ function StandingsTable({
                       <input
                         type="number"
                         placeholder="None"
-                        disabled={isDeleted}
+                        disabled={isDeleted || isRaceNotStarted}
                         value={edit.position}
                         onChange={(e) => onResultChange(member.userId, 'position', e.target.value)}
                         className="slds-input"
@@ -292,7 +290,7 @@ function StandingsTable({
                         <input
                           type="number"
                           placeholder="0"
-                          disabled={isDeleted}
+                          disabled={isDeleted || isRaceNotStarted}
                           value={edit.points}
                           onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
                           className="slds-input"
@@ -308,7 +306,7 @@ function StandingsTable({
                       <input
                         type="text"
                         placeholder="1:32.1"
-                        disabled={isDeleted}
+                        disabled={isDeleted || isRaceNotStarted}
                         value={edit.finishTime}
                         onChange={(e) => onResultChange(member.userId, 'finishTime', e.target.value)}
                         className="slds-input"
@@ -323,7 +321,7 @@ function StandingsTable({
                       <input
                         type="text"
                         placeholder="nose"
-                        disabled={isDeleted}
+                        disabled={isDeleted || isRaceNotStarted}
                         value={edit.margin}
                         onChange={(e) => onResultChange(member.userId, 'margin', e.target.value)}
                         className="slds-input"
@@ -338,7 +336,7 @@ function StandingsTable({
                       <input
                         type="text"
                         placeholder="3-2-1"
-                        disabled={isDeleted}
+                        disabled={isDeleted || isRaceNotStarted}
                         value={edit.passingOrder}
                         onChange={(e) => onResultChange(member.userId, 'passingOrder', e.target.value)}
                         className="slds-input"
@@ -353,7 +351,7 @@ function StandingsTable({
                       <input
                         type="text"
                         placeholder="34.5"
-                        disabled={isDeleted}
+                        disabled={isDeleted || isRaceNotStarted}
                         value={edit.final3F}
                         onChange={(e) => onResultChange(member.userId, 'final3F', e.target.value)}
                         className="slds-input"
@@ -377,11 +375,11 @@ function StandingsTable({
                     </span>
                   ) : savedResult ? (
                     <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', background: '#2e7d32', color: '#fff', borderRadius: '4px' }}>
-                      Saved (Pos: {savedResult.position ?? 'n/a'}, Pts: {savedResult.points})
+                      {isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
                     </span>
                   ) : (
                     <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', background: '#e0e0e0', color: '#555', borderRadius: '4px' }}>
-                      No result recorded
+                      {isRaceNotStarted ? 'No draw assigned' : 'No result recorded'}
                     </span>
                   )}
                 </td>

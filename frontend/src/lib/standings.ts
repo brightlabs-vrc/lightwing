@@ -147,17 +147,29 @@ export function parseMarginToSeconds(value: string): number {
   const trimmed = value.trim().toLowerCase()
   if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed === '0') return 0
 
-  // Capture optional fractional part like "1/2" or "3/4" after a whole number.
-  const fractionMatch = trimmed.match(/(\d+)\/(\d+)/)
+  let whole = 0
   let fraction = 0
-  if (fractionMatch) {
-    fraction = Number(fractionMatch[1]) / Number(fractionMatch[2])
+
+  const match = trimmed.match(/^(?:(\d+)\s*[- ]\s*)?(\d+)\/(\d+)|^(\d+)/)
+  if (match) {
+    if (match[4]) {
+      whole = Number(match[4])
+    } else {
+      if (match[1]) {
+        whole = Number(match[1])
+      }
+      const num = Number(match[2])
+      const den = Number(match[3])
+      if (den !== 0) {
+        fraction = num / den
+      }
+    }
   }
 
-  const wholeMatch = trimmed.match(/^(\d+)/)
-  const whole = wholeMatch ? Number(wholeMatch[1]) : 0
-
-  const base = whole + fraction
+  let base = whole + fraction
+  if (base === 0 && (trimmed.includes('nose') || trimmed.includes('head') || trimmed.includes('neck') || trimmed.includes('length'))) {
+    base = 1
+  }
 
   if (trimmed.includes('nose')) return base * 0.05
   if (trimmed.includes('head')) return base * 0.15

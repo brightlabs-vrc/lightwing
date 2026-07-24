@@ -247,7 +247,11 @@ function EventDetailPage() {
             <h2 className="font-pixel text-sm tracking-wider text-retro-text">
               STANDINGS (POINTS)
             </h2>
-            {!isConcluded ? <PixelBadge tone="gold">PROVISIONAL</PixelBadge> : null}
+            {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
+              <PixelBadge tone="green">FINAL</PixelBadge>
+            ) : (
+              <PixelBadge tone="gold">PROVISIONAL</PixelBadge>
+            )}
           </PixelStack>
           <PixelTable
             columns={pointsColumns}
@@ -266,7 +270,11 @@ function EventDetailPage() {
             <h2 className="font-pixel text-sm tracking-wider text-retro-text">
               STANDINGS (LADDER)
             </h2>
-            {!isConcluded ? <PixelBadge tone="gold">PROVISIONAL</PixelBadge> : null}
+            {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
+              <PixelBadge tone="green">FINAL</PixelBadge>
+            ) : (
+              <PixelBadge tone="gold">PROVISIONAL</PixelBadge>
+            )}
           </PixelStack>
           <PixelTable
             columns={ladderColumns}
