@@ -7,12 +7,33 @@ import {
   isSiteAdmin,
   roleHasPermission,
 } from "./permissions";
+import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
+import { cluster } from "../cache";
 
 export interface Actor {
   userId: string;
   activeOrganizationId: string | null;
   siteRole: SiteRoleName;
 }
+
+// Cache resolved actors by session token. Default TTL is conservative (4 min) so
+// that a session expiring at minute 5 is never served stale.
+export const actorCache = new StructKeyspace<{ token: string }, Actor>(cluster, {
+  keyPattern: "actor/:token",
+  defaultExpiry: expireInSeconds(240),
+});
+
+interface CachedMemberRole {
+  role: string | null;
+}
+
+export const memberRoleCache = new StructKeyspace<{ key: string }, CachedMemberRole>(
+  cluster,
+  {
+    keyPattern: "member-role/:key",
+    defaultExpiry: expireInSeconds(180), // 3 minutes
+  }
+);
 
 // Resolves the calling user from a better-auth session token supplied via the
 // `Authorization: Bearer <token>` header. The session table is owned by
@@ -28,6 +49,11 @@ export async function resolveActor(
     throw APIError.unauthenticated("missing session token");
   }
 
+  const cached = await actorCache.get({ token });
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const session = await prisma.session.findUnique({
     where: { token },
     include: { user: { select: { siteRole: true } } },
@@ -36,11 +62,20 @@ export async function resolveActor(
     throw APIError.unauthenticated("invalid or expired session");
   }
 
-  return {
+  const actor: Actor = {
     userId: session.userId,
     activeOrganizationId: session.activeOrganizationId ?? null,
     siteRole: session.user.siteRole as SiteRoleName,
   };
+
+  // TTL caps at remaining session lifetime to avoid serving an expired session.
+  const remainingMs = session.expiresAt.getTime() - Date.now();
+  const ttlSeconds = Math.min(240, Math.floor(remainingMs / 1000) - 5);
+  if (ttlSeconds > 0) {
+    await actorCache.set({ token }, actor, { expiry: expireInSeconds(ttlSeconds) });
+  }
+
+  return actor;
 }
 
 export async function getMemberRole(
@@ -48,10 +83,18 @@ export async function getMemberRole(
   organizationId: string,
   userId: string,
 ): Promise<string | null> {
+  const key = `${organizationId}:${userId}`;
+  const cached = await memberRoleCache.get({ key });
+  if (cached !== undefined) {
+    return cached.role;
+  }
+
   const member = await prisma.member.findUnique({
     where: { organizationId_userId: { organizationId, userId } },
   });
-  return member?.role ?? null;
+  const role = member?.role ?? null;
+  await memberRoleCache.set({ key }, { role });
+  return role;
 }
 
 // Authenticates the caller and asserts they hold a role in `organizationId`

@@ -22,6 +22,9 @@ const discordClientId = secret("DISCORD_AUTH_CLIENT_ID");
 const discordClientSecret = secret("DISCORD_AUTH_CLIENT_SECRET");
 const discordBotToken = secret("DISCORD_BOT_TOKEN");
 
+import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
+import { cluster } from "../cache";
+
 const ursDiscordGuildId = "1482993434410225739";
 const siteAdminRole = "SITE_ADMIN";
 const staffRoleNames = new Set([
@@ -30,7 +33,21 @@ const staffRoleNames = new Set([
   "Event Staff",
   "Competitive Integrity Administration Staff",
 ]);
-const staffRoleCacheTtlMs = 5 * 60 * 1000;
+
+// Singleton key — there is only one Discord guild to resolve roles for.
+const DISCORD_STAFF_ROLES_KEY = "discord-staff-role-ids";
+
+interface DiscordStaffRoles {
+  ids: string[];
+}
+
+const discordRolesCache = new StructKeyspace<{ key: string }, DiscordStaffRoles>(
+  cluster,
+  {
+    keyPattern: "discord-staff-roles/:key",
+    defaultExpiry: expireInSeconds(300), // 5 minutes, matches original intent
+  }
+);
 
 let discordBotRestClient: REST | null = null;
 
@@ -51,8 +68,6 @@ function getDiscordBotRestClient(): REST | null {
     return null;
   }
 }
-
-let cachedDiscordStaffRoleIds: { ids: Set<string>; expiresAt: number } | null = null;
 
 const accessControl = createAccessControl({
   organization: ["read", "update", "delete"],
@@ -95,9 +110,10 @@ function resolveStaffRoleIds(roles: APIRole[]): Set<string> {
   return new Set(roles.filter((role) => staffRoleNames.has(role.name)).map((role) => role.id));
 }
 
-async function getDiscordStaffRoleIds() {
-  if (cachedDiscordStaffRoleIds && cachedDiscordStaffRoleIds.expiresAt > Date.now()) {
-    return cachedDiscordStaffRoleIds.ids;
+async function getDiscordStaffRoleIds(): Promise<Set<string>> {
+  const cached = await discordRolesCache.get({ key: DISCORD_STAFF_ROLES_KEY });
+  if (cached !== undefined) {
+    return new Set(cached.ids);
   }
 
   const client = getDiscordBotRestClient();
@@ -115,10 +131,7 @@ async function getDiscordStaffRoleIds() {
   }
 
   const ids = resolveStaffRoleIds(roles);
-  cachedDiscordStaffRoleIds = {
-    ids,
-    expiresAt: Date.now() + staffRoleCacheTtlMs,
-  };
+  await discordRolesCache.set({ key: DISCORD_STAFF_ROLES_KEY }, { ids: [...ids] });
   return ids;
 }
 

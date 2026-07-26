@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { requireEventPermission } from "../auth/rbac";
 import { scorecalc } from "~encore/clients";
 import { resolvePoints } from "./scoring";
+import { eventDetailCache } from "./events";
 
 // Per-race results. Event admins assign points to participants on a specific
 // RaceEvent; the event-level EventPointsEntry aggregate is then recomputed as
@@ -107,6 +108,7 @@ export const assignRaceResult = api(
     });
 
     await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
+    await eventDetailCache.delete({ id: params.eventId });
 
     return toRaceResultView(result);
   },
@@ -200,6 +202,8 @@ export const replaceRaceResults = api(
       await scorecalc.submitCalc({ eventId: params.eventId, userIds: allAffectedUserIds });
     }
 
+    await eventDetailCache.delete({ id: params.eventId });
+
     return listResults(params.raceId);
   },
 );
@@ -281,6 +285,8 @@ export const mergeRaceResults = api(
       await scorecalc.submitCalc({ eventId: params.eventId, userIds: affectedUserIds });
     }
 
+    await eventDetailCache.delete({ id: params.eventId });
+
     return listResults(params.raceId);
   },
 );
@@ -318,6 +324,7 @@ export const deleteRaceResult = api(
     });
 
     await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
+    await eventDetailCache.delete({ id: params.eventId });
 
     return { deleted: true };
   },
