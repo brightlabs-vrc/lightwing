@@ -216,7 +216,7 @@ function StandingsTable({
           <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
             <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Competitor Name</div></th>
             <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-            <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Draw</div></th>
+            <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Draw</div></th>
             <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Position</div></th>
             <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Points</div></th>
             <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Finish Time</div></th>
@@ -258,7 +258,7 @@ function StandingsTable({
                         placeholder="Draw"
                         value={edit.gateNumber}
                         onChange={(e) => onResultChange(member.userId, 'gateNumber', e.target.value)}
-                        className="slds-input"
+                        className="slds-input standings-input-no-spinner"
                         style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
                       />
                     </div>
@@ -273,7 +273,7 @@ function StandingsTable({
                         disabled={isDeleted || isRaceNotStarted}
                         value={edit.position}
                         onChange={(e) => onResultChange(member.userId, 'position', e.target.value)}
-                        className="slds-input"
+                        className="slds-input standings-input-no-spinner"
                         style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
                       />
                     </div>
@@ -293,7 +293,7 @@ function StandingsTable({
                           disabled={isDeleted || isRaceNotStarted}
                           value={edit.points}
                           onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
-                          className="slds-input"
+                          className="slds-input standings-input-no-spinner"
                           style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
                         />
                       </div>
