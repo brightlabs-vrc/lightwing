@@ -184,14 +184,29 @@ export function inferFinishTimes(
   rows: DerivedRow[],
   editedResults: Record<string, EditedResult>,
 ): { error: string } | { edits: Record<string, EditedResult>; inferredCount: number } {
-  const rowsWithTime = rows.filter(
-    (d) => d.rowState !== 'pending_delete' && (d.edit.finishTime ?? '').trim() !== '',
-  )
-  if (rowsWithTime.length !== 1) {
-    return { error: 'Infer Times needs exactly one horse with a known finish time (the leader).' }
+  const activeRows = rows.filter((d) => d.rowState !== 'pending_delete')
+
+  let leader: DerivedRow | null = null
+
+  const pos1Rows = activeRows.filter((d) => d.edit.position === '1')
+  if (pos1Rows.length === 1) {
+    leader = pos1Rows[0]
+  } else if (pos1Rows.length > 1) {
+    return { error: 'Unable to determine the leader because multiple horses are marked with position 1.' }
+  } else {
+    // Fall back to a single row with an explicitly entered finish time
+    const rowsWithTime = activeRows.filter((d) => (d.edit.finishTime ?? '').trim() !== '')
+    if (rowsWithTime.length === 1) {
+      leader = rowsWithTime[0]
+    } else if (rowsWithTime.length > 1) {
+      return { error: 'Multiple horses have finish times entered. Please specify a single leader with position 1 and a valid finish time.' }
+    }
   }
 
-  const leader = rowsWithTime[0]
+  if (!leader) {
+    return { error: 'Unable to determine the leader. Please specify a leader with position 1 and a valid finish time.' }
+  }
+
   const leaderSeconds = parseFinishTimeToSeconds(leader.edit.finishTime ?? '')
   if (leaderSeconds === null) {
     return { error: 'Unable to parse the leader finish time. Use m:ss.t format (e.g. 1:32.1).' }
@@ -200,10 +215,8 @@ export function inferFinishTimes(
   const nextEdits: Record<string, EditedResult> = { ...editedResults }
   let inferredCount = 0
 
-  for (const d of rows) {
-    if (d.rowState === 'pending_delete') continue
+  for (const d of activeRows) {
     if (d.member.userId === leader.member.userId) continue
-    if ((d.edit.finishTime ?? '').trim() !== '') continue
 
     const gapSeconds = parseMarginToSeconds(d.edit.margin ?? '')
     if (gapSeconds === 0) continue
