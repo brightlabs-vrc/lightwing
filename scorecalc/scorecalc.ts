@@ -5,6 +5,18 @@ import { CronJob } from "encore.dev/cron";
 import { appMeta } from "encore.dev";
 import log from "encore.dev/log";
 import { prisma } from "./prisma";
+import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
+import { cluster } from "../cache";
+
+interface DummyEventDetail {
+  id: string;
+}
+
+// Duplicate keyspace definition to invalidate event-detail cache across service boundary
+const eventDetailCache = new StructKeyspace<{ id: string }, DummyEventDetail>(cluster, {
+  keyPattern: "event-detail/:id",
+  defaultExpiry: expireInSeconds(120),
+});
 
 // Pub/sub topic to report score calculation status.
 export interface ScoreCalcStatusEvent {
@@ -189,4 +201,6 @@ async function recomputeEventPointsInternal(eventId: string, userId: string): Pr
     create: { id: randomUUID(), eventId, userId, points: total },
     update: { points: total },
   });
+
+  await eventDetailCache.delete({ id: eventId });
 }

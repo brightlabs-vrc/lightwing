@@ -11,6 +11,30 @@ import { isSiteAdmin } from "../auth/permissions";
 import { type ClassTier, isEligible } from "./classtier";
 import { validateCustomScoringTables, resolvePoints } from "./scoring";
 import { scorecalc } from "~encore/clients";
+import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
+import { cluster } from "../cache";
+
+export const eventDetailCache = new StructKeyspace<{ id: string }, EventDetail>(
+  cluster,
+  {
+    keyPattern: "event-detail/:id",
+    defaultExpiry: expireInSeconds(120), // 2-minute safety-net TTL; mutations invalidate explicitly
+  }
+);
+
+interface PublicEventsCacheValue {
+  events: EventDetail[];
+}
+
+export const PUBLIC_EVENTS_KEY = "public-events-list";
+
+export const publicEventsCache = new StructKeyspace<{ key: string }, PublicEventsCacheValue>(
+  cluster,
+  {
+    keyPattern: "public-events-list/:key",
+    defaultExpiry: expireInSeconds(60), // 60-second TTL — stale by at most 1 minute
+  }
+);
 
 // API-facing string unions mirroring the Prisma enums. Encore's schema parser
 // cannot use Prisma's runtime enum objects as types, so these are declared as
@@ -223,6 +247,11 @@ export const listEvents = api(
 export const listPublicEvents = api(
   { expose: true, method: "GET", path: "/api/events/public" },
   async (): Promise<{ events: EventDetail[] }> => {
+    const cached = await publicEventsCache.get({ key: PUBLIC_EVENTS_KEY });
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const events = await prisma.event.findMany({
       where: {
         status: { in: ["UNOFFICIAL", "OFFICIAL", "CONCLUDED"] },
@@ -231,7 +260,9 @@ export const listPublicEvents = api(
     });
 
     const detailed = await Promise.all(events.map((event) => loadEvent(event.id)));
-    return { events: detailed };
+    const value = { events: detailed };
+    await publicEventsCache.set({ key: PUBLIC_EVENTS_KEY }, value);
+    return value;
   },
 );
 
@@ -321,6 +352,9 @@ export const updateEvent = api(
       await recomputeEventPointsInternal(params.id);
     }
 
+    await eventDetailCache.delete({ id: params.id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
+
     return loadEvent(params.id);
   },
 );
@@ -342,6 +376,8 @@ export const deleteEvent = api(
     });
 
     await prisma.event.delete({ where: { id } });
+    await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
     return { deleted: true };
   },
 );
@@ -393,6 +429,8 @@ export const addEventMember = api(
         update: {},
       });
     }
+
+    await eventDetailCache.delete({ id });
 
     return loadEvent(id);
   },
@@ -447,6 +485,7 @@ export const removeEventMember = api(
     });
 
     await removeMemberFromEventInternal(id, userId);
+    await eventDetailCache.delete({ id });
     return loadEvent(id);
   },
 );
@@ -510,6 +549,8 @@ export const joinEvent = api(
       });
     }
 
+    await eventDetailCache.delete({ id });
+
     return loadEvent(id);
   },
 );
@@ -537,6 +578,7 @@ export const leaveEvent = api(
     const userId = actor.userId;
 
     await removeMemberFromEventInternal(id, userId);
+    await eventDetailCache.delete({ id });
     return loadEvent(id);
   },
 );
@@ -559,6 +601,7 @@ export const setEventSignupsLocked = api(
     });
 
     await prisma.event.update({ where: { id }, data: { signupsLocked: locked } });
+    await eventDetailCache.delete({ id });
     return loadEvent(id);
   },
 );
@@ -594,6 +637,8 @@ export const addEventSchedule = api(
       },
     });
 
+    await eventDetailCache.delete({ id: params.id });
+
     return loadEvent(params.id);
   },
 );
@@ -626,6 +671,8 @@ export const setEventPoints = api(
       create: { id: randomUUID(), eventId: id, userId, points },
       update: { points },
     });
+
+    await eventDetailCache.delete({ id });
 
     return loadEvent(id);
   },
@@ -673,6 +720,8 @@ export const recordLadderMatch = api(
       data: { elo: loserElo, losses: { increment: 1 } },
     });
 
+    await eventDetailCache.delete({ id });
+
     return loadEvent(id);
   },
 );
@@ -701,6 +750,8 @@ export const setEventStatus = api(
     }
 
     await prisma.event.update({ where: { id }, data: { status } });
+    await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
     return loadEvent(id);
   },
 );
@@ -742,7 +793,12 @@ async function requireMembership(eventId: string, userId: string): Promise<void>
   }
 }
 
-async function loadEvent(id: string): Promise<EventDetail> {
+export async function loadEvent(id: string): Promise<EventDetail> {
+  const cached = await eventDetailCache.get({ id });
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const event = await prisma.event.findUnique({
     where: { id },
     include: {
@@ -785,7 +841,7 @@ async function loadEvent(id: string): Promise<EventDetail> {
         }))
       : null;
 
-  return {
+  const detail: EventDetail = {
     id: event.id,
     name: event.name,
     description: event.description,
@@ -830,6 +886,9 @@ async function loadEvent(id: string): Promise<EventDetail> {
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };
+
+  await eventDetailCache.set({ id }, detail);
+  return detail;
 }
 
 // Function to recompute all race result points for an event.
@@ -878,6 +937,8 @@ export async function recomputeEventPointsInternal(eventId: string): Promise<voi
       userIds: Array.from(affectedUserIds),
     });
   }
+
+  await eventDetailCache.delete({ id: eventId });
 }
 
 interface RecomputePointsParams {

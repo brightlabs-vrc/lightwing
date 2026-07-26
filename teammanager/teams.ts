@@ -2,8 +2,15 @@ import { randomUUID } from "node:crypto";
 import { api, APIError, Header } from "encore.dev/api";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { requirePermission, requireSiteAdmin } from "../auth/rbac";
+import { requirePermission, requireSiteAdmin, memberRoleCache } from "../auth/rbac";
 import { administratorRole, administratorRoleLimit } from "../auth/permissions";
+import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
+import { cluster } from "../cache";
+
+const teamCache = new StructKeyspace<{ id: string }, Team>(cluster, {
+  keyPattern: "team/:id",
+  defaultExpiry: expireInSeconds(300), // 5 minutes
+});
 
 function slugify(name: string): string {
   return name
@@ -46,6 +53,11 @@ interface GetTeamParams {
 export const getTeam = api(
   { expose: true, method: "GET", path: "/api/teams/:id" },
   async ({ id }: GetTeamParams): Promise<Team> => {
+    const cached = await teamCache.get({ id });
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const organization = await prisma.organization.findUnique({
       where: { id },
       include: {
@@ -60,7 +72,9 @@ export const getTeam = api(
       throw APIError.notFound("team not found");
     }
 
-    return toTeam(organization);
+    const team = toTeam(organization);
+    await teamCache.set({ id }, team);
+    return team;
   },
 );
 
@@ -113,6 +127,8 @@ export const updateTeamStats = api(
         },
       },
     });
+
+    await teamCache.delete({ id });
 
     return toTeam(organization);
   },
@@ -248,6 +264,9 @@ export const addTeamMember = api(
       throw error;
     }
 
+    await teamCache.delete({ id });
+    await memberRoleCache.delete({ key: `${id}:${userId}` });
+
     const updatedOrg = await prisma.organization.findUnique({
       where: { id },
       include: {
@@ -310,6 +329,9 @@ export const updateTeamMemberRole = api(
       data: { updatedAt: new Date() },
     });
 
+    await teamCache.delete({ id });
+    await memberRoleCache.delete({ key: `${id}:${userId}` });
+
     const updatedOrg = await prisma.organization.findUnique({
       where: { id },
       include: {
@@ -360,6 +382,9 @@ export const removeTeamMember = api(
       where: { id },
       data: { updatedAt: new Date() },
     });
+
+    await teamCache.delete({ id });
+    await memberRoleCache.delete({ key: `${id}:${userId}` });
 
     const updatedOrg = await prisma.organization.findUnique({
       where: { id },

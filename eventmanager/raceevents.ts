@@ -3,7 +3,7 @@ import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireEventPermission, resolveActor } from "../auth/rbac";
 import { isEligible, type ClassTier } from "./classtier";
-import { recomputeEventPointsInternal } from "./events";
+import { recomputeEventPointsInternal, eventDetailCache } from "./events";
 
 export interface RaceEventMemberView {
   userId: string;
@@ -82,6 +82,8 @@ export const createRaceEvent = api(
         endsAt: params.endsAt ? new Date(params.endsAt) : null,
       },
     });
+
+    await eventDetailCache.delete({ id: params.eventId });
 
     return toRaceEventDetail(race);
   },
@@ -167,6 +169,8 @@ export const reorderRaceEvents = api(
       },
       orderBy: { sequence: "asc" },
     });
+
+    await eventDetailCache.delete({ id: params.eventId });
 
     return { races: updatedRaces.map(toRaceEventDetail) };
   },
@@ -277,6 +281,8 @@ export const updateRaceEvent = api(
       await recomputeEventPointsInternal(params.eventId);
     }
 
+    await eventDetailCache.delete({ id: params.eventId });
+
     const updated = await requireRaceEvent(params.eventId, params.raceId);
     return toRaceEventDetail(updated);
   },
@@ -300,6 +306,7 @@ export const deleteRaceEvent = api(
     });
 
     await prisma.raceEvent.delete({ where: { id: raceId } });
+    await eventDetailCache.delete({ id: eventId });
     return { deleted: true };
   },
 );
@@ -430,6 +437,8 @@ export const addRaceEventMember = api(
       update: {},
     });
 
+    await eventDetailCache.delete({ id: eventId });
+
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
   }
@@ -470,6 +479,8 @@ export const removeRaceEventMember = api(
     await prisma.raceEventMember.deleteMany({
       where: { raceEventId: raceId, userId },
     });
+
+    await eventDetailCache.delete({ id: eventId });
 
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
@@ -564,6 +575,8 @@ export const joinRaceEvent = api(
       update: {},
     });
 
+    await eventDetailCache.delete({ id: eventId });
+
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
   }
@@ -605,6 +618,8 @@ export const leaveRaceEvent = api(
     await prisma.raceEventMember.deleteMany({
       where: { raceEventId: raceId, userId },
     });
+
+    await eventDetailCache.delete({ id: eventId });
 
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
