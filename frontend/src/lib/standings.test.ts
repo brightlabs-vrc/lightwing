@@ -26,7 +26,11 @@ function makeMockRow(
 }
 
 describe("inferFinishTimes", () => {
-  test("first inference: one leader time plus margins", () => {
+  test("standard contiguous positions with cumulative margins", () => {
+    // Cumulative:
+    // pos 1: 1:30.0
+    // pos 2: 1:30.0 + 1 1/2 lengths (0.75s) = 1:30.7 (or actually 1.5 * 0.5 = 0.75s -> formatted is 1:30.8 since .toFixed(1) rounds)
+    // pos 3: 1:30.8 + nose (0.05s) = 1:30.8 (1:30.75 + 0.05 = 1:30.8)
     const rows = [
       makeMockRow("user1", "1", "1:30.0", ""),
       makeMockRow("user2", "2", "", "1 1/2"),
@@ -44,16 +48,43 @@ describe("inferFinishTimes", () => {
     expect("error" in result).toBe(false);
     if (!("error" in result)) {
       expect(result.inferredCount).toBe(2);
+      // user2: 1:30.0 + (1.5 * 0.5) = 1:30.75 -> formatted 1:30.8
       expect(result.edits.user2.finishTime).toBe("1:30.8");
-      expect(result.edits.user3.finishTime).toBe("1:30.0");
+      // user3: 1:30.75 + 0.05 = 1:30.80 -> formatted 1:30.8
+      expect(result.edits.user3.finishTime).toBe("1:30.8");
     }
   });
 
-  test("repeated inference: repeated run after changing leader time recalculates from the new leader time", () => {
+  test("more distinct cumulative math", () => {
+    // Cumulative:
+    // pos 1: 1:20.0 (80.0s)
+    // pos 2: + 2 lengths (1.0s) = 1:21.0
+    // pos 3: + 3 lengths (1.5s) = 1:22.5
     const rows = [
-      makeMockRow("user1", "1", "1:32.0", ""),
+      makeMockRow("user1", "1", "1:20.0", ""),
+      makeMockRow("user2", "2", "", "2"),
+      makeMockRow("user3", "3", "", "3"),
+    ];
+
+    const result = inferFinishTimes(rows, {
+      user1: rows[0].edit,
+      user2: rows[1].edit,
+      user3: rows[2].edit,
+    });
+
+    expect("error" in result).toBe(false);
+    if (!("error" in result)) {
+      expect(result.inferredCount).toBe(2);
+      expect(result.edits.user2.finishTime).toBe("1:21.0");
+      expect(result.edits.user3.finishTime).toBe("1:22.5");
+    }
+  });
+
+  test("repeated inference: rerun after changing leader time recalculates downstream cumulatively", () => {
+    const rows = [
+      makeMockRow("user1", "1", "1:32.0", ""), // Updated leader time
       makeMockRow("user2", "2", "1:30.8", "1 1/2"),
-      makeMockRow("user3", "3", "1:30.0", "nose"),
+      makeMockRow("user3", "3", "1:30.8", "nose"),
     ];
 
     const editedResults: Record<string, EditedResult> = {
@@ -68,150 +99,183 @@ describe("inferFinishTimes", () => {
     if (!("error" in result)) {
       expect(result.inferredCount).toBe(2);
       expect(result.edits.user2.finishTime).toBe("1:32.8");
-      expect(result.edits.user3.finishTime).toBe("1:32.0");
+      expect(result.edits.user3.finishTime).toBe("1:32.8");
     }
   });
 
-  test("leader identified by position === '1' (even if multiple rows have finish times)", () => {
+  test("repeated inference: rerun after changing upstream margin recalculates downstream cumulatively", () => {
     const rows = [
       makeMockRow("user1", "1", "1:20.0", ""),
-      makeMockRow("user2", "2", "1:21.0", "2"),
-      makeMockRow("user3", "3", "", "nose"),
+      makeMockRow("user2", "2", "1:21.0", "4"), // Changed margin from 2 to 4 lengths (2.0s)
+      makeMockRow("user3", "3", "1:22.5", "3"),
     ];
 
-    const editedResults: Record<string, EditedResult> = {
+    const result = inferFinishTimes(rows, {
       user1: rows[0].edit,
       user2: rows[1].edit,
       user3: rows[2].edit,
-    };
-
-    const result = inferFinishTimes(rows, editedResults);
+    });
 
     expect("error" in result).toBe(false);
     if (!("error" in result)) {
       expect(result.inferredCount).toBe(2);
-      expect(result.edits.user2.finishTime).toBe("1:21.0");
-      expect(result.edits.user3.finishTime).toBe("1:20.0");
+      expect(result.edits.user2.finishTime).toBe("1:22.0");
+      expect(result.edits.user3.finishTime).toBe("1:23.5");
     }
   });
 
-  test("fallback leader: exactly one horse has an entered finish time and no horse has position === '1'", () => {
+  test("error on missing position 1 row", () => {
     const rows = [
-      makeMockRow("user1", "", "1:40.0", ""),
-      makeMockRow("user2", "2", "", "head"),
-      makeMockRow("user3", "3", "", "neck"),
+      makeMockRow("user2", "2", "", "1"),
+      makeMockRow("user3", "3", "", "1"),
     ];
-
-    const editedResults: Record<string, EditedResult> = {
-      user1: rows[0].edit,
-      user2: rows[1].edit,
-      user3: rows[2].edit,
-    };
-
-    const result = inferFinishTimes(rows, editedResults);
-
-    expect("error" in result).toBe(false);
-    if (!("error" in result)) {
-      expect(result.inferredCount).toBe(2);
-      expect(result.edits.user2.finishTime).toBe("1:40.2");
-      expect(result.edits.user3.finishTime).toBe("1:40.3");
+    const result = inferFinishTimes(rows, {
+      user2: rows[0].edit,
+      user3: rows[1].edit,
+    });
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error).toContain("Missing position 1 in the standings sequence. Infer time requires contiguous official finishing positions starting from 1.");
     }
   });
 
-  test("error when no valid leader can be determined", () => {
-    // Scenario 1: Multiple position 1 horses
-    const rows1 = [
-      makeMockRow("user1", "1", "1:30.0", ""),
-      makeMockRow("user2", "1", "1:32.0", ""),
-    ];
-    const result1 = inferFinishTimes(rows1, {
-      user1: rows1[0].edit,
-      user2: rows1[1].edit,
-    });
-    expect("error" in result1).toBe(true);
-    if ("error" in result1) {
-      expect(result1.error).toContain("multiple horses are marked with position 1");
-    }
-
-    // Scenario 2: No position 1 and multiple horses have finish times
-    const rows2 = [
-      makeMockRow("user1", "", "1:30.0", ""),
-      makeMockRow("user2", "", "1:32.0", ""),
-    ];
-    const result2 = inferFinishTimes(rows2, {
-      user1: rows2[0].edit,
-      user2: rows2[1].edit,
-    });
-    expect("error" in result2).toBe(true);
-    if ("error" in result2) {
-      expect(result2.error).toContain("Multiple horses have finish times entered");
-    }
-
-    // Scenario 3: No leader could be found at all
-    const rows3 = [
-      makeMockRow("user1", "", "", "1"),
-      makeMockRow("user2", "", "", "2"),
-    ];
-    const result3 = inferFinishTimes(rows3, {
-      user1: rows3[0].edit,
-      user2: rows3[1].edit,
-    });
-    expect("error" in result3).toBe(true);
-    if ("error" in result3) {
-      expect(result3.error).toContain("Unable to determine the leader");
-    }
-  });
-
-  test("rows with blank or zero-equivalent margins are skipped without causing total failure", () => {
+  test("error on gap in sequence", () => {
     const rows = [
       makeMockRow("user1", "1", "1:30.0", ""),
       makeMockRow("user2", "2", "", "1"),
-      makeMockRow("user3", "3", "", "0"),
-      makeMockRow("user4", "4", "", "—"),
-      makeMockRow("user5", "5", "", ""),
+      makeMockRow("user4", "4", "", "1"),
     ];
+    const result = inferFinishTimes(rows, {
+      user1: rows[0].edit,
+      user2: rows[1].edit,
+      user4: rows[2].edit,
+    });
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error).toContain("Missing position 3 in the standings sequence. Infer time requires contiguous official finishing positions starting from 1.");
+    }
+  });
 
-    const editedResults: Record<string, EditedResult> = {
+  test("error on duplicate position", () => {
+    const rows = [
+      makeMockRow("user1", "1", "1:30.0", ""),
+      makeMockRow("user2", "2", "", "1"),
+      makeMockRow("user3", "2", "", "1"),
+    ];
+    const result = inferFinishTimes(rows, {
       user1: rows[0].edit,
       user2: rows[1].edit,
       user3: rows[2].edit,
-      user4: rows[3].edit,
-      user5: rows[4].edit,
-    };
+    });
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error).toBe("Duplicate position 2 detected in standings.");
+    }
+  });
 
-    const result = inferFinishTimes(rows, editedResults);
+  test("error on non-numeric position", () => {
+    const rows = [
+      makeMockRow("user1", "1", "1:30.0", ""),
+      makeMockRow("user2", "2a", "", "1"),
+    ];
+    const result = inferFinishTimes(rows, {
+      user1: rows[0].edit,
+      user2: rows[1].edit,
+    });
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error).toBe("All rows participating in infer time must have numeric finishing positions.");
+    }
+  });
+
+  test("error on blank position", () => {
+    const rows = [
+      makeMockRow("user1", "1", "1:30.0", ""),
+      makeMockRow("user2", "", "", "1"),
+    ];
+    const result = inferFinishTimes(rows, {
+      user1: rows[0].edit,
+      user2: rows[1].edit,
+    });
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error).toBe("All rows participating in infer time must have numeric finishing positions.");
+    }
+  });
+
+  test("error on position 1 missing leader finish time", () => {
+    const rows = [
+      makeMockRow("user1", "1", "", ""),
+      makeMockRow("user2", "2", "", "1"),
+    ];
+    const result = inferFinishTimes(rows, {
+      user1: rows[0].edit,
+      user2: rows[1].edit,
+    });
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error).toBe("Unable to parse the leader finish time. Use m:ss.t format (e.g. 1:32.1).");
+    }
+  });
+
+  test("error on blank or zero margin in downstream rows", () => {
+    const blankRows = [
+      makeMockRow("user1", "1", "1:30.0", ""),
+      makeMockRow("user2", "2", "", ""),
+    ];
+    const resultBlank = inferFinishTimes(blankRows, {
+      user1: blankRows[0].edit,
+      user2: blankRows[1].edit,
+    });
+    expect("error" in resultBlank).toBe(true);
+    if ("error" in resultBlank) {
+      expect(resultBlank.error).toBe("Position 2 has an empty or zero margin, which blocks cumulative inference.");
+    }
+
+    const zeroRows = [
+      makeMockRow("user1", "1", "1:30.0", ""),
+      makeMockRow("user2", "2", "", "0"),
+    ];
+    const resultZero = inferFinishTimes(zeroRows, {
+      user1: zeroRows[0].edit,
+      user2: zeroRows[1].edit,
+    });
+    expect("error" in resultZero).toBe(true);
+    if ("error" in resultZero) {
+      expect(resultZero.error).toBe("Position 2 has an empty or zero margin, which blocks cumulative inference.");
+    }
+
+    const dashRows = [
+      makeMockRow("user1", "1", "1:30.0", ""),
+      makeMockRow("user2", "2", "", "—"),
+    ];
+    const resultDash = inferFinishTimes(dashRows, {
+      user1: dashRows[0].edit,
+      user2: dashRows[1].edit,
+    });
+    expect("error" in resultDash).toBe(true);
+    if ("error" in resultDash) {
+      expect(resultDash.error).toBe("Position 2 has an empty or zero margin, which blocks cumulative inference.");
+    }
+  });
+
+  test("rows with pending_delete are completely ignored", () => {
+    const rows = [
+      makeMockRow("user1", "1", "1:30.0", ""),
+      makeMockRow("user2", "2", "", "1"),
+      makeMockRow("user3", "3", "", "1", "pending_delete"), // ignored, sequence is still contiguous from 1 to 2!
+    ];
+
+    const result = inferFinishTimes(rows, {
+      user1: rows[0].edit,
+      user2: rows[1].edit,
+      user3: rows[2].edit,
+    });
 
     expect("error" in result).toBe(false);
     if (!("error" in result)) {
       expect(result.inferredCount).toBe(1);
       expect(result.edits.user2.finishTime).toBe("1:30.5");
-      expect(result.edits.user3.finishTime).toBe("");
-      expect(result.edits.user4.finishTime).toBe("");
-      expect(result.edits.user5.finishTime).toBe("");
-    }
-  });
-
-  test("safe row handling: rows with pending_delete are ignored from both leader selection and calculation", () => {
-    const rows = [
-      makeMockRow("user1", "1", "1:30.0", "", "pending_delete"),
-      makeMockRow("user2", "1", "1:35.0", ""),
-      makeMockRow("user3", "3", "", "1", "pending_delete"),
-      makeMockRow("user4", "4", "", "2"),
-    ];
-
-    const editedResults: Record<string, EditedResult> = {
-      user1: rows[0].edit,
-      user2: rows[1].edit,
-      user3: rows[2].edit,
-      user4: rows[3].edit,
-    };
-
-    const result = inferFinishTimes(rows, editedResults);
-
-    expect("error" in result).toBe(false);
-    if (!("error" in result)) {
-      expect(result.inferredCount).toBe(1);
-      expect(result.edits.user4.finishTime).toBe("1:36.0");
       expect(result.edits.user3.finishTime).toBe("");
     }
   });
