@@ -17,3 +17,13 @@ th {
 .pxl-btn-flat {
   filter: none !important;
 }
+
+/* Hide number input spinners inside standings table */
+.standings-input-no-spinner::-webkit-outer-spin-button,
+.standings-input-no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.standings-input-no-spinner[type=number] {
+  -moz-appearance: textfield;
+}
