@@ -548,7 +548,7 @@ export function useEventDetail(eventId: string) {
       return
     }
     setEditedResults(result.edits)
-    setGlobalSuccess(`Recalculated finish times for ${result.inferredCount} horse(s) from the leader's time and margins.`)
+    setGlobalSuccess(`Recalculated finish times cumulatively by finishing position for ${result.inferredCount} horse(s).`)
   }, [derivedStates, editedResults])
 
   const handleCancelStandingsEdit = useCallback(() => {

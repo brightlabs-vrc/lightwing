@@ -178,7 +178,7 @@ export function parseMarginToSeconds(value: string): number {
   return base * 0.5
 }
 
-// Infer missing finish times from the leader's time plus each horse's margin.
+// Infer missing finish times from the leader's time and ordered per-position margins.
 // Pure: returns either an error message or the next edits map + inferred count.
 export function inferFinishTimes(
   rows: DerivedRow[],
@@ -186,51 +186,78 @@ export function inferFinishTimes(
 ): { error: string } | { edits: Record<string, EditedResult>; inferredCount: number } {
   const activeRows = rows.filter((d) => d.rowState !== 'pending_delete')
 
-  let leader: DerivedRow | null = null
-
-  const pos1Rows = activeRows.filter((d) => d.edit.position === '1')
-  if (pos1Rows.length === 1) {
-    leader = pos1Rows[0]
-  } else if (pos1Rows.length > 1) {
-    return { error: 'Unable to determine the leader because multiple horses are marked with position 1.' }
-  } else {
-    // Fall back to a single row with an explicitly entered finish time
-    const rowsWithTime = activeRows.filter((d) => (d.edit.finishTime ?? '').trim() !== '')
-    if (rowsWithTime.length === 1) {
-      leader = rowsWithTime[0]
-    } else if (rowsWithTime.length > 1) {
-      return { error: 'Multiple horses have finish times entered. Please specify a single leader with position 1 and a valid finish time.' }
+  // 1. Verify all rows have valid numeric positions
+  for (const d of activeRows) {
+    const posStr = (d.edit.position ?? '').trim()
+    if (!posStr || !/^[1-9]\d*$/.test(posStr)) {
+      return { error: 'All rows participating in infer time must have numeric finishing positions.' }
     }
   }
 
-  if (!leader) {
-    return { error: 'Unable to determine the leader. Please specify a leader with position 1 and a valid finish time.' }
+  // 2. Check for duplicate positions
+  const posSet = new Set<number>()
+  for (const d of activeRows) {
+    const pos = Number(d.edit.position.trim())
+    if (posSet.has(pos)) {
+      return { error: `Duplicate position ${pos} detected in standings.` }
+    }
+    posSet.add(pos)
   }
 
+  // Sort rows ascending by position
+  const sortedRows = [...activeRows].sort((a, b) => {
+    return Number(a.edit.position.trim()) - Number(b.edit.position.trim())
+  })
+
+  if (sortedRows.length === 0) {
+    return { error: 'No active rows to infer finish times.' }
+  }
+
+  // 3. Verify contiguous positions starting from 1
+  for (let i = 0; i < sortedRows.length; i++) {
+    const expectedPos = i + 1
+    const actualPos = Number(sortedRows[i].edit.position.trim())
+    if (actualPos !== expectedPos) {
+      return {
+        error: `Missing position ${expectedPos} in the standings sequence. Infer time requires contiguous official finishing positions starting from 1.`
+      }
+    }
+  }
+
+  // 4. Position-1 must be the leader and have a valid, parseable finish time
+  const leader = sortedRows[0]
   const leaderSeconds = parseFinishTimeToSeconds(leader.edit.finishTime ?? '')
   if (leaderSeconds === null) {
     return { error: 'Unable to parse the leader finish time. Use m:ss.t format (e.g. 1:32.1).' }
   }
 
   const nextEdits: Record<string, EditedResult> = { ...editedResults }
+  let previousSeconds = leaderSeconds
   let inferredCount = 0
 
-  for (const d of activeRows) {
-    if (d.member.userId === leader.member.userId) continue
+  // 5. Apply cumulative margin math for positions 2..N
+  for (let i = 1; i < sortedRows.length; i++) {
+    const row = sortedRows[i]
+    const pos = i + 1
+    const marginStr = (row.edit.margin ?? '').trim()
 
-    const gapSeconds = parseMarginToSeconds(d.edit.margin ?? '')
-    if (gapSeconds === 0) continue
-
-    const inferredSeconds = leaderSeconds + gapSeconds
-    nextEdits[d.member.userId] = {
-      ...(nextEdits[d.member.userId] ?? EMPTY_EDIT),
-      finishTime: formatSecondsToFinishTime(inferredSeconds),
+    const isZeroEquivalent = !marginStr || marginStr === '0' || marginStr === '—' || marginStr === '-'
+    let gapSeconds = 0
+    if (!isZeroEquivalent) {
+      gapSeconds = parseMarginToSeconds(marginStr)
     }
-    inferredCount++
-  }
 
-  if (inferredCount === 0) {
-    return { error: 'No finish times could be inferred. Ensure trailing horses have a margin/length value.' }
+    if (isZeroEquivalent || gapSeconds === 0) {
+      return { error: `Position ${pos} has an empty or zero margin, which blocks cumulative inference.` }
+    }
+
+    const currentSeconds = previousSeconds + gapSeconds
+    nextEdits[row.member.userId] = {
+      ...(nextEdits[row.member.userId] ?? EMPTY_EDIT),
+      finishTime: formatSecondsToFinishTime(currentSeconds),
+    }
+    previousSeconds = currentSeconds
+    inferredCount++
   }
 
   return { edits: nextEdits, inferredCount }
