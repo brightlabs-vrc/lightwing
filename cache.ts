@@ -5,5 +5,5 @@ import { CacheCluster } from "encore.dev/storage/cache";
  * Encore provisions and manages the Redis instance automatically.
  */
 export const cluster = new CacheCluster("lightwing-cache", {
-  evictionPolicy: "allkeys-lru",
+  evictionPolicy: "volatile-ttl",
 });
