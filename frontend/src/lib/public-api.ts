@@ -268,6 +268,7 @@ export async function listPublicEvents(): Promise<{ events: eventmanager.EventDe
   if (!MOCK_MODE) {
     return appClient.eventmanager.listPublicEvents()
   }
+  mockPublicEvents = loadMockEvents()
   return { events: mockPublicEvents }
 }
 
@@ -275,6 +276,7 @@ export async function getPublicEvent(eventId: string): Promise<eventmanager.Even
   if (!MOCK_MODE) {
     return appClient.eventmanager.getEvent(eventId)
   }
+  mockPublicEvents = loadMockEvents()
   const event = mockPublicEvents.find((e) => e.id === eventId)
   if (!event) throw new Error('Event not found')
   return event
@@ -288,6 +290,7 @@ export async function joinEvent(
     return appClient.with({ auth: { authorization } }).eventmanager.joinEvent(eventId, { authorization })
   }
 
+  mockPublicEvents = loadMockEvents()
   const eventIndex = mockPublicEvents.findIndex((e) => e.id === eventId)
   if (eventIndex === -1) throw new Error('Event not found')
 
@@ -332,6 +335,7 @@ export async function leaveEvent(
     return appClient.with({ auth: { authorization } }).eventmanager.leaveEvent(eventId, { authorization })
   }
 
+  mockPublicEvents = loadMockEvents()
   const eventIndex = mockPublicEvents.findIndex((e) => e.id === eventId)
   if (eventIndex === -1) throw new Error('Event not found')
 
@@ -415,6 +419,7 @@ export async function listPublicRaceEvents(
   if (!MOCK_MODE) {
     return appClient.eventmanager.listRaceEvents(eventId)
   }
+  mockPublicEvents = loadMockEvents()
   const event = mockPublicEvents.find((e) => e.id === eventId)
   if (!event) throw new Error('Event not found')
   const races = (event.raceEvents ?? []).map((r) => ({
@@ -442,6 +447,7 @@ export async function getPublicRaceEvent(
   if (!MOCK_MODE) {
     return appClient.eventmanager.getRaceEvent(eventId, raceId)
   }
+  mockPublicEvents = loadMockEvents()
   const event = mockPublicEvents.find((e) => e.id === eventId)
   if (!event) throw new Error('Event not found')
   const race = (event.raceEvents as eventmanager.RaceEventDetail[] ?? []).find((r) => r.id === raceId)
@@ -461,6 +467,7 @@ export async function joinRaceEvent(
     return appClient.with({ auth: { authorization } }).eventmanager.joinRaceEvent(eventId, raceId, { authorization })
   }
 
+  mockPublicEvents = loadMockEvents()
   const eventIndex = mockPublicEvents.findIndex((e) => e.id === eventId)
   if (eventIndex === -1) throw new Error('Event not found')
 
@@ -478,10 +485,14 @@ export async function joinRaceEvent(
   const user = mockUserProfileMap.get(userId)
   if (!user) throw new Error('User not found')
 
-  // Require user to be event member first
+  // Require user to be event member first unless it's a granular participation event
   const isEventMember = event.members.some((m) => m.userId === userId)
   if (!isEventMember) {
-    throw new Error('User is not a member of this event')
+    if (!event.granularParticipation) {
+      throw new Error('User is not a member of this event')
+    }
+    // Auto-enroll user as event member
+    event.members = [...event.members, { userId, name: user.name, classTier: user.classTier }]
   }
 
   const targetRestriction = event.raceEvents[raceIndex].classRestriction ?? event.classRestriction
@@ -516,6 +527,7 @@ export async function joinRaceEvent(
 
   event.raceEvents[raceIndex] = updatedRace
 
+  saveMockEvents(mockPublicEvents)
   return updatedRace
 }
 
@@ -528,6 +540,7 @@ export async function leaveRaceEvent(
     return appClient.with({ auth: { authorization } }).eventmanager.leaveRaceEvent(eventId, raceId, { authorization })
   }
 
+  mockPublicEvents = loadMockEvents()
   const eventIndex = mockPublicEvents.findIndex((e) => e.id === eventId)
   if (eventIndex === -1) throw new Error('Event not found')
 
@@ -553,5 +566,6 @@ export async function leaveRaceEvent(
 
   event.raceEvents[raceIndex] = updatedRace
 
+  saveMockEvents(mockPublicEvents)
   return updatedRace
 }

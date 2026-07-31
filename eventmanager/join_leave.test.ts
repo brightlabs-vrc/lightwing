@@ -38,7 +38,13 @@ async function createSession(userId: string) {
   return token;
 }
 
-async function createEvent(ownerUserId: string, name: string, status: "DRAFT" | "UNOFFICIAL" | "OFFICIAL" | "CONCLUDED", classRestriction: ClassTier | null = null) {
+async function createEvent(
+  ownerUserId: string,
+  name: string,
+  status: "DRAFT" | "UNOFFICIAL" | "OFFICIAL" | "CONCLUDED",
+  classRestriction: ClassTier | null = null,
+  granularParticipation: boolean = false
+) {
   const id = `event-${randomUUID()}`;
   await prisma.event.create({
     data: {
@@ -49,6 +55,7 @@ async function createEvent(ownerUserId: string, name: string, status: "DRAFT" | 
       status,
       scoringType: 1,
       classRestriction,
+      granularParticipation,
     },
   });
   createdEventIds.push(id);
@@ -398,5 +405,136 @@ describe("Event withdrawal and member removal cleanup", () => {
       where: { raceEventId_userId: { raceEventId: raceId, userId } },
     });
     expect(raceResultAfter).toBeNull();
+  });
+});
+
+describe("Granular Race Signup Persistence", () => {
+  test("Granular event: auto-enrolls user as EventMember and joins RaceEventMember", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    // Create a granular event
+    const eventId = await createEvent(creatorId, "Granular Event", "UNOFFICIAL", "OP", true);
+    const raceId = await createRaceEvent(eventId, "Race 1");
+
+    // Initially, user is not a member of the event or the race
+    const initialEventMember = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(initialEventMember).toBeNull();
+
+    const initialRaceMember = await prisma.raceEventMember.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    expect(initialRaceMember).toBeNull();
+
+    // Self-service join race
+    const result = await joinRaceEvent({
+      eventId,
+      raceId,
+      authorization: `Bearer ${token}`,
+    });
+
+    expect(result.id).toBe(raceId);
+    expect(result.members.length).toBe(1);
+    expect(result.members[0].userId).toBe(userId);
+
+    // Verify database has both eventMember and raceEventMember
+    const eventMember = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(eventMember).not.toBeNull();
+
+    const raceMember = await prisma.raceEventMember.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    expect(raceMember).not.toBeNull();
+  });
+
+  test("Non-granular event: joining race without event membership still fails with failedPrecondition", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    // Create a standard non-granular event
+    const eventId = await createEvent(creatorId, "Standard Event", "UNOFFICIAL", "OP", false);
+    const raceId = await createRaceEvent(eventId, "Race 1");
+
+    await expect(
+      joinRaceEvent({
+        eventId,
+        raceId,
+        authorization: `Bearer ${token}`,
+      })
+    ).rejects.toThrow(/user is not a member of this event/);
+  });
+
+  test("Granular event: idempotent join is supported cleanly without duplicate records", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    const eventId = await createEvent(creatorId, "Granular Event IDP", "UNOFFICIAL", "OP", true);
+    const raceId = await createRaceEvent(eventId, "Race 1");
+
+    // First join
+    await joinRaceEvent({
+      eventId,
+      raceId,
+      authorization: `Bearer ${token}`,
+    });
+
+    // Second join (idempotent)
+    const result = await joinRaceEvent({
+      eventId,
+      raceId,
+      authorization: `Bearer ${token}`,
+    });
+
+    expect(result.members.length).toBe(1);
+
+    const eventMembers = await prisma.eventMember.findMany({
+      where: { eventId, userId },
+    });
+    expect(eventMembers.length).toBe(1);
+
+    const raceMembers = await prisma.raceEventMember.findMany({
+      where: { raceEventId: raceId, userId },
+    });
+    expect(raceMembers.length).toBe(1);
+  });
+
+  test("Granular event: leaving a race removes RaceEventMember but preserves EventMember", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    const eventId = await createEvent(creatorId, "Granular Event Leave", "UNOFFICIAL", "OP", true);
+    const raceId = await createRaceEvent(eventId, "Race 1");
+
+    // Join
+    await joinRaceEvent({
+      eventId,
+      raceId,
+      authorization: `Bearer ${token}`,
+    });
+
+    // Leave
+    const result = await leaveRaceEvent({
+      eventId,
+      raceId,
+      authorization: `Bearer ${token}`,
+    });
+
+    expect(result.members.length).toBe(0);
+
+    // Verify raceEventMember is deleted
+    const raceMember = await prisma.raceEventMember.findUnique({
+      where: { raceEventId_userId: { raceEventId: raceId, userId } },
+    });
+    expect(raceMember).toBeNull();
+
+    // Verify eventMember is PRESERVED
+    const eventMember = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(eventMember).not.toBeNull();
   });
 });

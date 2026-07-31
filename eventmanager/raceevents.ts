@@ -548,11 +548,13 @@ export const joinRaceEvent = api(
     const actor = await resolveActor(prisma, authorization);
     const userId = actor.userId;
 
-    // User must be an event member first
+    // Check if user is an event member
     const member = await prisma.eventMember.findUnique({
       where: { eventId_userId: { eventId, userId } },
     });
-    if (!member) {
+
+    // If user is not an event member and event does not allow granular participation, throw error
+    if (!member && !event.granularParticipation) {
       throw APIError.failedPrecondition("user is not a member of this event");
     }
 
@@ -569,10 +571,20 @@ export const joinRaceEvent = api(
       );
     }
 
-    await prisma.raceEventMember.upsert({
-      where: { raceEventId_userId: { raceEventId: raceId, userId } },
-      create: { id: randomUUID(), raceEventId: raceId, userId },
-      update: {},
+    await prisma.$transaction(async (tx) => {
+      if (!member && event.granularParticipation) {
+        await tx.eventMember.upsert({
+          where: { eventId_userId: { eventId, userId } },
+          create: { id: randomUUID(), eventId, userId },
+          update: {},
+        });
+      }
+
+      await tx.raceEventMember.upsert({
+        where: { raceEventId_userId: { raceEventId: raceId, userId } },
+        create: { id: randomUUID(), raceEventId: raceId, userId },
+        update: {},
+      });
     });
 
     await eventDetailCache.delete({ id: eventId });

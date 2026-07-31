@@ -13,6 +13,7 @@ import {
   PixelSectionHeader,
   PixelEmptyState,
   type PixelTableColumn,
+  useToast,
 } from '@pxlkit/ui-kit'
 import type { eventmanager } from '../../lib/client'
 
@@ -87,6 +88,7 @@ function EventDetailPage() {
 
   const isMember = session && event.members.some((m) => m.userId === session.user.id)
   const isConcluded = event.status === 'CONCLUDED'
+  const isGranular = event.granularParticipation
 
   const participantColumns: PixelTableColumn<eventmanager.EventMemberView>[] = [
     { key: 'name', header: 'NAME', render: (m) => <span className="font-medium">{m.name}</span> },
@@ -161,40 +163,42 @@ function EventDetailPage() {
             </PixelBadge>
           </PixelStack>
 
-          <div className="pt-4 border-t-2 border-retro-border">
-            {!session ? (
-              <PixelButton asChild variant="solid" tone="purple" className="pxl-btn-flat">
-                <Link to="/auth" search={{ redirect: `/events/${eventId}` }}>
-                  SIGN IN TO JOIN
-                </Link>
-              </PixelButton>
-            ) : (
-              <PixelStack gap={2}>
-                <PixelButton
-                  variant="solid"
-                  tone={isMember ? 'red' : 'green'}
-                  className="pxl-btn-flat"
-                  disabled={isConcluded || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending}
-                  loading={joinMutation.isPending || leaveMutation.isPending}
-                  onClick={() => {
-                    if (isConcluded) return
-                    if (isMember) {
-                      leaveMutation.mutate(eventId)
-                    } else {
-                      joinMutation.mutate(eventId)
-                    }
-                  }}
-                >
-                  {isMember ? 'WITHDRAW FROM EVENT' : 'SIGN UP FOR EVENT'}
+          {!isGranular && (
+            <div className="pt-4 border-t-2 border-retro-border">
+              {!session ? (
+                <PixelButton asChild variant="solid" tone="purple" className="pxl-btn-flat">
+                  <Link to="/auth" search={{ redirect: `/events/${eventId}` }}>
+                    SIGN IN TO JOIN
+                  </Link>
                 </PixelButton>
-                {event.signupsLocked && (
-                  <div className="text-retro-muted font-pixel text-xs mt-2">
-                    SIGNUPS ARE LOCKED FOR THIS EVENT
-                  </div>
-                )}
-              </PixelStack>
-            )}
-          </div>
+              ) : (
+                <PixelStack gap={2}>
+                  <PixelButton
+                    variant="solid"
+                    tone={isMember ? 'red' : 'green'}
+                    className="pxl-btn-flat"
+                    disabled={isConcluded || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending}
+                    loading={joinMutation.isPending || leaveMutation.isPending}
+                    onClick={() => {
+                      if (isConcluded) return
+                      if (isMember) {
+                        leaveMutation.mutate(eventId)
+                      } else {
+                        joinMutation.mutate(eventId)
+                      }
+                    }}
+                  >
+                    {isMember ? 'WITHDRAW FROM EVENT' : 'SIGN UP FOR EVENT'}
+                  </PixelButton>
+                  {event.signupsLocked && (
+                    <div className="text-retro-muted font-pixel text-xs mt-2">
+                      SIGNUPS ARE LOCKED FOR THIS EVENT
+                    </div>
+                  )}
+                </PixelStack>
+              )}
+            </div>
+          )}
         </PixelStack>
       </PixelCard>
 
@@ -391,14 +395,23 @@ function RaceStandingsTable({
 function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
   const queryClient = useQueryClient()
   const { session } = useAuth()
+  const { toast } = useToast()
   const isMember = session && event.members.some((m) => m.userId === session.user.id)
 
   const joinRaceMutation = useMutation({
     mutationFn: ({ raceId }: { raceId: string }) =>
       joinRaceEvent(event.id, raceId, `Bearer ${session?.session.token ?? ''}`),
     onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+    },
+    onError: (err: any) => {
+      const msg = err?.message || err?.toString() || 'Unknown error'
+      toast({
+        tone: 'red',
+        title: `Could not sign up for this race: ${msg}`,
+      })
     },
   })
 
@@ -406,8 +419,16 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
     mutationFn: ({ raceId }: { raceId: string }) =>
       leaveRaceEvent(event.id, raceId, `Bearer ${session?.session.token ?? ''}`),
     onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+    },
+    onError: (err: any) => {
+      const msg = err?.message || err?.toString() || 'Unknown error'
+      toast({
+        tone: 'red',
+        title: `Could not withdraw from this race: ${msg}`,
+      })
     },
   })
 
@@ -468,7 +489,35 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                     CLASS:{' '}
                     {race.classRestriction ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
                   </PixelBadge>
-                  {event.granularParticipation && isMember && (
+                  {event.granularParticipation && (
+                    <>
+                      {!session ? (
+                        <PixelButton asChild variant="solid" tone="purple" size="sm" className="pxl-btn-flat font-pixel text-[10px]">
+                          <Link to="/auth" search={{ redirect: `/events/${event.id}` }}>
+                            SIGN IN
+                          </Link>
+                        </PixelButton>
+                      ) : (
+                        <PixelButton
+                          variant="solid"
+                          tone={isRaceMember ? 'red' : 'green'}
+                          size="sm"
+                          className="pxl-btn-flat font-pixel text-[10px]"
+                          disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
+                          onClick={() => {
+                            if (isRaceMember) {
+                              leaveRaceMutation.mutate({ raceId: race.id })
+                            } else {
+                              joinRaceMutation.mutate({ raceId: race.id })
+                            }
+                          }}
+                        >
+                          {isRaceMember ? 'WITHDRAW' : 'SIGN UP'}
+                        </PixelButton>
+                      )}
+                    </>
+                  )}
+                  {!event.granularParticipation && isMember && (
                     <PixelButton
                       variant="solid"
                       tone={isRaceMember ? 'red' : 'green'}
