@@ -9,6 +9,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-admin-1', {
     id: 'mock-admin-1',
     name: 'Mock Admin',
+    slug: 'mock-admin',
     email: 'mock-admin@lightwing.local',
     image: null,
     biography: 'Local mock administrator account for frontend-only testing.',
@@ -23,6 +24,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-user-1', {
     id: 'mock-user-1',
     name: 'Thunder Bolt',
+    slug: 'thunder-bolt',
     email: 'bolt@lightwing.local',
     image: null,
     biography: 'A rapid competitor on the turf.',
@@ -37,6 +39,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-user-2', {
     id: 'mock-user-2',
     name: 'Shadow Runner',
+    slug: 'shadow-runner',
     email: 'shadow@lightwing.local',
     image: null,
     biography: 'Silent but swift.',

@@ -181,6 +181,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-admin-1',
       name: 'Mock Admin',
+      slug: 'mock-admin',
       email: 'mock-admin@lightwing.local',
       image: null,
       biography: 'Local mock administrator account for frontend-only testing.',
@@ -205,6 +206,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-user-1',
       name: 'Thunder Bolt',
+      slug: 'thunder-bolt',
       email: 'bolt@lightwing.local',
       image: null,
       biography: 'A rapid competitor on the turf.',
@@ -222,6 +224,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-user-2',
       name: 'Shadow Runner',
+      slug: 'shadow-runner',
       email: 'shadow@lightwing.local',
       image: null,
       biography: 'Loves the dirt track racing.',
@@ -239,6 +242,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-user-3',
       name: 'Swift Galloper',
+      slug: 'swift-galloper',
       email: 'gallop@lightwing.local',
       image: null,
       biography: 'A high tier challenger.',
@@ -1393,8 +1397,7 @@ export async function listAdminTeamMembers(
   offset?: number,
 ): Promise<{ members: Array<{ userId: string; name: string; slug: string | null; role: string }>; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.listTeamMembers({
-      id: teamId,
+    return appClient.teammanager.listTeamMembers(teamId, {
       search,
       limit,
       offset,
