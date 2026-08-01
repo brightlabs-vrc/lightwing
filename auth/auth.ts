@@ -230,7 +230,10 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     discord: {
       clientId: discordClientId(),
       clientSecret: discordClientSecret(),
-      scope: ["identify", "email", "guilds", "guilds.members.read"],
+      scope: ["identify", "guilds", "guilds.members.read"],
+      mapProfileToUser: (profile) => ({
+        email: `${profile.id}@discord.invalid`,
+      }),
     },
   },
   databaseHooks: {
