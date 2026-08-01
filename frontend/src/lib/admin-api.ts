@@ -613,6 +613,7 @@ export async function createRaceEvent(
     classRestriction: params.classRestriction ?? null,
     startsAt: params.startsAt ?? null,
     endsAt: params.endsAt ?? null,
+    members: [],
   }
 
   mockEvents = mockEvents.map((evt) => {

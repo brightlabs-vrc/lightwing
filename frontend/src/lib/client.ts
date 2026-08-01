@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-2wkkq.encr.app`
+    return `https://${name}-oopto.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the 2wkkq Encore application.
+ * Client is an API client for the oopto Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -499,6 +499,12 @@ export namespace eventmanager {
         classTier: ClassTier | null
     }
 
+    export interface RaceEventMemberView {
+        userId: string
+        name: string
+        classTier: ClassTier | null
+    }
+
     export interface RaceEventView {
         id: string
         name: string
@@ -511,6 +517,7 @@ export namespace eventmanager {
         classRestriction: ClassTier | null
         startsAt: string | null
         endsAt: string | null
+        members: RaceEventMemberView[]
     }
 
     /**
@@ -1832,7 +1839,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "2wkkq-Generated-TS-Client (Encore/v1.57.13)";
+            this.headers["User-Agent"] = "oopto-Generated-TS-Client (Encore/v1.57.13)";
         }
 
         this.requestInit = options.requestInit ?? {};

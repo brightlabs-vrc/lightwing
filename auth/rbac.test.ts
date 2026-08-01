@@ -13,7 +13,7 @@ async function createUser(id: string, name: string, siteRole: "USER" | "SITE_ADM
     data: {
       id,
       name,
-      email: `${id}@discord.invalid`,
+      email: `${id}@example.com`,
       siteRole,
     },
   });
