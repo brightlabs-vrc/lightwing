@@ -8,6 +8,7 @@ import { AlertBanner } from '../../components/AlertBanner'
 import { EventScoringTablesEditor } from '../../components/EventScoringTablesEditor'
 import type { eventmanager } from '../../lib/client'
 import { MOCK_MODE } from '../../lib/mock-mode'
+import { DEFAULT_SCORING_TABLES } from '../../lib/scoringDefaults'
 
 export const Route = createFileRoute('/admin/events')({
   beforeLoad: async ({ location }) => {
@@ -37,12 +38,7 @@ function AdminEventsListPage() {
   const [formClassRestriction, setFormClassRestriction] = useState<string>('OP')
   const [formGranularParticipation, setFormGranularParticipation] = useState(false)
   const [formScoringRulesMode, setFormScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
-  const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>({
-    OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-    GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-    GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-    GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
-  })
+  const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -78,12 +74,7 @@ function AdminEventsListPage() {
       setFormClassRestriction('OP')
       setFormGranularParticipation(false)
       setFormScoringRulesMode('STANDARD')
-      setFormCustomScoringTables({
-        OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-        GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-        GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-        GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
-      })
+      setFormCustomScoringTables(DEFAULT_SCORING_TABLES)
     }
   }, [showCreateModal, activeUserId, activeOrgId])
 
