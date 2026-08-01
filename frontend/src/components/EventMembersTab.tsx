@@ -1,6 +1,8 @@
 import type { eventmanager } from '../lib/client'
 import styles from './EventMembersTab.module.css'
 
+import { UserSearchCombobox } from './UserSearchCombobox'
+
 interface EventMembersTabProps {
   selectedEvent: eventmanager.EventDetail
   newMemberUserId: string
@@ -23,16 +25,12 @@ export function EventMembersTab({
         <form onSubmit={handleAddMember} className={styles.formGrid}>
           <div className={`slds-form-element ${styles.formElement}`}>
             <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="new-member-input">
-              Register Competitor (Enter User ID)
+              Register Competitor
             </label>
             <div className="slds-form-element__control">
-              <input
-                id="new-member-input"
-                type="text"
-                placeholder="e.g. user_abc123"
+              <UserSearchCombobox
                 value={newMemberUserId}
-                onChange={(e) => setNewMemberUserId(e.target.value)}
-                className={`slds-input ${styles.inputControl}`}
+                onChange={(val) => setNewMemberUserId(val)}
               />
             </div>
           </div>

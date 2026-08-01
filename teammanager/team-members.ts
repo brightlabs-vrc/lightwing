@@ -1,11 +1,71 @@
 import { randomUUID } from "node:crypto";
-import { api, APIError, Header } from "encore.dev/api";
+import { api, APIError, Header, Query } from "encore.dev/api";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { requirePermission, memberRoleCache } from "../auth/rbac";
 import { toTeam, teamCache, TEAM_WITH_MEMBERS_INCLUDE, type Team } from "./teams";
 import { assertAdminCapNotReached } from "./team-guards";
 import { ADMINISTRATOR_ROLE } from "../lib/constants";
+
+interface ListTeamMembersParams {
+  id: string;
+  search?: Query<string>;
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface ListTeamMembersResponse {
+  members: Array<{
+    userId: string;
+    name: string;
+    slug: string | null;
+    role: string;
+  }>;
+  total: number;
+}
+
+// Lists members of a team with search and pagination. Publicly accessible.
+export const listTeamMembers = api(
+  { expose: true, method: "GET", path: "/api/teams/:id/members" },
+  async ({ id, search, limit, offset }: ListTeamMembersParams): Promise<ListTeamMembersResponse> => {
+    const where: any = { organizationId: id };
+    if (search) {
+      where.user = {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { slug: { contains: search, mode: "insensitive" } },
+        ],
+      };
+    }
+
+    const total = await prisma.member.count({ where });
+
+    const members = await prisma.member.findMany({
+      where,
+      take: limit ?? undefined,
+      skip: offset ?? undefined,
+      include: {
+        user: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return {
+      members: members.map((m) => ({
+        userId: m.userId,
+        name: m.user.name,
+        slug: m.user.slug,
+        role: m.role,
+      })),
+      total,
+    };
+  }
+);
 
 interface AddTeamMemberParams {
   id: string;

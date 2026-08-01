@@ -9,6 +9,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-admin-1', {
     id: 'mock-admin-1',
     name: 'Mock Admin',
+    slug: 'mock-admin',
     email: 'mock-admin@lightwing.local',
     image: null,
     biography: 'Local mock administrator account for frontend-only testing.',
@@ -23,6 +24,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-user-1', {
     id: 'mock-user-1',
     name: 'Thunder Bolt',
+    slug: 'thunder-bolt',
     email: 'bolt@lightwing.local',
     image: null,
     biography: 'A rapid competitor on the turf.',
@@ -37,6 +39,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-user-2', {
     id: 'mock-user-2',
     name: 'Shadow Runner',
+    slug: 'shadow-runner',
     email: 'shadow@lightwing.local',
     image: null,
     biography: 'Silent but swift.',
@@ -264,12 +267,46 @@ function getCurrentMockUserId(): string | null {
   }
 }
 
-export async function listPublicEvents(): Promise<{ events: eventmanager.EventDetail[] }> {
+export async function listPublicEvents(
+  limit?: number,
+  offset?: number,
+): Promise<{ events: eventmanager.EventListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listPublicEvents()
+    return appClient.eventmanager.listPublicEvents({
+      limit,
+      offset,
+    })
   }
   mockPublicEvents = loadMockEvents()
-  return { events: mockPublicEvents }
+
+  let events = mockPublicEvents.map((e) => ({
+    id: e.id,
+    name: e.name,
+    description: e.description,
+    ownerType: e.ownerType,
+    organizationId: e.organizationId,
+    ownerUserId: e.ownerUserId,
+    status: e.status,
+    scoringType: e.scoringType,
+    scoringTypeLabel: e.scoringTypeLabel,
+    classRestriction: e.classRestriction,
+    granularParticipation: e.granularParticipation,
+    signupsLocked: e.signupsLocked,
+    raceCount: e.raceEvents.length,
+    memberCount: e.members.length,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  }))
+
+  const total = events.length
+  if (offset !== undefined) {
+    events = events.slice(offset)
+  }
+  if (limit !== undefined) {
+    events = events.slice(0, limit)
+  }
+
+  return { events, total }
 }
 
 export async function getPublicEvent(eventId: string): Promise<eventmanager.EventDetail> {

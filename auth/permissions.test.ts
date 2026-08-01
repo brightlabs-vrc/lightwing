@@ -2,10 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
   administratorRole,
   administratorRoleLimit,
-  eventAdministratorRole,
   isSiteAdmin,
   memberRole,
-  organizationAdministratorRole,
   roleHasPermission,
   siteAdminRole,
 } from "./permissions";
@@ -14,12 +12,6 @@ describe("roleHasPermission", () => {
   test("administrators can manage every resource", () => {
     expect(roleHasPermission(administratorRole, "event", "delete")).toBe(true);
     expect(roleHasPermission(administratorRole, "organization", "update")).toBe(true);
-  });
-
-  test("event administrators can manage events but not the organization", () => {
-    expect(roleHasPermission(eventAdministratorRole, "event", "create")).toBe(true);
-    expect(roleHasPermission(eventAdministratorRole, "event", "delete")).toBe(true);
-    expect(roleHasPermission(eventAdministratorRole, "organization", "update")).toBe(false);
   });
 
   test("plain members only get read access", () => {
@@ -35,22 +27,18 @@ describe("roleHasPermission", () => {
     expect(administratorRoleLimit).toBe(3);
   });
 
-  test("administrators and event administrators get full race CRUD", () => {
-    for (const role of [administratorRole, eventAdministratorRole]) {
-      for (const action of ["read", "create", "update", "delete"] as const) {
-        expect(roleHasPermission(role, "raceEvent", action)).toBe(true);
-        expect(roleHasPermission(role, "raceResult", action)).toBe(true);
-      }
+  test("administrators get full race CRUD", () => {
+    for (const action of ["read", "create", "update", "delete"] as const) {
+      expect(roleHasPermission(administratorRole, "raceEvent", action)).toBe(true);
+      expect(roleHasPermission(administratorRole, "raceResult", action)).toBe(true);
     }
   });
 
-  test("members and organization admins only read races", () => {
-    for (const role of [memberRole, organizationAdministratorRole]) {
-      expect(roleHasPermission(role, "raceEvent", "read")).toBe(true);
-      expect(roleHasPermission(role, "raceResult", "read")).toBe(true);
-      expect(roleHasPermission(role, "raceEvent", "create")).toBe(false);
-      expect(roleHasPermission(role, "raceResult", "update")).toBe(false);
-    }
+  test("members only read races", () => {
+    expect(roleHasPermission(memberRole, "raceEvent", "read")).toBe(true);
+    expect(roleHasPermission(memberRole, "raceResult", "read")).toBe(true);
+    expect(roleHasPermission(memberRole, "raceEvent", "create")).toBe(false);
+    expect(roleHasPermission(memberRole, "raceResult", "update")).toBe(false);
   });
 });
 

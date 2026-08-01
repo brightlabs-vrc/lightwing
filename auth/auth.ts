@@ -82,8 +82,6 @@ const accessControl = createAccessControl({
 // control policy stays in sync with the checks performed by other services.
 const roles = {
   administrator: accessControl.newRole({ ...roleStatements.administrator }),
-  eventAdministrator: accessControl.newRole({ ...roleStatements.eventAdministrator }),
-  organizationAdministrator: accessControl.newRole({ ...roleStatements.organizationAdministrator }),
   member: accessControl.newRole({ ...roleStatements.member }),
 };
 
@@ -250,13 +248,35 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       create: {
         before: async (user) => {
           const existingUsers = await prisma.user.count();
+          const baseSlug = user.name ? user.name : "user";
+          let slug = baseSlug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+          if (!slug || slug.length < 3) {
+            slug = "user";
+          }
+          let uniqueSlug = slug;
+          let counter = 2;
+          while (true) {
+            const collision = await prisma.user.findUnique({ where: { slug: uniqueSlug } });
+            if (!collision) {
+              break;
+            }
+            uniqueSlug = `${slug}-${counter}`;
+            counter++;
+          }
+
           if (existingUsers > 0) {
-            return;
+            return {
+              data: {
+                ...user,
+                slug: uniqueSlug,
+              },
+            };
           }
 
           return {
             data: {
               ...user,
+              slug: uniqueSlug,
               siteRole: siteAdminRole,
             },
           };

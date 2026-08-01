@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-b6hee.encr.app`
+    return `https://${name}-88d98.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the b6hee Encore application.
+ * Client is an API client for the 88d98 Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -134,6 +134,7 @@ export namespace auth {
     export interface UpdateUserParams {
         authorization: string
         name?: string
+        slug?: string
         image?: string | null
         biography?: string | null
         careerOverview?: string | null
@@ -143,6 +144,7 @@ export namespace auth {
     export interface UserProfile {
         id: string
         name: string
+        slug: string | null
         email: string
         image: string | null
         biography: string | null
@@ -162,6 +164,7 @@ export namespace auth {
             this.baseClient = baseClient
             this.authHandler = this.authHandler.bind(this)
             this.getUserProfile = this.getUserProfile.bind(this)
+            this.getUserProfileBySlug = this.getUserProfileBySlug.bind(this)
             this.listUsers = this.listUsers.bind(this)
             this.setUserSiteRole = this.setUserSiteRole.bind(this)
             this.updateUserProfile = this.updateUserProfile.bind(this)
@@ -185,6 +188,15 @@ export namespace auth {
         public async getUserProfile(id: string): Promise<UserProfile> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/api/users/${encodeURIComponent(id)}`)
+            return await resp.json() as UserProfile
+        }
+
+        /**
+         * Returns a participant's public profile by slug.
+         */
+        public async getUserProfileBySlug(slug: string): Promise<UserProfile> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/users/by-slug/${encodeURIComponent(slug)}`)
             return await resp.json() as UserProfile
         }
 
@@ -244,6 +256,7 @@ export namespace auth {
                 careerOverview: params.careerOverview,
                 image:          params.image,
                 name:           params.name,
+                slug:           params.slug,
                 vrchatUsername: params.vrchatUsername,
             }
 
@@ -255,6 +268,11 @@ export namespace auth {
 }
 
 export namespace eventmanager {
+    export interface AddEventAdminParams {
+        authorization: string
+        userId: string
+    }
+
     export interface AddMemberParams {
         authorization: string
         userId: string
@@ -374,6 +392,11 @@ export namespace eventmanager {
         classRestriction: ClassTier | null
     }
 
+    export interface EventAdminResponse {
+        userId: string
+        name: string
+    }
+
     export interface EventDetail {
         id: string
         name: string
@@ -394,6 +417,25 @@ export namespace eventmanager {
         schedules: EventScheduleView[]
         pointsOverview: PointsEntryView[] | null
         ladderOverview: LadderEntryView[] | null
+        createdAt: string
+        updatedAt: string
+    }
+
+    export interface EventListItem {
+        id: string
+        name: string
+        description: string | null
+        ownerType: EventOwnerType
+        organizationId: string | null
+        ownerUserId: string | null
+        status: EventStatus
+        scoringType: number
+        scoringTypeLabel: string
+        classRestriction: ClassTier | null
+        granularParticipation: boolean
+        signupsLocked: boolean
+        raceCount: number
+        memberCount: number
         createdAt: string
         updatedAt: string
     }
@@ -455,6 +497,18 @@ export namespace eventmanager {
     export interface ListEventsParams {
         organizationId?: string
         classRestriction?: ClassTier
+        limit?: number
+        offset?: number
+    }
+
+    export interface ListEventsResponse {
+        events: EventListItem[]
+        total: number
+    }
+
+    export interface ListPublicEventsParams {
+        limit?: number
+        offset?: number
     }
 
     export interface MergeRaceResultsParams {
@@ -556,6 +610,10 @@ export namespace eventmanager {
         authorization: string
     }
 
+    export interface RemoveEventAdminParams {
+        authorization: string
+    }
+
     export interface RemoveMemberParams {
         authorization: string
     }
@@ -629,6 +687,7 @@ export namespace eventmanager {
 
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
+            this.addEventAdmin = this.addEventAdmin.bind(this)
             this.addEventMember = this.addEventMember.bind(this)
             this.addEventSchedule = this.addEventSchedule.bind(this)
             this.addRaceEventMember = this.addRaceEventMember.bind(this)
@@ -648,6 +707,7 @@ export namespace eventmanager {
             this.listClassTiers = this.listClassTiers.bind(this)
             this.listDatasets = this.listDatasets.bind(this)
             this.listEligibleEvents = this.listEligibleEvents.bind(this)
+            this.listEventAdmins = this.listEventAdmins.bind(this)
             this.listEvents = this.listEvents.bind(this)
             this.listPublicEvents = this.listPublicEvents.bind(this)
             this.listRaceEventMembers = this.listRaceEventMembers.bind(this)
@@ -656,6 +716,7 @@ export namespace eventmanager {
             this.mergeRaceResults = this.mergeRaceResults.bind(this)
             this.recomputeEventPoints = this.recomputeEventPoints.bind(this)
             this.recordLadderMatch = this.recordLadderMatch.bind(this)
+            this.removeEventAdmin = this.removeEventAdmin.bind(this)
             this.removeEventMember = this.removeEventMember.bind(this)
             this.removeRaceEventMember = this.removeRaceEventMember.bind(this)
             this.reorderRaceEvents = this.reorderRaceEvents.bind(this)
@@ -667,6 +728,29 @@ export namespace eventmanager {
             this.updateDatasetStatus = this.updateDatasetStatus.bind(this)
             this.updateEvent = this.updateEvent.bind(this)
             this.updateRaceEvent = this.updateRaceEvent.bind(this)
+        }
+
+        /**
+         * Adds an administrator to an event. Gated by requireEventPermission(..., action: "update").
+         */
+        public async addEventAdmin(id: string, params: AddEventAdminParams): Promise<{
+    success: boolean
+}> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                userId: params.userId,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(id)}/admins`, JSON.stringify(body), {headers})
+            return await resp.json() as {
+    success: boolean
+}
         }
 
         /**
@@ -1011,36 +1095,49 @@ export namespace eventmanager {
         }
 
         /**
+         * Lists event administrators.
+         */
+        public async listEventAdmins(id: string): Promise<{
+    admins: EventAdminResponse[]
+}> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/${encodeURIComponent(id)}/admins`)
+            return await resp.json() as {
+    admins: EventAdminResponse[]
+}
+        }
+
+        /**
          * Lists events, optionally filtered by organization or class restriction.
          */
-        public async listEvents(params: ListEventsParams): Promise<{
-    events: EventDetail[]
-}> {
+        public async listEvents(params: ListEventsParams): Promise<ListEventsResponse> {
             // Convert our params into the objects we need for the request
             const query = makeRecord<string, string | string[]>({
                 classRestriction: params.classRestriction === undefined ? undefined : String(params.classRestriction),
+                limit:            params.limit === undefined ? undefined : String(params.limit),
+                offset:           params.offset === undefined ? undefined : String(params.offset),
                 organizationId:   params.organizationId,
             })
 
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/api/events`, undefined, {query})
-            return await resp.json() as {
-    events: EventDetail[]
-}
+            return await resp.json() as ListEventsResponse
         }
 
         /**
          * Lists public events (UNOFFICIAL, OFFICIAL, CONCLUDED) without DRAFT visibility.
          * Used by the public events page.
          */
-        public async listPublicEvents(): Promise<{
-    events: EventDetail[]
-}> {
+        public async listPublicEvents(params: ListPublicEventsParams): Promise<ListEventsResponse> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                limit:  params.limit === undefined ? undefined : String(params.limit),
+                offset: params.offset === undefined ? undefined : String(params.offset),
+            })
+
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/public`)
-            return await resp.json() as {
-    events: EventDetail[]
-}
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/events/public`, undefined, {query})
+            return await resp.json() as ListEventsResponse
         }
 
         /**
@@ -1149,6 +1246,24 @@ export namespace eventmanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("POST", `/api/events/${encodeURIComponent(id)}/ladder/matches`, JSON.stringify(body), {headers})
             return await resp.json() as EventDetail
+        }
+
+        /**
+         * Removes an administrator from an event. Gated by requireEventPermission(..., action: "update").
+         */
+        public async removeEventAdmin(id: string, userId: string, params: RemoveEventAdminParams): Promise<{
+    success: boolean
+}> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/events/${encodeURIComponent(id)}/admins/${encodeURIComponent(userId)}`, undefined, {headers})
+            return await resp.json() as {
+    success: boolean
+}
         }
 
         /**
@@ -1426,6 +1541,33 @@ export namespace teammanager {
         logo?: string | null
     }
 
+    export interface ListTeamMembersParams {
+        search?: string
+        limit?: number
+        offset?: number
+    }
+
+    export interface ListTeamMembersResponse {
+        members: {
+            userId: string
+            name: string
+            slug: string | null
+            role: string
+        }[]
+        total: number
+    }
+
+    export interface ListTeamsParams {
+        search?: string
+        limit?: number
+        offset?: number
+    }
+
+    export interface ListTeamsResponse {
+        teams: TeamListItem[]
+        total: number
+    }
+
     export interface RemoveTeamMemberParams {
         authorization: string
     }
@@ -1438,6 +1580,15 @@ export namespace teammanager {
         stats: TeamStats
         administratorSlotsRemaining: number
         members: TeamMemberSummary[]
+    }
+
+    export interface TeamListItem {
+        id: string
+        name: string
+        slug: string
+        logo: string | null
+        administratorSlotsRemaining: number
+        memberCount: number
     }
 
     export interface TeamMemberSummary {
@@ -1479,6 +1630,8 @@ export namespace teammanager {
             this.addTeamMember = this.addTeamMember.bind(this)
             this.createTeam = this.createTeam.bind(this)
             this.getTeam = this.getTeam.bind(this)
+            this.getTeamBySlug = this.getTeamBySlug.bind(this)
+            this.listTeamMembers = this.listTeamMembers.bind(this)
             this.listTeams = this.listTeams.bind(this)
             this.removeTeamMember = this.removeTeamMember.bind(this)
             this.updateTeamMemberRole = this.updateTeamMemberRole.bind(this)
@@ -1535,16 +1688,44 @@ export namespace teammanager {
         }
 
         /**
-         * Lists all teams mapped via toTeam.
+         * Returns a team by its unique slug.
          */
-        public async listTeams(): Promise<{
-    teams: Team[]
-}> {
+        public async getTeamBySlug(slug: string): Promise<Team> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI("GET", `/api/teams`)
-            return await resp.json() as {
-    teams: Team[]
-}
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/teams/by-slug/${encodeURIComponent(slug)}`)
+            return await resp.json() as Team
+        }
+
+        /**
+         * Lists members of a team with search and pagination. Publicly accessible.
+         */
+        public async listTeamMembers(id: string, params: ListTeamMembersParams): Promise<ListTeamMembersResponse> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                limit:  params.limit === undefined ? undefined : String(params.limit),
+                offset: params.offset === undefined ? undefined : String(params.offset),
+                search: params.search,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/teams/${encodeURIComponent(id)}/members`, undefined, {query})
+            return await resp.json() as ListTeamMembersResponse
+        }
+
+        /**
+         * Lists all teams with search and pagination support.
+         */
+        public async listTeams(params: ListTeamsParams): Promise<ListTeamsResponse> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                limit:  params.limit === undefined ? undefined : String(params.limit),
+                offset: params.offset === undefined ? undefined : String(params.offset),
+                search: params.search,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/teams`, undefined, {query})
+            return await resp.json() as ListTeamsResponse
         }
 
         /**
@@ -1834,7 +2015,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "b6hee-Generated-TS-Client (Encore/v1.57.13)";
+            this.headers["User-Agent"] = "88d98-Generated-TS-Client (Encore/v1.57.13)";
         }
 
         this.requestInit = options.requestInit ?? {};
