@@ -179,13 +179,10 @@ export async function processQueue(): Promise<void> {
   }
 }
 
-// Maps retry counts (1 to 4) to backoff intervals in seconds (5, 10, 30, 60).
-function getBackoffDelaySeconds(retryCount: number): number {
-  if (retryCount === 1) return 5;
-  if (retryCount === 2) return 10;
-  if (retryCount === 3) return 30;
-  if (retryCount === 4) return 60;
-  return 0;
+const BACKOFF_SECONDS = [0, 5, 10, 30, 60] as const;
+
+function getBackoffDelaySeconds(attempt: number): number {
+  return BACKOFF_SECONDS[Math.min(attempt, BACKOFF_SECONDS.length - 1)];
 }
 
 // Recomputes the event-level points aggregate for a participant.

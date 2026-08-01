@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-oopto.encr.app`
+    return `https://${name}-b6hee.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the oopto Encore application.
+ * Client is an API client for the b6hee Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -313,7 +313,7 @@ export namespace eventmanager {
         ownerType: EventOwnerType
         organizationId?: string | null
         ownerUserId?: string | null
-        scoringType: ScoringType
+        scoringType: number
         scoringRulesMode?: string | null
         customScoringTables?: any
         classRestriction?: ClassTier | null
@@ -520,9 +520,6 @@ export namespace eventmanager {
         members: RaceEventMemberView[]
     }
 
-    /**
-     * One participant's entry in a bulk standings payload.
-     */
     export interface RaceResultInput {
         userId: string
         position?: number | null
@@ -577,8 +574,6 @@ export namespace eventmanager {
         results: RaceResultInput[]
     }
 
-    export type ScoringType = 1 | 2
-
     export interface SetPointsParams {
         authorization: string
         points: number
@@ -591,7 +586,7 @@ export namespace eventmanager {
 
     export interface SetStatusParams {
         authorization: string
-        status: EventStatus
+        status: any
     }
 
     export interface SetUserClassParams {
@@ -611,7 +606,7 @@ export namespace eventmanager {
         description?: string | null
         scoringRulesMode?: string | null
         customScoringTables?: any
-        classRestriction?: ClassTier | null
+        classRestriction?: any
         granularParticipation?: boolean
     }
 
@@ -1839,7 +1834,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "oopto-Generated-TS-Client (Encore/v1.57.13)";
+            this.headers["User-Agent"] = "b6hee-Generated-TS-Client (Encore/v1.57.13)";
         }
 
         this.requestInit = options.requestInit ?? {};

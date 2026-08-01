@@ -3,178 +3,19 @@ import { useState, useEffect } from 'react'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { AdminLayout } from '../-AdminLayout'
 import { useEventDetail } from '../../../hooks/useEventDetail'
-import { isRaceNotStarted, isRaceOngoing, isRaceConcluded } from '../../../lib/raceStatus'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { LoadingBox } from '../../../components/LoadingBox'
-import { StandingsEditor } from '../../../components/StandingsEditor'
 import { GradePointsPreview } from '../../../components/GradePointsPreview'
 import { EventScoringTablesEditor } from '../../../components/EventScoringTablesEditor'
 import type { eventmanager } from '../../../lib/client'
 
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { RaceListPanel } from '../../../components/RaceListPanel'
+import { RaceDetailPane } from '../../../components/RaceDetailPane'
 
-interface SortableRaceItemProps {
-  race: eventmanager.RaceEventDetail
-  onMoveUp?: () => void
-  onMoveDown?: () => void
-  isFirst: boolean
-  isLast: boolean
-  isSelected: boolean
-  onSelect: () => void
-}
-
-function SortableRaceItem({
-  race,
-  onMoveUp,
-  onMoveDown,
-  isFirst,
-  isLast,
-  isSelected,
-  onSelect,
-}: SortableRaceItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: race.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    border: '1px solid #dddbda',
-    borderRadius: '4px',
-    background: isSelected ? '#0176d3' : '#ffffff',
-    padding: '8px',
-    marginBottom: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    boxShadow: isDragging ? '0 5px 15px rgba(0,0,0,0.15)' : 'none',
-    zIndex: isDragging ? 1000 : 'auto',
-  }
-
-  let statusText = 'Ready'
-  if (race.startsAt && !race.endsAt) {
-    statusText = 'Live'
-  } else if (race.endsAt) {
-    statusText = 'Done'
-  }
-
-  return (
-    <div ref={setNodeRef} style={style}>
-      {/* Left side: Drag handle. Only the drag handle should initiate drag behavior */}
-      <div
-        {...attributes}
-        {...listeners}
-        style={{
-          cursor: 'grab',
-          padding: '4px 8px',
-          background: '#f1f5f9',
-          border: '1px solid #cbd5e1',
-          borderRadius: '4px',
-          userSelect: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        title="Drag to reorder"
-      >
-        <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#64748b' }}>☰</span>
-      </div>
-
-      {/* Center: main body. Clicking anywhere else selects the race */}
-      <div
-        onClick={onSelect}
-        style={{
-          flexGrow: 1,
-          cursor: 'pointer',
-          minWidth: 0,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px', color: isSelected ? '#ffffff' : '#1e293b' }}>
-            #{race.sequence}. {race.name}
-          </span>
-          <span
-            className="slds-badge"
-            style={{
-              padding: '1px 6px',
-              fontSize: '10px',
-              backgroundColor: statusText === 'Live' ? '#2e7d32' : statusText === 'Done' ? '#475569' : '#0284c7',
-              color: '#ffffff',
-            }}
-          >
-            {statusText}
-          </span>
-        </div>
-      </div>
-
-      {/* Right side: fallback controls */}
-      <div style={{ display: 'flex', gap: '4px' }}>
-        <button
-          type="button"
-          disabled={isFirst}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (onMoveUp) onMoveUp()
-          }}
-          className="slds-button slds-button_neutral"
-          style={{
-            padding: '2px 6px',
-            fontSize: '11px',
-            height: '24px',
-            lineHeight: '20px',
-            borderRadius: '3px',
-            color: isSelected ? '#1e293b' : undefined,
-          }}
-          title="Move up"
-        >
-          &uarr;
-        </button>
-        <button
-          type="button"
-          disabled={isLast}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (onMoveDown) onMoveDown()
-          }}
-          className="slds-button slds-button_neutral"
-          style={{
-            padding: '2px 6px',
-            fontSize: '11px',
-            height: '24px',
-            lineHeight: '20px',
-            borderRadius: '3px',
-            color: isSelected ? '#1e293b' : undefined,
-          }}
-          title="Move down"
-        >
-          &darr;
-        </button>
-      </div>
-    </div>
-  )
-}
+import { EventSummaryTab } from '../../../components/EventSummaryTab'
+import { EventMembersTab } from '../../../components/EventMembersTab'
+import { EventRacesTab } from '../../../components/EventRacesTab'
+import { DEFAULT_SCORING_TABLES } from '../../../lib/scoringDefaults'
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   beforeLoad: async ({ location }) => {
@@ -242,70 +83,7 @@ function AdminEventDetailPage() {
   const [showEditEventModal, setShowEditEventModal] = useState(false)
   const [showEditRaceModal, setShowEditRaceModal] = useState(false)
 
-  const [isReordering, setIsReordering] = useState(false)
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
   const hasStartedOrConcludedRaces = races.some((r) => r.startsAt !== null || r.endsAt !== null)
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over) return
-
-    if (active.id !== over.id) {
-      const oldIndex = races.findIndex((r) => r.id === active.id)
-      const newIndex = races.findIndex((r) => r.id === over.id)
-      const nextOrder = arrayMove(races, oldIndex, newIndex)
-      const nextOrderedIds = nextOrder.map((r) => r.id)
-
-      if (hasStartedOrConcludedRaces) {
-        if (!window.confirm("Reordering races after activity has started can change the published event schedule. Continue?")) {
-          return
-        }
-      }
-
-      void handleReorderRaces(nextOrderedIds)
-    }
-  }
-
-  const handleMoveUp = (index: number) => {
-    if (index <= 0) return
-    const nextOrder = [...races]
-    const temp = nextOrder[index]
-    nextOrder[index] = nextOrder[index - 1]
-    nextOrder[index - 1] = temp
-    const nextOrderedIds = nextOrder.map((r) => r.id)
-
-    if (hasStartedOrConcludedRaces) {
-      if (!window.confirm("Reordering races after activity has started can change the published event schedule. Continue?")) {
-        return
-      }
-    }
-
-    void handleReorderRaces(nextOrderedIds)
-  }
-
-  const handleMoveDown = (index: number) => {
-    if (index >= races.length - 1) return
-    const nextOrder = [...races]
-    const temp = nextOrder[index]
-    nextOrder[index] = nextOrder[index + 1]
-    nextOrder[index + 1] = temp
-    const nextOrderedIds = nextOrder.map((r) => r.id)
-
-    if (hasStartedOrConcludedRaces) {
-      if (!window.confirm("Reordering races after activity has started can change the published event schedule. Continue?")) {
-        return
-      }
-    }
-
-    void handleReorderRaces(nextOrderedIds)
-  }
 
   // Race Edit Form States
   const [raceEditName, setRaceEditName] = useState('')
@@ -323,12 +101,7 @@ function AdminEventDetailPage() {
   const [editGranularParticipation, setEditGranularParticipation] = useState(false)
   const [editSignupsLocked, setEditSignupsLocked] = useState(false)
   const [editScoringRulesMode, setEditScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
-  const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>({
-    OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-    GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-    GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-    GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
-  })
+  const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   // Set race edit values when modal is toggled or race selection changes
@@ -356,12 +129,7 @@ function AdminEventDetailPage() {
       if (selectedEvent.customScoringTables) {
         setEditCustomScoringTables(selectedEvent.customScoringTables)
       } else {
-        setEditCustomScoringTables({
-          OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-          GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-          GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-          GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
-        })
+        setEditCustomScoringTables(DEFAULT_SCORING_TABLES)
       }
     }
   }, [showEditEventModal, selectedEvent])
@@ -674,681 +442,57 @@ function AdminEventDetailPage() {
 
             {/* Tab 1: Summary Info */}
             {activeTab === 'details' && (
-              <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
-                <div className="slds-grid slds-wrap slds-gutters">
-                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Description</p>
-                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
-                      {selectedEvent.description ?? 'No description registered.'}
-                    </p>
-                  </div>
-                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Scoring Configuration</p>
-                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
-                      Scoring Mode: <strong>{selectedEvent.scoringTypeLabel}</strong> ({selectedEvent.scoringType === 1 ? 'Points aggregation' : 'Ladder Rating (ELO)'}) <br />
-                      {selectedEvent.scoringType === 1 && (
-                        <>
-                          Rules Source: <strong>{selectedEvent.scoringRulesMode || 'STANDARD'}</strong>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Owner Parameters</p>
-                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
-                      Ownership Type: {selectedEvent.ownerType} <br />
-                      ID: {selectedEvent.organizationId ?? selectedEvent.ownerUserId}
-                    </p>
-                  </div>
-                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Class restriction</p>
-                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
-                      Tier Restriction: <strong>{selectedEvent.classRestriction ?? 'PRE_OP (Any tier eligibility)'}</strong>
-                    </p>
-                  </div>
-                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Participation Model</p>
-                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
-                      Granular Per-Race Participation: <strong>{selectedEvent.granularParticipation ? 'Enabled (Per-Race registration required)' : 'Disabled (Event-wide registration)'}</strong>
-                    </p>
-                  </div>
-                  <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                    <p className="slds-text-title_caps text-slate-500 font-bold" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Signups Status</p>
-                    <p className="slds-text-body_regular text-slate-800 slds-m-top_xx-small">
-                      Signups Lock: <strong>{selectedEvent.signupsLocked ? 'Locked (Self-service signups disabled)' : 'Open (Self-service signups enabled)'}</strong>
-                    </p>
-                  </div>
-                </div>
-
-                {selectedEvent.scoringType === 1 && (
-                  <div className="slds-m-bottom_large" style={{ marginTop: '1.5rem' }}>
-                    <h3 className="slds-text-heading_small font-bold slds-m-bottom_small text-slate-900" style={{ fontWeight: 'bold', fontSize: '14px', borderBottom: '1px solid #f3f2f1', paddingBottom: '4px' }}>
-                      Event Points Scoring Configuration Tables
-                    </h3>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      {['OP', 'GIII', 'GII', 'GI'].map((grade) => {
-                        const DEFAULT_TABLES: Record<string, Record<number, number>> = {
-                          OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-                          GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-                          GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-                          GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
-                        };
-                        const table = (selectedEvent.scoringRulesMode === 'CUSTOM' && selectedEvent.customScoringTables)
-                          ? (selectedEvent.customScoringTables[grade] || DEFAULT_TABLES[grade])
-                          : DEFAULT_TABLES[grade];
-                        return <GradePointsPreview key={grade} grade={grade} table={table} />;
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Standings overview aggregates block */}
-                <div className="slds-m-top_large">
-                  <h3 className="slds-text-heading_small font-bold slds-m-bottom_small text-slate-900" style={{ fontWeight: 'bold', borderBottom: '1px solid #f3f2f1', paddingBottom: '4px' }}>
-                    Current Event Overall Leaderboard
-                  </h3>
-                  {selectedEvent.scoringType === 1 ? (
-                    selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
-                      <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
-                        <thead>
-                          <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Rank</div></th>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Name</div></th>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Total Points</div></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedEvent.pointsOverview.map((item, idx) => (
-                            <tr key={item.userId} className="slds-hint-parent">
-                              <td><strong>{idx + 1}</strong></td>
-                              <td><span className="font-semibold text-blue-600">{item.name}</span></td>
-                              <td><code className="text-xs">{item.userId}</code></td>
-                              <td><strong>{item.points} pts</strong></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="slds-text-body_small text-slate-500">No participants score standings loaded.</p>
-                    )
-                  ) : (
-                    selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
-                      <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
-                        <thead>
-                          <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Rank</div></th>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Name</div></th>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Rating (ELO)</div></th>
-                            <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Wins / Losses</div></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedEvent.ladderOverview.map((item) => (
-                            <tr key={item.userId} className="slds-hint-parent">
-                              <td><strong>{item.rank}</strong></td>
-                              <td><span className="font-semibold text-blue-600">{item.name}</span></td>
-                              <td><strong>{item.elo}</strong></td>
-                              <td>{item.wins}W - {item.losses}L</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="slds-text-body_small text-slate-500">No ladder match results computed yet.</p>
-                    )
-                  )}
-                </div>
-              </div>
+              <EventSummaryTab selectedEvent={selectedEvent} />
             )}
 
             {/* Tab 2: Registered Members */}
             {activeTab === 'members' && (
-              <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
-                {/* Add Member Quick Form */}
-                <div className="slds-box slds-m-bottom_large" style={{ background: '#f3f2f1', border: '1px solid #dddbda' }}>
-                  <form onSubmit={handleAddMember} className="slds-grid slds-wrap slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
-                    <div className="slds-form-element" style={{ flexGrow: 1, minWidth: '240px' }}>
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="new-member-input">
-                        Register Competitor (Enter User ID)
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="new-member-input"
-                          type="text"
-                          placeholder="e.g. user_abc123"
-                          value={newMemberUserId}
-                          onChange={(e) => setNewMemberUserId(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', background: '#fff' }}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="submit"
-                      className="slds-button slds-button_brand"
-                      style={{ padding: '6px 16px', height: '36px' }}
-                    >
-                      Register Member
-                    </button>
-                  </form>
-                  <p className="slds-text-body_small text-slate-500 slds-m-top_x-small" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
-                    💡 For mock testing, you can input "mock-user-1", "mock-user-2", "mock-user-3" or other valid IDs.
-                  </p>
-                </div>
-
-                {/* List Members */}
-                <h3 className="slds-text-heading_small font-bold slds-m-bottom_small text-slate-900" style={{ fontWeight: 'bold' }}>Registered Participants</h3>
-                {selectedEvent.members.length === 0 ? (
-                  <p className="slds-text-body_small text-slate-500">No participants are currently registered for this competition.</p>
-                ) : (
-                  <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda' }}>
-                    <thead>
-                      <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                        <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Competitor Name</div></th>
-                        <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-                        <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Skill Tier</div></th>
-                        <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate">Actions</div></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedEvent.members.map((member) => (
-                        <tr key={member.userId} className="slds-hint-parent">
-                          <td><span className="font-semibold text-slate-800">{member.name}</span></td>
-                          <td><code className="text-xs">{member.userId}</code></td>
-                          <td>
-                            <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px' }}>
-                              {member.classTier ?? 'PRE_OP'}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              onClick={() => void handleRemoveMember(member.userId)}
-                              className="slds-button slds-button_destructive"
-                              style={{ padding: '1px 8px', fontSize: '11px', background: '#d32f2f', color: '#fff' }}
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              <EventMembersTab
+                selectedEvent={selectedEvent}
+                newMemberUserId={newMemberUserId}
+                setNewMemberUserId={setNewMemberUserId}
+                handleAddMember={handleAddMember}
+                handleRemoveMember={handleRemoveMember}
+              />
             )}
 
             {/* Tab 3: Unified Races & Tracks Experience */}
             {activeTab === 'races' && (
-              <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
-                {races.length === 0 ? (
-                  <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
-                    <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>No races yet</p>
-                    <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
-                      Configure your first race track using the wizard.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateRaceModal(true)}
-                      className="slds-button slds-button_brand slds-m-top_medium"
-                    >
-                      Create Race Track
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    {/* Left Sidebar: Race Selector */}
-                    <div style={{ flex: '1 1 300px', maxWidth: '360px', background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
-                          Configure / Manage Tracks
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() => setIsReordering(!isReordering)}
-                          className={`slds-button ${isReordering ? 'slds-button_brand' : 'slds-button_neutral'}`}
-                          style={{ padding: '2px 10px', fontSize: '11px', height: '28px' }}
-                        >
-                          {isReordering ? 'Done' : 'Reorder'}
-                        </button>
-                      </div>
-
-                      {isReordering ? (
-                        <div style={{ marginBottom: '16px' }}>
-                          <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', lineHeight: '1.4', fontStyle: 'italic' }}>
-                            Drag items or use the arrows to reorder. Changes are saved automatically.
-                          </p>
-                          {(() => {
-                            const DndContextAny = DndContext as any
-                            const SortableContextAny = SortableContext as any
-                            return (
-                              <DndContextAny
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                onDragEnd={handleDragEnd}
-                              >
-                                <SortableContextAny
-                                  items={races.map((r) => r.id)}
-                                  strategy={verticalListSortingStrategy}
-                                >
-                                  {races.map((race, index) => (
-                                    <SortableRaceItem
-                                      key={race.id}
-                                      race={race}
-                                      isFirst={index === 0}
-                                      isLast={index === races.length - 1}
-                                      isSelected={selectedRaceId === race.id}
-                                      onSelect={() => void handleSelectRace(race, false)}
-                                      onMoveUp={() => handleMoveUp(index)}
-                                      onMoveDown={() => handleMoveDown(index)}
-                                    />
-                                  ))}
-                                </SortableContextAny>
-                              </DndContextAny>
-                            )
-                          })()}
-                        </div>
-                      ) : (
-                        <>
-                          {/* Group: Ongoing */}
-                          {ongoingRaces.length > 0 && (
-                            <div className="slds-m-bottom_medium">
-                              <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
-                                Ongoing ({ongoingRaces.length})
-                              </h4>
-                              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                                {ongoingRaces.map((race) => (
-                                  <li key={race.id} className="slds-m-bottom_xx-small">
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleSelectRace(race, false)}
-                                      className="slds-button slds-button_neutral"
-                                      style={{
-                                        width: '100%',
-                                        textAlign: 'left',
-                                        padding: '8px 12px',
-                                        background: selectedRaceId === race.id ? '#0176d3' : '#ffffff',
-                                        color: selectedRaceId === race.id ? '#ffffff' : '#0176d3',
-                                        fontWeight: selectedRaceId === race.id ? 'bold' : 'normal',
-                                        border: selectedRaceId === race.id ? '1px solid #0176d3' : '1px solid #dddbda',
-                                        borderRadius: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                      }}
-                                    >
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        #{race.sequence}. {race.name}
-                                      </span>
-                                      <span style={{ fontSize: '10px', opacity: 0.85 }}>Live</span>
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {/* Group: Concluded */}
-                          {concludedRaces.length > 0 && (
-                            <div className="slds-m-bottom_medium">
-                              <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
-                                Concluded ({concludedRaces.length})
-                              </h4>
-                              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                                {concludedRaces.map((race) => (
-                                  <li key={race.id} className="slds-m-bottom_xx-small">
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleSelectRace(race, false)}
-                                      className="slds-button slds-button_neutral"
-                                      style={{
-                                        width: '100%',
-                                        textAlign: 'left',
-                                        padding: '8px 12px',
-                                        background: selectedRaceId === race.id ? '#0176d3' : '#ffffff',
-                                        color: selectedRaceId === race.id ? '#ffffff' : '#0176d3',
-                                        fontWeight: selectedRaceId === race.id ? 'bold' : 'normal',
-                                        border: selectedRaceId === race.id ? '1px solid #0176d3' : '1px solid #dddbda',
-                                        borderRadius: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                      }}
-                                    >
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        #{race.sequence}. {race.name}
-                                      </span>
-                                      <span style={{ fontSize: '10px', opacity: 0.85 }}>Done</span>
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {/* Group: Not Started */}
-                          {notStartedRaces.length > 0 && (
-                            <div>
-                              <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
-                                Not Started ({notStartedRaces.length})
-                              </h4>
-                              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                                {notStartedRaces.map((race) => (
-                                  <li key={race.id} className="slds-m-bottom_xx-small">
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleSelectRace(race, false)}
-                                      className="slds-button slds-button_neutral"
-                                      style={{
-                                        width: '100%',
-                                        textAlign: 'left',
-                                        padding: '8px 12px',
-                                        background: selectedRaceId === race.id ? '#0176d3' : '#ffffff',
-                                        color: selectedRaceId === race.id ? '#ffffff' : '#0176d3',
-                                        fontWeight: selectedRaceId === race.id ? 'bold' : 'normal',
-                                        border: selectedRaceId === race.id ? '1px solid #0176d3' : '1px solid #dddbda',
-                                        borderRadius: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                      }}
-                                    >
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        #{race.sequence}. {race.name}
-                                      </span>
-                                      <span style={{ fontSize: '10px', opacity: 0.85 }}>Ready</span>
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    {/* Right Pane: Focused Race details / StandingsEditor OR clean placeholder state */}
-                    <div style={{ flex: '2 1 500px', minWidth: '0' }}>
-                      {selectedRaceId === null || !selectedRace ? (
-                        /* Case A: Show elegant, clean placeholder state box */
-                        <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center', textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                          <div style={{ padding: '2rem' }}>
-                            <p className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
-                              No race selected
-                            </p>
-                            <p className="slds-text-body_regular text-slate-500 slds-m-top_small" style={{ fontSize: '14px', maxWidth: '360px', margin: '8px auto 0 auto', lineHeight: '1.5' }}>
-                              Select a race track from the left panel to begin managing competitors, recording standings, and starting or concluding races.
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setShowCreateRaceModal(true)}
-                              className="slds-button slds-button_brand slds-m-top_large"
-                              style={{ padding: '6px 16px' }}
-                            >
-                              Create Race Track
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Case B: Specific Race is selected — render management controls, lineup and StandingsEditor */
-                        <div>
-                          {/* Race Details Header Card */}
-                          <div className="slds-box slds-m-bottom_medium bg-white" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
-                            <div className="slds-grid slds-grid_align-spread slds-grid_vertical-align-center" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                              <div>
-                                <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
-                                  #{selectedRace.sequence}. {selectedRace.name}
-                                </h3>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                  <p className="text-slate-500 text-xs" style={{ margin: 0 }}>
-                                    Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> | Location: <strong>{selectedRace.location}</strong>
-                                  </p>
-                                  <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '11px', textTransform: 'none' }}>
-                                    Class Restriction: <strong>{selectedRace.classRestriction ?? 'Any tier'}</strong>
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0, fontSize: '12px' }} htmlFor="race-class-restriction-select">
-                                    Class Restriction:
-                                  </label>
-                                  <div className="slds-form-element__control">
-                                    <select
-                                      id="race-class-restriction-select"
-                                      value={selectedRace.classRestriction || ''}
-                                      onChange={(e) => void handleUpdateRace(selectedRace.id, { classRestriction: e.target.value ? e.target.value as eventmanager.ClassTier : null })}
-                                      className="slds-select"
-                                      style={{ minWidth: '130px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
-                                    >
-                                      <option value="">Any Tier (None)</option>
-                                      {CLASS_TIER_OPTIONS.map((tier) => (
-                                        <option key={tier} value={tier}>
-                                          {tier}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-
-                                {selectedEvent.scoringType === 1 && (
-                                  <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0, fontSize: '12px' }} htmlFor="race-grade-select">
-                                      Grade:
-                                    </label>
-                                    <div className="slds-form-element__control">
-                                      <select
-                                        id="race-grade-select"
-                                        value={selectedRace.grade || ''}
-                                        onChange={(e) => void handleUpdateRace(selectedRace.id, { grade: e.target.value || null })}
-                                        className="slds-select"
-                                        style={{ minWidth: '100px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
-                                      >
-                                        <option value="">-- None --</option>
-                                        <option value="OP">OP</option>
-                                        <option value="GIII">GIII</option>
-                                        <option value="GII">GII</option>
-                                        <option value="GI">GI</option>
-                                      </select>
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div style={{ display: 'flex', gap: '6px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowEditRaceModal(true)}
-                                    className="slds-button slds-button_neutral"
-                                    style={{ padding: '4px 12px', fontSize: '12px' }}
-                                  >
-                                    Edit Race
-                                  </button>
-                                  {isRaceNotStarted(selectedRace) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleStartRace(selectedRace.id)}
-                                      className="slds-button slds-button_success"
-                                      style={{ padding: '4px 12px', fontSize: '12px', background: '#2e7d32', color: '#fff' }}
-                                    >
-                                      Start Race
-                                    </button>
-                                  )}
-                                  {isRaceOngoing(selectedRace) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleEndRace(selectedRace.id)}
-                                      className="slds-button slds-button_destructive"
-                                      style={{ padding: '4px 12px', fontSize: '12px', background: '#d32f2f', color: '#fff' }}
-                                    >
-                                      End Race
-                                    </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleDeleteRace(selectedRace.id)}
-                                    className="slds-button slds-button_neutral"
-                                    style={{ padding: '4px 12px', fontSize: '12px', color: '#d32f2f' }}
-                                  >
-                                    Delete Race
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedRaceId(null)
-                                    }}
-                                    className="slds-button slds-button_neutral"
-                                    style={{ padding: '4px 12px', fontSize: '12px' }}
-                                  >
-                                    Clear Selection
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="text-slate-500 slds-m-top_small" style={{ fontSize: '11px', borderTop: '1px solid #f3f2f1', paddingTop: '8px' }}>
-                              {selectedRace.startsAt ? `Started: ${new Date(selectedRace.startsAt).toLocaleString()}` : 'Race is currently not started'} <br />
-                              {selectedRace.endsAt ? `Ended: ${new Date(selectedRace.endsAt).toLocaleString()}` : ''}
-                              {selectedRace.grade && (
-                                <span style={{ float: 'right' }}>
-                                  Scoring Table: <strong>{selectedRace.grade}</strong> | Source: <strong>{selectedEvent.scoringRulesMode === 'CUSTOM' ? 'Event Custom Rules' : 'Event Standard Rules'}</strong>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Warning Banner if points-based event but race has no grade */}
-                          {selectedEvent.scoringType === 1 && !selectedRace.grade && (
-                            <div className="slds-m-bottom_medium">
-                              <AlertBanner variant="error">
-                                <div style={{ textAlign: 'left' }}>
-                                  <strong>Missing Race Grade Configuration</strong>
-                                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7f1d1d' }}>
-                                    This event is points-based, but this race has no grade configured. Points for its results will resolve to <strong>0</strong> until a grade is configured.
-                                  </p>
-                                </div>
-                              </AlertBanner>
-                            </div>
-                          )}
-
-                          {/* Granular Participant lineup box */}
-                          {selectedEvent.granularParticipation && (
-                            <div className="slds-box slds-m-bottom_medium" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '1rem' }}>
-                              <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Competitor Lineup</span>
-                                <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '10px' }}>
-                                  {(selectedRace.members ?? []).length} Registered
-                                </span>
-                              </h3>
-
-                              <div className="slds-box slds-m-bottom_small" style={{ background: '#f3f2f1', border: '1px solid #dddbda', padding: '8px 12px' }}>
-                                <form
-                                  onSubmit={(e) => {
-                                    e.preventDefault();
-                                    void handleAddRaceMember(selectedRace.id, newRaceMemberUserId);
-                                  }}
-                                  className="slds-grid slds-wrap"
-                                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                                >
-                                  <div style={{ flexGrow: 1, minWidth: '180px' }}>
-                                    <select
-                                      value={newRaceMemberUserId}
-                                      onChange={(e) => setNewRaceMemberUserId(e.target.value)}
-                                      className="slds-select"
-                                      style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px', background: '#fff', fontSize: '12px' }}
-                                    >
-                                      <option value="">-- Add Competitor from Event Members --</option>
-                                      {selectedEvent.members
-                                        .filter((em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId))
-                                        .map((em) => (
-                                          <option key={em.userId} value={em.userId}>
-                                            {em.name} ({em.classTier ?? 'PRE_OP'})
-                                          </option>
-                                        ))}
-                                    </select>
-                                  </div>
-                                  <button
-                                    type="submit"
-                                    className="slds-button slds-button_brand"
-                                    style={{ padding: '4px 12px', height: '30px', fontSize: '12px' }}
-                                    disabled={!newRaceMemberUserId}
-                                  >
-                                    Add
-                                  </button>
-                                </form>
-                              </div>
-
-                              {(selectedRace.members?.length ?? 0) === 0 ? (
-                                <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: 0 }}>No competitors registered specifically for this race yet.</p>
-                              ) : (
-                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  {(selectedRace.members ?? []).map((m) => (
-                                    <span
-                                      key={m.userId}
-                                      className="slds-badge slds-theme_light"
-                                      style={{
-                                        padding: '2px 8px',
-                                        fontSize: '11px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        border: '1px solid #dddbda',
-                                        background: '#f8fafc',
-                                      }}
-                                    >
-                                      <strong>{m.name}</strong>
-                                      <button
-                                        type="button"
-                                        onClick={() => void handleRemoveRaceMember(selectedRace.id, m.userId)}
-                                        style={{
-                                          background: 'transparent',
-                                          border: 'none',
-                                          color: '#d32f2f',
-                                          cursor: 'pointer',
-                                          fontWeight: 'bold',
-                                          padding: 0,
-                                        }}
-                                        title="Remove competitor"
-                                      >
-                                        ✕
-                                      </button>
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Dynamic Standings editor grid */}
-                          <StandingsEditor
-                            raceName={selectedRace.name}
-                            isRaceOngoing={isRaceOngoing(selectedRace)}
-                            isRaceNotStarted={isRaceNotStarted(selectedRace)}
-                            loadingResults={loadingResults}
-                            memberCount={selectedEvent.granularParticipation ? (selectedRace.members?.length ?? 0) : selectedEvent.members.length}
-                            rows={derivedStates}
-                            changeSummary={changeSummary}
-                            savingBatch={savingBatch}
-                            onInferTimes={handleInferFinishTimes}
-                            onCancel={handleCancelStandingsEdit}
-                            onSave={handleUnifiedSave}
-                            onResetAll={resetStandingsDraft}
-                            onResultChange={handleResultChange}
-                            onTogglePendingDeletion={togglePendingDeletion}
-                            onUndoRow={handleUndoRow}
-                            noTopMargin={true}
-                            scoringType={selectedEvent.scoringType}
-                            scoringRulesMode={selectedEvent.scoringRulesMode}
-                            customScoringTables={selectedEvent.customScoringTables}
-                            raceGrade={selectedRace.grade}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <EventRacesTab
+                races={races}
+                selectedRaceId={selectedRaceId}
+                setSelectedRaceId={setSelectedRaceId}
+                selectedRace={selectedRace}
+                ongoingRaces={ongoingRaces}
+                concludedRaces={concludedRaces}
+                notStartedRaces={notStartedRaces}
+                handleSelectRace={handleSelectRace}
+                handleReorderRaces={handleReorderRaces}
+                hasStartedOrConcludedRaces={hasStartedOrConcludedRaces}
+                setShowCreateRaceModal={setShowCreateRaceModal}
+                selectedEvent={selectedEvent}
+                newRaceMemberUserId={newRaceMemberUserId}
+                setNewRaceMemberUserId={setNewRaceMemberUserId}
+                CLASS_TIER_OPTIONS={CLASS_TIER_OPTIONS}
+                handleUpdateRace={handleUpdateRace}
+                handleStartRace={handleStartRace}
+                handleEndRace={handleEndRace}
+                handleDeleteRace={handleDeleteRace}
+                handleAddRaceMember={handleAddRaceMember}
+                handleRemoveRaceMember={handleRemoveRaceMember}
+                setShowEditRaceModal={setShowEditRaceModal}
+                loadingResults={loadingResults}
+                derivedStates={derivedStates}
+                changeSummary={changeSummary}
+                savingBatch={savingBatch}
+                handleInferFinishTimes={handleInferFinishTimes}
+                handleCancelStandingsEdit={handleCancelStandingsEdit}
+                handleUnifiedSave={handleUnifiedSave}
+                resetStandingsDraft={resetStandingsDraft}
+                handleResultChange={handleResultChange}
+                togglePendingDeletion={togglePendingDeletion}
+                handleUndoRow={handleUndoRow}
+              />
             )}
 
             {/* Tab 4: Datasets (Disabled Placeholder) */}

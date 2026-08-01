@@ -10,9 +10,11 @@ vi.mock("~encore/clients", () => ({
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import { prisma } from "./prisma";
-import { createEvent, addEventMember } from "./events";
+import { createEvent } from "./events";
+import { addEventMember } from "./event-members";
 import { createRaceEvent, addRaceEventMember } from "./raceevents";
-import { assignRaceResult, replaceRaceResults, mergeRaceResults } from "./results";
+import { assignRaceResult } from "./results";
+import { replaceRaceResults, mergeRaceResults } from "./results-bulk";
 
 const createdUserIds: string[] = [];
 const createdEventIds: string[] = [];

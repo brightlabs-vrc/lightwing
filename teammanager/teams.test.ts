@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import { prisma } from "./prisma";
-import { getTeam, updateTeamStats, listTeams, createTeam, addTeamMember, updateTeamMemberRole, removeTeamMember } from "./teams";
+import { getTeam, listTeams, createTeam } from "./teams";
+import { updateTeamStats } from "./team-stats";
+import { addTeamMember, updateTeamMemberRole, removeTeamMember } from "./team-members";
 
 const createdUserIds: string[] = [];
 const createdOrganizationIds: string[] = [];

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import { prisma } from "./prisma";
-import { joinEvent, leaveEvent, getEvent, addEventMember, removeEventMember } from "./events";
+import { getEvent } from "./events";
+import { joinEvent, leaveEvent, addEventMember, removeEventMember } from "./event-members";
 import { joinRaceEvent, leaveRaceEvent, addRaceEventMember, removeRaceEventMember } from "./raceevents";
 import type { ClassTier } from "./classtier";
 
