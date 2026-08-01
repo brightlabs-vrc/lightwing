@@ -316,6 +316,8 @@ export async function listAdminEvents(
     classRestriction: e.classRestriction,
     granularParticipation: e.granularParticipation,
     signupsLocked: e.signupsLocked,
+    raceCount: e.raceEvents.length,
+    memberCount: e.members.length,
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
   }))
