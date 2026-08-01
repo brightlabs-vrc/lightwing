@@ -4,6 +4,7 @@ import {
   getAdminEvent,
   updateAdminEvent,
   recomputeEventPoints,
+  listRaceResults,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
 import {
@@ -11,6 +12,7 @@ import {
   isRaceConcluded,
   isRaceNotStarted,
 } from '../lib/raceStatus'
+import { editsFromResults } from '../lib/standings'
 
 import { useEventRaces } from './useEventRaces'
 import { useEventMembers } from './useEventMembers'
@@ -211,24 +213,10 @@ export function useEventDetail(eventId: string) {
         setActiveTab('races')
       }
       try {
-        const response = await getAdminEvent(eventId) // refresh or list results
-        const resultsRes = response.raceEvents?.find((re) => re.id === race.id)?.results ?? []
-        resultsHook.setResults(resultsRes as any)
-
-        // initialize editedResults
-        const edits: Record<string, any> = {}
-        for (const r of resultsRes) {
-          edits[r.userId] = {
-            position: r.position !== null ? String(r.position) : '',
-            points: String(r.points),
-            gateNumber: r.gateNumber !== null ? String(r.gateNumber) : '',
-            finishTime: r.finishTime ?? '',
-            margin: r.margin ?? '',
-            passingOrder: r.passingOrder ?? '',
-            final3F: r.final3F ?? '',
-          }
-        }
-        resultsHook.setEditedResults(edits)
+        const response = await listRaceResults(eventId, race.id)
+        const resultsRes = response.results
+        resultsHook.setResults(resultsRes)
+        resultsHook.setEditedResults(editsFromResults(resultsRes))
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to load race results')
         resultsHook.setResults([])
