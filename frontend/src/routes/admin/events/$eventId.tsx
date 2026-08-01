@@ -194,7 +194,6 @@ function AdminEventDetailPage() {
     races,
     selectedRaceId,
     setSelectedRaceId,
-    setSelectedRace,
     selectedRace,
     newMemberUserId,
     setNewMemberUserId,
@@ -1198,7 +1197,6 @@ function AdminEventDetailPage() {
                                     type="button"
                                     onClick={() => {
                                       setSelectedRaceId(null)
-                                      setSelectedRace(null)
                                     }}
                                     className="slds-button slds-button_neutral"
                                     style={{ padding: '4px 12px', fontSize: '12px' }}

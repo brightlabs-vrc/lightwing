@@ -84,6 +84,12 @@ export interface LadderEntryView {
   rank: number;
 }
 
+export interface RaceEventMemberView {
+  userId: string;
+  name: string;
+  classTier: ClassTier | null;
+}
+
 export interface RaceEventView {
   id: string;
   name: string;
@@ -96,6 +102,7 @@ export interface RaceEventView {
   classRestriction: ClassTier | null;
   startsAt: string | null;
   endsAt: string | null;
+  members: RaceEventMemberView[];
 }
 
 export interface EventDetail {
@@ -212,6 +219,8 @@ export const createEvent = api(
         granularParticipation: params.granularParticipation ?? false,
       },
     });
+
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return loadEvent(event.id);
   },
@@ -382,6 +391,27 @@ export const deleteEvent = api(
   },
 );
 
+export async function ensureEventStandingsRow(
+  tx: any,
+  eventId: string,
+  userId: string,
+  scoringType: number,
+): Promise<void> {
+  if (scoringType === SCORING_POINTS) {
+    await tx.eventPointsEntry.upsert({
+      where: { eventId_userId: { eventId, userId } },
+      create: { id: randomUUID(), eventId, userId, points: 0 },
+      update: {},
+    });
+  } else {
+    await tx.eventLadderEntry.upsert({
+      where: { eventId_userId: { eventId, userId } },
+      create: { id: randomUUID(), eventId, userId, elo: LADDER_STARTING_ELO },
+      update: {},
+    });
+  }
+}
+
 interface AddMemberParams {
   id: string;
   authorization: Header<"Authorization">;
@@ -416,21 +446,10 @@ export const addEventMember = api(
       update: {},
     });
 
-    if (event.scoringType === SCORING_POINTS) {
-      await prisma.eventPointsEntry.upsert({
-        where: { eventId_userId: { eventId: id, userId } },
-        create: { id: randomUUID(), eventId: id, userId, points: 0 },
-        update: {},
-      });
-    } else {
-      await prisma.eventLadderEntry.upsert({
-        where: { eventId_userId: { eventId: id, userId } },
-        create: { id: randomUUID(), eventId: id, userId, elo: LADDER_STARTING_ELO },
-        update: {},
-      });
-    }
+    await ensureEventStandingsRow(prisma, id, userId, event.scoringType);
 
     await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return loadEvent(id);
   },
@@ -486,6 +505,7 @@ export const removeEventMember = api(
 
     await removeMemberFromEventInternal(id, userId);
     await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
     return loadEvent(id);
   },
 );
@@ -535,21 +555,10 @@ export const joinEvent = api(
       update: {},
     });
 
-    if (event.scoringType === SCORING_POINTS) {
-      await prisma.eventPointsEntry.upsert({
-        where: { eventId_userId: { eventId: id, userId } },
-        create: { id: randomUUID(), eventId: id, userId, points: 0 },
-        update: {},
-      });
-    } else {
-      await prisma.eventLadderEntry.upsert({
-        where: { eventId_userId: { eventId: id, userId } },
-        create: { id: randomUUID(), eventId: id, userId, elo: LADDER_STARTING_ELO },
-        update: {},
-      });
-    }
+    await ensureEventStandingsRow(prisma, id, userId, event.scoringType);
 
     await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return loadEvent(id);
   },
@@ -579,6 +588,7 @@ export const leaveEvent = api(
 
     await removeMemberFromEventInternal(id, userId);
     await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
     return loadEvent(id);
   },
 );
@@ -602,6 +612,7 @@ export const setEventSignupsLocked = api(
 
     await prisma.event.update({ where: { id }, data: { signupsLocked: locked } });
     await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
     return loadEvent(id);
   },
 );
@@ -638,6 +649,7 @@ export const addEventSchedule = api(
     });
 
     await eventDetailCache.delete({ id: params.id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return loadEvent(params.id);
   },
@@ -673,6 +685,7 @@ export const setEventPoints = api(
     });
 
     await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return loadEvent(id);
   },
@@ -721,6 +734,7 @@ export const recordLadderMatch = api(
     });
 
     await eventDetailCache.delete({ id });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return loadEvent(id);
   },
@@ -802,7 +816,21 @@ export async function loadEvent(id: string): Promise<EventDetail> {
   const event = await prisma.event.findUnique({
     where: { id },
     include: {
-      raceEvents: { orderBy: { sequence: "asc" } },
+      raceEvents: {
+        orderBy: { sequence: "asc" },
+        include: {
+          raceMembers: {
+            include: {
+              user: {
+                select: {
+                  name: true,
+                  classTier: true,
+                },
+              },
+            },
+          },
+        },
+      },
       members: { include: { user: { select: { name: true, classTier: true } } } },
       schedules: { orderBy: { startsAt: "asc" } },
       pointsEntries: {
@@ -868,6 +896,13 @@ export async function loadEvent(id: string): Promise<EventDetail> {
       classRestriction: race.classRestriction,
       startsAt: race.startsAt ? race.startsAt.toISOString() : null,
       endsAt: race.endsAt ? race.endsAt.toISOString() : null,
+      members: race.raceMembers
+        ? race.raceMembers.map((rm) => ({
+            userId: rm.userId,
+            name: rm.user.name,
+            classTier: rm.user.classTier,
+          }))
+        : [],
     })),
     members: event.members.map((member) => ({
       userId: member.userId,
@@ -939,6 +974,7 @@ export async function recomputeEventPointsInternal(eventId: string): Promise<voi
   }
 
   await eventDetailCache.delete({ id: eventId });
+  await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 }
 
 interface RecomputePointsParams {

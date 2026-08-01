@@ -59,7 +59,10 @@ export function useEventDetail(eventId: string) {
   // Race Management States
   const [races, setRaces] = useState<eventmanager.RaceEventDetail[]>([])
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(null)
-  const [selectedRace, setSelectedRace] = useState<eventmanager.RaceEventDetail | null>(null)
+  const selectedRace = useMemo(
+    () => races.find((r) => r.id === selectedRaceId) ?? null,
+    [races, selectedRaceId],
+  )
 
   // Results Editor States
   const [results, setResults] = useState<eventmanager.RaceResultView[]>([])
@@ -99,7 +102,6 @@ export function useEventDetail(eventId: string) {
     setGlobalError(null)
     setGlobalSuccess(null)
     setSelectedRaceId(null)
-    setSelectedRace(null)
     setResults([])
     setEditedResults({})
     setPendingDeletions(new Set())
@@ -288,9 +290,6 @@ export function useEventDetail(eventId: string) {
       try {
         const updatedRace = await addRaceEventMember(eventId, raceId, userId.trim(), authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updatedRace : r)))
-        if (selectedRaceId === raceId) {
-          setSelectedRace(updatedRace)
-        }
         setNewRaceMemberUserId('')
         setGlobalSuccess(`Successfully registered competitor "${userId}" for the race.`)
       } catch (cause) {
@@ -310,9 +309,6 @@ export function useEventDetail(eventId: string) {
       try {
         const updatedRace = await removeRaceEventMember(eventId, raceId, userId, authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updatedRace : r)))
-        if (selectedRaceId === raceId) {
-          setSelectedRace(updatedRace)
-        }
         setGlobalSuccess('Successfully unregistered competitor from the race.')
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to unregister race member')
@@ -351,7 +347,6 @@ export function useEventDetail(eventId: string) {
   const handleSelectRace = useCallback(
     async (race: eventmanager.RaceEventDetail, switchTab = true) => {
       setSelectedRaceId(race.id)
-      setSelectedRace(race)
       setLoadingResults(true)
       setGlobalError(null)
       setGlobalSuccess(null)
@@ -384,9 +379,6 @@ export function useEventDetail(eventId: string) {
         const nowString = new Date().toISOString()
         const updated = await updateRaceEvent(eventId, raceId, { startsAt: nowString }, authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updated : r)))
-        if (selectedRaceId === raceId) {
-          setSelectedRace(updated)
-        }
         setGlobalSuccess(`Race manually started at ${new Date(nowString).toLocaleTimeString()}.`)
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to start race')
@@ -436,9 +428,6 @@ export function useEventDetail(eventId: string) {
       try {
         const updated = await updateRaceEvent(eventId, raceId, params, authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updated : r)))
-        if (selectedRaceId === raceId) {
-          setSelectedRace(updated)
-        }
         setGlobalSuccess('Race updated successfully.')
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to update race details')
@@ -458,7 +447,6 @@ export function useEventDetail(eventId: string) {
         await deleteRaceEvent(eventId, raceId, authHeader)
         if (selectedRaceId === raceId) {
           setSelectedRaceId(null)
-          setSelectedRace(null)
           setResults([])
           setEditedResults({})
           setPendingDeletions(new Set())
@@ -554,7 +542,6 @@ export function useEventDetail(eventId: string) {
   const handleCancelStandingsEdit = useCallback(() => {
     resetStandingsDraft()
     setSelectedRaceId(null)
-    setSelectedRace(null)
     setGlobalError(null)
     setGlobalSuccess(null)
   }, [])
@@ -574,30 +561,12 @@ export function useEventDetail(eventId: string) {
           sequence: index + 1,
         }))
         setRaces(optimisticRaces)
-        if (selectedRaceId) {
-          const updatedSel = optimisticRaces.find((r) => r.id === selectedRaceId)
-          if (updatedSel) {
-            setSelectedRace(updatedSel)
-          }
-        }
         const response = await reorderRaceEvents(eventId, orderedRaceIds, authHeader)
         setRaces(response.races)
-        if (selectedRaceId) {
-          const updatedSel = response.races.find((r) => r.id === selectedRaceId)
-          if (updatedSel) {
-            setSelectedRace(updatedSel)
-          }
-        }
         setGlobalSuccess('Race order updated successfully.')
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to reorder race events')
         setRaces(originalRaces)
-        if (selectedRaceId) {
-          const originalSel = originalRaces.find((r) => r.id === selectedRaceId)
-          if (originalSel) {
-            setSelectedRace(originalSel)
-          }
-        }
       }
     },
     [authHeader, eventId, races, selectedRaceId],
@@ -738,7 +707,6 @@ export function useEventDetail(eventId: string) {
     races,
     selectedRaceId,
     setSelectedRaceId,
-    setSelectedRace,
     selectedRace,
     results,
     editedResults,

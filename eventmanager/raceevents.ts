@@ -3,7 +3,7 @@ import { api, APIError, Header } from "encore.dev/api";
 import { prisma } from "./prisma";
 import { requireEventPermission, resolveActor } from "../auth/rbac";
 import { isEligible, type ClassTier } from "./classtier";
-import { recomputeEventPointsInternal, eventDetailCache } from "./events";
+import { recomputeEventPointsInternal, eventDetailCache, ensureEventStandingsRow, publicEventsCache, PUBLIC_EVENTS_KEY } from "./events";
 
 export interface RaceEventMemberView {
   userId: string;
@@ -84,6 +84,7 @@ export const createRaceEvent = api(
     });
 
     await eventDetailCache.delete({ id: params.eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return toRaceEventDetail(race);
   },
@@ -171,6 +172,7 @@ export const reorderRaceEvents = api(
     });
 
     await eventDetailCache.delete({ id: params.eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     return { races: updatedRaces.map(toRaceEventDetail) };
   },
@@ -282,6 +284,7 @@ export const updateRaceEvent = api(
     }
 
     await eventDetailCache.delete({ id: params.eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     const updated = await requireRaceEvent(params.eventId, params.raceId);
     return toRaceEventDetail(updated);
@@ -307,6 +310,7 @@ export const deleteRaceEvent = api(
 
     await prisma.raceEvent.delete({ where: { id: raceId } });
     await eventDetailCache.delete({ id: eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
     return { deleted: true };
   },
 );
@@ -437,7 +441,10 @@ export const addRaceEventMember = api(
       update: {},
     });
 
+    await ensureEventStandingsRow(prisma, eventId, userId, event.scoringType);
+
     await eventDetailCache.delete({ id: eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
@@ -481,6 +488,7 @@ export const removeRaceEventMember = api(
     });
 
     await eventDetailCache.delete({ id: eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
@@ -580,6 +588,8 @@ export const joinRaceEvent = api(
         });
       }
 
+      await ensureEventStandingsRow(tx, eventId, userId, event.scoringType);
+
       await tx.raceEventMember.upsert({
         where: { raceEventId_userId: { raceEventId: raceId, userId } },
         create: { id: randomUUID(), raceEventId: raceId, userId },
@@ -588,6 +598,7 @@ export const joinRaceEvent = api(
     });
 
     await eventDetailCache.delete({ id: eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
@@ -632,6 +643,7 @@ export const leaveRaceEvent = api(
     });
 
     await eventDetailCache.delete({ id: eventId });
+    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
     const updatedRace = await requireRaceEvent(eventId, raceId);
     return toRaceEventDetail(updatedRace);
