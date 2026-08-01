@@ -37,6 +37,25 @@ export const publicEventsCache = new StructKeyspace<{ key: string }, PublicEvent
   }
 );
 
+export interface EventListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  ownerType: EventOwnerType;
+  organizationId: string | null;
+  ownerUserId: string | null;
+  status: EventStatus;
+  scoringType: number;
+  scoringTypeLabel: string;
+  classRestriction: ClassTier | null;
+  granularParticipation: boolean;
+  signupsLocked: boolean;
+  raceCount: number;
+  memberCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // API-facing string unions mirroring the Prisma enums. Encore's schema parser
 // cannot use Prisma's runtime enum objects as types, so these are declared as
 // plain literal unions with byte-identical values (see classtier.ts).
@@ -225,49 +244,122 @@ export const createEvent = api(
 interface ListEventsParams {
   organizationId?: Query<string>;
   classRestriction?: Query<ClassTier>;
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface ListEventsResponse {
+  events: EventListItem[];
+  total: number;
+}
+
+function toListItem(event: any): EventListItem {
+  return {
+    id: event.id,
+    name: event.name,
+    description: event.description,
+    ownerType: event.ownerType as EventOwnerType,
+    organizationId: event.organizationId,
+    ownerUserId: event.ownerUserId,
+    status: event.status as EventStatus,
+    scoringType: event.scoringType,
+    scoringTypeLabel: SCORING_LABELS[event.scoringType] ?? "unknown",
+    classRestriction: event.classRestriction,
+    granularParticipation: event.granularParticipation,
+    signupsLocked: event.signupsLocked,
+    raceCount: event._count?.raceEvents ?? 0,
+    memberCount: event._count?.members ?? 0,
+    createdAt: event.createdAt.toISOString(),
+    updatedAt: event.updatedAt.toISOString(),
+  };
 }
 
 // Lists events, optionally filtered by organization or class restriction.
 export const listEvents = api(
   { expose: true, method: "GET", path: "/api/events" },
-  async ({
-    organizationId,
-    classRestriction,
-  }: ListEventsParams): Promise<{ events: EventDetail[] }> => {
+  async (params: ListEventsParams): Promise<ListEventsResponse> => {
+    const { organizationId, classRestriction, limit, offset } = params || {};
+    const where: any = {
+      organizationId: organizationId ?? undefined,
+      classRestriction: (classRestriction as ClassTier | undefined) ?? undefined,
+    };
+
+    const total = await prisma.event.count({ where });
+
     const events = await prisma.event.findMany({
-      where: {
-        organizationId: organizationId ?? undefined,
-        classRestriction: (classRestriction as ClassTier | undefined) ?? undefined,
+      where,
+      take: limit ?? undefined,
+      skip: offset ?? undefined,
+      include: {
+        _count: {
+          select: {
+            raceEvents: true,
+            members: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const detailed = await Promise.all(events.map((event) => loadEvent(event.id)));
-    return { events: detailed };
+    return {
+      events: events.map(toListItem),
+      total,
+    };
   },
 );
+
+interface ListPublicEventsParams {
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface PublicEventsCacheValue {
+  events: EventListItem[];
+  total: number;
+}
 
 // Lists public events (UNOFFICIAL, OFFICIAL, CONCLUDED) without DRAFT visibility.
 // Used by the public events page.
 export const listPublicEvents = api(
   { expose: true, method: "GET", path: "/api/events/public" },
-  async (): Promise<{ events: EventDetail[] }> => {
-    const cached = await publicEventsCache.get({ key: PUBLIC_EVENTS_KEY });
+  async (params: ListPublicEventsParams): Promise<ListEventsResponse> => {
+    const { limit, offset } = params || {};
+    const l = limit ?? 10;
+    const o = offset ?? 0;
+    const cacheKey = `${PUBLIC_EVENTS_KEY}:${l}:${o}`;
+    const cached = await publicEventsCache.get({ key: cacheKey }) as any;
     if (cached !== undefined) {
       return cached;
     }
 
+    const where = {
+      status: { in: ["UNOFFICIAL", "OFFICIAL", "CONCLUDED"] as any[] },
+    };
+
+    const total = await prisma.event.count({ where });
+
     const events = await prisma.event.findMany({
-      where: {
-        status: { in: ["UNOFFICIAL", "OFFICIAL", "CONCLUDED"] },
+      where,
+      take: l,
+      skip: o,
+      include: {
+        _count: {
+          select: {
+            raceEvents: true,
+            members: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const detailed = await Promise.all(events.map((event) => loadEvent(event.id)));
-    const value = { events: detailed };
-    await publicEventsCache.set({ key: PUBLIC_EVENTS_KEY }, value);
-    return value;
+    const result = {
+      events: events.map(toListItem),
+      total,
+    };
+
+    await publicEventsCache.set({ key: cacheKey }, result);
+    return result;
   },
 );
 
@@ -282,6 +374,93 @@ export const getEvent = api(
   async ({ id }: EventIdParams): Promise<EventDetail> => {
     return loadEvent(id);
   },
+);
+
+interface EventAdminResponse {
+  userId: string;
+  name: string;
+}
+
+// Lists event administrators.
+export const listEventAdmins = api(
+  { expose: true, method: "GET", path: "/api/events/:id/admins" },
+  async ({ id }: EventIdParams): Promise<{ admins: EventAdminResponse[] }> => {
+    const admins = await prisma.eventAdmin.findMany({
+      where: { eventId: id },
+      include: { user: { select: { name: true } } },
+    });
+
+    return {
+      admins: admins.map((admin) => ({
+        userId: admin.userId,
+        name: admin.user.name,
+      })),
+    };
+  }
+);
+
+interface AddEventAdminParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  userId: string;
+}
+
+// Adds an administrator to an event. Gated by requireEventPermission(..., action: "update").
+export const addEventAdmin = api(
+  { expose: true, auth: true, method: "POST", path: "/api/events/:id/admins" },
+  async ({ id, authorization, userId }: AddEventAdminParams): Promise<{ success: boolean }> => {
+    await requireEventPermission(prisma, {
+      authorization,
+      eventId: id,
+      action: "update",
+    });
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw APIError.notFound("user not found");
+    }
+
+    try {
+      await prisma.eventAdmin.create({
+        data: {
+          id: randomUUID(),
+          eventId: id,
+          userId,
+        },
+      });
+    } catch (error) {
+      // ignore if already an admin
+    }
+
+    return { success: true };
+  }
+);
+
+interface RemoveEventAdminParams {
+  id: string;
+  userId: string;
+  authorization: Header<"Authorization">;
+}
+
+// Removes an administrator from an event. Gated by requireEventPermission(..., action: "update").
+export const removeEventAdmin = api(
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:id/admins/:userId" },
+  async ({ id, userId, authorization }: RemoveEventAdminParams): Promise<{ success: boolean }> => {
+    await requireEventPermission(prisma, {
+      authorization,
+      eventId: id,
+      action: "update",
+    });
+
+    await prisma.eventAdmin.deleteMany({
+      where: {
+        eventId: id,
+        userId,
+      },
+    });
+
+    return { success: true };
+  }
 );
 
 interface DeleteEventParams {

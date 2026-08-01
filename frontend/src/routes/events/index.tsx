@@ -1,7 +1,9 @@
 import { useAuth } from '../../hooks/useAuth'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { listPublicEvents } from '../../lib/public-api'
+import { Pagination } from '../../components/Pagination'
 import {
   PixelContainer,
   PixelStack,
@@ -47,10 +49,12 @@ export const Route = createFileRoute('/events/')({
 function EventsPage() {
   const queryClient = useQueryClient()
   const { session } = useAuth()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['public-events'],
-    queryFn: () => listPublicEvents(),
+    queryKey: ['public-events', page, pageSize],
+    queryFn: () => listPublicEvents(pageSize, (page - 1) * pageSize),
   })
 
   if (isLoading) {
@@ -92,49 +96,57 @@ function EventsPage() {
             description="There are no public events running at this moment."
           />
         ) : (
-          publicEvents.map((event) => {
-            const isMember = session && event.members.some((m) => m.userId === session.user.id)
-            return (
-              <Link
-                key={event.id}
-                to="/events/$eventId"
-                params={{ eventId: event.id }}
-                className="block"
-              >
-                <PixelCard className="hover:border-retro-primary transition-all duration-150">
-                  <PixelStack gap={4}>
-                    <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
-                      <PixelStack gap={2}>
-                        <h2 className="text-xl font-pixel tracking-wide text-retro-text">
-                          {event.name}
-                        </h2>
-                        {event.description && (
-                          <p className="text-base text-retro-muted max-w-2xl font-sans leading-relaxed">
-                            {event.description}
-                          </p>
-                        )}
+          <>
+            {publicEvents.map((event) => {
+              return (
+                <Link
+                  key={event.id}
+                  to="/events/$eventId"
+                  params={{ eventId: event.id }}
+                  className="block"
+                >
+                  <PixelCard className="hover:border-retro-primary transition-all duration-150">
+                    <PixelStack gap={4}>
+                      <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
+                        <PixelStack gap={2}>
+                          <h2 className="text-xl font-pixel tracking-wide text-retro-text">
+                            {event.name}
+                          </h2>
+                          {event.description && (
+                            <p className="text-base text-retro-muted max-w-2xl font-sans leading-relaxed">
+                              {event.description}
+                            </p>
+                          )}
+                        </PixelStack>
+                        <PixelBadge tone={STATUS_TONE[event.status]}>
+                          {STATUS_LABELS[event.status].toUpperCase()}
+                        </PixelBadge>
                       </PixelStack>
-                      <PixelBadge tone={STATUS_TONE[event.status]}>
-                        {STATUS_LABELS[event.status].toUpperCase()}
-                      </PixelBadge>
-                    </PixelStack>
 
-                    <PixelStack direction="row" gap={4} wrap>
-                      <PixelBadge tone="neutral">
-                        SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
-                      </PixelBadge>
-                      <PixelBadge tone="neutral">
-                        CLASS: {event.classRestriction ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN'}
-                      </PixelBadge>
-                      <PixelBadge tone="neutral">RACES: {event.raceEvents.length}</PixelBadge>
-                      <PixelBadge tone="neutral">MEMBERS: {event.members.length}</PixelBadge>
-                      {isMember ? <PixelBadge tone="green">JOINED</PixelBadge> : null}
+                      <PixelStack direction="row" gap={4} wrap>
+                        <PixelBadge tone="neutral">
+                          SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
+                        </PixelBadge>
+                        <PixelBadge tone="neutral">
+                          CLASS: {event.classRestriction ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN'}
+                        </PixelBadge>
+                        <PixelBadge tone="neutral">RACES: {event.raceCount}</PixelBadge>
+                        <PixelBadge tone="neutral">MEMBERS: {event.memberCount}</PixelBadge>
+                      </PixelStack>
                     </PixelStack>
-                  </PixelStack>
-                </PixelCard>
-              </Link>
-            )
-          })
+                  </PixelCard>
+                </Link>
+              )
+            })}
+
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data?.total || 0}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </>
         )}
       </PixelStack>
     </PixelContainer>

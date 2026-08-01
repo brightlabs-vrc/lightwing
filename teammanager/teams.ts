@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { api, APIError, Header } from "encore.dev/api";
+import { api, APIError, Header, Query } from "encore.dev/api";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { requireSiteAdmin } from "../auth/rbac";
@@ -52,6 +52,15 @@ export interface Team {
   members: TeamMemberSummary[];
 }
 
+export interface TeamListItem {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
+  administratorSlotsRemaining: number;
+  memberCount: number;
+}
+
 interface GetTeamParams {
   id: string;
 }
@@ -80,6 +89,27 @@ export const getTeam = api(
   },
 );
 
+interface GetTeamBySlugParams {
+  slug: string;
+}
+
+// Returns a team by its unique slug.
+export const getTeamBySlug = api(
+  { expose: true, method: "GET", path: "/api/teams/by-slug/:slug" },
+  async ({ slug }: GetTeamBySlugParams): Promise<Team> => {
+    const organization = await prisma.organization.findUnique({
+      where: { slug },
+      include: TEAM_WITH_MEMBERS_INCLUDE,
+    });
+
+    if (!organization) {
+      throw APIError.notFound("team not found");
+    }
+
+    return toTeam(organization);
+  },
+);
+
 type OrganizationWithMembers = {
   id: string;
   name: string;
@@ -89,19 +119,66 @@ type OrganizationWithMembers = {
   pointsAverage: number | null;
   seasonRank: number | null;
   averagePointsPerEvent: number | null;
-  members: { userId: string; role: string; user: { name: string } }[];
+  members: { id: string; userId: string; role: string; user: { name: string } }[];
 };
 
-// Lists all teams mapped via toTeam.
+interface ListTeamsParams {
+  search?: Query<string>;
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface ListTeamsResponse {
+  teams: TeamListItem[];
+  total: number;
+}
+
+// Lists all teams with search and pagination support.
 export const listTeams = api(
   { expose: true, method: "GET", path: "/api/teams" },
-  async (): Promise<{ teams: Team[] }> => {
+  async (params: ListTeamsParams): Promise<ListTeamsResponse> => {
+    const { search, limit, offset } = params || {};
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const total = await prisma.organization.count({ where });
+
     const organizations = await prisma.organization.findMany({
-      include: TEAM_WITH_MEMBERS_INCLUDE,
+      where,
+      take: limit ?? undefined,
+      skip: offset ?? undefined,
+      include: {
+        members: {
+          select: { role: true },
+        },
+      },
       orderBy: { name: "asc" },
     });
 
-    return { teams: organizations.map(toTeam) };
+    const teams = organizations.map((org) => {
+      const administratorCount = org.members.filter(
+        (member) => member.role === ADMINISTRATOR_ROLE,
+      ).length;
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo: org.logo,
+        administratorSlotsRemaining: Math.max(
+          ADMINISTRATOR_ROLE_LIMIT - administratorCount,
+          0,
+        ),
+        memberCount: org.members.length,
+      };
+    });
+
+    return { teams, total };
   }
 );
 

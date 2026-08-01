@@ -284,13 +284,54 @@ export function hydrateRaceEvent(eventId: string, race: eventmanager.RaceEventVi
   }
 }
 
-export async function listAdminEvents(): Promise<{ events: eventmanager.EventDetail[] }> {
+export async function listAdminEvents(
+  organizationId?: string,
+  classRestriction?: eventmanager.ClassTier,
+  limit?: number,
+  offset?: number,
+): Promise<{ events: eventmanager.EventListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listEvents({})
+    return appClient.eventmanager.listEvents({
+      organizationId,
+      classRestriction,
+      limit,
+      offset,
+    })
   }
 
-  const hydratedEvents = mockEvents.map((evt) => hydrateEventRaceEvents(evt))
-  return { events: hydratedEvents }
+  let events = mockEvents.map((e) => ({
+    id: e.id,
+    name: e.name,
+    description: e.description,
+    ownerType: e.ownerType,
+    organizationId: e.organizationId,
+    ownerUserId: e.ownerUserId,
+    status: e.status,
+    scoringType: e.scoringType,
+    scoringTypeLabel: e.scoringTypeLabel,
+    classRestriction: e.classRestriction,
+    granularParticipation: e.granularParticipation,
+    signupsLocked: e.signupsLocked,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  }))
+
+  if (organizationId) {
+    events = events.filter((e) => e.organizationId === organizationId)
+  }
+  if (classRestriction) {
+    events = events.filter((e) => e.classRestriction === classRestriction)
+  }
+
+  const total = events.length
+  if (offset !== undefined) {
+    events = events.slice(offset)
+  }
+  if (limit !== undefined) {
+    events = events.slice(0, limit)
+  }
+
+  return { events, total }
 }
 
 export async function getAdminEvent(eventId: string): Promise<eventmanager.EventDetail> {
@@ -1264,12 +1305,42 @@ export async function updateAdminUserClass(
 // TEAM MANAGEMENT METHODS
 // -----------------------------------------------------------------------------
 
-export async function listAdminTeams(): Promise<{ teams: teammanager.Team[] }> {
+export async function listAdminTeams(
+  search?: string,
+  limit?: number,
+  offset?: number,
+): Promise<{ teams: teammanager.TeamListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.listTeams()
+    return appClient.teammanager.listTeams({
+      search,
+      limit,
+      offset,
+    })
   }
 
-  return { teams: mockTeamsList }
+  let filtered = mockTeamsList.map((t) => ({
+    id: t.id,
+    name: t.name,
+    slug: t.slug,
+    logo: t.logo,
+    administratorSlotsRemaining: t.administratorSlotsRemaining,
+    memberCount: t.members.length,
+  }))
+
+  if (search) {
+    const lower = search.toLowerCase()
+    filtered = filtered.filter((t) => t.name.toLowerCase().includes(lower) || t.slug.toLowerCase().includes(lower))
+  }
+
+  const total = filtered.length
+  if (offset !== undefined) {
+    filtered = filtered.slice(offset)
+  }
+  if (limit !== undefined) {
+    filtered = filtered.slice(0, limit)
+  }
+
+  return { teams: filtered, total }
 }
 
 export async function getAdminTeam(id: string): Promise<teammanager.Team> {
@@ -1313,6 +1384,52 @@ export async function updateAdminTeamStats(
   }
 
   return team
+}
+
+export async function listAdminTeamMembers(
+  teamId: string,
+  search?: string,
+  limit?: number,
+  offset?: number,
+): Promise<{ members: Array<{ userId: string; name: string; slug: string | null; role: string }>; total: number }> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.listTeamMembers({
+      id: teamId,
+      search,
+      limit,
+      offset,
+    })
+  }
+
+  const team = mockTeamsList.find((t) => t.id === teamId)
+  if (!team) {
+    throw new Error('Mock team not found')
+  }
+
+  let filtered = team.members.map((m) => {
+    const user = mockUserProfiles.get(m.userId)
+    return {
+      userId: m.userId,
+      name: m.name,
+      slug: user ? user.slug : null,
+      role: m.role,
+    }
+  })
+
+  if (search) {
+    const lower = search.toLowerCase()
+    filtered = filtered.filter((m) => m.name.toLowerCase().includes(lower) || (m.slug && m.slug.toLowerCase().includes(lower)))
+  }
+
+  const total = filtered.length
+  if (offset !== undefined) {
+    filtered = filtered.slice(offset)
+  }
+  if (limit !== undefined) {
+    filtered = filtered.slice(0, limit)
+  }
+
+  return { members: filtered, total }
 }
 
 // -----------------------------------------------------------------------------
