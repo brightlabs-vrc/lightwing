@@ -29,7 +29,7 @@ async function createUser(prefix: string, name: string, vrchatUsername: string |
     data: {
       id,
       name,
-      email: `${id}@discord.invalid`,
+      email: `${id}@example.com`,
       siteRole: "USER",
       vrchatUsername,
     },

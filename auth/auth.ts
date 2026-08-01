@@ -230,19 +230,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     discord: {
       clientId: discordClientId(),
       clientSecret: discordClientSecret(),
-      scope: ["identify", "guilds", "guilds.members.read"],
-      mapProfileToUser: (profile) => ({
-        // better-auth requires a non-null email field.
-        // Use a deterministic, non-routable placeholder derived from the
-        // stable Discord user ID. The `.invalid` TLD is RFC-2606-reserved
-        // and will never route to a real mailbox.
-        email: `${profile.id}@discord.invalid`,
-        emailVerified: false,
-        name: profile.username,
-        image: profile.avatar
-          ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
-          : null,
-      }),
+      scope: ["identify", "email", "guilds", "guilds.members.read"],
     },
   },
   databaseHooks: {
