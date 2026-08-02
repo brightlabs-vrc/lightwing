@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-88d98.encr.app`
+    return `https://${name}-258wq.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the 88d98 Encore application.
+ * Client is an API client for the 258wq Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -1614,6 +1614,13 @@ export namespace teammanager {
         role: string
     }
 
+    export interface UpdateTeamParams {
+        authorization: string
+        name?: string
+        slug?: string
+        logo?: string | null
+    }
+
     export interface UpdateTeamStatsParams {
         authorization: string
         rankingAverage?: number | null
@@ -1634,6 +1641,7 @@ export namespace teammanager {
             this.listTeamMembers = this.listTeamMembers.bind(this)
             this.listTeams = this.listTeams.bind(this)
             this.removeTeamMember = this.removeTeamMember.bind(this)
+            this.updateTeam = this.updateTeam.bind(this)
             this.updateTeamMemberRole = this.updateTeamMemberRole.bind(this)
             this.updateTeamStats = this.updateTeamStats.bind(this)
         }
@@ -1739,6 +1747,28 @@ export namespace teammanager {
 
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("DELETE", `/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, undefined, {headers})
+            return await resp.json() as Team
+        }
+
+        /**
+         * Updates a team's core metadata (name, slug, logo).
+         * Accessible to team administrators (via organization update permission) or site administrators.
+         */
+        public async updateTeam(id: string, params: UpdateTeamParams): Promise<Team> {
+            // Convert our params into the objects we need for the request
+            const headers = makeRecord<string, string>({
+                authorization: params.authorization,
+            })
+
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                logo: params.logo,
+                name: params.name,
+                slug: params.slug,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/teams/${encodeURIComponent(id)}`, JSON.stringify(body), {headers})
             return await resp.json() as Team
         }
 
@@ -2015,7 +2045,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "88d98-Generated-TS-Client (Encore/v1.57.13)";
+            this.headers["User-Agent"] = "258wq-Generated-TS-Client (Encore/v1.57.13)";
         }
 
         this.requestInit = options.requestInit ?? {};

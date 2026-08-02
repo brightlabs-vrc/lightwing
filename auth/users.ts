@@ -92,7 +92,7 @@ interface UpdateUserParams {
 }
 
 import { isSiteAdmin } from "./permissions";
-import { isValidSlug } from "../lib/slugs";
+import { isValidUserSlug } from "../lib/slugs";
 
 // Updates the authenticated user's own profile fields (issue #7). A user may
 // only edit their own record or a site admin may edit other profiles.
@@ -120,7 +120,7 @@ export const updateUserProfile = api(
 
     let nextSlug = existing.slug;
     if (slug !== undefined && slug !== existing.slug) {
-      if (!isValidSlug(slug)) {
+      if (!isValidUserSlug(slug)) {
         throw APIError.invalidArgument("invalid slug format or length");
       }
       const collision = await prisma.user.findUnique({ where: { slug } });

@@ -1247,6 +1247,7 @@ export async function updateAdminUserProfile(
   userId: string,
   params: {
     name?: string
+    slug?: string
     image?: string | null
     biography?: string | null
     careerOverview?: string | null
@@ -1269,6 +1270,7 @@ export async function updateAdminUserProfile(
   const updated: auth.UserProfile = {
     ...existing,
     name: params.name !== undefined ? params.name : existing.name,
+    slug: params.slug !== undefined ? params.slug : existing.slug,
     image: params.image !== undefined ? params.image : existing.image,
     biography: params.biography !== undefined ? params.biography : existing.biography,
     careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
@@ -1388,6 +1390,33 @@ export async function updateAdminTeamStats(
     seasonRank: params.seasonRank !== undefined ? params.seasonRank : team.stats.seasonRank,
     averagePointsPerEvent: params.averagePointsPerEvent !== undefined ? params.averagePointsPerEvent : team.stats.averagePointsPerEvent,
   }
+
+  return team
+}
+
+export async function updateAdminTeam(
+  id: string,
+  params: {
+    name?: string
+    slug?: string
+    logo?: string | null
+  },
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.updateTeam(id, {
+      authorization,
+      ...params,
+    })
+  }
+
+  const teamIndex = mockTeamsList.findIndex((t) => t.id === id)
+  if (teamIndex === -1) throw new Error('Mock team not found')
+  const team = mockTeamsList[teamIndex]
+
+  team.name = params.name !== undefined ? params.name : team.name
+  team.slug = params.slug !== undefined ? params.slug : team.slug
+  team.logo = params.logo !== undefined ? params.logo : team.logo
 
   return team
 }

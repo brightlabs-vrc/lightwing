@@ -26,6 +26,7 @@ function AdminUserDetailPage() {
 
   // Local state for editable fields
   const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
   const [biography, setBiography] = useState('')
   const [careerOverview, setCareerOverview] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
@@ -45,6 +46,7 @@ function AdminUserDetailPage() {
       const loaded = await getAdminUserProfile(userId)
       setProfile(loaded)
       setName(loaded.name || '')
+      setSlug(loaded.slug || '')
       setBiography(loaded.biography || '')
       setCareerOverview(loaded.careerOverview || '')
       setVrchatUsername(loaded.vrchatUsername || '')
@@ -77,6 +79,7 @@ function AdminUserDetailPage() {
       // 1. Update Profile Fields if changed
       const profileChanged =
         name !== (profile.name || '') ||
+        slug !== (profile.slug || '') ||
         biography !== (profile.biography || '') ||
         careerOverview !== (profile.careerOverview || '') ||
         vrchatUsername !== (profile.vrchatUsername || '') ||
@@ -87,6 +90,7 @@ function AdminUserDetailPage() {
           profile.id,
           {
             name,
+            slug,
             biography: biography.trim() || null,
             careerOverview: careerOverview.trim() || null,
             vrchatUsername: vrchatUsername.trim() || null,
@@ -189,6 +193,22 @@ function AdminUserDetailPage() {
                             onChange={(e) => setName(e.target.value)}
                             className="slds-input font-bold"
                             style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%', fontWeight: 'bold' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Slug Input */}
+                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
+                        <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="user-slug">Slug (Handle)</label>
+                        <div className="slds-form-element__control slds-m-top_xx-small">
+                          <input
+                            id="user-slug"
+                            type="text"
+                            value={slug}
+                            onChange={(e) => setSlug(e.target.value)}
+                            className="slds-input"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                            placeholder="e.g. thunder"
                           />
                         </div>
                       </div>

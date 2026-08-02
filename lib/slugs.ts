@@ -31,7 +31,14 @@ export function slugify(name: string): string {
 }
 
 /**
- * Validates whether a slug matches regex and length rules, and is not reserved.
+ * Checks if a slug is in the reserved list.
+ */
+export function isReservedSlug(slug: string): boolean {
+  return RESERVED_SLUGS.has(slug);
+}
+
+/**
+ * Validates whether a team slug matches regex and length rules, and is not reserved.
  */
 export function isValidSlug(slug: string): boolean {
   if (slug.length < 3 || slug.length > 32) {
@@ -40,7 +47,23 @@ export function isValidSlug(slug: string): boolean {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     return false;
   }
-  if (RESERVED_SLUGS.has(slug)) {
+  if (isReservedSlug(slug)) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Validates whether a user slug matches regex (alphanumeric only) and length 4-8 rules, and is not reserved.
+ */
+export function isValidUserSlug(slug: string): boolean {
+  if (slug.length < 4 || slug.length > 8) {
+    return false;
+  }
+  if (!/^[a-z0-9]+$/.test(slug)) {
+    return false;
+  }
+  if (isReservedSlug(slug)) {
     return false;
   }
   return true;
@@ -48,34 +71,52 @@ export function isValidSlug(slug: string): boolean {
 
 /**
  * Generates a unique user slug starting from a base username.
- * Appends "-2", "-3", etc. if the slug is already taken or reserved.
+ * For users, slugs must be alphanumeric and 4-8 characters.
+ * Otherwise, default to using a derivative using their Discord ID.
  */
 export async function generateUniqueUserSlug(
-  prisma: { user: { findUnique: (args: { where: { slug: string } }) => Promise<any> } },
+  prisma: any,
   baseName: string,
+  userId: string,
 ): Promise<string> {
-  let base = slugify(baseName);
-  if (!base || base.length < 3) {
-    base = "user";
-  }
-  if (base.length > 25) {
-    base = base.slice(0, 25);
-  }
+  // Normalize name to lowercase alphanumeric
+  let base = baseName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // Check if alphanumeric and between 4 and 8 characters, and not reserved
+  let isValid = base.length >= 4 && base.length <= 8 && !isReservedSlug(base);
 
   let slug = base;
-  if (RESERVED_SLUGS.has(slug)) {
-    slug = `${base}-1`;
+  if (isValid) {
+    // Check collision
+    const existing = await prisma.user.findUnique({ where: { slug } });
+    if (existing && existing.id !== userId) {
+      isValid = false; // Collision!
+    }
   }
 
-  let counter = 2;
-  while (true) {
-    const existing = await prisma.user.findUnique({ where: { slug } });
-    if (!existing && !RESERVED_SLUGS.has(slug)) {
-      return slug;
+  if (!isValid) {
+    // Default to using a derivative of their Discord ID
+    const account = await prisma.account.findFirst({
+      where: { userId, providerId: "discord" },
+    });
+    const discordId = account?.accountId || userId;
+    const normalizedDiscordId = discordId.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const lastPart = normalizedDiscordId.slice(-7);
+    slug = `u${lastPart}`.slice(0, 8);
+
+    let counter = 2;
+    while (true) {
+      const existing = await prisma.user.findUnique({ where: { slug } });
+      if (!existing || existing.id === userId) {
+        break;
+      }
+      const suffix = String(counter);
+      slug = `u${lastPart}`.slice(0, 8 - suffix.length) + suffix;
+      counter++;
     }
-    slug = `${base}-${counter}`;
-    counter++;
   }
+
+  return slug;
 }
 
 /**
@@ -94,17 +135,33 @@ export async function generateUniqueOrgSlug(
   }
 
   let slug = base;
-  if (RESERVED_SLUGS.has(slug)) {
+  if (isReservedSlug(slug)) {
     slug = `${base}-1`;
   }
 
   let counter = 2;
   while (true) {
     const existing = await prisma.organization.findUnique({ where: { slug } });
-    if (!existing && !RESERVED_SLUGS.has(slug)) {
+    if (!existing && !isReservedSlug(slug)) {
       return slug;
     }
     slug = `${base}-${counter}`;
     counter++;
   }
+}
+
+/**
+ * Wrapper for generating unique user slugs using a lazily loaded Prisma.
+ */
+export async function ensureUniqueUserSlug(base: string, userId: string): Promise<string> {
+  const { prisma } = await import("../auth/prisma");
+  return generateUniqueUserSlug(prisma, base, userId);
+}
+
+/**
+ * Wrapper for generating unique team slugs using a lazily loaded Prisma.
+ */
+export async function ensureUniqueTeamSlug(base: string): Promise<string> {
+  const { prisma } = await import("../auth/prisma");
+  return generateUniqueOrgSlug(prisma, base);
 }
