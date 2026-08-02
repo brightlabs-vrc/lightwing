@@ -7,6 +7,7 @@ import {
   isValidUserSlug,
   isValidSlug,
   generateUniqueUserSlug,
+  generateUniqueOrgSlug,
 } from "../lib/slugs";
 import { ensureUserSlug } from "./auth";
 
@@ -54,12 +55,59 @@ describe("Slug Helpers and Recovery", () => {
     expect(isValidUserSlug("admin")).toBe(false); // reserved
   });
 
-  test("isValidSlug enforces team slug rules (allows hyphens, length 3-32)", () => {
+  test("isValidSlug enforces team slug rules (allows hyphens, length 3-24)", () => {
     expect(isValidSlug("ab")).toBe(false); // too short
     expect(isValidSlug("abc")).toBe(true); // valid
+    expect(isValidSlug("a".repeat(24))).toBe(true); // valid (max limit)
+    expect(isValidSlug("a".repeat(25))).toBe(false); // too long
     expect(isValidSlug("team-slug")).toBe(true); // valid
     expect(isValidSlug("team--slug")).toBe(false); // invalid pattern
     expect(isValidSlug("admin")).toBe(false); // reserved
+  });
+
+  test("user slug truncation to 24 characters", async () => {
+    const longName = "a".repeat(30);
+    const slug = await generateUniqueUserSlug(prisma, longName, `user-${randomUUID()}`);
+    expect(slug.length).toBe(24);
+    expect(slug).toBe("a".repeat(24));
+  });
+
+  test("user slug collision resolution within 24 characters limit", async () => {
+    const userId1 = await createUser("CollisionUser", "collisionuser");
+    const userId2 = `user-${randomUUID()}`;
+
+    const slug = await generateUniqueUserSlug(prisma, "CollisionUser", userId2);
+    expect(slug.length).toBeLessThanOrEqual(24);
+    expect(slug).toBe("collisionuser2");
+
+    // Multiple collisions
+    const userId3 = await createUser("CollisionUser", "collisionuser2");
+    const slug2 = await generateUniqueUserSlug(prisma, "CollisionUser", `user-${randomUUID()}`);
+    expect(slug2).toBe("collisionuser3");
+    expect(slug2.length).toBeLessThanOrEqual(24);
+  });
+
+  test("team slug truncation to 24 characters", async () => {
+    const longTeamName = "a".repeat(30);
+    const slug = await generateUniqueOrgSlug(prisma, longTeamName);
+    expect(slug.length).toBe(24);
+    expect(slug).toBe("a".repeat(24));
+  });
+
+  test("team slug collision resolution within 24 characters limit", async () => {
+    const orgPrisma = {
+      organization: {
+        findUnique: async ({ where: { slug } }: any) => {
+          if (slug === "myteam" || slug === "myteam-2") {
+            return { id: "existing" };
+          }
+          return null;
+        }
+      }
+    };
+    const slug = await generateUniqueOrgSlug(orgPrisma, "myteam");
+    expect(slug).toBe("myteam-3");
+    expect(slug.length).toBeLessThanOrEqual(24);
   });
 
   test("user slug collision resolution fallback", async () => {
