@@ -211,6 +211,9 @@ function AdminUserDetailPage() {
                             placeholder="e.g. thunder"
                           />
                         </div>
+                        <div className="slds-m-top_xx-small text-slate-400" style={{ fontSize: '11px' }}>
+                          Slugs must be between 4 and 24 lowercase alphanumeric characters.
+                        </div>
                       </div>
 
                       {/* VRChat Username Input */}
