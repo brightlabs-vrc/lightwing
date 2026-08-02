@@ -145,6 +145,12 @@ function AdminTeamDetailPage() {
     evt.preventDefault()
     if (!authHeader) return
 
+    const trimmedSlug = teamSlug.trim()
+    if (trimmedSlug && trimmedSlug.length > 24) {
+      setTeamError('Slug must be 24 characters or fewer.')
+      return
+    }
+
     setUpdatingTeam(true)
     setTeamError(null)
     try {
@@ -152,7 +158,7 @@ function AdminTeamDetailPage() {
         teamId,
         {
           name: teamName.trim() || undefined,
-          slug: teamSlug.trim() || undefined,
+          slug: trimmedSlug || undefined,
           logo: teamLogo.trim() || null,
         },
         authHeader,
@@ -800,6 +806,9 @@ function AdminTeamDetailPage() {
                           style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
                           required
                         />
+                      </div>
+                      <div className="slds-m-top_xx-small text-slate-400" style={{ fontSize: '11px' }}>
+                        Slug must be 24 characters or fewer.
                       </div>
                     </div>
 

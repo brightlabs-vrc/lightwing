@@ -41,7 +41,7 @@ export function isReservedSlug(slug: string): boolean {
  * Validates whether a team slug matches regex and length rules, and is not reserved.
  */
 export function isValidSlug(slug: string): boolean {
-  if (slug.length < 3 || slug.length > 32) {
+  if (slug.length < 3 || slug.length > 24) {
     return false;
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
@@ -82,6 +82,11 @@ export async function generateUniqueUserSlug(
   // Normalize name to lowercase alphanumeric
   let base = baseName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+  // If base length exceeds 24 characters, truncate it
+  if (base.length > 24) {
+    base = base.slice(0, 24);
+  }
+
   // Check if alphanumeric and between 4 and 24 characters, and not reserved
   let isValid = base.length >= 4 && base.length <= 24 && !isReservedSlug(base);
 
@@ -89,31 +94,41 @@ export async function generateUniqueUserSlug(
   if (isValid) {
     // Check collision
     const existing = await prisma.user.findUnique({ where: { slug } });
-    if (existing && existing.id !== userId) {
-      isValid = false; // Collision!
+    if (!existing || existing.id === userId) {
+      return slug;
+    }
+    // Collision! We must resolve it within 24 characters limit.
+    let counter = 2;
+    while (true) {
+      const suffix = String(counter);
+      const tempSlug = base.slice(0, 24 - suffix.length) + suffix;
+      const collision = await prisma.user.findUnique({ where: { slug: tempSlug } });
+      if (!collision || collision.id === userId) {
+        return tempSlug;
+      }
+      counter++;
     }
   }
 
-  if (!isValid) {
-    // Default to using a derivative of their Discord ID
-    const account = await prisma.account.findFirst({
-      where: { userId, providerId: "discord" },
-    });
-    const discordId = account?.accountId || userId;
-    const normalizedDiscordId = discordId.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const lastPart = normalizedDiscordId.slice(-7);
-    slug = `u${lastPart}`.slice(0, 24);
+  // Default to using a derivative of their Discord ID
+  const account = await prisma.account.findFirst({
+    where: { userId, providerId: "discord" },
+  });
+  const discordId = account?.accountId || userId;
+  const normalizedDiscordId = discordId.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // To make sure u + suffix is unique and matches u + discord ID/userId, take the rightmost characters
+  const lastPart = normalizedDiscordId.slice(-23);
+  slug = `u${lastPart}`.slice(0, 24);
 
-    let counter = 2;
-    while (true) {
-      const existing = await prisma.user.findUnique({ where: { slug } });
-      if (!existing || existing.id === userId) {
-        break;
-      }
-      const suffix = String(counter);
-      slug = `u${lastPart}`.slice(0, 24 - suffix.length) + suffix;
-      counter++;
+  let counter = 2;
+  while (true) {
+    const existing = await prisma.user.findUnique({ where: { slug } });
+    if (!existing || existing.id === userId) {
+      break;
     }
+    const suffix = String(counter);
+    slug = `u${lastPart}`.slice(0, 24 - suffix.length) + suffix;
+    counter++;
   }
 
   return slug;
@@ -130,13 +145,13 @@ export async function generateUniqueOrgSlug(
   if (!base || base.length < 3) {
     base = "team";
   }
-  if (base.length > 25) {
-    base = base.slice(0, 25);
+  if (base.length > 24) {
+    base = base.slice(0, 24);
   }
 
   let slug = base;
   if (isReservedSlug(slug)) {
-    slug = `${base}-1`;
+    slug = `${base.slice(0, 22)}-1`;
   }
 
   let counter = 2;
@@ -145,7 +160,8 @@ export async function generateUniqueOrgSlug(
     if (!existing && !isReservedSlug(slug)) {
       return slug;
     }
-    slug = `${base}-${counter}`;
+    const suffix = `-${counter}`;
+    slug = `${base.slice(0, 24 - suffix.length)}${suffix}`;
     counter++;
   }
 }

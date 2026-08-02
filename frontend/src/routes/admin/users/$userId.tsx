@@ -69,6 +69,16 @@ function AdminUserDetailPage() {
       return
     }
 
+    const trimmedSlug = slug.trim()
+    if (trimmedSlug && (trimmedSlug.length < 4 || trimmedSlug.length > 24)) {
+      setError('Slug must be between 4 and 24 characters.')
+      return
+    }
+    if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
+      setError('Slug must contain only lowercase letters and numbers.')
+      return
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -79,7 +89,7 @@ function AdminUserDetailPage() {
       // 1. Update Profile Fields if changed
       const profileChanged =
         name !== (profile.name || '') ||
-        slug !== (profile.slug || '') ||
+        trimmedSlug !== (profile.slug || '') ||
         biography !== (profile.biography || '') ||
         careerOverview !== (profile.careerOverview || '') ||
         vrchatUsername !== (profile.vrchatUsername || '') ||
@@ -90,7 +100,7 @@ function AdminUserDetailPage() {
           profile.id,
           {
             name,
-            slug,
+            slug: trimmedSlug || undefined,
             biography: biography.trim() || null,
             careerOverview: careerOverview.trim() || null,
             vrchatUsername: vrchatUsername.trim() || null,

@@ -121,7 +121,18 @@ function ProfilePage() {
             className="w-full"
             loading={updateMutation.isPending}
             disabled={updateMutation.isPending}
-            onClick={() => updateMutation.mutate({ biography, careerOverview, vrchatUsername, slug })}
+            onClick={() => {
+              const trimmedSlug = slug.trim()
+              if (trimmedSlug && (trimmedSlug.length < 4 || trimmedSlug.length > 24)) {
+                toast({ tone: 'red', title: 'Slug must be between 4 and 24 characters.' })
+                return
+              }
+              if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
+                toast({ tone: 'red', title: 'Slug must contain only lowercase letters and numbers.' })
+                return
+              }
+              updateMutation.mutate({ biography, careerOverview, vrchatUsername, slug: trimmedSlug })
+            }}
           >
             {updateMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}
           </PixelButton>
