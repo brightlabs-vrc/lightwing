@@ -54,10 +54,10 @@ export function isValidSlug(slug: string): boolean {
 }
 
 /**
- * Validates whether a user slug matches regex (alphanumeric only) and length 4-8 rules, and is not reserved.
+ * Validates whether a user slug matches regex (alphanumeric only) and length 4-24 rules, and is not reserved.
  */
 export function isValidUserSlug(slug: string): boolean {
-  if (slug.length < 4 || slug.length > 8) {
+  if (slug.length < 4 || slug.length > 24) {
     return false;
   }
   if (!/^[a-z0-9]+$/.test(slug)) {
@@ -82,8 +82,8 @@ export async function generateUniqueUserSlug(
   // Normalize name to lowercase alphanumeric
   let base = baseName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-  // Check if alphanumeric and between 4 and 8 characters, and not reserved
-  let isValid = base.length >= 4 && base.length <= 8 && !isReservedSlug(base);
+  // Check if alphanumeric and between 4 and 24 characters, and not reserved
+  let isValid = base.length >= 4 && base.length <= 24 && !isReservedSlug(base);
 
   let slug = base;
   if (isValid) {
@@ -102,7 +102,7 @@ export async function generateUniqueUserSlug(
     const discordId = account?.accountId || userId;
     const normalizedDiscordId = discordId.toLowerCase().replace(/[^a-z0-9]/g, "");
     const lastPart = normalizedDiscordId.slice(-7);
-    slug = `u${lastPart}`.slice(0, 8);
+    slug = `u${lastPart}`.slice(0, 24);
 
     let counter = 2;
     while (true) {
@@ -111,7 +111,7 @@ export async function generateUniqueUserSlug(
         break;
       }
       const suffix = String(counter);
-      slug = `u${lastPart}`.slice(0, 8 - suffix.length) + suffix;
+      slug = `u${lastPart}`.slice(0, 24 - suffix.length) + suffix;
       counter++;
     }
   }

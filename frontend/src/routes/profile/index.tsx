@@ -85,8 +85,9 @@ function ProfilePage() {
           <PixelInput label="NAME" value={profile?.name ?? ''} disabled />
 
           <PixelInput
-            label="SLUG (HANDLE)"
-            placeholder="e.g. competitor-slug"
+            label="HANDLE"
+            placeholder="e.g. competitorhandle"
+            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters and numbers only)."
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
           />

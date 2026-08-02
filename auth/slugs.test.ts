@@ -45,11 +45,11 @@ describe("Slug Helpers and Recovery", () => {
     expect(isReservedSlug("not-reserved")).toBe(false);
   });
 
-  test("isValidUserSlug enforces alphanumeric and 4-8 length limit", () => {
+  test("isValidUserSlug enforces alphanumeric and 4-24 length limit", () => {
     expect(isValidUserSlug("abc")).toBe(false); // too short
     expect(isValidUserSlug("abcd")).toBe(true); // valid
-    expect(isValidUserSlug("abcdefgh")).toBe(true); // valid
-    expect(isValidUserSlug("abcdefghi")).toBe(false); // too long
+    expect(isValidUserSlug("a".repeat(24))).toBe(true); // valid (max limit)
+    expect(isValidUserSlug("a".repeat(25))).toBe(false); // too long
     expect(isValidUserSlug("abc-d")).toBe(false); // has hyphen
     expect(isValidUserSlug("admin")).toBe(false); // reserved
   });
@@ -71,7 +71,7 @@ describe("Slug Helpers and Recovery", () => {
     // generateUniqueUserSlug should default to a derivative using their Discord ID
     const newSlug = await generateUniqueUserSlug(prisma, "Bolt", u2);
     expect(newSlug.length).toBeGreaterThanOrEqual(4);
-    expect(newSlug.length).toBeLessThanOrEqual(8);
+    expect(newSlug.length).toBeLessThanOrEqual(24);
     expect(newSlug).not.toBe("bolt");
   });
 
@@ -82,7 +82,7 @@ describe("Slug Helpers and Recovery", () => {
     const slug = await ensureUserSlug(userId);
     expect(slug).not.toBeNull();
     expect(slug?.length).toBeGreaterThanOrEqual(4);
-    expect(slug?.length).toBeLessThanOrEqual(8);
+    expect(slug?.length).toBeLessThanOrEqual(24);
 
     // Idempotent call
     const slug2 = await ensureUserSlug(userId);
