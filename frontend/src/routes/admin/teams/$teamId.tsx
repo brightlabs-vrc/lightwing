@@ -5,6 +5,7 @@ import { requireSiteAdmin } from '../../../lib/auth-guard'
 import {
   getAdminTeam,
   updateAdminTeamStats,
+  updateAdminTeam,
   addAdminTeamMember,
   updateAdminTeamMemberRole,
   removeAdminTeamMember,
@@ -42,6 +43,7 @@ function AdminTeamDetailPage() {
   // Modals state
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false)
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false)
 
   // Edit Stats form state
   const [seasonRank, setSeasonRank] = useState('')
@@ -50,6 +52,13 @@ function AdminTeamDetailPage() {
   const [averagePointsPerEvent, setAveragePointsPerEvent] = useState('')
   const [updatingStats, setUpdatingStats] = useState(false)
   const [statsError, setStatsError] = useState<string | null>(null)
+
+  // Edit Team Parameters form state
+  const [teamName, setTeamName] = useState('')
+  const [teamSlug, setTeamSlug] = useState('')
+  const [teamLogo, setTeamLogo] = useState('')
+  const [updatingTeam, setUpdatingTeam] = useState(false)
+  const [teamError, setTeamError] = useState<string | null>(null)
 
   // Add Member form state
   const [selectedUserId, setSelectedUserId] = useState('')
@@ -74,6 +83,11 @@ function AdminTeamDetailPage() {
       setPointsAverage(loadedTeam.stats.pointsAverage !== null ? String(loadedTeam.stats.pointsAverage) : '')
       setRankingAverage(loadedTeam.stats.rankingAverage !== null ? String(loadedTeam.stats.rankingAverage) : '')
       setAveragePointsPerEvent(loadedTeam.stats.averagePointsPerEvent !== null ? String(loadedTeam.stats.averagePointsPerEvent) : '')
+
+      // Prepopulate team parameters form
+      setTeamName(loadedTeam.name || '')
+      setTeamSlug(loadedTeam.slug || '')
+      setTeamLogo(loadedTeam.logo || '')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load team details')
     } finally {
@@ -124,6 +138,35 @@ function AdminTeamDetailPage() {
       setStatsError(cause instanceof Error ? cause.message : 'Failed to update statistics')
     } finally {
       setUpdatingStats(false)
+    }
+  }
+
+  async function handleUpdateTeam(evt: React.FormEvent) {
+    evt.preventDefault()
+    if (!authHeader) return
+
+    setUpdatingTeam(true)
+    setTeamError(null)
+    try {
+      const updated = await updateAdminTeam(
+        teamId,
+        {
+          name: teamName.trim() || undefined,
+          slug: teamSlug.trim() || undefined,
+          logo: teamLogo.trim() || null,
+        },
+        authHeader,
+      )
+      setTeam(updated)
+      setTeamName(updated.name || '')
+      setTeamSlug(updated.slug || '')
+      setTeamLogo(updated.logo || '')
+      setIsTeamModalOpen(false)
+      setSuccess('Team parameters updated successfully.')
+    } catch (cause) {
+      setTeamError(cause instanceof Error ? cause.message : 'Failed to update team parameters')
+    } finally {
+      setUpdatingTeam(false)
     }
   }
 
@@ -195,6 +238,16 @@ function AdminTeamDetailPage() {
 
   const actions = (
     <div style={{ display: 'flex', gap: '8px' }}>
+      <button
+        type="button"
+        onClick={() => {
+          setTeamError(null)
+          setIsTeamModalOpen(true)
+        }}
+        className="slds-button slds-button_neutral"
+      >
+        Edit Team Parameters
+      </button>
       <button
         type="button"
         onClick={() => {
@@ -668,6 +721,121 @@ function AdminTeamDetailPage() {
                     className="slds-button slds-button_brand"
                   >
                     {addingMember ? 'Adding...' : 'Add Member'}
+                  </button>
+                </footer>
+              </form>
+            </div>
+          </section>
+          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
+        </>
+      )}
+
+      {/* Edit Team Modal */}
+      {isTeamModalOpen && (
+        <>
+          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
+            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
+              <header className="slds-modal__header">
+                <button
+                  type="button"
+                  onClick={() => setIsTeamModalOpen(false)}
+                  className="slds-button slds-button_icon slds-modal__close"
+                  title="Close"
+                  style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    right: '0.5rem',
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  X
+                </button>
+                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  Configure Team Parameters
+                </h2>
+              </header>
+
+              <form onSubmit={(e) => void handleUpdateTeam(e)}>
+                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                  {teamError && (
+                    <div className="slds-m-bottom_medium">
+                      <AlertBanner variant="error">{teamError}</AlertBanner>
+                    </div>
+                  )}
+
+                  <div className="slds-form slds-form_stacked">
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-name-input">
+                        Team Name
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="team-name-input"
+                          type="text"
+                          value={teamName}
+                          onChange={(e) => setTeamName(e.target.value)}
+                          placeholder="e.g. My Racing Team"
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-slug-input">
+                        Team Slug
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="team-slug-input"
+                          type="text"
+                          value={teamSlug}
+                          onChange={(e) => setTeamSlug(e.target.value)}
+                          placeholder="e.g. my-racing-team"
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="slds-form-element">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-logo-input">
+                        Team Logo URL
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="team-logo-input"
+                          type="text"
+                          value={teamLogo}
+                          onChange={(e) => setTeamLogo(e.target.value)}
+                          placeholder="e.g. https://example.com/logo.png"
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsTeamModalOpen(false)}
+                    className="slds-button slds-button_neutral"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingTeam}
+                    className="slds-button slds-button_brand"
+                  >
+                    {updatingTeam ? 'Updating...' : 'Save Parameters'}
                   </button>
                 </footer>
               </form>

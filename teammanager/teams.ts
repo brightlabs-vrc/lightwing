@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { api, APIError, Header, Query } from "encore.dev/api";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { requireSiteAdmin } from "../auth/rbac";
+import { requireSiteAdmin, requirePermission, resolveActor } from "../auth/rbac";
+import { isSiteAdmin } from "../auth/permissions";
+import { isValidSlug } from "../lib/slugs";
 import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
 import { cluster } from "../cache";
 import { ADMINISTRATOR_ROLE, ADMINISTRATOR_ROLE_LIMIT } from "../lib/constants";
@@ -244,3 +246,75 @@ export function toTeam(organization: OrganizationWithMembers): Team {
     })),
   };
 }
+
+interface UpdateTeamParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  name?: string;
+  slug?: string;
+  logo?: string | null;
+}
+
+// Updates a team's core metadata (name, slug, logo).
+// Accessible to team administrators (via organization update permission) or site administrators.
+export const updateTeam = api(
+  { expose: true, auth: true, method: "PATCH", path: "/api/teams/:id" },
+  async ({
+    id,
+    authorization,
+    name,
+    slug,
+    logo,
+  }: UpdateTeamParams): Promise<Team> => {
+    const actor = await resolveActor(prisma, authorization);
+    const hasOrgUpdatePermission = async () => {
+      try {
+        await requirePermission(prisma, {
+          authorization,
+          organizationId: id,
+          resource: "organization",
+          action: "update",
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (!isSiteAdmin(actor.siteRole) && !(await hasOrgUpdatePermission())) {
+      throw APIError.permissionDenied("cannot update team metadata");
+    }
+
+    const existing = await prisma.organization.findUnique({ where: { id } });
+    if (!existing) {
+      throw APIError.notFound("team not found");
+    }
+
+    let nextSlug = existing.slug;
+    if (slug !== undefined && slug !== existing.slug) {
+      if (!isValidSlug(slug)) {
+        throw APIError.invalidArgument("invalid slug format or length");
+      }
+      const collision = await prisma.organization.findUnique({ where: { slug } });
+      if (collision) {
+        throw APIError.alreadyExists("team slug is already in use");
+      }
+      nextSlug = slug;
+    }
+
+    const organization = await prisma.organization.update({
+      where: { id },
+      data: {
+        name: name ?? undefined,
+        slug: nextSlug,
+        logo: logo === undefined ? undefined : logo,
+        updatedAt: new Date(),
+      },
+      include: TEAM_WITH_MEMBERS_INCLUDE,
+    });
+
+    await teamCache.delete({ id });
+
+    return toTeam(organization);
+  },
+);

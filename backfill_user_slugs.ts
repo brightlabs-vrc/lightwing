@@ -15,7 +15,7 @@ async function main() {
   console.log(`Found ${users.length} users without a slug.`);
 
   for (const user of users) {
-    const slug = await generateUniqueUserSlug(prisma, user.name);
+    const slug = await generateUniqueUserSlug(prisma, user.name, user.id);
     await prisma.user.update({
       where: { id: user.id },
       data: { slug },

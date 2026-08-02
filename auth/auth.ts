@@ -24,8 +24,23 @@ const discordBotToken = secret("DISCORD_BOT_TOKEN");
 
 import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
 import { cluster } from "../cache";
+import { generateUniqueUserSlug } from "../lib/slugs";
 
 const ursDiscordGuildId = "1482993434410225739";
+
+export async function ensureUserSlug(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+  if (user.slug !== null) return user.slug;
+
+  const baseSource = user.name || "user";
+  const slug = await generateUniqueUserSlug(prisma, baseSource, userId);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { slug },
+  });
+  return slug;
+}
 const siteAdminRole = "SITE_ADMIN";
 const staffRoleNames = new Set([
   "Moderation Staff",
@@ -248,21 +263,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       create: {
         before: async (user) => {
           const existingUsers = await prisma.user.count();
-          const baseSlug = user.name ? user.name : "user";
-          let slug = baseSlug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-          if (!slug || slug.length < 3) {
-            slug = "user";
-          }
-          let uniqueSlug = slug;
-          let counter = 2;
-          while (true) {
-            const collision = await prisma.user.findUnique({ where: { slug: uniqueSlug } });
-            if (!collision) {
-              break;
-            }
-            uniqueSlug = `${slug}-${counter}`;
-            counter++;
-          }
+          const uniqueSlug = await generateUniqueUserSlug(prisma, user.name || "user", user.id);
 
           if (existingUsers > 0) {
             return {
@@ -287,6 +288,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       create: {
         before: async (session) => {
           await syncSiteRoleFromDiscordMembership(session.userId);
+          await ensureUserSlug(session.userId);
         },
       },
     },

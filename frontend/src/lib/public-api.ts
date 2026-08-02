@@ -406,6 +406,7 @@ export async function updateMyProfile(
   userId: string,
   params: {
     name?: string
+    slug?: string
     biography?: string | null
     careerOverview?: string | null
     vrchatUsername?: string | null
@@ -416,6 +417,7 @@ export async function updateMyProfile(
     return appClient.with({ auth: { authorization } }).auth.updateUserProfile(userId, {
       authorization,
       name: params.name,
+      slug: params.slug,
       biography: params.biography,
       careerOverview: params.careerOverview,
       vrchatUsername: params.vrchatUsername,
@@ -428,6 +430,7 @@ export async function updateMyProfile(
   const updated: auth.UserProfile = {
     ...existing,
     name: params.name ?? existing.name,
+    slug: params.slug !== undefined ? params.slug : existing.slug,
     biography: params.biography !== undefined ? params.biography : existing.biography,
     careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
     vrchatUsername: params.vrchatUsername !== undefined ? params.vrchatUsername : existing.vrchatUsername,
