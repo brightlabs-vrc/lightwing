@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { requireEventPermission, resolveActor } from "../auth/rbac";
 import { isEligible, type ClassTier } from "./classtier";
 import { recomputeEventPointsInternal, eventDetailCache, ensureEventStandingsRow, publicEventsCache, PUBLIC_EVENTS_KEY } from "./events";
+import { removeMemberFromEventInternal } from "./event-members";
 
 export interface RaceEventMemberView {
   userId: string;
@@ -487,6 +488,20 @@ export const removeRaceEventMember = api(
       where: { raceEventId: raceId, userId },
     });
 
+    if (event.granularParticipation) {
+      const activeRaceCount = await prisma.raceEventMember.count({
+        where: {
+          userId,
+          raceEvent: {
+            eventId,
+          },
+        },
+      });
+      if (activeRaceCount === 0) {
+        await removeMemberFromEventInternal(eventId, userId);
+      }
+    }
+
     await eventDetailCache.delete({ id: eventId });
     await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
 
@@ -641,6 +656,20 @@ export const leaveRaceEvent = api(
     await prisma.raceEventMember.deleteMany({
       where: { raceEventId: raceId, userId },
     });
+
+    if (event.granularParticipation) {
+      const activeRaceCount = await prisma.raceEventMember.count({
+        where: {
+          userId,
+          raceEvent: {
+            eventId,
+          },
+        },
+      });
+      if (activeRaceCount === 0) {
+        await removeMemberFromEventInternal(eventId, userId);
+      }
+    }
 
     await eventDetailCache.delete({ id: eventId });
     await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });

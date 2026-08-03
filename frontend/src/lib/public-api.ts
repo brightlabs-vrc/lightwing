@@ -573,15 +573,15 @@ export async function joinRaceEvent(
     mockRaceMembersMap.set(raceId, raceMembers)
   }
 
-  const updatedRace = {
+  const joinedRace = {
     ...event.raceEvents[raceIndex],
     members: raceMembers,
   } as any
 
-  event.raceEvents[raceIndex] = updatedRace
+  event.raceEvents[raceIndex] = joinedRace
 
   saveMockEvents(mockPublicEvents)
-  return updatedRace
+  return joinedRace
 }
 
 export async function leaveRaceEvent(
@@ -618,6 +618,17 @@ export async function leaveRaceEvent(
   } as any
 
   event.raceEvents[raceIndex] = updatedRace
+
+  if (event.granularParticipation) {
+    const userHasOtherRaces = event.raceEvents.some((r, idx) => {
+      if (idx === raceIndex) return false
+      const members = mockRaceMembersMap.get(r.id) ?? []
+      return members.some((m) => m.userId === userId)
+    })
+    if (!userHasOtherRaces) {
+      event.members = event.members.filter((m) => m.userId !== userId)
+    }
+  }
 
   saveMockEvents(mockPublicEvents)
   return updatedRace
