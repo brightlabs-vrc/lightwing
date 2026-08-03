@@ -618,11 +618,26 @@ export async function loadEvent(id: string): Promise<EventDetail> {
           }))
         : [],
     })),
-    members: event.members.map((member) => ({
-      userId: member.userId,
-      name: member.user.name,
-      classTier: member.user.classTier,
-    })),
+    members: (() => {
+      const activeUserIds = new Set<string>();
+      if (event.granularParticipation) {
+        for (const race of event.raceEvents) {
+          if (race.raceMembers) {
+            for (const rm of race.raceMembers) {
+              activeUserIds.add(rm.userId);
+            }
+          }
+        }
+      }
+      const filteredMembers = event.granularParticipation
+        ? event.members.filter((m) => activeUserIds.has(m.userId))
+        : event.members;
+      return filteredMembers.map((member) => ({
+        userId: member.userId,
+        name: member.user.name,
+        classTier: member.user.classTier,
+      }));
+    })(),
     schedules: event.schedules.map((schedule) => ({
       id: schedule.id,
       title: schedule.title,
