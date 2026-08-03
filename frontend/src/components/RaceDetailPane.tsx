@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useRef } from 'react'
 import type { eventmanager } from '../lib/client'
 import { AlertBanner } from './AlertBanner'
 import { StandingsEditor } from './StandingsEditor'
@@ -5,6 +6,187 @@ import {
   isRaceOngoing,
   isRaceNotStarted,
 } from '../lib/raceStatus'
+
+interface RaceMemberComboboxProps {
+  value: string
+  onChange: (userId: string) => void
+  members: eventmanager.EventMemberView[]
+  placeholder?: string
+}
+
+export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
+  value,
+  onChange,
+  members,
+  placeholder = 'Search competitor from event members...',
+}) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (value) {
+      const found = members.find((m) => m.userId === value)
+      if (found) {
+        setSearchTerm(`${found.name} (${found.classTier ?? 'PRE_OP'})`)
+      }
+    } else {
+      setSearchTerm('')
+    }
+  }, [value, members])
+
+  const filtered = members.filter((m) => {
+    if (!searchTerm || value) return true
+    const term = searchTerm.toLowerCase()
+    return (
+      m.name.toLowerCase().includes(term) ||
+      m.userId.toLowerCase().includes(term) ||
+      (m.classTier ?? 'PRE_OP').toLowerCase().includes(term)
+    )
+  })
+
+  useEffect(() => {
+    setHighlightedIndex(-1)
+  }, [searchTerm])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleSelect = (member: eventmanager.EventMemberView) => {
+    onChange(member.userId)
+    setSearchTerm(`${member.name} (${member.classTier ?? 'PRE_OP'})`)
+    setIsOpen(false)
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setSearchTerm(val)
+    setIsOpen(true)
+    if (!val) {
+      onChange('')
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        setIsOpen(true)
+      }
+      return
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightedIndex((prev) => (filtered.length > 0 ? (prev + 1) % filtered.length : -1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIndex((prev) => (filtered.length > 0 ? (prev - 1 + filtered.length) % filtered.length : -1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
+        handleSelect(filtered[highlightedIndex])
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setIsOpen(false)
+    }
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <div className="slds-form-element__control slds-input-has-icon slds-input-has-icon_right">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder}
+          className="slds-input"
+          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%', background: '#fff', fontSize: '12px' }}
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('')
+              onChange('')
+              setIsOpen(false)
+            }}
+            style={{
+              position: 'absolute',
+              right: '8px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: '#94a3b8',
+              fontSize: '12px',
+            }}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {isOpen && (searchTerm && !value || filtered.length > 0) && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            background: '#fff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '4px',
+            marginTop: '4px',
+            zIndex: 9999,
+            maxHeight: '150px',
+            overflowY: 'auto',
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+          }}
+        >
+          {filtered.length === 0 && (
+            <div style={{ padding: '6px 12px', color: '#64748b', fontSize: '12px' }}>
+              No matches found
+            </div>
+          )}
+
+          {filtered.map((member, idx) => (
+            <div
+              key={member.userId}
+              onClick={() => handleSelect(member)}
+              style={{
+                padding: '6px 12px',
+                cursor: 'pointer',
+                borderBottom: '1px solid #f1f5f9',
+                fontSize: '12px',
+                background: highlightedIndex === idx ? '#f1f5f9' : 'transparent',
+              }}
+              onMouseEnter={(e) => {
+                setHighlightedIndex(idx)
+              }}
+            >
+              <div style={{ fontWeight: '600', color: '#1e293b' }}>{member.name}</div>
+              <div style={{ fontSize: '10px', color: '#64748b' }}>
+                ID: {member.userId} | Class: {member.classTier ?? 'PRE_OP'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface RaceDetailPaneProps {
   selectedEvent: eventmanager.EventDetail
@@ -248,21 +430,13 @@ export function RaceDetailPane({
               style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               <div style={{ flexGrow: 1, minWidth: '180px' }}>
-                <select
+                <RaceMemberCombobox
                   value={newRaceMemberUserId}
-                  onChange={(e) => setNewRaceMemberUserId(e.target.value)}
-                  className="slds-select"
-                  style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px', background: '#fff', fontSize: '12px' }}
-                >
-                  <option value="">-- Add Competitor from Event Members --</option>
-                  {selectedEvent.members
-                    .filter((em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId))
-                    .map((em) => (
-                      <option key={em.userId} value={em.userId}>
-                        {em.name} ({em.classTier ?? 'PRE_OP'})
-                      </option>
-                    ))}
-                </select>
+                  onChange={(val) => setNewRaceMemberUserId(val)}
+                  members={selectedEvent.members.filter(
+                    (em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId)
+                  )}
+                />
               </div>
               <button
                 type="submit"

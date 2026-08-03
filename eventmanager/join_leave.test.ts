@@ -156,7 +156,7 @@ describe("joinEvent and leaveEvent public endpoints", () => {
 
   test("reject signup if user does not satisfy class tier restriction", async () => {
     const creatorId = await createUser("creator", "Creator User");
-    const userId = await createUser("participant-low", "Low Tier Participant", "G3");
+    const userId = await createUser("participant-low", "Low Tier Participant", "G2");
     const token = await createSession(userId);
     const eventId = await createEvent(creatorId, "Elite OP Championship", "OFFICIAL", "OP");
 

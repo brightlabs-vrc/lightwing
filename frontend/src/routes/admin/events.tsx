@@ -12,6 +12,7 @@ import { EventScoringTablesEditor } from '../../components/EventScoringTablesEdi
 import type { eventmanager } from '../../lib/client'
 import { MOCK_MODE } from '../../lib/mock-mode'
 import { DEFAULT_SCORING_TABLES } from '../../lib/scoringDefaults'
+import { SldsSkeletonList } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/admin/events')({
   beforeLoad: async ({ location }) => {
@@ -210,7 +211,7 @@ function AdminEventsListPage() {
 
             <div className="slds-card__body" style={{ padding: '0 1rem 1rem 1rem' }}>
               {loadingEvents ? (
-                <p className="slds-text-body_small slds-p-around_medium" style={{ color: '#514f4d' }}>Loading events...</p>
+                <SldsSkeletonList count={3} />
               ) : events.length === 0 ? (
                 <p className="slds-text-body_small slds-p-around_medium" style={{ color: '#514f4d' }}>No events found.</p>
               ) : (

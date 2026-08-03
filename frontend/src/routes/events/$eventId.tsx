@@ -16,6 +16,7 @@ import {
   useToast,
 } from '@pxlkit/ui-kit'
 import type { eventmanager } from '../../lib/client'
+import { PixelSkeletonDetail } from '../../components/LoadingSkeleton'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
   PRE_OP: 'PRE-OP',
@@ -67,9 +68,9 @@ function EventDetailPage() {
 
   if (isLoading) {
     return (
-      <PixelStack align="center" justify="center" gap={4} className="py-20">
-        <PixelSpinner size="lg" label="Loading event..." />
-      </PixelStack>
+      <PixelContainer maxWidth="full" padding="md">
+        <PixelSkeletonDetail />
+      </PixelContainer>
     )
   }
   if (error) {

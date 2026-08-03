@@ -19,6 +19,7 @@ export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
   const [results, setResults] = useState<auth.UserProfile[]>([])
   const [loading, setLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Fetch the selected user profile to display their name initially if we only have their ID
@@ -39,6 +40,11 @@ export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
       setSearchTerm('')
     }
   }, [value, session?.session.token])
+
+  // Reset highlighting when results change
+  useEffect(() => {
+    setHighlightedIndex(-1)
+  }, [results])
 
   // Debounced search
   useEffect(() => {
@@ -96,6 +102,31 @@ export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        setIsOpen(true)
+      }
+      return
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightedIndex((prev) => (results.length > 0 ? (prev + 1) % results.length : -1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIndex((prev) => (results.length > 0 ? (prev - 1 + results.length) % results.length : -1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (highlightedIndex >= 0 && highlightedIndex < results.length) {
+        handleSelect(results[highlightedIndex])
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setIsOpen(false)
+    }
+  }
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <div className="slds-form-element__control slds-input-has-icon slds-input-has-icon_right">
@@ -103,6 +134,7 @@ export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
           type="text"
           value={searchTerm}
           onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
           className="slds-input"
@@ -163,7 +195,7 @@ export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
           )}
 
           {!loading &&
-            results.map((user) => (
+            results.map((user, idx) => (
               <div
                 key={user.id}
                 onClick={() => handleSelect(user)}
@@ -172,12 +204,10 @@ export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
                   cursor: 'pointer',
                   borderBottom: '1px solid #f1f5f9',
                   fontSize: '13px',
+                  background: highlightedIndex === idx ? '#f1f5f9' : 'transparent',
                 }}
                 onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.background = '#f8fafc'
-                }}
-                onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                  setHighlightedIndex(idx)
                 }}
               >
                 <div style={{ fontWeight: '600', color: '#1e293b' }}>{user.name}</div>

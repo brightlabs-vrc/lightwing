@@ -14,6 +14,7 @@ import {
   PixelEmptyState,
 } from '@pxlkit/ui-kit'
 import type { eventmanager } from '../../lib/client'
+import { PixelSkeletonList } from '../../components/LoadingSkeleton'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
   PRE_OP: 'PRE-OP',
@@ -59,9 +60,16 @@ function EventsPage() {
 
   if (isLoading) {
     return (
-      <PixelStack align="center" justify="center" gap={4} className="py-20">
-        <PixelSpinner size="lg" label="Loading events..." />
-      </PixelStack>
+      <PixelContainer maxWidth="full" padding="md">
+        <PixelSectionHeader
+          title="COMPETITIVE EVENTS"
+          titleTone="purple"
+          size="lg"
+        />
+        <div className="mt-6">
+          <PixelSkeletonList count={3} />
+        </div>
+      </PixelContainer>
     )
   }
   if (error) {
@@ -145,6 +153,7 @@ function EventsPage() {
               total={data?.total || 0}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
+              variant="pixel"
             />
           </>
         )}
