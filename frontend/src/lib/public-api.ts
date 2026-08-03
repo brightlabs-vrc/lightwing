@@ -309,6 +309,31 @@ export async function listPublicEvents(
   return { events, total }
 }
 
+function isEligible(
+  participantTier: string | null,
+  eventRestriction: string | null,
+): boolean {
+  if (eventRestriction === null) {
+    return true
+  }
+  if (participantTier === null) {
+    return false
+  }
+  if (participantTier === eventRestriction) {
+    return true
+  }
+  if (participantTier === 'PRE_OP') {
+    return eventRestriction === 'PRE_OP' || eventRestriction === 'OP'
+  }
+  const order = ['PRE_OP', 'OP', 'G3', 'G2', 'G1']
+  const pIdx = order.indexOf(participantTier)
+  const rIdx = order.indexOf(eventRestriction)
+  if (pIdx === -1 || rIdx === -1) {
+    return false
+  }
+  return rIdx === pIdx - 1
+}
+
 export async function getPublicEvent(eventId: string): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
     return appClient.eventmanager.getEvent(eventId)
@@ -348,7 +373,7 @@ export async function joinEvent(
 
   const eventRestriction = event.classRestriction
   const userTier = user.classTier
-  if (eventRestriction && userTier !== eventRestriction) {
+  if (!isEligible(userTier, eventRestriction)) {
     throw new Error('Participant class tier does not satisfy the event class restriction')
   }
 
@@ -538,20 +563,8 @@ export async function joinRaceEvent(
   const targetRestriction = event.raceEvents[raceIndex].classRestriction ?? event.classRestriction
   const userTier = user.classTier
 
-  const CLASS_TIER_ORDER: Record<string, number> = {
-    PRE_OP: 0,
-    OP: 1,
-    G3: 2,
-    G2: 3,
-    G1: 4,
-  }
-
-  if (targetRestriction) {
-    const userVal = CLASS_TIER_ORDER[userTier ?? ''] ?? -1
-    const reqVal = CLASS_TIER_ORDER[targetRestriction] ?? -1
-    if (userVal < reqVal) {
-      throw new Error('Participant class tier does not satisfy the race class restriction')
-    }
+  if (!isEligible(userTier, targetRestriction)) {
+    throw new Error('Participant class tier does not satisfy the race class restriction')
   }
 
   let raceMembers = mockRaceMembersMap.get(raceId) ?? []

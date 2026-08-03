@@ -6,6 +6,7 @@ import { useEventDetail } from '../../../hooks/useEventDetail'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { LoadingBox } from '../../../components/LoadingBox'
 import { GradePointsPreview } from '../../../components/GradePointsPreview'
+import { SldsSkeletonDetail } from '../../../components/LoadingSkeleton'
 import { EventScoringTablesEditor } from '../../../components/EventScoringTablesEditor'
 import type { eventmanager } from '../../../lib/client'
 
@@ -312,7 +313,7 @@ function AdminEventDetailPage() {
       )}
 
       {loadingEventDetail ? (
-        <LoadingBox message={`Loading details for ${selectedEvent?.name ?? eventId}...`} />
+        <SldsSkeletonDetail />
       ) : selectedEvent ? (
         <div className="slds-box bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', padding: '1.5rem' }}>
           <div className="slds-grid slds-grid_align-spread slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #dddbda', paddingBottom: '1rem' }}>

@@ -20,8 +20,13 @@ export const CLASS_TIER_LABELS: Record<ClassTier, string> = {
 };
 
 // Class restrictions exist so participants are matched with others of equal
-// skill. A participant is eligible for an event when the event is open
-// (no restriction) or their class tier exactly matches the event's restriction.
+// skill.
+// Eligibility rules:
+// - If there is no restriction, any participant is allowed.
+// - Same class: allowed.
+// - One class lower: allowed.
+// - Two or more classes lower: rejected.
+// - `PRE_OP`: allowed only for `PRE_OP` and `OP`.
 export function isEligible(
   participantTier: ClassTier | null,
   eventRestriction: ClassTier | null,
@@ -29,5 +34,28 @@ export function isEligible(
   if (eventRestriction === null) {
     return true;
   }
-  return participantTier === eventRestriction;
+  if (participantTier === null) {
+    return false;
+  }
+
+  if (participantTier === eventRestriction) {
+    return true;
+  }
+
+  // PRE_OP participant is special: can enter PRE_OP and OP, but not graded classes (G3, G2, G1).
+  if (participantTier === "PRE_OP") {
+    return eventRestriction === "PRE_OP" || eventRestriction === "OP";
+  }
+
+  const pIdx = CLASS_TIER_ORDER.indexOf(participantTier);
+  const rIdx = CLASS_TIER_ORDER.indexOf(eventRestriction);
+
+  if (pIdx === -1 || rIdx === -1) {
+    return false;
+  }
+
+  // Other racers can enter their own class or one class lower.
+  // Since CLASS_TIER_ORDER is ["PRE_OP", "OP", "G3", "G2", "G1"],
+  // one class lower restriction means rIdx === pIdx - 1.
+  return rIdx === pIdx - 1;
 }
