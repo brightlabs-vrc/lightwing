@@ -27,3 +27,21 @@ th {
 .standings-input-no-spinner[type=number] {
   -moz-appearance: textfield;
 }
+
+/* Custom overrides for toast notifications to allow long error messages to display fully */
+[data-pxl-toast] {
+  max-width: 36rem !important; /* Increase width from max-w-sm (24rem) to 36rem for better readability of long errors */
+  width: calc(100vw - 2rem) !important; /* Safe padding on viewport edge on mobile devices */
+}
+
+@media (min-width: 640px) {
+  [data-pxl-toast] {
+    width: 36rem !important;
+  }
+}
+
+[data-pxl-toast] p.truncate {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}

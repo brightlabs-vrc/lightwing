@@ -4,15 +4,16 @@ import { prisma } from "./prisma";
 import {
   requireEventPermission,
   requirePermission,
-  requireSiteAdmin,
   resolveActor,
 } from "../auth/rbac";
 import { isSiteAdmin } from "../auth/permissions";
-import { type ClassTier, isEligible } from "./classtier";
+import { type ClassTier } from "./classtier";
 import { validateCustomScoringTables, resolvePoints } from "./scoring";
 import { scorecalc } from "~encore/clients";
 import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
 import { cluster } from "../cache";
+import { invalidateEventCaches } from "./cache-utils";
+import { SCORING_POINTS, SCORING_LADDER } from "../lib/constants";
 
 export const eventDetailCache = new StructKeyspace<{ id: string }, EventDetail>(
   cluster,
@@ -36,20 +37,34 @@ export const publicEventsCache = new StructKeyspace<{ key: string }, PublicEvent
   }
 );
 
+export interface EventListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  ownerType: EventOwnerType;
+  organizationId: string | null;
+  ownerUserId: string | null;
+  status: EventStatus;
+  scoringType: number;
+  scoringTypeLabel: string;
+  classRestriction: ClassTier | null;
+  granularParticipation: boolean;
+  signupsLocked: boolean;
+  raceCount: number;
+  memberCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // API-facing string unions mirroring the Prisma enums. Encore's schema parser
 // cannot use Prisma's runtime enum objects as types, so these are declared as
 // plain literal unions with byte-identical values (see classtier.ts).
 export type EventOwnerType = "ORGANIZATION" | "USER";
 export type EventStatus = "DRAFT" | "UNOFFICIAL" | "OFFICIAL" | "CONCLUDED";
 
-// Event scoring types (issue #4). 1 = points-based, 2 = ladder-elo.
-export const SCORING_POINTS = 1;
-export const SCORING_LADDER_ELO = 2;
-export type ScoringType = typeof SCORING_POINTS | typeof SCORING_LADDER_ELO;
-
 const SCORING_LABELS: Record<number, string> = {
   [SCORING_POINTS]: "points-based",
-  [SCORING_LADDER_ELO]: "ladder-elo",
+  [SCORING_LADDER]: "ladder-elo",
 };
 
 const LADDER_STARTING_ELO = 1200;
@@ -136,7 +151,7 @@ interface CreateEventParams {
   ownerType: EventOwnerType;
   organizationId?: string | null;
   ownerUserId?: string | null;
-  scoringType: ScoringType;
+  scoringType: number;
   scoringRulesMode?: string | null;
   customScoringTables?: any | null;
   classRestriction?: ClassTier | null;
@@ -220,7 +235,7 @@ export const createEvent = api(
       },
     });
 
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
+    await invalidateEventCaches(event.id);
 
     return loadEvent(event.id);
   },
@@ -229,49 +244,122 @@ export const createEvent = api(
 interface ListEventsParams {
   organizationId?: Query<string>;
   classRestriction?: Query<ClassTier>;
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface ListEventsResponse {
+  events: EventListItem[];
+  total: number;
+}
+
+function toListItem(event: any): EventListItem {
+  return {
+    id: event.id,
+    name: event.name,
+    description: event.description,
+    ownerType: event.ownerType as EventOwnerType,
+    organizationId: event.organizationId,
+    ownerUserId: event.ownerUserId,
+    status: event.status as EventStatus,
+    scoringType: event.scoringType,
+    scoringTypeLabel: SCORING_LABELS[event.scoringType] ?? "unknown",
+    classRestriction: event.classRestriction,
+    granularParticipation: event.granularParticipation,
+    signupsLocked: event.signupsLocked,
+    raceCount: event._count?.raceEvents ?? 0,
+    memberCount: event._count?.members ?? 0,
+    createdAt: event.createdAt.toISOString(),
+    updatedAt: event.updatedAt.toISOString(),
+  };
 }
 
 // Lists events, optionally filtered by organization or class restriction.
 export const listEvents = api(
   { expose: true, method: "GET", path: "/api/events" },
-  async ({
-    organizationId,
-    classRestriction,
-  }: ListEventsParams): Promise<{ events: EventDetail[] }> => {
+  async (params: ListEventsParams): Promise<ListEventsResponse> => {
+    const { organizationId, classRestriction, limit, offset } = params || {};
+    const where: any = {
+      organizationId: organizationId ?? undefined,
+      classRestriction: (classRestriction as ClassTier | undefined) ?? undefined,
+    };
+
+    const total = await prisma.event.count({ where });
+
     const events = await prisma.event.findMany({
-      where: {
-        organizationId: organizationId ?? undefined,
-        classRestriction: (classRestriction as ClassTier | undefined) ?? undefined,
+      where,
+      take: limit ?? undefined,
+      skip: offset ?? undefined,
+      include: {
+        _count: {
+          select: {
+            raceEvents: true,
+            members: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const detailed = await Promise.all(events.map((event) => loadEvent(event.id)));
-    return { events: detailed };
+    return {
+      events: events.map(toListItem),
+      total,
+    };
   },
 );
+
+interface ListPublicEventsParams {
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface PublicEventsCacheValue {
+  events: EventListItem[];
+  total: number;
+}
 
 // Lists public events (UNOFFICIAL, OFFICIAL, CONCLUDED) without DRAFT visibility.
 // Used by the public events page.
 export const listPublicEvents = api(
   { expose: true, method: "GET", path: "/api/events/public" },
-  async (): Promise<{ events: EventDetail[] }> => {
-    const cached = await publicEventsCache.get({ key: PUBLIC_EVENTS_KEY });
+  async (params: ListPublicEventsParams): Promise<ListEventsResponse> => {
+    const { limit, offset } = params || {};
+    const l = limit ?? 10;
+    const o = offset ?? 0;
+    const cacheKey = `${PUBLIC_EVENTS_KEY}:${l}:${o}`;
+    const cached = await publicEventsCache.get({ key: cacheKey }) as any;
     if (cached !== undefined) {
       return cached;
     }
 
+    const where = {
+      status: { in: ["UNOFFICIAL", "OFFICIAL", "CONCLUDED"] as any[] },
+    };
+
+    const total = await prisma.event.count({ where });
+
     const events = await prisma.event.findMany({
-      where: {
-        status: { in: ["UNOFFICIAL", "OFFICIAL", "CONCLUDED"] },
+      where,
+      take: l,
+      skip: o,
+      include: {
+        _count: {
+          select: {
+            raceEvents: true,
+            members: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const detailed = await Promise.all(events.map((event) => loadEvent(event.id)));
-    const value = { events: detailed };
-    await publicEventsCache.set({ key: PUBLIC_EVENTS_KEY }, value);
-    return value;
+    const result = {
+      events: events.map(toListItem),
+      total,
+    };
+
+    await publicEventsCache.set({ key: cacheKey }, result);
+    return result;
   },
 );
 
@@ -288,84 +376,91 @@ export const getEvent = api(
   },
 );
 
-interface UpdateEventParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  name?: string;
-  description?: string | null;
-  scoringRulesMode?: string | null;
-  customScoringTables?: any | null;
-  classRestriction?: ClassTier | null;
-  granularParticipation?: boolean;
+interface EventAdminResponse {
+  userId: string;
+  name: string;
 }
 
-// Updates an event's editable fields (scoring type is immutable once set).
-export const updateEvent = api(
-  { expose: true, auth: true, method: "PATCH", path: "/api/events/:id" },
-  async (params: UpdateEventParams): Promise<EventDetail> => {
-    const existingEvent = await requireEvent(params.id);
+// Lists event administrators.
+export const listEventAdmins = api(
+  { expose: true, method: "GET", path: "/api/events/:id/admins" },
+  async ({ id }: EventIdParams): Promise<{ admins: EventAdminResponse[] }> => {
+    const admins = await prisma.eventAdmin.findMany({
+      where: { eventId: id },
+      include: { user: { select: { name: true } } },
+    });
+
+    return {
+      admins: admins.map((admin) => ({
+        userId: admin.userId,
+        name: admin.user.name,
+      })),
+    };
+  }
+);
+
+interface AddEventAdminParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  userId: string;
+}
+
+// Adds an administrator to an event. Gated by requireEventPermission(..., action: "update").
+export const addEventAdmin = api(
+  { expose: true, auth: true, method: "POST", path: "/api/events/:id/admins" },
+  async ({ id, authorization, userId }: AddEventAdminParams): Promise<{ success: boolean }> => {
     await requireEventPermission(prisma, {
-      authorization: params.authorization,
-      eventId: params.id,
+      authorization,
+      eventId: id,
       action: "update",
     });
 
-    let updatedScoringRulesMode: string | undefined = undefined;
-    let updatedCustomScoringTables: any | undefined = undefined;
-    let triggerRecomputation = false;
-
-    if (existingEvent.scoringType === SCORING_POINTS) {
-      if (params.scoringRulesMode !== undefined) {
-        updatedScoringRulesMode = params.scoringRulesMode ?? "STANDARD";
-        if (updatedScoringRulesMode === "CUSTOM") {
-          const tables = params.customScoringTables !== undefined ? params.customScoringTables : existingEvent.customScoringTables;
-          if (!tables) {
-            throw APIError.invalidArgument("customScoringTables is required when scoringRulesMode is CUSTOM");
-          }
-          validateCustomScoringTables(tables);
-          updatedCustomScoringTables = tables;
-        } else {
-          updatedCustomScoringTables = null;
-        }
-
-        if (existingEvent.scoringRulesMode !== updatedScoringRulesMode) {
-          triggerRecomputation = true;
-        }
-      }
-
-      if (params.customScoringTables !== undefined && (updatedScoringRulesMode ?? existingEvent.scoringRulesMode) === "CUSTOM") {
-        validateCustomScoringTables(params.customScoringTables);
-        updatedCustomScoringTables = params.customScoringTables;
-
-        if (JSON.stringify(existingEvent.customScoringTables) !== JSON.stringify(updatedCustomScoringTables)) {
-          triggerRecomputation = true;
-        }
-      }
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw APIError.notFound("user not found");
     }
 
-    await prisma.event.update({
-      where: { id: params.id },
-      data: {
-        name: params.name ?? undefined,
-        description: params.description === undefined ? undefined : params.description,
-        scoringRulesMode: updatedScoringRulesMode,
-        customScoringTables: updatedCustomScoringTables,
-        classRestriction:
-          params.classRestriction === undefined ? undefined : params.classRestriction,
-        granularParticipation:
-          params.granularParticipation === undefined ? undefined : params.granularParticipation,
+    try {
+      await prisma.eventAdmin.create({
+        data: {
+          id: randomUUID(),
+          eventId: id,
+          userId,
+        },
+      });
+    } catch (error) {
+      // ignore if already an admin
+    }
+
+    return { success: true };
+  }
+);
+
+interface RemoveEventAdminParams {
+  id: string;
+  userId: string;
+  authorization: Header<"Authorization">;
+}
+
+// Removes an administrator from an event. Gated by requireEventPermission(..., action: "update").
+export const removeEventAdmin = api(
+  { expose: true, auth: true, method: "DELETE", path: "/api/events/:id/admins/:userId" },
+  async ({ id, userId, authorization }: RemoveEventAdminParams): Promise<{ success: boolean }> => {
+    await requireEventPermission(prisma, {
+      authorization,
+      eventId: id,
+      action: "update",
+    });
+
+    await prisma.eventAdmin.deleteMany({
+      where: {
+        eventId: id,
+        userId,
       },
     });
 
-    if (triggerRecomputation) {
-      await recomputeEventPointsInternal(params.id);
-    }
-
-    await eventDetailCache.delete({ id: params.id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-
-    return loadEvent(params.id);
-  },
+    return { success: true };
+  }
 );
 
 interface DeleteEventParams {
@@ -377,7 +472,10 @@ interface DeleteEventParams {
 export const deleteEvent = api(
   { expose: true, auth: true, method: "DELETE", path: "/api/events/:id" },
   async ({ id, authorization }: DeleteEventParams): Promise<{ deleted: boolean }> => {
-    await requireEvent(id);
+    const existing = await prisma.event.findUnique({ where: { id } });
+    if (!existing) {
+      throw APIError.notFound("event not found");
+    }
     await requireEventPermission(prisma, {
       authorization,
       eventId: id,
@@ -385,8 +483,7 @@ export const deleteEvent = api(
     });
 
     await prisma.event.delete({ where: { id } });
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
+    await invalidateEventCaches(id);
     return { deleted: true };
   },
 );
@@ -412,365 +509,7 @@ export async function ensureEventStandingsRow(
   }
 }
 
-interface AddMemberParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  userId: string;
-}
-
-// Registers a participant for an event. Enforces the event's class restriction
-// (issue #3) and seeds the scoring record for the event's scoring type.
-export const addEventMember = api(
-  { expose: true, auth: true, method: "POST", path: "/api/events/:id/members" },
-  async ({ id, authorization, userId }: AddMemberParams): Promise<EventDetail> => {
-    const event = await requireEvent(id);
-    await requireEventPermission(prisma, {
-      authorization,
-      eventId: id,
-      action: "update",
-    });
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw APIError.notFound("user not found");
-    }
-    if (!isEligible(user.classTier, event.classRestriction)) {
-      throw APIError.failedPrecondition(
-        "participant class tier does not satisfy the event class restriction",
-      );
-    }
-
-    await prisma.eventMember.upsert({
-      where: { eventId_userId: { eventId: id, userId } },
-      create: { id: randomUUID(), eventId: id, userId },
-      update: {},
-    });
-
-    await ensureEventStandingsRow(prisma, id, userId, event.scoringType);
-
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-
-    return loadEvent(id);
-  },
-);
-
-async function removeMemberFromEventInternal(eventId: string, userId: string): Promise<void> {
-  // 1. Delete EventMember
-  await prisma.eventMember.deleteMany({ where: { eventId, userId } });
-
-  // 2. Delete EventPointsEntry
-  await prisma.eventPointsEntry.deleteMany({ where: { eventId, userId } });
-
-  // 3. Delete EventLadderEntry
-  await prisma.eventLadderEntry.deleteMany({ where: { eventId, userId } });
-
-  // 4. Delete RaceEventMember for races belonging to this event
-  await prisma.raceEventMember.deleteMany({
-    where: {
-      userId,
-      raceEvent: {
-        eventId,
-      },
-    },
-  });
-
-  // 5. Delete RaceResult for races belonging to this event
-  await prisma.raceResult.deleteMany({
-    where: {
-      userId,
-      raceEvent: {
-        eventId,
-      },
-    },
-  });
-}
-
-interface RemoveMemberParams {
-  id: string;
-  userId: string;
-  authorization: Header<"Authorization">;
-}
-
-// Removes a participant from an event.
-export const removeEventMember = api(
-  { expose: true, auth: true, method: "DELETE", path: "/api/events/:id/members/:userId" },
-  async ({ id, userId, authorization }: RemoveMemberParams): Promise<EventDetail> => {
-    await requireEvent(id);
-    await requireEventPermission(prisma, {
-      authorization,
-      eventId: id,
-      action: "update",
-    });
-
-    await removeMemberFromEventInternal(id, userId);
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-    return loadEvent(id);
-  },
-);
-
-interface JoinEventParams {
-  id: string;
-  authorization: Header<"Authorization">;
-}
-
-// Public self-signup endpoint: allows authenticated users to join events
-// in UNOFFICIAL or OFFICIAL status. Does NOT require event permissions.
-export const joinEvent = api(
-  { expose: true, auth: true, method: "POST", path: "/api/events/:id/join" },
-  async ({ id, authorization }: JoinEventParams): Promise<EventDetail> => {
-    const event = await requireEvent(id);
-
-    // Only allow public signups for visible events
-    if (event.status !== "UNOFFICIAL" && event.status !== "OFFICIAL") {
-      throw APIError.failedPrecondition(
-        "event is not open for public signup (must be UNOFFICIAL or OFFICIAL)",
-      );
-    }
-
-    if (event.signupsLocked) {
-      throw APIError.failedPrecondition(
-        "signups are locked for this event",
-      );
-    }
-
-    // Resolve the authenticated actor - self-service, no permission check
-    const actor = await resolveActor(prisma, authorization);
-    const userId = actor.userId;
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw APIError.notFound("user not found");
-    }
-    if (!isEligible(user.classTier, event.classRestriction)) {
-      throw APIError.failedPrecondition(
-        "participant class tier does not satisfy the event class restriction",
-      );
-    }
-
-    await prisma.eventMember.upsert({
-      where: { eventId_userId: { eventId: id, userId } },
-      create: { id: randomUUID(), eventId: id, userId },
-      update: {},
-    });
-
-    await ensureEventStandingsRow(prisma, id, userId, event.scoringType);
-
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-
-    return loadEvent(id);
-  },
-);
-
-interface LeaveEventParams {
-  id: string;
-  authorization: Header<"Authorization">;
-}
-
-// Public self-exit endpoint: allows authenticated users to leave events they've joined.
-// Does NOT require event permissions - users can withdraw from their own membership.
-export const leaveEvent = api(
-  { expose: true, auth: true, method: "DELETE", path: "/api/events/:id/join" },
-  async ({ id, authorization }: LeaveEventParams): Promise<EventDetail> => {
-    const event = await requireEvent(id);
-
-    if (event.signupsLocked) {
-      throw APIError.failedPrecondition(
-        "signups are locked for this event",
-      );
-    }
-
-    // Resolve the authenticated actor - self-service, no permission check
-    const actor = await resolveActor(prisma, authorization);
-    const userId = actor.userId;
-
-    await removeMemberFromEventInternal(id, userId);
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-    return loadEvent(id);
-  },
-);
-
-interface SetSignupsLockedParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  locked: boolean;
-}
-
-// Toggles the event's signup lock state. Gated by event-update permission.
-export const setEventSignupsLocked = api(
-  { expose: true, auth: true, method: "PUT", path: "/api/events/:id/signups-lock" },
-  async ({ id, authorization, locked }: SetSignupsLockedParams): Promise<EventDetail> => {
-    await requireEvent(id);
-    await requireEventPermission(prisma, {
-      authorization,
-      eventId: id,
-      action: "update",
-    });
-
-    await prisma.event.update({ where: { id }, data: { signupsLocked: locked } });
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-    return loadEvent(id);
-  },
-);
-
-interface AddScheduleParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  title?: string | null;
-  startsAt: string;
-  endsAt?: string | null;
-  location?: string | null;
-}
-
-// Adds a schedule slot to an event (issue #4).
-export const addEventSchedule = api(
-  { expose: true, auth: true, method: "POST", path: "/api/events/:id/schedules" },
-  async (params: AddScheduleParams): Promise<EventDetail> => {
-    await requireEvent(params.id);
-    await requireEventPermission(prisma, {
-      authorization: params.authorization,
-      eventId: params.id,
-      action: "update",
-    });
-
-    await prisma.eventSchedule.create({
-      data: {
-        id: randomUUID(),
-        eventId: params.id,
-        title: params.title ?? null,
-        startsAt: new Date(params.startsAt),
-        endsAt: params.endsAt ? new Date(params.endsAt) : null,
-        location: params.location ?? null,
-      },
-    });
-
-    await eventDetailCache.delete({ id: params.id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-
-    return loadEvent(params.id);
-  },
-);
-
-interface SetPointsParams {
-  id: string;
-  userId: string;
-  authorization: Header<"Authorization">;
-  points: number;
-}
-
-// Sets a participant's points on a points-based event (points overview).
-export const setEventPoints = api(
-  { expose: true, auth: true, method: "PUT", path: "/api/events/:id/points/:userId" },
-  async ({ id, userId, authorization, points }: SetPointsParams): Promise<EventDetail> => {
-    const event = await requireEvent(id);
-    await requireEventPermission(prisma, {
-      authorization,
-      eventId: id,
-      action: "update",
-    });
-
-    if (event.scoringType !== SCORING_POINTS) {
-      throw APIError.failedPrecondition("event is not points-based");
-    }
-    await requireMembership(id, userId);
-
-    await prisma.eventPointsEntry.upsert({
-      where: { eventId_userId: { eventId: id, userId } },
-      create: { id: randomUUID(), eventId: id, userId, points },
-      update: { points },
-    });
-
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-
-    return loadEvent(id);
-  },
-);
-
-interface LadderMatchParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  winnerId: string;
-  loserId: string;
-}
-
-// Records a 1v1 result on a ladder-elo event and updates both ratings
-// (ladder overview).
-export const recordLadderMatch = api(
-  { expose: true, auth: true, method: "POST", path: "/api/events/:id/ladder/matches" },
-  async ({ id, authorization, winnerId, loserId }: LadderMatchParams): Promise<EventDetail> => {
-    const event = await requireEvent(id);
-    await requireEventPermission(prisma, {
-      authorization,
-      eventId: id,
-      action: "update",
-    });
-
-    if (event.scoringType !== SCORING_LADDER_ELO) {
-      throw APIError.failedPrecondition("event is not ladder-elo");
-    }
-    if (winnerId === loserId) {
-      throw APIError.invalidArgument("winner and loser must differ");
-    }
-    await requireMembership(id, winnerId);
-    await requireMembership(id, loserId);
-
-    const winner = await getOrCreateLadderEntry(id, winnerId);
-    const loser = await getOrCreateLadderEntry(id, loserId);
-
-    const { winnerElo, loserElo } = computeElo(winner.elo, loser.elo);
-
-    await prisma.eventLadderEntry.update({
-      where: { eventId_userId: { eventId: id, userId: winnerId } },
-      data: { elo: winnerElo, wins: { increment: 1 } },
-    });
-    await prisma.eventLadderEntry.update({
-      where: { eventId_userId: { eventId: id, userId: loserId } },
-      data: { elo: loserElo, losses: { increment: 1 } },
-    });
-
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-
-    return loadEvent(id);
-  },
-);
-
-interface SetStatusParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  status: EventStatus;
-}
-
-// Sets an event's lifecycle status. Endorsing an event as OFFICIAL is a
-// platform action reserved for site administrators; all other statuses
-// (DRAFT/UNOFFICIAL/CONCLUDED) may be set by anyone who can update the event.
-export const setEventStatus = api(
-  { expose: true, auth: true, method: "PUT", path: "/api/events/:id/status" },
-  async ({ id, authorization, status }: SetStatusParams): Promise<EventDetail> => {
-    await requireEvent(id);
-    if (status === "OFFICIAL") {
-      await requireSiteAdmin(prisma, authorization);
-    } else {
-      await requireEventPermission(prisma, {
-        authorization,
-        eventId: id,
-        action: "update",
-      });
-    }
-
-    await prisma.event.update({ where: { id }, data: { status } });
-    await eventDetailCache.delete({ id });
-    await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
-    return loadEvent(id);
-  },
-);
-
-function computeElo(
+export function computeElo(
   winnerElo: number,
   loserElo: number,
 ): { winnerElo: number; loserElo: number } {
@@ -780,31 +519,6 @@ function computeElo(
     winnerElo: Math.round(winnerElo + LADDER_K_FACTOR * (1 - expectedWinner)),
     loserElo: Math.round(loserElo + LADDER_K_FACTOR * (0 - expectedLoser)),
   };
-}
-
-async function getOrCreateLadderEntry(eventId: string, userId: string) {
-  return prisma.eventLadderEntry.upsert({
-    where: { eventId_userId: { eventId, userId } },
-    create: { id: randomUUID(), eventId, userId, elo: LADDER_STARTING_ELO },
-    update: {},
-  });
-}
-
-async function requireEvent(id: string) {
-  const event = await prisma.event.findUnique({ where: { id } });
-  if (!event) {
-    throw APIError.notFound("event not found");
-  }
-  return event;
-}
-
-async function requireMembership(eventId: string, userId: string): Promise<void> {
-  const member = await prisma.eventMember.findUnique({
-    where: { eventId_userId: { eventId, userId } },
-  });
-  if (!member) {
-    throw APIError.failedPrecondition("user is not a member of this event");
-  }
 }
 
 export async function loadEvent(id: string): Promise<EventDetail> {
@@ -858,7 +572,7 @@ export async function loadEvent(id: string): Promise<EventDetail> {
       : null;
 
   const ladderOverview =
-    event.scoringType === SCORING_LADDER_ELO
+    event.scoringType === SCORING_LADDER
       ? event.ladderEntries.map((entry, index) => ({
           userId: entry.userId,
           name: entry.user.name,
@@ -904,11 +618,26 @@ export async function loadEvent(id: string): Promise<EventDetail> {
           }))
         : [],
     })),
-    members: event.members.map((member) => ({
-      userId: member.userId,
-      name: member.user.name,
-      classTier: member.user.classTier,
-    })),
+    members: (() => {
+      const activeUserIds = new Set<string>();
+      if (event.granularParticipation) {
+        for (const race of event.raceEvents) {
+          if (race.raceMembers) {
+            for (const rm of race.raceMembers) {
+              activeUserIds.add(rm.userId);
+            }
+          }
+        }
+      }
+      const filteredMembers = event.granularParticipation
+        ? event.members.filter((m) => activeUserIds.has(m.userId))
+        : event.members;
+      return filteredMembers.map((member) => ({
+        userId: member.userId,
+        name: member.user.name,
+        classTier: member.user.classTier,
+      }));
+    })(),
     schedules: event.schedules.map((schedule) => ({
       id: schedule.id,
       title: schedule.title,
@@ -973,27 +702,5 @@ export async function recomputeEventPointsInternal(eventId: string): Promise<voi
     });
   }
 
-  await eventDetailCache.delete({ id: eventId });
-  await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
+  await invalidateEventCaches(eventId);
 }
-
-interface RecomputePointsParams {
-  id: string;
-  authorization: Header<"Authorization">;
-}
-
-// Recomputes all points-based results for an event. Gated by update permission on the event.
-export const recomputeEventPoints = api(
-  { expose: true, auth: true, method: "POST", path: "/api/events/:id/recompute-points" },
-  async ({ id, authorization }: RecomputePointsParams): Promise<{ success: boolean }> => {
-    await requireEvent(id);
-    await requireEventPermission(prisma, {
-      authorization,
-      eventId: id,
-      action: "update",
-    });
-
-    await recomputeEventPointsInternal(id);
-    return { success: true };
-  },
-);

@@ -20,8 +20,6 @@ export type SiteRoleName = "USER" | "SITE_ADMIN";
 export const siteAdminRole = "SITE_ADMIN";
 
 export const administratorRole = "administrator";
-export const eventAdministratorRole = "eventAdministrator";
-export const organizationAdministratorRole = "organizationAdministrator";
 export const memberRole = "member";
 
 // True when the supplied global site role has platform-wide administrator rights.
@@ -41,22 +39,6 @@ export const roleStatements = {
     event: ["read", "create", "update", "delete"],
     raceEvent: ["read", "create", "update", "delete"],
     raceResult: ["read", "create", "update", "delete"],
-  },
-  eventAdministrator: {
-    organization: ["read"],
-    member: ["read"],
-    invitation: ["read"],
-    event: ["read", "create", "update", "delete"],
-    raceEvent: ["read", "create", "update", "delete"],
-    raceResult: ["read", "create", "update", "delete"],
-  },
-  organizationAdministrator: {
-    organization: ["read"],
-    member: ["read", "create", "update"],
-    invitation: ["read", "create"],
-    event: ["read"],
-    raceEvent: ["read"],
-    raceResult: ["read"],
   },
   member: {
     organization: ["read"],

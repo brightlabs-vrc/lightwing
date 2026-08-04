@@ -29,6 +29,7 @@ function ProfilePage() {
   const [biography, setBiography] = useState('')
   const [careerOverview, setCareerOverview] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
+  const [slug, setSlug] = useState('')
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['my-profile', session?.user.id],
@@ -42,17 +43,19 @@ function ProfilePage() {
       setBiography(profile.biography ?? '')
       setCareerOverview(profile.careerOverview ?? '')
       setVrchatUsername(profile.vrchatUsername ?? '')
+      setSlug(profile.slug ?? '')
     }
   }, [profile])
 
   const updateMutation = useMutation({
-    mutationFn: (data: { biography: string; careerOverview: string; vrchatUsername: string }) =>
+    mutationFn: (data: { biography: string; careerOverview: string; vrchatUsername: string; slug: string }) =>
       updateMyProfile(
         session?.user.id ?? '',
         {
           biography: data.biography || null,
           careerOverview: data.careerOverview || null,
           vrchatUsername: data.vrchatUsername || null,
+          slug: data.slug || undefined,
         },
         `Bearer ${session?.session.token ?? ''}`,
       ),
@@ -75,7 +78,19 @@ function ProfilePage() {
 
       <PixelCard className="">
         <PixelStack gap={5}>
+          {updateMutation.isError && (
+            <PixelAlert tone="red" message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update profile'} />
+          )}
+
           <PixelInput label="NAME" value={profile?.name ?? ''} disabled />
+
+          <PixelInput
+            label="HANDLE"
+            placeholder="e.g. competitorhandle"
+            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters and numbers only)."
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+          />
 
           <PixelTextarea
             label="BIOGRAPHY"
@@ -106,7 +121,18 @@ function ProfilePage() {
             className="w-full"
             loading={updateMutation.isPending}
             disabled={updateMutation.isPending}
-            onClick={() => updateMutation.mutate({ biography, careerOverview, vrchatUsername })}
+            onClick={() => {
+              const trimmedSlug = slug.trim()
+              if (trimmedSlug && (trimmedSlug.length < 4 || trimmedSlug.length > 24)) {
+                toast({ tone: 'red', title: 'Slug must be between 4 and 24 characters.' })
+                return
+              }
+              if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
+                toast({ tone: 'red', title: 'Slug must contain only lowercase letters and numbers.' })
+                return
+              }
+              updateMutation.mutate({ biography, careerOverview, vrchatUsername, slug: trimmedSlug })
+            }}
           >
             {updateMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}
           </PixelButton>

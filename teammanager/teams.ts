@@ -1,13 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { api, APIError, Header } from "encore.dev/api";
+import { api, APIError, Header, Query } from "encore.dev/api";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { requirePermission, requireSiteAdmin, memberRoleCache } from "../auth/rbac";
-import { administratorRole, administratorRoleLimit } from "../auth/permissions";
+import { requireSiteAdmin, requirePermission, resolveActor } from "../auth/rbac";
+import { isSiteAdmin } from "../auth/permissions";
+import { isValidSlug } from "../lib/slugs";
 import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
 import { cluster } from "../cache";
+import { ADMINISTRATOR_ROLE, ADMINISTRATOR_ROLE_LIMIT } from "../lib/constants";
 
-const teamCache = new StructKeyspace<{ id: string }, Team>(cluster, {
+export const TEAM_WITH_MEMBERS_INCLUDE = {
+  members: {
+    include: { user: { select: { name: true } } },
+    orderBy: { createdAt: "asc" as const },
+  },
+} satisfies Prisma.OrganizationInclude;
+
+export const teamCache = new StructKeyspace<{ id: string }, Team>(cluster, {
   keyPattern: "team/:id",
   defaultExpiry: expireInSeconds(300), // 5 minutes
 });
@@ -45,6 +54,15 @@ export interface Team {
   members: TeamMemberSummary[];
 }
 
+export interface TeamListItem {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
+  administratorSlotsRemaining: number;
+  memberCount: number;
+}
+
 interface GetTeamParams {
   id: string;
 }
@@ -60,12 +78,7 @@ export const getTeam = api(
 
     const organization = await prisma.organization.findUnique({
       where: { id },
-      include: {
-        members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
+      include: TEAM_WITH_MEMBERS_INCLUDE,
     });
 
     if (!organization) {
@@ -78,57 +91,22 @@ export const getTeam = api(
   },
 );
 
-interface UpdateTeamStatsParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  rankingAverage?: number | null;
-  pointsAverage?: number | null;
-  seasonRank?: number | null;
-  averagePointsPerEvent?: number | null;
+interface GetTeamBySlugParams {
+  slug: string;
 }
 
-// Updates a team's aggregate statistics. Requires a role with organization
-// update permission (administrator) in the target team.
-export const updateTeamStats = api(
-  { expose: true, auth: true, method: "PATCH", path: "/api/teams/:id/stats" },
-  async ({
-    id,
-    authorization,
-    rankingAverage,
-    pointsAverage,
-    seasonRank,
-    averagePointsPerEvent,
-  }: UpdateTeamStatsParams): Promise<Team> => {
-    await requirePermission(prisma, {
-      authorization,
-      organizationId: id,
-      resource: "organization",
-      action: "update",
+// Returns a team by its unique slug.
+export const getTeamBySlug = api(
+  { expose: true, method: "GET", path: "/api/teams/by-slug/:slug" },
+  async ({ slug }: GetTeamBySlugParams): Promise<Team> => {
+    const organization = await prisma.organization.findUnique({
+      where: { slug },
+      include: TEAM_WITH_MEMBERS_INCLUDE,
     });
 
-    const existing = await prisma.organization.findUnique({ where: { id } });
-    if (!existing) {
+    if (!organization) {
       throw APIError.notFound("team not found");
     }
-
-    const organization = await prisma.organization.update({
-      where: { id },
-      data: {
-        rankingAverage: rankingAverage === undefined ? undefined : rankingAverage,
-        pointsAverage: pointsAverage === undefined ? undefined : pointsAverage,
-        seasonRank: seasonRank === undefined ? undefined : seasonRank,
-        averagePointsPerEvent:
-          averagePointsPerEvent === undefined ? undefined : averagePointsPerEvent,
-      },
-      include: {
-        members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
-
-    await teamCache.delete({ id });
 
     return toTeam(organization);
   },
@@ -143,24 +121,66 @@ type OrganizationWithMembers = {
   pointsAverage: number | null;
   seasonRank: number | null;
   averagePointsPerEvent: number | null;
-  members: { userId: string; role: string; user: { name: string } }[];
+  members: { id: string; userId: string; role: string; user: { name: string } }[];
 };
 
-// Lists all teams mapped via toTeam.
+interface ListTeamsParams {
+  search?: Query<string>;
+  limit?: Query<number>;
+  offset?: Query<number>;
+}
+
+interface ListTeamsResponse {
+  teams: TeamListItem[];
+  total: number;
+}
+
+// Lists all teams with search and pagination support.
 export const listTeams = api(
   { expose: true, method: "GET", path: "/api/teams" },
-  async (): Promise<{ teams: Team[] }> => {
+  async (params: ListTeamsParams): Promise<ListTeamsResponse> => {
+    const { search, limit, offset } = params || {};
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const total = await prisma.organization.count({ where });
+
     const organizations = await prisma.organization.findMany({
+      where,
+      take: limit ?? undefined,
+      skip: offset ?? undefined,
       include: {
         members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
+          select: { role: true },
         },
       },
       orderBy: { name: "asc" },
     });
 
-    return { teams: organizations.map(toTeam) };
+    const teams = organizations.map((org) => {
+      const administratorCount = org.members.filter(
+        (member) => member.role === ADMINISTRATOR_ROLE,
+      ).length;
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo: org.logo,
+        administratorSlotsRemaining: Math.max(
+          ADMINISTRATOR_ROLE_LIMIT - administratorCount,
+          0,
+        ),
+        memberCount: org.members.length,
+      };
+    });
+
+    return { teams, total };
   }
 );
 
@@ -186,12 +206,7 @@ export const createTeam = api(
           logo: logo ?? null,
           updatedAt: new Date(),
         },
-        include: {
-          members: {
-            include: { user: { select: { name: true } } },
-            orderBy: { createdAt: "asc" },
-          },
-        },
+        include: TEAM_WITH_MEMBERS_INCLUDE,
       });
 
       return toTeam(organization);
@@ -204,209 +219,9 @@ export const createTeam = api(
   }
 );
 
-interface AddTeamMemberParams {
-  id: string;
-  authorization: Header<"Authorization">;
-  userId: string;
-  role?: string;
-}
-
-// Registers a participant for a team.
-export const addTeamMember = api(
-  { expose: true, auth: true, method: "POST", path: "/api/teams/:id/members" },
-  async ({ id, authorization, userId, role }: AddTeamMemberParams): Promise<Team> => {
-    await requirePermission(prisma, {
-      authorization,
-      organizationId: id,
-      resource: "member",
-      action: "create",
-    });
-
-    const targetRole = role ?? "member";
-
-    const organization = await prisma.organization.findUnique({ where: { id } });
-    if (!organization) {
-      throw APIError.notFound("team not found");
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw APIError.notFound("user not found");
-    }
-
-    if (targetRole === administratorRole) {
-      const adminCount = await prisma.member.count({
-        where: { organizationId: id, role: administratorRole },
-      });
-      if (adminCount >= administratorRoleLimit) {
-        throw APIError.failedPrecondition("At most three administrators can belong to an organization.");
-      }
-    }
-
-    try {
-      await prisma.member.create({
-        data: {
-          id: randomUUID(),
-          organizationId: id,
-          userId,
-          role: targetRole,
-        },
-      });
-
-      await prisma.organization.update({
-        where: { id },
-        data: { updatedAt: new Date() },
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw APIError.alreadyExists("user is already a member of this team");
-      }
-      throw error;
-    }
-
-    await teamCache.delete({ id });
-    await memberRoleCache.delete({ key: `${id}:${userId}` });
-
-    const updatedOrg = await prisma.organization.findUnique({
-      where: { id },
-      include: {
-        members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
-
-    if (!updatedOrg) {
-      throw APIError.notFound("team not found");
-    }
-
-    return toTeam(updatedOrg);
-  }
-);
-
-interface UpdateTeamMemberRoleParams {
-  id: string;
-  userId: string;
-  authorization: Header<"Authorization">;
-  role: string;
-}
-
-// Updates a team member's role.
-export const updateTeamMemberRole = api(
-  { expose: true, auth: true, method: "PATCH", path: "/api/teams/:id/members/:userId" },
-  async ({ id, userId, authorization, role }: UpdateTeamMemberRoleParams): Promise<Team> => {
-    await requirePermission(prisma, {
-      authorization,
-      organizationId: id,
-      resource: "member",
-      action: "update",
-    });
-
-    const existingMember = await prisma.member.findUnique({
-      where: { organizationId_userId: { organizationId: id, userId } },
-    });
-    if (!existingMember) {
-      throw APIError.notFound("member not found");
-    }
-
-    if (role === administratorRole && existingMember.role !== administratorRole) {
-      const adminCount = await prisma.member.count({
-        where: { organizationId: id, role: administratorRole },
-      });
-      if (adminCount >= administratorRoleLimit) {
-        throw APIError.failedPrecondition("At most three administrators can belong to an organization.");
-      }
-    }
-
-    await prisma.member.update({
-      where: { organizationId_userId: { organizationId: id, userId } },
-      data: { role },
-    });
-
-    await prisma.organization.update({
-      where: { id },
-      data: { updatedAt: new Date() },
-    });
-
-    await teamCache.delete({ id });
-    await memberRoleCache.delete({ key: `${id}:${userId}` });
-
-    const updatedOrg = await prisma.organization.findUnique({
-      where: { id },
-      include: {
-        members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
-
-    if (!updatedOrg) {
-      throw APIError.notFound("team not found");
-    }
-
-    return toTeam(updatedOrg);
-  }
-);
-
-interface RemoveTeamMemberParams {
-  id: string;
-  userId: string;
-  authorization: Header<"Authorization">;
-}
-
-// Removes a participant from a team.
-export const removeTeamMember = api(
-  { expose: true, auth: true, method: "DELETE", path: "/teams/:id/members/:userId" },
-  async ({ id, userId, authorization }: RemoveTeamMemberParams): Promise<Team> => {
-    await requirePermission(prisma, {
-      authorization,
-      organizationId: id,
-      resource: "member",
-      action: "delete",
-    });
-
-    const existingMember = await prisma.member.findUnique({
-      where: { organizationId_userId: { organizationId: id, userId } },
-    });
-    if (!existingMember) {
-      throw APIError.notFound("member not found");
-    }
-
-    await prisma.member.delete({
-      where: { organizationId_userId: { organizationId: id, userId } },
-    });
-
-    await prisma.organization.update({
-      where: { id },
-      data: { updatedAt: new Date() },
-    });
-
-    await teamCache.delete({ id });
-    await memberRoleCache.delete({ key: `${id}:${userId}` });
-
-    const updatedOrg = await prisma.organization.findUnique({
-      where: { id },
-      include: {
-        members: {
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
-
-    if (!updatedOrg) {
-      throw APIError.notFound("team not found");
-    }
-
-    return toTeam(updatedOrg);
-  }
-);
-
-function toTeam(organization: OrganizationWithMembers): Team {
+export function toTeam(organization: OrganizationWithMembers): Team {
   const administratorCount = organization.members.filter(
-    (member) => member.role === administratorRole,
+    (member) => member.role === ADMINISTRATOR_ROLE,
   ).length;
 
   return {
@@ -421,7 +236,7 @@ function toTeam(organization: OrganizationWithMembers): Team {
       averagePointsPerEvent: organization.averagePointsPerEvent,
     },
     administratorSlotsRemaining: Math.max(
-      administratorRoleLimit - administratorCount,
+      ADMINISTRATOR_ROLE_LIMIT - administratorCount,
       0,
     ),
     members: organization.members.map((member) => ({
@@ -431,3 +246,75 @@ function toTeam(organization: OrganizationWithMembers): Team {
     })),
   };
 }
+
+interface UpdateTeamParams {
+  id: string;
+  authorization: Header<"Authorization">;
+  name?: string;
+  slug?: string;
+  logo?: string | null;
+}
+
+// Updates a team's core metadata (name, slug, logo).
+// Accessible to team administrators (via organization update permission) or site administrators.
+export const updateTeam = api(
+  { expose: true, auth: true, method: "PATCH", path: "/api/teams/:id" },
+  async ({
+    id,
+    authorization,
+    name,
+    slug,
+    logo,
+  }: UpdateTeamParams): Promise<Team> => {
+    const actor = await resolveActor(prisma, authorization);
+    const hasOrgUpdatePermission = async () => {
+      try {
+        await requirePermission(prisma, {
+          authorization,
+          organizationId: id,
+          resource: "organization",
+          action: "update",
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (!isSiteAdmin(actor.siteRole) && !(await hasOrgUpdatePermission())) {
+      throw APIError.permissionDenied("cannot update team metadata");
+    }
+
+    const existing = await prisma.organization.findUnique({ where: { id } });
+    if (!existing) {
+      throw APIError.notFound("team not found");
+    }
+
+    let nextSlug = existing.slug;
+    if (slug !== undefined && slug !== existing.slug) {
+      if (!isValidSlug(slug)) {
+        throw APIError.invalidArgument("invalid slug format or length");
+      }
+      const collision = await prisma.organization.findUnique({ where: { slug } });
+      if (collision) {
+        throw APIError.alreadyExists("team slug is already in use");
+      }
+      nextSlug = slug;
+    }
+
+    const organization = await prisma.organization.update({
+      where: { id },
+      data: {
+        name: name ?? undefined,
+        slug: nextSlug,
+        logo: logo === undefined ? undefined : logo,
+        updatedAt: new Date(),
+      },
+      include: TEAM_WITH_MEMBERS_INCLUDE,
+    });
+
+    await teamCache.delete({ id });
+
+    return toTeam(organization);
+  },
+);

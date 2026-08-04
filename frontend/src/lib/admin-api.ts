@@ -181,6 +181,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-admin-1',
       name: 'Mock Admin',
+      slug: 'mock-admin',
       email: 'mock-admin@lightwing.local',
       image: null,
       biography: 'Local mock administrator account for frontend-only testing.',
@@ -205,6 +206,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-user-1',
       name: 'Thunder Bolt',
+      slug: 'thunder-bolt',
       email: 'bolt@lightwing.local',
       image: null,
       biography: 'A rapid competitor on the turf.',
@@ -222,6 +224,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-user-2',
       name: 'Shadow Runner',
+      slug: 'shadow-runner',
       email: 'shadow@lightwing.local',
       image: null,
       biography: 'Loves the dirt track racing.',
@@ -239,6 +242,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
     {
       id: 'mock-user-3',
       name: 'Swift Galloper',
+      slug: 'swift-galloper',
       email: 'gallop@lightwing.local',
       image: null,
       biography: 'A high tier challenger.',
@@ -284,13 +288,56 @@ export function hydrateRaceEvent(eventId: string, race: eventmanager.RaceEventVi
   }
 }
 
-export async function listAdminEvents(): Promise<{ events: eventmanager.EventDetail[] }> {
+export async function listAdminEvents(
+  organizationId?: string,
+  classRestriction?: eventmanager.ClassTier,
+  limit?: number,
+  offset?: number,
+): Promise<{ events: eventmanager.EventListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listEvents({})
+    return appClient.eventmanager.listEvents({
+      organizationId,
+      classRestriction,
+      limit,
+      offset,
+    })
   }
 
-  const hydratedEvents = mockEvents.map((evt) => hydrateEventRaceEvents(evt))
-  return { events: hydratedEvents }
+  let events = mockEvents.map((e) => ({
+    id: e.id,
+    name: e.name,
+    description: e.description,
+    ownerType: e.ownerType,
+    organizationId: e.organizationId,
+    ownerUserId: e.ownerUserId,
+    status: e.status,
+    scoringType: e.scoringType,
+    scoringTypeLabel: e.scoringTypeLabel,
+    classRestriction: e.classRestriction,
+    granularParticipation: e.granularParticipation,
+    signupsLocked: e.signupsLocked,
+    raceCount: e.raceEvents.length,
+    memberCount: e.members.length,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  }))
+
+  if (organizationId) {
+    events = events.filter((e) => e.organizationId === organizationId)
+  }
+  if (classRestriction) {
+    events = events.filter((e) => e.classRestriction === classRestriction)
+  }
+
+  const total = events.length
+  if (offset !== undefined) {
+    events = events.slice(offset)
+  }
+  if (limit !== undefined) {
+    events = events.slice(0, limit)
+  }
+
+  return { events, total }
 }
 
 export async function getAdminEvent(eventId: string): Promise<eventmanager.EventDetail> {
@@ -1200,6 +1247,7 @@ export async function updateAdminUserProfile(
   userId: string,
   params: {
     name?: string
+    slug?: string
     image?: string | null
     biography?: string | null
     careerOverview?: string | null
@@ -1222,6 +1270,7 @@ export async function updateAdminUserProfile(
   const updated: auth.UserProfile = {
     ...existing,
     name: params.name !== undefined ? params.name : existing.name,
+    slug: params.slug !== undefined ? params.slug : existing.slug,
     image: params.image !== undefined ? params.image : existing.image,
     biography: params.biography !== undefined ? params.biography : existing.biography,
     careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
@@ -1264,12 +1313,42 @@ export async function updateAdminUserClass(
 // TEAM MANAGEMENT METHODS
 // -----------------------------------------------------------------------------
 
-export async function listAdminTeams(): Promise<{ teams: teammanager.Team[] }> {
+export async function listAdminTeams(
+  search?: string,
+  limit?: number,
+  offset?: number,
+): Promise<{ teams: teammanager.TeamListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.listTeams()
+    return appClient.teammanager.listTeams({
+      search,
+      limit,
+      offset,
+    })
   }
 
-  return { teams: mockTeamsList }
+  let filtered = mockTeamsList.map((t) => ({
+    id: t.id,
+    name: t.name,
+    slug: t.slug,
+    logo: t.logo,
+    administratorSlotsRemaining: t.administratorSlotsRemaining,
+    memberCount: t.members.length,
+  }))
+
+  if (search) {
+    const lower = search.toLowerCase()
+    filtered = filtered.filter((t) => t.name.toLowerCase().includes(lower) || t.slug.toLowerCase().includes(lower))
+  }
+
+  const total = filtered.length
+  if (offset !== undefined) {
+    filtered = filtered.slice(offset)
+  }
+  if (limit !== undefined) {
+    filtered = filtered.slice(0, limit)
+  }
+
+  return { teams: filtered, total }
 }
 
 export async function getAdminTeam(id: string): Promise<teammanager.Team> {
@@ -1313,6 +1392,78 @@ export async function updateAdminTeamStats(
   }
 
   return team
+}
+
+export async function updateAdminTeam(
+  id: string,
+  params: {
+    name?: string
+    slug?: string
+    logo?: string | null
+  },
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.updateTeam(id, {
+      authorization,
+      ...params,
+    })
+  }
+
+  const teamIndex = mockTeamsList.findIndex((t) => t.id === id)
+  if (teamIndex === -1) throw new Error('Mock team not found')
+  const team = mockTeamsList[teamIndex]
+
+  team.name = params.name !== undefined ? params.name : team.name
+  team.slug = params.slug !== undefined ? params.slug : team.slug
+  team.logo = params.logo !== undefined ? params.logo : team.logo
+
+  return team
+}
+
+export async function listAdminTeamMembers(
+  teamId: string,
+  search?: string,
+  limit?: number,
+  offset?: number,
+): Promise<{ members: Array<{ userId: string; name: string; slug: string | null; role: string }>; total: number }> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.listTeamMembers(teamId, {
+      search,
+      limit,
+      offset,
+    })
+  }
+
+  const team = mockTeamsList.find((t) => t.id === teamId)
+  if (!team) {
+    throw new Error('Mock team not found')
+  }
+
+  let filtered = team.members.map((m) => {
+    const user = mockUserProfiles.get(m.userId)
+    return {
+      userId: m.userId,
+      name: m.name,
+      slug: user ? user.slug : null,
+      role: m.role,
+    }
+  })
+
+  if (search) {
+    const lower = search.toLowerCase()
+    filtered = filtered.filter((m) => m.name.toLowerCase().includes(lower) || (m.slug && m.slug.toLowerCase().includes(lower)))
+  }
+
+  const total = filtered.length
+  if (offset !== undefined) {
+    filtered = filtered.slice(offset)
+  }
+  if (limit !== undefined) {
+    filtered = filtered.slice(0, limit)
+  }
+
+  return { members: filtered, total }
 }
 
 // -----------------------------------------------------------------------------

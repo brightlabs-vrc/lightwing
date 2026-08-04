@@ -17,6 +17,7 @@ export interface TeamAffiliation {
 export interface UserProfile {
   id: string;
   name: string;
+  slug: string | null;
   email: string;
   image: string | null;
   biography: string | null;
@@ -54,10 +55,36 @@ export const getUserProfile = api(
   },
 );
 
+interface GetUserBySlugParams {
+  slug: string;
+}
+
+// Returns a participant's public profile by slug.
+export const getUserProfileBySlug = api(
+  { expose: true, method: "GET", path: "/api/users/by-slug/:slug" },
+  async ({ slug }: GetUserBySlugParams): Promise<UserProfile> => {
+    const user = await prisma.user.findUnique({
+      where: { slug },
+      include: {
+        members: {
+          include: { organization: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw APIError.notFound("user not found");
+    }
+
+    return toProfile(user);
+  },
+);
+
 interface UpdateUserParams {
   id: string;
   authorization: Header<"Authorization">;
   name?: string;
+  slug?: string;
   image?: string | null;
   biography?: string | null;
   careerOverview?: string | null;
@@ -65,6 +92,7 @@ interface UpdateUserParams {
 }
 
 import { isSiteAdmin } from "./permissions";
+import { isValidUserSlug } from "../lib/slugs";
 
 // Updates the authenticated user's own profile fields (issue #7). A user may
 // only edit their own record or a site admin may edit other profiles.
@@ -74,6 +102,7 @@ export const updateUserProfile = api(
     id,
     authorization,
     name,
+    slug,
     image,
     biography,
     careerOverview,
@@ -89,10 +118,23 @@ export const updateUserProfile = api(
       throw APIError.notFound("user not found");
     }
 
+    let nextSlug = existing.slug;
+    if (slug !== undefined && slug !== existing.slug) {
+      if (!isValidUserSlug(slug)) {
+        throw APIError.invalidArgument("invalid slug format or length");
+      }
+      const collision = await prisma.user.findUnique({ where: { slug } });
+      if (collision) {
+        throw APIError.alreadyExists("user slug is already in use");
+      }
+      nextSlug = slug;
+    }
+
     const user = await prisma.user.update({
       where: { id },
       data: {
         name: name ?? undefined,
+        slug: nextSlug ?? undefined,
         image: image === undefined ? undefined : image,
         biography: biography === undefined ? undefined : biography,
         careerOverview: careerOverview === undefined ? undefined : careerOverview,
@@ -144,6 +186,7 @@ export const setUserSiteRole = api(
 type UserWithMembers = {
   id: string;
   name: string;
+  slug: string | null;
   email: string;
   image: string | null;
   biography: string | null;
@@ -163,6 +206,7 @@ function toProfile(user: UserWithMembers): UserProfile {
   return {
     id: user.id,
     name: user.name,
+    slug: user.slug,
     email: user.email,
     image: user.image,
     biography: user.biography,
@@ -209,6 +253,7 @@ export const listUsers = api(
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
       ];
     }
 

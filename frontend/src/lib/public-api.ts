@@ -9,6 +9,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-admin-1', {
     id: 'mock-admin-1',
     name: 'Mock Admin',
+    slug: 'mock-admin',
     email: 'mock-admin@lightwing.local',
     image: null,
     biography: 'Local mock administrator account for frontend-only testing.',
@@ -23,6 +24,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-user-1', {
     id: 'mock-user-1',
     name: 'Thunder Bolt',
+    slug: 'thunder-bolt',
     email: 'bolt@lightwing.local',
     image: null,
     biography: 'A rapid competitor on the turf.',
@@ -37,6 +39,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
   ['mock-user-2', {
     id: 'mock-user-2',
     name: 'Shadow Runner',
+    slug: 'shadow-runner',
     email: 'shadow@lightwing.local',
     image: null,
     biography: 'Silent but swift.',
@@ -264,12 +267,71 @@ function getCurrentMockUserId(): string | null {
   }
 }
 
-export async function listPublicEvents(): Promise<{ events: eventmanager.EventDetail[] }> {
+export async function listPublicEvents(
+  limit?: number,
+  offset?: number,
+): Promise<{ events: eventmanager.EventListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listPublicEvents()
+    return appClient.eventmanager.listPublicEvents({
+      limit,
+      offset,
+    })
   }
   mockPublicEvents = loadMockEvents()
-  return { events: mockPublicEvents }
+
+  let events = mockPublicEvents.map((e) => ({
+    id: e.id,
+    name: e.name,
+    description: e.description,
+    ownerType: e.ownerType,
+    organizationId: e.organizationId,
+    ownerUserId: e.ownerUserId,
+    status: e.status,
+    scoringType: e.scoringType,
+    scoringTypeLabel: e.scoringTypeLabel,
+    classRestriction: e.classRestriction,
+    granularParticipation: e.granularParticipation,
+    signupsLocked: e.signupsLocked,
+    raceCount: e.raceEvents.length,
+    memberCount: e.members.length,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  }))
+
+  const total = events.length
+  if (offset !== undefined) {
+    events = events.slice(offset)
+  }
+  if (limit !== undefined) {
+    events = events.slice(0, limit)
+  }
+
+  return { events, total }
+}
+
+function isEligible(
+  participantTier: string | null,
+  eventRestriction: string | null,
+): boolean {
+  if (eventRestriction === null) {
+    return true
+  }
+  if (participantTier === null) {
+    return false
+  }
+  if (participantTier === eventRestriction) {
+    return true
+  }
+  if (participantTier === 'PRE_OP') {
+    return eventRestriction === 'PRE_OP' || eventRestriction === 'OP'
+  }
+  const order = ['PRE_OP', 'OP', 'G3', 'G2', 'G1']
+  const pIdx = order.indexOf(participantTier)
+  const rIdx = order.indexOf(eventRestriction)
+  if (pIdx === -1 || rIdx === -1) {
+    return false
+  }
+  return rIdx === pIdx - 1
 }
 
 export async function getPublicEvent(eventId: string): Promise<eventmanager.EventDetail> {
@@ -311,7 +373,7 @@ export async function joinEvent(
 
   const eventRestriction = event.classRestriction
   const userTier = user.classTier
-  if (eventRestriction && userTier !== eventRestriction) {
+  if (!isEligible(userTier, eventRestriction)) {
     throw new Error('Participant class tier does not satisfy the event class restriction')
   }
 
@@ -369,6 +431,7 @@ export async function updateMyProfile(
   userId: string,
   params: {
     name?: string
+    slug?: string
     biography?: string | null
     careerOverview?: string | null
     vrchatUsername?: string | null
@@ -379,6 +442,7 @@ export async function updateMyProfile(
     return appClient.with({ auth: { authorization } }).auth.updateUserProfile(userId, {
       authorization,
       name: params.name,
+      slug: params.slug,
       biography: params.biography,
       careerOverview: params.careerOverview,
       vrchatUsername: params.vrchatUsername,
@@ -391,6 +455,7 @@ export async function updateMyProfile(
   const updated: auth.UserProfile = {
     ...existing,
     name: params.name ?? existing.name,
+    slug: params.slug !== undefined ? params.slug : existing.slug,
     biography: params.biography !== undefined ? params.biography : existing.biography,
     careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
     vrchatUsername: params.vrchatUsername !== undefined ? params.vrchatUsername : existing.vrchatUsername,
@@ -498,20 +563,8 @@ export async function joinRaceEvent(
   const targetRestriction = event.raceEvents[raceIndex].classRestriction ?? event.classRestriction
   const userTier = user.classTier
 
-  const CLASS_TIER_ORDER: Record<string, number> = {
-    PRE_OP: 0,
-    OP: 1,
-    G3: 2,
-    G2: 3,
-    G1: 4,
-  }
-
-  if (targetRestriction) {
-    const userVal = CLASS_TIER_ORDER[userTier ?? ''] ?? -1
-    const reqVal = CLASS_TIER_ORDER[targetRestriction] ?? -1
-    if (userVal < reqVal) {
-      throw new Error('Participant class tier does not satisfy the race class restriction')
-    }
+  if (!isEligible(userTier, targetRestriction)) {
+    throw new Error('Participant class tier does not satisfy the race class restriction')
   }
 
   let raceMembers = mockRaceMembersMap.get(raceId) ?? []
@@ -520,15 +573,15 @@ export async function joinRaceEvent(
     mockRaceMembersMap.set(raceId, raceMembers)
   }
 
-  const updatedRace = {
+  const joinedRace = {
     ...event.raceEvents[raceIndex],
     members: raceMembers,
   } as any
 
-  event.raceEvents[raceIndex] = updatedRace
+  event.raceEvents[raceIndex] = joinedRace
 
   saveMockEvents(mockPublicEvents)
-  return updatedRace
+  return joinedRace
 }
 
 export async function leaveRaceEvent(
@@ -565,6 +618,17 @@ export async function leaveRaceEvent(
   } as any
 
   event.raceEvents[raceIndex] = updatedRace
+
+  if (event.granularParticipation) {
+    const userHasOtherRaces = event.raceEvents.some((r, idx) => {
+      if (idx === raceIndex) return false
+      const members = mockRaceMembersMap.get(r.id) ?? []
+      return members.some((m) => m.userId === userId)
+    })
+    if (!userHasOtherRaces) {
+      event.members = event.members.filter((m) => m.userId !== userId)
+    }
+  }
 
   saveMockEvents(mockPublicEvents)
   return updatedRace

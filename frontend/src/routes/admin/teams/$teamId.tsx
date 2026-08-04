@@ -5,13 +5,17 @@ import { requireSiteAdmin } from '../../../lib/auth-guard'
 import {
   getAdminTeam,
   updateAdminTeamStats,
+  updateAdminTeam,
   addAdminTeamMember,
   updateAdminTeamMemberRole,
   removeAdminTeamMember,
   listAdminUsers,
+  listAdminTeamMembers,
 } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
+import { UserSearchCombobox } from '../../../components/UserSearchCombobox'
+import { Pagination } from '../../../components/Pagination'
 import type { teammanager, auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/teams/$teamId')({
@@ -25,14 +29,21 @@ function AdminTeamDetailPage() {
   const { teamId } = Route.useParams()
   const { session } = useAuth()
   const [team, setTeam] = useState<teammanager.Team | null>(null)
-  const [systemUsers, setSystemUsers] = useState<auth.UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // Roster state
+  const [members, setMembers] = useState<Array<{ userId: string; name: string; slug: string | null; role: string }>>([])
+  const [totalMembers, setTotalMembers] = useState(0)
+  const [memberPage, setMemberPage] = useState(1)
+  const [memberPageSize, setMemberPageSize] = useState(10)
+  const [memberSearch, setMemberSearch] = useState('')
+
   // Modals state
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false)
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false)
 
   // Edit Stats form state
   const [seasonRank, setSeasonRank] = useState('')
@@ -41,6 +52,13 @@ function AdminTeamDetailPage() {
   const [averagePointsPerEvent, setAveragePointsPerEvent] = useState('')
   const [updatingStats, setUpdatingStats] = useState(false)
   const [statsError, setStatsError] = useState<string | null>(null)
+
+  // Edit Team Parameters form state
+  const [teamName, setTeamName] = useState('')
+  const [teamSlug, setTeamSlug] = useState('')
+  const [teamLogo, setTeamLogo] = useState('')
+  const [updatingTeam, setUpdatingTeam] = useState(false)
+  const [teamError, setTeamError] = useState<string | null>(null)
 
   // Add Member form state
   const [selectedUserId, setSelectedUserId] = useState('')
@@ -65,6 +83,11 @@ function AdminTeamDetailPage() {
       setPointsAverage(loadedTeam.stats.pointsAverage !== null ? String(loadedTeam.stats.pointsAverage) : '')
       setRankingAverage(loadedTeam.stats.rankingAverage !== null ? String(loadedTeam.stats.rankingAverage) : '')
       setAveragePointsPerEvent(loadedTeam.stats.averagePointsPerEvent !== null ? String(loadedTeam.stats.averagePointsPerEvent) : '')
+
+      // Prepopulate team parameters form
+      setTeamName(loadedTeam.name || '')
+      setTeamSlug(loadedTeam.slug || '')
+      setTeamLogo(loadedTeam.logo || '')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load team details')
     } finally {
@@ -72,23 +95,24 @@ function AdminTeamDetailPage() {
     }
   }
 
-  async function loadSystemUsers() {
-    if (!authHeader) return
+  async function fetchRoster() {
     try {
-      const response = await listAdminUsers(authHeader)
-      setSystemUsers(response.users)
-      if (response.users.length > 0) {
-        setSelectedUserId(response.users[0].id)
-      }
+      const offset = (memberPage - 1) * memberPageSize
+      const response = await listAdminTeamMembers(teamId, memberSearch, memberPageSize, offset)
+      setMembers(response.members)
+      setTotalMembers(response.total)
     } catch (cause) {
-      console.error('Failed to load system users', cause)
+      console.error('Failed to load roster', cause)
     }
   }
 
   useEffect(() => {
     void loadTeamData()
-    void loadSystemUsers()
   }, [teamId, authHeader])
+
+  useEffect(() => {
+    void fetchRoster()
+  }, [teamId, memberPage, memberPageSize, memberSearch])
 
   async function handleUpdateStats(evt: React.FormEvent) {
     evt.preventDefault()
@@ -117,6 +141,41 @@ function AdminTeamDetailPage() {
     }
   }
 
+  async function handleUpdateTeam(evt: React.FormEvent) {
+    evt.preventDefault()
+    if (!authHeader) return
+
+    const trimmedSlug = teamSlug.trim()
+    if (trimmedSlug && trimmedSlug.length > 24) {
+      setTeamError('Slug must be 24 characters or fewer.')
+      return
+    }
+
+    setUpdatingTeam(true)
+    setTeamError(null)
+    try {
+      const updated = await updateAdminTeam(
+        teamId,
+        {
+          name: teamName.trim() || undefined,
+          slug: trimmedSlug || undefined,
+          logo: teamLogo.trim() || null,
+        },
+        authHeader,
+      )
+      setTeam(updated)
+      setTeamName(updated.name || '')
+      setTeamSlug(updated.slug || '')
+      setTeamLogo(updated.logo || '')
+      setIsTeamModalOpen(false)
+      setSuccess('Team parameters updated successfully.')
+    } catch (cause) {
+      setTeamError(cause instanceof Error ? cause.message : 'Failed to update team parameters')
+    } finally {
+      setUpdatingTeam(false)
+    }
+  }
+
   async function handleAddMember(evt: React.FormEvent) {
     evt.preventDefault()
     if (!selectedUserId) {
@@ -139,6 +198,7 @@ function AdminTeamDetailPage() {
       setTeam(updated)
       setIsMemberModalOpen(false)
       setSuccess('Competitor added to team successfully.')
+      void fetchRoster()
     } catch (cause) {
       setMemberError(cause instanceof Error ? cause.message : 'Failed to add team member')
     } finally {
@@ -156,6 +216,7 @@ function AdminTeamDetailPage() {
       const updated = await removeAdminTeamMember(teamId, memberUserId, authHeader)
       setTeam(updated)
       setSuccess('Member removed from team successfully.')
+      void fetchRoster()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to remove member')
     }
@@ -170,6 +231,7 @@ function AdminTeamDetailPage() {
       const updated = await updateAdminTeamMemberRole(teamId, memberUserId, newRole, authHeader)
       setTeam(updated)
       setSuccess(`Member role updated to ${newRole} successfully.`)
+      void fetchRoster()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to change member role')
     }
@@ -178,12 +240,20 @@ function AdminTeamDetailPage() {
   const roleOptions = [
     { value: 'member', label: 'Member' },
     { value: 'administrator', label: 'Administrator' },
-    { value: 'organizationAdministrator', label: 'Organization Administrator' },
-    { value: 'eventAdministrator', label: 'Event Administrator' },
   ]
 
   const actions = (
     <div style={{ display: 'flex', gap: '8px' }}>
+      <button
+        type="button"
+        onClick={() => {
+          setTeamError(null)
+          setIsTeamModalOpen(true)
+        }}
+        className="slds-button slds-button_neutral"
+      >
+        Edit Team Parameters
+      </button>
       <button
         type="button"
         onClick={() => {
@@ -299,7 +369,7 @@ function AdminTeamDetailPage() {
                     <div className="slds-media__body">
                       <h2 className="slds-card__header-title">
                         <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                          Team Roster ({team.members.length} Competitors)
+                          Team Roster ({totalMembers} Competitors)
                         </span>
                       </h2>
                     </div>
@@ -307,73 +377,105 @@ function AdminTeamDetailPage() {
                 </div>
 
                 <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-                  {team.members.length > 0 ? (
-                    <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                      <table className="slds-table slds-table_cell-buffer slds-table_bordered" aria-label="Team Roster Table" style={{ width: '100%' }}>
-                        <thead>
-                          <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                            <th scope="col" style={{ width: '250px' }}>
-                              <div className="slds-truncate font-bold" title="Competitor Name" style={{ fontWeight: 'bold' }}>Competitor Name</div>
-                            </th>
-                            <th scope="col" style={{ width: '250px' }}>
-                              <div className="slds-truncate font-bold" title="Roster Role" style={{ fontWeight: 'bold' }}>Roster Role</div>
-                            </th>
-                            <th scope="col" style={{ width: '150px' }}>
-                              <div className="slds-truncate font-bold" title="Role Action" style={{ fontWeight: 'bold' }}>Change Role</div>
-                            </th>
-                            <th scope="col" style={{ width: '120px' }}>
-                              <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {team.members.map((member) => (
-                            <tr key={member.userId} className="slds-hint-parent hover:bg-slate-50">
-                              <th scope="row">
-                                <div className="slds-truncate font-bold" title={member.name}>
-                                  <Link
-                                    to="/admin/users/$userId"
-                                    params={{ userId: member.userId }}
-                                    className="text-blue-600 hover:underline font-bold"
-                                  >
-                                    {member.name}
-                                  </Link>
-                                </div>
-                              </th>
-                              <td>
-                                <span className={`slds-badge ${member.role === 'administrator' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                                  {member.role}
-                                </span>
-                              </td>
-                              <td>
-                                <select
-                                  value={member.role}
-                                  onChange={(e) => handleChangeRole(member.userId, e.target.value)}
-                                  className="slds-select"
-                                  style={{ padding: '2px 8px', height: '28px', fontSize: '12px', minWidth: '150px' }}
-                                >
-                                  {roleOptions.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveMember(member.userId)}
-                                  className="slds-button slds-button_destructive"
-                                  style={{ fontSize: '12px', padding: '2px 10px', background: '#d32f2f', color: '#fff' }}
-                                >
-                                  Remove
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {/* Search Bar */}
+                  <div className="slds-form-element slds-m-bottom_medium" style={{ maxWidth: '300px' }}>
+                    <div className="slds-form-element__control">
+                      <input
+                        type="text"
+                        placeholder="Search roster by name/slug..."
+                        value={memberSearch}
+                        onChange={(e) => {
+                          setMemberSearch(e.target.value)
+                          setMemberPage(1)
+                        }}
+                        className="slds-input"
+                        style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                      />
                     </div>
+                  </div>
+
+                  {members.length > 0 ? (
+                    <>
+                      <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
+                        <table className="slds-table slds-table_cell-buffer slds-table_bordered" aria-label="Team Roster Table" style={{ width: '100%' }}>
+                          <thead>
+                            <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
+                              <th scope="col" style={{ width: '250px' }}>
+                                <div className="slds-truncate font-bold" title="Competitor Name" style={{ fontWeight: 'bold' }}>Competitor Name</div>
+                              </th>
+                              <th scope="col" style={{ width: '250px' }}>
+                                <div className="slds-truncate font-bold" title="Roster Role" style={{ fontWeight: 'bold' }}>Roster Role</div>
+                              </th>
+                              <th scope="col" style={{ width: '150px' }}>
+                                <div className="slds-truncate font-bold" title="Role Action" style={{ fontWeight: 'bold' }}>Change Role</div>
+                              </th>
+                              <th scope="col" style={{ width: '120px' }}>
+                                <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {members.map((member) => (
+                              <tr key={member.userId} className="slds-hint-parent hover:bg-slate-50">
+                                <th scope="row">
+                                  <div className="slds-truncate font-bold" title={member.name}>
+                                    <Link
+                                      to="/admin/users/$userId"
+                                      params={{ userId: member.userId }}
+                                      className="text-blue-600 hover:underline font-bold"
+                                    >
+                                      {member.name}
+                                    </Link>
+                                    {member.slug && (
+                                      <span style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
+                                        @{member.slug}
+                                      </span>
+                                    )}
+                                  </div>
+                                </th>
+                                <td>
+                                  <span className={`slds-badge ${member.role === 'administrator' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
+                                    {member.role}
+                                  </span>
+                                </td>
+                                <td>
+                                  <select
+                                    value={member.role}
+                                    onChange={(e) => handleChangeRole(member.userId, e.target.value)}
+                                    className="slds-select"
+                                    style={{ padding: '2px 8px', height: '28px', fontSize: '12px', minWidth: '150px' }}
+                                  >
+                                    {roleOptions.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveMember(member.userId)}
+                                    className="slds-button slds-button_destructive"
+                                    style={{ fontSize: '12px', padding: '2px 10px', background: '#d32f2f', color: '#fff' }}
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <Pagination
+                        page={memberPage}
+                        pageSize={memberPageSize}
+                        total={totalMembers}
+                        onPageChange={setMemberPage}
+                        onPageSizeChange={setMemberPageSize}
+                      />
+                    </>
                   ) : (
                     <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
                       <p>This team does not have any roster members. Click "Add Team Member" to populate the team roster.</p>
@@ -581,19 +683,10 @@ function AdminTeamDetailPage() {
                         Select System Competitor
                       </label>
                       <div className="slds-form-element__control">
-                        <select
-                          id="select-user-dropdown"
+                        <UserSearchCombobox
                           value={selectedUserId}
-                          onChange={(e) => setSelectedUserId(e.target.value)}
-                          className="slds-select"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        >
-                          {systemUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.name}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => setSelectedUserId(val)}
+                        />
                       </div>
                     </div>
 
@@ -634,6 +727,124 @@ function AdminTeamDetailPage() {
                     className="slds-button slds-button_brand"
                   >
                     {addingMember ? 'Adding...' : 'Add Member'}
+                  </button>
+                </footer>
+              </form>
+            </div>
+          </section>
+          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
+        </>
+      )}
+
+      {/* Edit Team Modal */}
+      {isTeamModalOpen && (
+        <>
+          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
+            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
+              <header className="slds-modal__header">
+                <button
+                  type="button"
+                  onClick={() => setIsTeamModalOpen(false)}
+                  className="slds-button slds-button_icon slds-modal__close"
+                  title="Close"
+                  style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    right: '0.5rem',
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  X
+                </button>
+                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  Configure Team Parameters
+                </h2>
+              </header>
+
+              <form onSubmit={(e) => void handleUpdateTeam(e)}>
+                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                  {teamError && (
+                    <div className="slds-m-bottom_medium">
+                      <AlertBanner variant="error">{teamError}</AlertBanner>
+                    </div>
+                  )}
+
+                  <div className="slds-form slds-form_stacked">
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-name-input">
+                        Team Name
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="team-name-input"
+                          type="text"
+                          value={teamName}
+                          onChange={(e) => setTeamName(e.target.value)}
+                          placeholder="e.g. My Racing Team"
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-slug-input">
+                        Team Slug
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="team-slug-input"
+                          type="text"
+                          value={teamSlug}
+                          onChange={(e) => setTeamSlug(e.target.value)}
+                          placeholder="e.g. my-racing-team"
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                          required
+                        />
+                      </div>
+                      <div className="slds-m-top_xx-small text-slate-400" style={{ fontSize: '11px' }}>
+                        Slug must be 24 characters or fewer.
+                      </div>
+                    </div>
+
+                    <div className="slds-form-element">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-logo-input">
+                        Team Logo URL
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="team-logo-input"
+                          type="text"
+                          value={teamLogo}
+                          onChange={(e) => setTeamLogo(e.target.value)}
+                          placeholder="e.g. https://example.com/logo.png"
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsTeamModalOpen(false)}
+                    className="slds-button slds-button_neutral"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingTeam}
+                    className="slds-button slds-button_brand"
+                  >
+                    {updatingTeam ? 'Updating...' : 'Save Parameters'}
                   </button>
                 </footer>
               </form>

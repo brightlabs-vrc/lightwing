@@ -8,7 +8,7 @@ permissions:
 jobs:
   frontend-unit:
     name: Frontend Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
@@ -33,7 +33,7 @@ jobs:
 
   backend-unit:
     name: Backend Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -45,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           cache: pnpm
 
       - name: Install Encore CLI

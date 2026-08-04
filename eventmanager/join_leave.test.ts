@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import { prisma } from "./prisma";
-import { joinEvent, leaveEvent, getEvent, addEventMember, removeEventMember } from "./events";
+import { getEvent } from "./events";
+import { joinEvent, leaveEvent, addEventMember, removeEventMember } from "./event-members";
 import { joinRaceEvent, leaveRaceEvent, addRaceEventMember, removeRaceEventMember } from "./raceevents";
 import type { ClassTier } from "./classtier";
 
@@ -155,7 +156,7 @@ describe("joinEvent and leaveEvent public endpoints", () => {
 
   test("reject signup if user does not satisfy class tier restriction", async () => {
     const creatorId = await createUser("creator", "Creator User");
-    const userId = await createUser("participant-low", "Low Tier Participant", "G3");
+    const userId = await createUser("participant-low", "Low Tier Participant", "G2");
     const token = await createSession(userId);
     const eventId = await createEvent(creatorId, "Elite OP Championship", "OFFICIAL", "OP");
 
@@ -502,7 +503,7 @@ describe("Granular Race Signup Persistence", () => {
     expect(raceMembers.length).toBe(1);
   });
 
-  test("Granular event: leaving a race removes RaceEventMember but preserves EventMember", async () => {
+  test("Granular event: leaving a race removes RaceEventMember and removes EventMember if no other races", async () => {
     const creatorId = await createUser("creator", "Creator User");
     const userId = await createUser("participant", "Participant User", "OP");
     const token = await createSession(userId);
@@ -531,10 +532,71 @@ describe("Granular Race Signup Persistence", () => {
     });
     expect(raceMember).toBeNull();
 
-    // Verify eventMember is PRESERVED
+    // Verify eventMember is REMOVED
     const eventMember = await prisma.eventMember.findUnique({
       where: { eventId_userId: { eventId, userId } },
     });
-    expect(eventMember).not.toBeNull();
+    expect(eventMember).toBeNull();
+  });
+
+  test("Granular event: partial and full withdrawal with reload persistence", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const userId = await createUser("participant", "Participant User", "OP");
+    const token = await createSession(userId);
+    const eventId = await createEvent(creatorId, "Granular Event Partial Full", "UNOFFICIAL", "OP", true);
+    const raceId1 = await createRaceEvent(eventId, "Race 1");
+    const raceId2 = await createRaceEvent(eventId, "Race 2");
+
+    // 1. Join Race 1
+    await joinRaceEvent({
+      eventId,
+      raceId: raceId1,
+      authorization: `Bearer ${token}`,
+    });
+
+    // 2. Join Race 2
+    await joinRaceEvent({
+      eventId,
+      raceId: raceId2,
+      authorization: `Bearer ${token}`,
+    });
+
+    // Verify user is in event member list
+    let loadedEvent = await getEvent({ id: eventId });
+    expect(loadedEvent.members.length).toBe(1);
+    expect(loadedEvent.members[0].userId).toBe(userId);
+
+    // 3. Partial withdrawal: Leave Race 1
+    await leaveRaceEvent({
+      eventId,
+      raceId: raceId1,
+      authorization: `Bearer ${token}`,
+    });
+
+    // Verify still in event members (active in Race 2)
+    const eventMemberPartial = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(eventMemberPartial).not.toBeNull();
+
+    loadedEvent = await getEvent({ id: eventId });
+    expect(loadedEvent.members.length).toBe(1);
+    expect(loadedEvent.members[0].userId).toBe(userId);
+
+    // 4. Full withdrawal: Leave Race 2 (the final active race)
+    await leaveRaceEvent({
+      eventId,
+      raceId: raceId2,
+      authorization: `Bearer ${token}`,
+    });
+
+    // Verify completely removed from event members
+    const eventMemberFull = await prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+    });
+    expect(eventMemberFull).toBeNull();
+
+    loadedEvent = await getEvent({ id: eventId });
+    expect(loadedEvent.members.length).toBe(0);
   });
 });

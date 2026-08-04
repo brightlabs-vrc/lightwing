@@ -5,9 +5,14 @@ import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
+import { UserSearchCombobox } from '../../components/UserSearchCombobox'
+import { TeamSearchCombobox } from '../../components/TeamSearchCombobox'
+import { Pagination } from '../../components/Pagination'
 import { EventScoringTablesEditor } from '../../components/EventScoringTablesEditor'
 import type { eventmanager } from '../../lib/client'
 import { MOCK_MODE } from '../../lib/mock-mode'
+import { DEFAULT_SCORING_TABLES } from '../../lib/scoringDefaults'
+import { SldsSkeletonList } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/admin/events')({
   beforeLoad: async ({ location }) => {
@@ -22,7 +27,10 @@ function AdminEventsListPage() {
     select: (state) => state.location.pathname,
   })
   const isListRoute = pathname === '/admin/events'
-  const [events, setEvents] = useState<eventmanager.EventDetail[]>([])
+  const [events, setEvents] = useState<eventmanager.EventListItem[]>([])
+  const [totalEvents, setTotalEvents] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [loadingEvents, setLoadingEvents] = useState(true)
   const [globalError, setGlobalError] = useState<string | null>(null)
 
@@ -37,12 +45,7 @@ function AdminEventsListPage() {
   const [formClassRestriction, setFormClassRestriction] = useState<string>('OP')
   const [formGranularParticipation, setFormGranularParticipation] = useState(false)
   const [formScoringRulesMode, setFormScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
-  const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>({
-    OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-    GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-    GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-    GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
-  })
+  const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -53,8 +56,10 @@ function AdminEventsListPage() {
     setLoadingEvents(true)
     setGlobalError(null)
     try {
-      const response = await listAdminEvents()
+      const offset = (page - 1) * pageSize
+      const response = await listAdminEvents(undefined, undefined, pageSize, offset)
       setEvents(response.events)
+      setTotalEvents(response.total)
     } catch (cause) {
       setGlobalError(cause instanceof Error ? cause.message : 'Unable to load events')
     } finally {
@@ -64,7 +69,7 @@ function AdminEventsListPage() {
 
   useEffect(() => {
     void loadEvents()
-  }, [])
+  }, [page, pageSize])
 
   // Set default values when modal opens or active session changes
   useEffect(() => {
@@ -78,12 +83,7 @@ function AdminEventsListPage() {
       setFormClassRestriction('OP')
       setFormGranularParticipation(false)
       setFormScoringRulesMode('STANDARD')
-      setFormCustomScoringTables({
-        OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-        GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-        GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-        GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
-      })
+      setFormCustomScoringTables(DEFAULT_SCORING_TABLES)
     }
   }, [showCreateModal, activeUserId, activeOrgId])
 
@@ -211,56 +211,65 @@ function AdminEventsListPage() {
 
             <div className="slds-card__body" style={{ padding: '0 1rem 1rem 1rem' }}>
               {loadingEvents ? (
-                <p className="slds-text-body_small slds-p-around_medium" style={{ color: '#514f4d' }}>Loading events...</p>
+                <SldsSkeletonList count={3} />
               ) : events.length === 0 ? (
                 <p className="slds-text-body_small slds-p-around_medium" style={{ color: '#514f4d' }}>No events found.</p>
               ) : (
-                <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {events.map((evt) => (
-                    <li key={evt.id} className="slds-item slds-p-vertical_small">
-                      <Link
-                        to="/admin/events/$eventId"
-                        params={{ eventId: evt.id }}
-                        className="slds-text-link_reset"
-                        style={{
-                          display: 'block',
-                          textDecoration: 'none',
-                          borderRadius: '4px',
-                          padding: '12px',
-                          transition: 'background 0.2s',
-                          borderLeft: '4px solid transparent',
-                        }}
-                      >
-                        <div className="slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span className="slds-text-body_regular font-bold text-slate-900" style={{ fontWeight: 'bold', fontSize: '1rem' }}>{evt.name}</span>
-                          <span
-                            className={`slds-badge ${
-                              evt.status === 'OFFICIAL'
-                                ? 'slds-theme_success'
-                                : evt.status === 'CONCLUDED'
-                                ? 'slds-theme_inverse'
-                                : 'slds-theme_light'
-                            }`}
-                            style={{
-                              fontSize: '10px',
-                              padding: '2px 8px',
-                              borderRadius: '3px',
-                              color: evt.status === 'OFFICIAL' ? '#fff' : evt.status === 'CONCLUDED' ? '#fff' : '#000',
-                              backgroundColor: evt.status === 'OFFICIAL' ? '#2e7d32' : evt.status === 'CONCLUDED' ? '#180505' : '#e0e0e0',
-                            }}
-                          >
-                            {evt.status}
-                          </span>
-                        </div>
-                        <div className="slds-text-body_small text-slate-500 slds-m-top_xx-small" style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Type: {evt.scoringTypeLabel}</span>
-                          <span>Tier: {evt.classRestriction ?? 'Any'}</span>
-                          <span>{evt.members.length} participants</span>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                    {events.map((evt) => (
+                      <li key={evt.id} className="slds-item slds-p-vertical_small">
+                        <Link
+                          to="/admin/events/$eventId"
+                          params={{ eventId: evt.id }}
+                          className="slds-text-link_reset"
+                          style={{
+                            display: 'block',
+                            textDecoration: 'none',
+                            borderRadius: '4px',
+                            padding: '12px',
+                            transition: 'background 0.2s',
+                            borderLeft: '4px solid transparent',
+                          }}
+                        >
+                          <div className="slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span className="slds-text-body_regular font-bold text-slate-900" style={{ fontWeight: 'bold', fontSize: '1rem' }}>{evt.name}</span>
+                            <span
+                              className={`slds-badge ${
+                                evt.status === 'OFFICIAL'
+                                  ? 'slds-theme_success'
+                                  : evt.status === 'CONCLUDED'
+                                  ? 'slds-theme_inverse'
+                                  : 'slds-theme_light'
+                              }`}
+                              style={{
+                                fontSize: '10px',
+                                padding: '2px 8px',
+                                borderRadius: '3px',
+                                color: evt.status === 'OFFICIAL' ? '#fff' : evt.status === 'CONCLUDED' ? '#fff' : '#000',
+                                backgroundColor: evt.status === 'OFFICIAL' ? '#2e7d32' : evt.status === 'CONCLUDED' ? '#180505' : '#e0e0e0',
+                              }}
+                            >
+                              {evt.status}
+                            </span>
+                          </div>
+                          <div className="slds-text-body_small text-slate-500 slds-m-top_xx-small" style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Type: {evt.scoringTypeLabel}</span>
+                            <span>Tier: {evt.classRestriction ?? 'Any'}</span>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Pagination
+                    page={page}
+                    pageSize={pageSize}
+                    total={totalEvents}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </>
               )}
             </div>
           </article>
@@ -465,36 +474,22 @@ function AdminEventsListPage() {
                         {formOwnerType === 'USER' ? (
                           <div className="slds-form-element">
                             <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-user-id">
-                              Owner User ID
+                              Owner User
                             </label>
-                            <div className="slds-form-element__control">
-                              <input
-                                id="owner-user-id"
-                                type="text"
-                                placeholder="e.g. user_abc123"
-                                value={formOwnerUserId}
-                                onChange={(e) => setFormOwnerUserId(e.target.value)}
-                                className="slds-input"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                              />
-                            </div>
+                            <UserSearchCombobox
+                              value={formOwnerUserId}
+                              onChange={(val) => setFormOwnerUserId(val)}
+                            />
                           </div>
                         ) : (
                           <div className="slds-form-element">
                             <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-org-id">
-                              Organization ID
+                              Owner Organization
                             </label>
-                            <div className="slds-form-element__control">
-                              <input
-                                id="owner-org-id"
-                                type="text"
-                                placeholder="e.g. org_abc123"
-                                value={formOrganizationId}
-                                onChange={(e) => setFormOrganizationId(e.target.value)}
-                                className="slds-input"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                              />
-                            </div>
+                            <TeamSearchCombobox
+                              value={formOrganizationId}
+                              onChange={(val) => setFormOrganizationId(val)}
+                            />
                           </div>
                         )}
                       </div>

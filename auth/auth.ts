@@ -24,8 +24,23 @@ const discordBotToken = secret("DISCORD_BOT_TOKEN");
 
 import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
 import { cluster } from "../cache";
+import { generateUniqueUserSlug } from "../lib/slugs";
 
 const ursDiscordGuildId = "1482993434410225739";
+
+export async function ensureUserSlug(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+  if (user.slug !== null) return user.slug;
+
+  const baseSource = user.name || "user";
+  const slug = await generateUniqueUserSlug(prisma, baseSource, userId);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { slug },
+  });
+  return slug;
+}
 const siteAdminRole = "SITE_ADMIN";
 const staffRoleNames = new Set([
   "Moderation Staff",
@@ -82,8 +97,6 @@ const accessControl = createAccessControl({
 // control policy stays in sync with the checks performed by other services.
 const roles = {
   administrator: accessControl.newRole({ ...roleStatements.administrator }),
-  eventAdministrator: accessControl.newRole({ ...roleStatements.eventAdministrator }),
-  organizationAdministrator: accessControl.newRole({ ...roleStatements.organizationAdministrator }),
   member: accessControl.newRole({ ...roleStatements.member }),
 };
 
@@ -197,6 +210,8 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
+const frontendUrlFromEnv = process.env.FRONTEND_URL?.replace(/\/$/, "");
+
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
   baseURL: appMeta().apiBaseUrl,
@@ -208,7 +223,16 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     "http://localhost:5173",
     // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
     appMeta().apiBaseUrl,
+    ...(frontendUrlFromEnv ? [frontendUrlFromEnv] : []),
   ],
+  advanced: frontendUrlFromEnv
+    ? {
+        defaultCookieAttributes: {
+          sameSite: "none",
+          secure: !frontendUrlFromEnv.startsWith("http://"),
+        },
+      }
+    : undefined,
   user: {
     additionalFields: {
       siteRole: {
@@ -250,13 +274,21 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       create: {
         before: async (user) => {
           const existingUsers = await prisma.user.count();
+          const uniqueSlug = await generateUniqueUserSlug(prisma, user.name || "user", user.id);
+
           if (existingUsers > 0) {
-            return;
+            return {
+              data: {
+                ...user,
+                slug: uniqueSlug,
+              },
+            };
           }
 
           return {
             data: {
               ...user,
+              slug: uniqueSlug,
               siteRole: siteAdminRole,
             },
           };
@@ -267,6 +299,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       create: {
         before: async (session) => {
           await syncSiteRoleFromDiscordMembership(session.userId);
+          await ensureUserSlug(session.userId);
         },
       },
     },

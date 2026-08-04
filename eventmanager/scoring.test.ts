@@ -15,9 +15,12 @@ import {
   validateCustomScoringTables,
   resolvePoints,
 } from "./scoring";
-import { createEvent, addEventMember, updateEvent, recomputeEventPointsInternal } from "./events";
+import { createEvent, recomputeEventPointsInternal } from "./events";
+import { addEventMember } from "./event-members";
+import { updateEvent } from "./event-updates";
 import { createRaceEvent, updateRaceEvent } from "./raceevents";
-import { assignRaceResult, replaceRaceResults, mergeRaceResults } from "./results";
+import { assignRaceResult } from "./results";
+import { replaceRaceResults, mergeRaceResults } from "./results-bulk";
 
 const createdUserIds: string[] = [];
 const createdEventIds: string[] = [];

@@ -10,7 +10,7 @@ vi.mock("~encore/clients", () => ({
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import { prisma } from "./prisma";
-import { createEvent, addEventMember } from "./events";
+import { createEvent } from "./events";
 import { createRaceEvent } from "./raceevents";
 import { listEligibleEvents } from "./classes";
 
