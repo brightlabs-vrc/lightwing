@@ -2,6 +2,7 @@ import type { eventmanager } from '../lib/client'
 import styles from './EventMembersTab.module.css'
 
 import { UserSearchCombobox } from './UserSearchCombobox'
+import { UserLink } from './UserLink'
 
 interface EventMembersTabProps {
   selectedEvent: eventmanager.EventDetail
@@ -64,7 +65,7 @@ export function EventMembersTab({
           <tbody>
             {selectedEvent.members.map((member) => (
               <tr key={member.userId} className="slds-hint-parent">
-                <td><span className="font-semibold text-slate-800">{member.name}</span></td>
+                <td><UserLink userId={member.userId} name={member.name} /></td>
                 <td><code className="text-xs">{member.userId}</code></td>
                 <td>
                   <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px' }}>

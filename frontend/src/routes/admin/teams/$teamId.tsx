@@ -16,6 +16,7 @@ import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { UserSearchCombobox } from '../../../components/UserSearchCombobox'
 import { Pagination } from '../../../components/Pagination'
+import { UserLink } from '../../../components/UserLink'
 import type { teammanager, auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/teams/$teamId')({
@@ -419,13 +420,7 @@ function AdminTeamDetailPage() {
                               <tr key={member.userId} className="slds-hint-parent hover:bg-slate-50">
                                 <th scope="row">
                                   <div className="slds-truncate font-bold" title={member.name}>
-                                    <Link
-                                      to="/admin/users/$userId"
-                                      params={{ userId: member.userId }}
-                                      className="text-blue-600 hover:underline font-bold"
-                                    >
-                                      {member.name}
-                                    </Link>
+                                    <UserLink userId={member.userId} name={member.name} />
                                     {member.slug && (
                                       <span style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
                                         @{member.slug}

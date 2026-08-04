@@ -2,6 +2,7 @@ import type { eventmanager } from '../lib/client'
 import { GradePointsPreview } from './GradePointsPreview'
 import styles from './EventSummaryTab.module.css'
 import { DEFAULT_SCORING_TABLES } from '../lib/scoringDefaults'
+import { UserLink } from './UserLink'
 
 interface EventSummaryTabProps {
   selectedEvent: eventmanager.EventDetail
@@ -91,7 +92,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                 {selectedEvent.pointsOverview.map((item, idx) => (
                   <tr key={item.userId} className="slds-hint-parent">
                     <td><strong>{idx + 1}</strong></td>
-                    <td><span className="font-semibold text-blue-600">{item.name}</span></td>
+                    <td><UserLink userId={item.userId} name={item.name} /></td>
                     <td><code className="text-xs">{item.userId}</code></td>
                     <td><strong>{item.points} pts</strong></td>
                   </tr>
@@ -116,7 +117,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                 {selectedEvent.ladderOverview.map((item) => (
                   <tr key={item.userId} className="slds-hint-parent">
                     <td><strong>{item.rank}</strong></td>
-                    <td><span className="font-semibold text-blue-600">{item.name}</span></td>
+                    <td><UserLink userId={item.userId} name={item.name} /></td>
                     <td><strong>{item.elo}</strong></td>
                     <td>{item.wins}W - {item.losses}L</td>
                   </tr>
