@@ -652,11 +652,12 @@ function AdminEventDetailPage() {
                           <div className="slds-form-element__control">
                             <select
                               id="race-restriction"
-                              value={newRaceForm.classRestriction}
-                              onChange={(e) => setNewRaceForm((c) => ({ ...c, classRestriction: e.target.value as eventmanager.ClassTier }))}
+                              value={newRaceForm.classRestriction || ''}
+                              onChange={(e) => setNewRaceForm((c) => ({ ...c, classRestriction: e.target.value ? e.target.value as eventmanager.ClassTier : null }))}
                               className="slds-select"
                               style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                             >
+                              <option value="">Any Tier Eligibility (None)</option>
                               {CLASS_TIER_OPTIONS.map((tier) => (
                                 <option key={tier} value={tier}>{tier}</option>
                               ))}

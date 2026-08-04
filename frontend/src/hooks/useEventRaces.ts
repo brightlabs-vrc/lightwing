@@ -12,7 +12,7 @@ export interface NewRaceForm {
   distanceMeters: number
   trackType: string
   location: string
-  classRestriction: eventmanager.ClassTier
+  classRestriction: eventmanager.ClassTier | null
   grade?: string
 }
 
