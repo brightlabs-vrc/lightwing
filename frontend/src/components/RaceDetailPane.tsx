@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import type { eventmanager } from '../lib/client'
 import { AlertBanner } from './AlertBanner'
 import { StandingsEditor } from './StandingsEditor'
+import { UserLink } from './UserLink'
 import {
   isRaceOngoing,
   isRaceNotStarted,
@@ -467,7 +468,7 @@ export function RaceDetailPane({
                     background: '#f8fafc',
                   }}
                 >
-                  <strong>{m.name}</strong>
+                  <UserLink userId={m.userId} name={m.name} />
                   <button
                     type="button"
                     onClick={() => void handleRemoveRaceMember(selectedRace.id, m.userId)}

@@ -6,6 +6,7 @@ import { listAdminUsers } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { Pagination } from '../../../components/Pagination'
+import { UserLink } from '../../../components/UserLink'
 import type { auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/')({
@@ -127,13 +128,7 @@ function AdminUsersPage() {
                           <tr key={user.id} className="slds-hint-parent hover:bg-slate-50">
                             <th scope="row">
                               <div className="slds-truncate font-bold" title={user.name}>
-                                <Link
-                                  to="/admin/users/$userId"
-                                  params={{ userId: user.id }}
-                                  className="text-blue-600 hover:underline font-bold"
-                                >
-                                  {user.name}
-                                </Link>
+                                <UserLink userId={user.id} name={user.name} />
                                 {user.id === session?.user.id && (
                                   <span className="slds-badge slds-m-left_small" style={{ fontSize: '10px', padding: '1px 4px' }}>
                                     You

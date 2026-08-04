@@ -1,6 +1,7 @@
 import type { eventmanager } from '../lib/client'
 import type { ChangeSummary, DerivedRow, EditedResult } from '../lib/standings'
 import { AlertBanner } from './AlertBanner'
+import { UserLink } from './UserLink'
 import { DEFAULT_SCORING_TABLES } from '../lib/scoringDefaults'
 
 interface StandingsEditorProps {
@@ -239,7 +240,7 @@ function StandingsTable({
                 }}
               >
                 <td>
-                  <span className="font-bold text-slate-800" style={{ fontWeight: 'bold' }}>{member.name}</span>
+                  <UserLink userId={member.userId} name={member.name} />
                 </td>
                 <td>
                   <code className="text-xs">{member.userId}</code>
