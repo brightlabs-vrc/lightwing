@@ -160,7 +160,7 @@ function EventDetailPage() {
             </PixelBadge>
             <PixelBadge tone="neutral">
               CLASS RESTRICTION:{' '}
-              {event.classRestriction ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN TO ALL'}
+              {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP' ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN TO ALL'}
             </PixelBadge>
           </PixelStack>
 
@@ -488,7 +488,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                 <PixelStack direction="row" gap={2} align="center">
                   <PixelBadge tone="neutral">
                     CLASS:{' '}
-                    {race.classRestriction ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
+                    {race.classRestriction && race.classRestriction !== 'PRE_OP' && race.classRestriction !== 'OP' ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
                   </PixelBadge>
                   {event.granularParticipation && (
                     <>

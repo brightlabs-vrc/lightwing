@@ -52,7 +52,7 @@ export function useEventRaces({
     distanceMeters: 1200,
     trackType: 'Turf',
     location: '',
-    classRestriction: 'OP',
+    classRestriction: null,
     grade: 'OP',
   })
 
@@ -71,7 +71,7 @@ export function useEventRaces({
           distanceMeters: 1200,
           trackType: 'Turf',
           location: '',
-          classRestriction: 'OP',
+          classRestriction: null,
           grade: 'OP',
         })
         setGlobalSuccess(`Successfully created race event "${newRaceForm.name}".`)

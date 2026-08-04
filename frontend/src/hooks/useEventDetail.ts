@@ -20,7 +20,7 @@ import { useEventResults } from './useEventResults'
 import { useEventStatus } from './useEventStatus'
 
 const STATUS_OPTIONS: eventmanager.EventStatus[] = ['DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'CONCLUDED']
-const CLASS_TIER_OPTIONS = ['PRE_OP', 'OP', 'G3', 'G2', 'G1']
+const CLASS_TIER_OPTIONS = ['G3', 'G2', 'G1']
 
 export type ActiveTab = 'details' | 'members' | 'races' | 'datasets'
 

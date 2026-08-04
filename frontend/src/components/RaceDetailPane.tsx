@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { eventmanager } from '../lib/client'
 import { AlertBanner } from './AlertBanner'
+
+function formatClassTier(tier: string | null | undefined): string {
+  if (!tier || tier === 'PRE_OP' || tier === 'OP') {
+    return 'None'
+  }
+  return tier
+}
 import { StandingsEditor } from './StandingsEditor'
 import { UserLink } from './UserLink'
 import {
@@ -30,7 +37,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
     if (value) {
       const found = members.find((m) => m.userId === value)
       if (found) {
-        setSearchTerm(`${found.name} (${found.classTier ?? 'PRE_OP'})`)
+        setSearchTerm(`${found.name} (${formatClassTier(found.classTier)})`)
       }
     } else {
       setSearchTerm('')
@@ -43,7 +50,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
     return (
       m.name.toLowerCase().includes(term) ||
       m.userId.toLowerCase().includes(term) ||
-      (m.classTier ?? 'PRE_OP').toLowerCase().includes(term)
+      formatClassTier(m.classTier).toLowerCase().includes(term)
     )
   })
 
@@ -63,7 +70,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
 
   const handleSelect = (member: eventmanager.EventMemberView) => {
     onChange(member.userId)
-    setSearchTerm(`${member.name} (${member.classTier ?? 'PRE_OP'})`)
+    setSearchTerm(`${member.name} (${formatClassTier(member.classTier)})`)
     setIsOpen(false)
   }
 
@@ -179,7 +186,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
             >
               <div style={{ fontWeight: '600', color: '#1e293b' }}>{member.name}</div>
               <div style={{ fontSize: '10px', color: '#64748b' }}>
-                ID: {member.userId} | Class: {member.classTier ?? 'PRE_OP'}
+                ID: {member.userId} | Class: {formatClassTier(member.classTier)}
               </div>
             </div>
           ))}
@@ -284,7 +291,7 @@ export function RaceDetailPane({
                 Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> | Location: <strong>{selectedRace.location}</strong>
               </p>
               <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '11px', textTransform: 'none' }}>
-                Class Restriction: <strong>{selectedRace.classRestriction ?? 'Any tier'}</strong>
+                Class Restriction: <strong>{formatClassTier(selectedRace.classRestriction)}</strong>
               </span>
             </div>
           </div>
@@ -297,7 +304,7 @@ export function RaceDetailPane({
               <div className="slds-form-element__control">
                 <select
                   id="race-class-restriction-select"
-                  value={selectedRace.classRestriction || ''}
+                  value={(!selectedRace.classRestriction || selectedRace.classRestriction === 'PRE_OP' || selectedRace.classRestriction === 'OP') ? '' : selectedRace.classRestriction}
                   onChange={(e) => void handleUpdateRace(selectedRace.id, { classRestriction: e.target.value ? e.target.value as eventmanager.ClassTier : null })}
                   className="slds-select"
                   style={{ minWidth: '130px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}

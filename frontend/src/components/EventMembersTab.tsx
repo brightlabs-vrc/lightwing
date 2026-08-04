@@ -69,7 +69,7 @@ export function EventMembersTab({
                 <td><code className="text-xs">{member.userId}</code></td>
                 <td>
                   <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px' }}>
-                    {member.classTier ?? 'PRE_OP'}
+                    {!member.classTier || member.classTier === 'PRE_OP' || member.classTier === 'OP' ? 'None' : member.classTier}
                   </span>
                 </td>
                 <td>

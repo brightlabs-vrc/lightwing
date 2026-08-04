@@ -31,24 +31,23 @@ export function isEligible(
   participantTier: ClassTier | null,
   eventRestriction: ClassTier | null,
 ): boolean {
-  if (eventRestriction === null) {
+  // PRE_OP and OP are treated as equivalent to unrestricted / none (null)
+  const normParticipant = (participantTier === "PRE_OP" || participantTier === "OP") ? null : participantTier;
+  const normRestriction = (eventRestriction === "PRE_OP" || eventRestriction === "OP") ? null : eventRestriction;
+
+  if (normRestriction === null) {
     return true;
   }
-  if (participantTier === null) {
+  if (normParticipant === null) {
     return false;
   }
 
-  if (participantTier === eventRestriction) {
+  if (normParticipant === normRestriction) {
     return true;
   }
 
-  // PRE_OP participant is special: can enter PRE_OP and OP, but not graded classes (G3, G2, G1).
-  if (participantTier === "PRE_OP") {
-    return eventRestriction === "PRE_OP" || eventRestriction === "OP";
-  }
-
-  const pIdx = CLASS_TIER_ORDER.indexOf(participantTier);
-  const rIdx = CLASS_TIER_ORDER.indexOf(eventRestriction);
+  const pIdx = CLASS_TIER_ORDER.indexOf(normParticipant);
+  const rIdx = CLASS_TIER_ORDER.indexOf(normRestriction);
 
   if (pIdx === -1 || rIdx === -1) {
     return false;

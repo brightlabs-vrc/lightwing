@@ -826,8 +826,6 @@ function AdminEventDetailPage() {
                               style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                             >
                               <option value="">Any Tier Eligibility (None)</option>
-                              <option value="PRE_OP">PRE_OP</option>
-                              <option value="OP">OP</option>
                               <option value="G3">G3</option>
                               <option value="G2">G2</option>
                               <option value="G1">G1</option>

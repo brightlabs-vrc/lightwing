@@ -140,6 +140,30 @@ describe("listUsers endpoint", () => {
     expect(response.users.some((u) => u.id === adminId)).toBe(false);
   });
 
+  test("filters users by vrchatUsername with search query", async () => {
+    const vrchatId = `vrc-${randomUUID()}`;
+    await prisma.user.create({
+      data: {
+        id: vrchatId,
+        name: "Discord Name",
+        email: `${vrchatId}@discord.invalid`,
+        vrchatUsername: "UniqueVrcName",
+      },
+    });
+    createdUserIds.push(vrchatId);
+
+    const adminId = await createUser("root-admin-vrc", "Root Admin", "SITE_ADMIN");
+    const token = await createSession(adminId);
+
+    const response = await listUsers({
+      authorization: `Bearer ${token}`,
+      search: "UniqueVrcName",
+    });
+
+    expect(response.users.some((u) => u.id === vrchatId)).toBe(true);
+    expect(response.users.some((u) => u.id === adminId)).toBe(false);
+  });
+
   test("paginates users with limit and offset query params", async () => {
     const p1 = await createUser("p-one", "P1");
     const p2 = await createUser("p-two", "P2");

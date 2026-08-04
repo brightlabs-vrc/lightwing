@@ -254,6 +254,7 @@ export const listUsers = api(
         { name: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
         { slug: { contains: search, mode: "insensitive" } },
+        { vrchatUsername: { contains: search, mode: "insensitive" } },
       ];
     }
 
