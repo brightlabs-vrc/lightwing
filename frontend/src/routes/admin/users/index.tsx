@@ -106,8 +106,11 @@ function AdminUsersPage() {
                     <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Competitors Directory Table" style={{ width: '100%' }}>
                       <thead>
                         <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '250px' }}>
-                            <div className="slds-truncate font-bold" title="Full Name" style={{ fontWeight: 'bold' }}>Full Name</div>
+                          <th scope="col" style={{ width: '200px' }}>
+                            <div className="slds-truncate font-bold" title="VRChat Username" style={{ fontWeight: 'bold' }}>VRChat Username</div>
+                          </th>
+                          <th scope="col" style={{ width: '200px' }}>
+                            <div className="slds-truncate font-bold" title="Discord Name" style={{ fontWeight: 'bold' }}>Discord Name</div>
                           </th>
                           <th scope="col" style={{ width: '150px' }}>
                             <div className="slds-truncate font-bold" title="Site Role" style={{ fontWeight: 'bold' }}>Site Role</div>
@@ -127,8 +130,8 @@ function AdminUsersPage() {
                         {users.map((user) => (
                           <tr key={user.id} className="slds-hint-parent hover:bg-slate-50">
                             <th scope="row">
-                              <div className="slds-truncate font-bold" title={user.name}>
-                                <UserLink userId={user.id} name={user.name} />
+                              <div className="slds-truncate font-bold" title={user.vrchatUsername || 'No VRChat Name'}>
+                                <UserLink userId={user.id} name={user.vrchatUsername || '—'} />
                                 {user.id === session?.user.id && (
                                   <span className="slds-badge slds-m-left_small" style={{ fontSize: '10px', padding: '1px 4px' }}>
                                     You
@@ -137,13 +140,18 @@ function AdminUsersPage() {
                               </div>
                             </th>
                             <td>
+                              <div className="slds-truncate" title={user.name}>
+                                {user.name}
+                              </div>
+                            </td>
+                            <td>
                               <span className={`slds-badge ${user.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
                                 {user.siteRole}
                               </span>
                             </td>
                             <td>
-                              <div className="slds-truncate" title={user.classTier ?? 'PRE_OP'}>
-                                {user.classTier ?? 'PRE_OP'}
+                              <div className="slds-truncate" title={!user.classTier || user.classTier === 'PRE_OP' || user.classTier === 'OP' ? 'None' : user.classTier}>
+                                {!user.classTier || user.classTier === 'PRE_OP' || user.classTier === 'OP' ? 'None' : user.classTier}
                               </div>
                             </td>
                             <td>

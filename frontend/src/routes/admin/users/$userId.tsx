@@ -47,14 +47,18 @@ function AdminUserDetailPage() {
     setSuccess(null)
     try {
       const loaded = await getAdminUserProfile(userId)
-      setProfile(loaded)
+      const normalizedProfile = {
+        ...loaded,
+        classTier: (loaded.classTier === 'PRE_OP' || loaded.classTier === 'OP') ? null : loaded.classTier
+      }
+      setProfile(normalizedProfile)
       setName(loaded.name || '')
       setSlug(loaded.slug || '')
       setBiography(loaded.biography || '')
       setCareerOverview(loaded.careerOverview || '')
       setVrchatUsername(loaded.vrchatUsername || '')
       setImage(loaded.image || '')
-      setClassTier(loaded.classTier || '')
+      setClassTier(normalizedProfile.classTier || '')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load competitor profile')
     } finally {
@@ -286,14 +290,12 @@ function AdminUserDetailPage() {
                             <div className="slds-form-element__control slds-m-top_xx-small">
                               <select
                                 id="skill-class-tier"
-                                value={classTier}
+                                value={classTier || ''}
                                 onChange={(e) => setClassTier(e.target.value)}
                                 className="slds-select"
                                 style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                               >
-                                <option value="">None / PRE_OP (Default)</option>
-                                <option value="PRE_OP">PRE_OP</option>
-                                <option value="OP">OP</option>
+                                <option value="">None (Default)</option>
                                 <option value="G3">G3</option>
                                 <option value="G2">G2</option>
                                 <option value="G1">G1</option>

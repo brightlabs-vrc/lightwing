@@ -313,21 +313,22 @@ function isEligible(
   participantTier: string | null,
   eventRestriction: string | null,
 ): boolean {
-  if (eventRestriction === null) {
+  // PRE_OP and OP are treated as equivalent to unrestricted / none (null)
+  const normParticipant = (participantTier === 'PRE_OP' || participantTier === 'OP') ? null : participantTier
+  const normRestriction = (eventRestriction === 'PRE_OP' || eventRestriction === 'OP') ? null : eventRestriction
+
+  if (normRestriction === null) {
     return true
   }
-  if (participantTier === null) {
+  if (normParticipant === null) {
     return false
   }
-  if (participantTier === eventRestriction) {
+  if (normParticipant === normRestriction) {
     return true
   }
-  if (participantTier === 'PRE_OP') {
-    return eventRestriction === 'PRE_OP' || eventRestriction === 'OP'
-  }
   const order = ['PRE_OP', 'OP', 'G3', 'G2', 'G1']
-  const pIdx = order.indexOf(participantTier)
-  const rIdx = order.indexOf(eventRestriction)
+  const pIdx = order.indexOf(normParticipant)
+  const rIdx = order.indexOf(normRestriction)
   if (pIdx === -1 || rIdx === -1) {
     return false
   }

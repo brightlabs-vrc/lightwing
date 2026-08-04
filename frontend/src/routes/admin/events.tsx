@@ -42,7 +42,7 @@ function AdminEventsListPage() {
   const [formOwnerUserId, setFormOwnerUserId] = useState('')
   const [formOrganizationId, setFormOrganizationId] = useState('')
   const [formScoringType, setFormScoringType] = useState<number>(1)
-  const [formClassRestriction, setFormClassRestriction] = useState<string>('OP')
+  const [formClassRestriction, setFormClassRestriction] = useState<string>('')
   const [formGranularParticipation, setFormGranularParticipation] = useState(false)
   const [formScoringRulesMode, setFormScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
@@ -80,7 +80,7 @@ function AdminEventsListPage() {
       setFormOwnerUserId(activeUserId || 'mock-admin-1')
       setFormOrganizationId(activeOrgId || 'org_mock_urs')
       setFormScoringType(1)
-      setFormClassRestriction('OP')
+      setFormClassRestriction('')
       setFormGranularParticipation(false)
       setFormScoringRulesMode('STANDARD')
       setFormCustomScoringTables(DEFAULT_SCORING_TABLES)
@@ -255,7 +255,7 @@ function AdminEventsListPage() {
                           </div>
                           <div className="slds-text-body_small text-slate-500 slds-m-top_xx-small" style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between' }}>
                             <span>Type: {evt.scoringTypeLabel}</span>
-                            <span>Tier: {evt.classRestriction ?? 'Any'}</span>
+                            <span>Tier: {evt.classRestriction && evt.classRestriction !== 'PRE_OP' && evt.classRestriction !== 'OP' ? evt.classRestriction : 'Any'}</span>
                           </div>
                         </Link>
                       </li>
@@ -379,14 +379,12 @@ function AdminEventsListPage() {
                           <div className="slds-form-element__control">
                             <select
                               id="class-tier"
-                              value={formClassRestriction}
-                              onChange={(e) => setFormClassRestriction(e.target.value)}
+                              value={formClassRestriction || ''}
+                              onChange={(e) => setFormClassRestriction(e.target.value || '')}
                               className="slds-select"
                               style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                             >
                               <option value="">Any Tier Eligibility (None)</option>
-                              <option value="PRE_OP">PRE_OP</option>
-                              <option value="OP">OP</option>
                               <option value="G3">G3</option>
                               <option value="G2">G2</option>
                               <option value="G1">G1</option>

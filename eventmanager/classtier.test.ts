@@ -28,31 +28,31 @@ describe("isEligible", () => {
     expect(isEligible(ClassTier.G2, null)).toBe(true);
   });
 
-  test("G1 eligibility: can enter G1 and G2, but not G3, OP, or PRE_OP", () => {
+  test("G1 eligibility: can enter G1 and G2, and unrestricted/PRE_OP/OP", () => {
     expect(isEligible(ClassTier.G1, ClassTier.G1)).toBe(true);
     expect(isEligible(ClassTier.G1, ClassTier.G2)).toBe(true);
     expect(isEligible(ClassTier.G1, ClassTier.G3)).toBe(false);
-    expect(isEligible(ClassTier.G1, ClassTier.OP)).toBe(false);
-    expect(isEligible(ClassTier.G1, ClassTier.PRE_OP)).toBe(false);
+    expect(isEligible(ClassTier.G1, ClassTier.OP)).toBe(true); // Treated as null/unrestricted
+    expect(isEligible(ClassTier.G1, ClassTier.PRE_OP)).toBe(true); // Treated as null/unrestricted
   });
 
-  test("G2 eligibility: can enter G2 and G3, but not G1, OP, or PRE_OP", () => {
+  test("G2 eligibility: can enter G2 and G3, and unrestricted/PRE_OP/OP", () => {
     expect(isEligible(ClassTier.G2, ClassTier.G2)).toBe(true);
     expect(isEligible(ClassTier.G2, ClassTier.G3)).toBe(true);
     expect(isEligible(ClassTier.G2, ClassTier.G1)).toBe(false);
-    expect(isEligible(ClassTier.G2, ClassTier.OP)).toBe(false);
-    expect(isEligible(ClassTier.G2, ClassTier.PRE_OP)).toBe(false);
+    expect(isEligible(ClassTier.G2, ClassTier.OP)).toBe(true); // Treated as null/unrestricted
+    expect(isEligible(ClassTier.G2, ClassTier.PRE_OP)).toBe(true); // Treated as null/unrestricted
   });
 
-  test("G3 eligibility: can enter G3 and OP, but not G2, G1, or PRE_OP", () => {
+  test("G3 eligibility: can enter G3 and unrestricted/PRE_OP/OP", () => {
     expect(isEligible(ClassTier.G3, ClassTier.G3)).toBe(true);
-    expect(isEligible(ClassTier.G3, ClassTier.OP)).toBe(true);
+    expect(isEligible(ClassTier.G3, ClassTier.OP)).toBe(true); // Treated as null/unrestricted
     expect(isEligible(ClassTier.G3, ClassTier.G2)).toBe(false);
     expect(isEligible(ClassTier.G3, ClassTier.G1)).toBe(false);
-    expect(isEligible(ClassTier.G3, ClassTier.PRE_OP)).toBe(false);
+    expect(isEligible(ClassTier.G3, ClassTier.PRE_OP)).toBe(true); // Treated as null/unrestricted
   });
 
-  test("PRE_OP eligibility: can enter PRE_OP and OP only", () => {
+  test("PRE_OP eligibility: can enter PRE_OP and OP, and unrestricted, but not restricted graded classes", () => {
     expect(isEligible(ClassTier.PRE_OP, ClassTier.PRE_OP)).toBe(true);
     expect(isEligible(ClassTier.PRE_OP, ClassTier.OP)).toBe(true);
     expect(isEligible(ClassTier.PRE_OP, ClassTier.G3)).toBe(false);
@@ -60,7 +60,7 @@ describe("isEligible", () => {
     expect(isEligible(ClassTier.PRE_OP, ClassTier.G1)).toBe(false);
   });
 
-  test("OP eligibility: can enter OP and PRE_OP, but not G3, G2, or G1", () => {
+  test("OP eligibility: can enter OP and PRE_OP, and unrestricted, but not restricted graded classes", () => {
     expect(isEligible(ClassTier.OP, ClassTier.OP)).toBe(true);
     expect(isEligible(ClassTier.OP, ClassTier.PRE_OP)).toBe(true);
     expect(isEligible(ClassTier.OP, ClassTier.G3)).toBe(false);
@@ -69,6 +69,7 @@ describe("isEligible", () => {
   });
 
   test("null participant checks", () => {
-    expect(isEligible(null, ClassTier.OP)).toBe(false);
+    expect(isEligible(null, ClassTier.OP)).toBe(true); // Treated as null restriction
+    expect(isEligible(null, ClassTier.G3)).toBe(false);
   });
 });

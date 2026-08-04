@@ -136,7 +136,10 @@ function EventsPage() {
                           SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
                         </PixelBadge>
                         <PixelBadge tone="neutral">
-                          CLASS: {event.classRestriction ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN'}
+                          CLASS:{' '}
+                          {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP'
+                            ? CLASS_TIER_LABELS[event.classRestriction as any]
+                            : 'OPEN'}
                         </PixelBadge>
                         <PixelBadge tone="neutral">RACES: {event.raceCount}</PixelBadge>
                         <PixelBadge tone="neutral">MEMBERS: {event.memberCount}</PixelBadge>

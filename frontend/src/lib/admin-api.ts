@@ -1190,7 +1190,11 @@ export async function listAdminUsers(
   let users = Array.from(mockUserProfiles.values())
   if (search) {
     const lower = search.toLowerCase()
-    users = users.filter((u) => u.name.toLowerCase().includes(lower) || u.email.toLowerCase().includes(lower))
+    users = users.filter((u) =>
+      u.name.toLowerCase().includes(lower) ||
+      u.email.toLowerCase().includes(lower) ||
+      (u.vrchatUsername && u.vrchatUsername.toLowerCase().includes(lower))
+    )
   }
   const total = users.length
   if (offset !== undefined) {
