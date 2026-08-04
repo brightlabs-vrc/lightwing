@@ -210,6 +210,8 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
+const frontendUrlFromEnv = process.env.FRONTEND_URL?.replace(/\/$/, "");
+
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
   baseURL: appMeta().apiBaseUrl,
@@ -221,7 +223,16 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     "http://localhost:5173",
     // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
     appMeta().apiBaseUrl,
+    ...(frontendUrlFromEnv ? [frontendUrlFromEnv] : []),
   ],
+  advanced: frontendUrlFromEnv
+    ? {
+        defaultCookieAttributes: {
+          sameSite: "none",
+          secure: !frontendUrlFromEnv.startsWith("http://"),
+        },
+      }
+    : undefined,
   user: {
     additionalFields: {
       siteRole: {
