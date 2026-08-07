@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, test, afterEach } from "vitest";
 import { prisma } from "./prisma";
-import { submitCalc, processQueue } from "./scorecalc";
+import { submitCalc, handleScoreCalcCompleted, handleScoreCalcFailed } from "./scorecalc";
+import { handleScoreCalcRequest } from "../scorecalc-worker/worker";
+import { calculateEventProjection, computeChecksum } from "./core/calculate";
 
-describe("Scorecalc Service", () => {
+describe("Scorecalc Asynchronous Event-Driven Pipeline", () => {
   const createdUserIds: string[] = [];
   const createdEventIds: string[] = [];
   const createdRaceEventIds: string[] = [];
@@ -11,15 +13,11 @@ describe("Scorecalc Service", () => {
   const createdEventMemberIds: string[] = [];
 
   afterEach(async () => {
-    // Delete only the records created by this test file to avoid interfering with concurrent/other tests
     if (createdEventIds.length > 0) {
-      await prisma.scoreCalcTask.deleteMany({ where: { eventId: { in: createdEventIds } } });
+      await prisma.scoreCalcJob.deleteMany({ where: { eventId: { in: createdEventIds } } });
+      await prisma.scoreCalcState.deleteMany({ where: { eventId: { in: createdEventIds } } });
       await prisma.eventPointsEntry.deleteMany({ where: { eventId: { in: createdEventIds } } });
     }
-    // Delete any manual failed task eventIds we might have inserted
-    await prisma.scoreCalcTask.deleteMany({
-      where: { eventId: { in: ["non-existent-event-id", "test-fail-event-id"] } },
-    });
 
     if (createdRaceResultIds.length > 0) {
       await prisma.raceResult.deleteMany({ where: { id: { in: createdRaceResultIds } } });
@@ -43,7 +41,7 @@ describe("Scorecalc Service", () => {
     }
   });
 
-  async function setupTestEvent() {
+  async function setupTestEvent(scoringType = 1) {
     const userId = `user-${randomUUID()}`;
     const eventId = `event-${randomUUID()}`;
     const raceId1 = `race-${randomUUID()}`;
@@ -59,14 +57,14 @@ describe("Scorecalc Service", () => {
     });
     createdUserIds.push(userId);
 
-    // Seed Event (scoringType: 1 is points-based)
+    // Seed Event
     await prisma.event.create({
       data: {
         id: eventId,
         name: "Test Points Event",
         ownerType: "USER",
         ownerUserId: userId,
-        scoringType: 1,
+        scoringType: scoringType,
         status: "UNOFFICIAL",
       },
     });
@@ -111,155 +109,274 @@ describe("Scorecalc Service", () => {
     return { userId, eventId, raceId1, raceId2 };
   }
 
-  test("should successfully enqueue work, process queue in FIFO batches, and recompute points", async () => {
+  test("pure calculation engine computes deterministic projections and checksums", () => {
+    const projection = calculateEventProjection({
+      eventId: "test-event",
+      members: ["user-c", "user-a", "user-b"],
+      raceResults: [
+        { userId: "user-a", points: 10 },
+        { userId: "user-b", points: 5 },
+        { userId: "user-a", points: 20 },
+      ],
+    });
+
+    // Output is sorted alphabetically by userId
+    expect(projection.entries).toEqual([
+      { userId: "user-a", points: 30 },
+      { userId: "user-b", points: 5 },
+      { userId: "user-c", points: 0 },
+    ]);
+
+    const checksum1 = computeChecksum(projection.entries);
+    const checksum2 = computeChecksum(projection.entries);
+    expect(checksum1).toBe(checksum2);
+  });
+
+  test("submitting calculation creates a job, increments generation, and publishes ScoreCalcRequested", async () => {
+    const { userId, eventId } = await setupTestEvent();
+
+    const response = await submitCalc({
+      eventId,
+      userIds: [userId],
+    });
+
+    expect(response.jobId).toBeDefined();
+    expect(response.generation).toBe(1);
+
+    // Verify job in database
+    const job = await prisma.scoreCalcJob.findUnique({
+      where: { id: response.jobId },
+    });
+    expect(job).not.toBeNull();
+    expect(job?.status).toBe("PENDING");
+    expect(job?.generation).toBe(1);
+    expect(job?.requestedUserIds).toEqual([userId]);
+
+    // Verify state in database
+    const state = await prisma.scoreCalcState.findUnique({
+      where: { eventId },
+    });
+    expect(state).not.toBeNull();
+    expect(state?.latestGeneration).toBe(1);
+    expect(state?.acceptedGeneration).toBe(0);
+  });
+
+  test("submitting calculation for non-points based event is defensively rejected (no-op)", async () => {
+    const { userId, eventId } = await setupTestEvent(2); // scoringType: 2 (ladder-elo)
+
+    const response = await submitCalc({
+      eventId,
+      userIds: [userId],
+    });
+
+    // Returns a defensive fallback response and does not increment database jobs
+    expect(response.jobId).toBe("no-op");
+    expect(response.generation).toBe(0);
+
+    const jobs = await prisma.scoreCalcJob.findMany({
+      where: { eventId },
+    });
+    expect(jobs).toHaveLength(0);
+  });
+
+  test("full e2e pipeline: worker claims/calculates, coordinator persists standings", async () => {
     const { userId, eventId, raceId1, raceId2 } = await setupTestEvent();
 
-    // 1. Create race results for the participant
-    const resId1 = randomUUID();
+    // 1. Create race results
+    const res1 = randomUUID();
     await prisma.raceResult.create({
       data: {
-        id: resId1,
+        id: res1,
         raceEventId: raceId1,
-        userId: userId,
+        userId,
         points: 25,
         position: 1,
       },
     });
-    createdRaceResultIds.push(resId1);
+    createdRaceResultIds.push(res1);
 
-    const resId2 = randomUUID();
+    const res2 = randomUUID();
     await prisma.raceResult.create({
       data: {
-        id: resId2,
+        id: res2,
         raceEventId: raceId2,
-        userId: userId,
-        points: 18,
+        userId,
+        points: 15,
         position: 2,
       },
     });
-    createdRaceResultIds.push(resId2);
+    createdRaceResultIds.push(res2);
 
-    // 2. Submit calculation work to the scorecalc service queue
-    await submitCalc({
-      eventId: eventId,
+    // 2. submit calculation
+    const { jobId, generation } = await submitCalc({
+      eventId,
       userIds: [userId],
     });
 
-    // 3. Verify task is enqueued in ScoreCalcTask in PENDING status
-    const tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId, userId },
+    // 3. Invoke worker handler directly to process request
+    await handleScoreCalcRequest({
+      version: 1,
+      jobId,
+      eventId,
+      generation,
+      requestedAt: new Date().toISOString(),
     });
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].status).toBe("PENDING");
 
-    // 4. Force queue processing (simulating the background process or cron run)
-    await processQueue();
-
-    // 5. Verify the task has been marked as COMPLETED
-    const updatedTasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId, userId },
+    const jobAfterWorker = await prisma.scoreCalcJob.findUnique({
+      where: { id: jobId },
     });
-    expect(updatedTasks).toHaveLength(1);
-    expect(updatedTasks[0].status).toBe("COMPLETED");
+    expect(jobAfterWorker?.status).toBe("PROCESSING");
+    expect(jobAfterWorker?.attempts).toBe(1);
 
-    // 6. Verify event points are aggregated correctly (25 + 18 = 43)
+    // 4. Construct ScoreCalcCompleted message representing completed calculation
+    const computedAt = new Date().toISOString();
+    const result = {
+      eventId,
+      entries: [{ userId, points: 40 }], // 25 + 15
+    };
+    const resultChecksum = computeChecksum(result.entries);
+
+    // 5. Invoke coordinator complete handler directly
+    await handleScoreCalcCompleted({
+      version: 1,
+      jobId,
+      eventId,
+      generation,
+      computedAt,
+      result,
+      resultChecksum,
+    });
+
+    // Verify job updated to COMPLETED
+    const finalJob = await prisma.scoreCalcJob.findUnique({
+      where: { id: jobId },
+    });
+    expect(finalJob?.status).toBe("COMPLETED");
+    expect(finalJob?.completedAt).not.toBeNull();
+    expect(finalJob?.resultChecksum).toBe(resultChecksum);
+
+    // Verify eventPointsEntry is persisted successfully (25 + 15 = 40)
     const pointsEntry = await prisma.eventPointsEntry.findUnique({
       where: { eventId_userId: { eventId, userId } },
     });
     expect(pointsEntry).not.toBeNull();
-    expect(pointsEntry?.points).toBe(43);
+    expect(pointsEntry?.points).toBe(40);
+
+    // Verify state accepted generation
+    const finalState = await prisma.scoreCalcState.findUnique({
+      where: { eventId },
+    });
+    expect(finalState?.acceptedGeneration).toBe(generation);
   });
 
-  test("should implement backoff intervals and stop retrying after 5 failures", async () => {
-    const invalidEventId = "non-existent-event-id";
-    const invalidUserId = "non-existent-user-id";
+  test("generation fencing protects against stale/delayed out-of-order completions", async () => {
+    const { userId, eventId } = await setupTestEvent();
 
-    // 1. Enqueue task with non-existent IDs to trigger db foreign key constraints failure on upsert
-    await submitCalc({
-      eventId: invalidEventId,
-      userIds: [invalidUserId],
+    // Submit Gen 1
+    const gen1 = await submitCalc({ eventId, userIds: [userId] });
+    // Submit Gen 2 (simulating another mutation)
+    const gen2 = await submitCalc({ eventId, userIds: [userId] });
+
+    expect(gen1.generation).toBe(1);
+    expect(gen2.generation).toBe(2);
+
+    // Let's claim Gen 1 on the worker
+    await handleScoreCalcRequest({
+      version: 1,
+      jobId: gen1.jobId,
+      eventId,
+      generation: 1,
+      requestedAt: new Date().toISOString(),
     });
 
-    let tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId: invalidEventId, userId: invalidUserId },
+    // Let's claim Gen 2 on the worker
+    await handleScoreCalcRequest({
+      version: 1,
+      jobId: gen2.jobId,
+      eventId,
+      generation: 2,
+      requestedAt: new Date().toISOString(),
     });
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].status).toBe("PENDING");
-    expect(tasks[0].retryCount).toBe(0);
 
-    // --- FAILURE 1 ---
-    await processQueue();
-    tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId: invalidEventId, userId: invalidUserId },
+    // Now, we receive a delayed completed event for Gen 1 (e.g. slow network)
+    const resultGen1 = {
+      eventId,
+      entries: [{ userId, points: 10 }],
+    };
+    await handleScoreCalcCompleted({
+      version: 1,
+      jobId: gen1.jobId,
+      eventId,
+      generation: 1,
+      computedAt: new Date().toISOString(),
+      result: resultGen1,
+      resultChecksum: computeChecksum(resultGen1.entries),
     });
-    expect(tasks[0].status).toBe("PENDING");
-    expect(tasks[0].retryCount).toBe(1);
-    const delay1 = tasks[0].nextRunAt.getTime() - Date.now();
-    expect(delay1).toBeGreaterThan(4000); // 5s backoff
-    expect(delay1).toBeLessThan(6000);
 
-    // --- FAILURE 2 ---
-    await prisma.scoreCalcTask.update({
-      where: { id: tasks[0].id },
-      data: { nextRunAt: new Date(Date.now() - 1000) },
+    // Gen 1 completed event should be ignored for persistence and marked SUPERSEDED because gen2 exists as latest!
+    const jobGen1 = await prisma.scoreCalcJob.findUnique({
+      where: { id: gen1.jobId },
     });
-    await processQueue();
-    tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId: invalidEventId, userId: invalidUserId },
-    });
-    expect(tasks[0].retryCount).toBe(2);
-    const delay2 = tasks[0].nextRunAt.getTime() - Date.now();
-    expect(delay2).toBeGreaterThan(9000); // 10s backoff
+    expect(jobGen1?.status).toBe("SUPERSEDED");
 
-    // --- FAILURE 3 ---
-    await prisma.scoreCalcTask.update({
-      where: { id: tasks[0].id },
-      data: { nextRunAt: new Date(Date.now() - 1000) },
+    // The points in database should NOT be updated to 10
+    const pointsEntryBeforeGen2 = await prisma.eventPointsEntry.findUnique({
+      where: { eventId_userId: { eventId, userId } },
     });
-    await processQueue();
-    tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId: invalidEventId, userId: invalidUserId },
-    });
-    expect(tasks[0].retryCount).toBe(3);
-    const delay3 = tasks[0].nextRunAt.getTime() - Date.now();
-    expect(delay3).toBeGreaterThan(29000); // 30s backoff
+    expect(pointsEntryBeforeGen2).toBeNull(); // still null (has not processed any gen completion yet)
 
-    // --- FAILURE 4 ---
-    await prisma.scoreCalcTask.update({
-      where: { id: tasks[0].id },
-      data: { nextRunAt: new Date(Date.now() - 1000) },
+    // Now, process Gen 2 completion
+    const resultGen2 = {
+      eventId,
+      entries: [{ userId, points: 50 }],
+    };
+    await handleScoreCalcCompleted({
+      version: 1,
+      jobId: gen2.jobId,
+      eventId,
+      generation: 2,
+      computedAt: new Date().toISOString(),
+      result: resultGen2,
+      resultChecksum: computeChecksum(resultGen2.entries),
     });
-    await processQueue();
-    tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId: invalidEventId, userId: invalidUserId },
-    });
-    expect(tasks[0].retryCount).toBe(4);
-    const delay4 = tasks[0].nextRunAt.getTime() - Date.now();
-    expect(delay4).toBeGreaterThan(59000); // 60s backoff
 
-    // --- FAILURE 5 (Max limit reached) ---
-    await prisma.scoreCalcTask.update({
-      where: { id: tasks[0].id },
-      data: { nextRunAt: new Date(Date.now() - 1000) },
+    // Gen 2 completes successfully
+    const jobGen2 = await prisma.scoreCalcJob.findUnique({
+      where: { id: gen2.jobId },
     });
-    await processQueue();
-    tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId: invalidEventId, userId: invalidUserId },
-    });
-    expect(tasks[0].status).toBe("FAILED");
-    expect(tasks[0].retryCount).toBe(5);
+    expect(jobGen2?.status).toBe("COMPLETED");
 
-    // --- Try running again ---
-    await prisma.scoreCalcTask.update({
-      where: { id: tasks[0].id },
-      data: { nextRunAt: new Date(Date.now() - 1000) },
+    // Standings are updated to Gen 2 results
+    const pointsEntryAfterGen2 = await prisma.eventPointsEntry.findUnique({
+      where: { eventId_userId: { eventId, userId } },
     });
-    await processQueue();
-    tasks = await prisma.scoreCalcTask.findMany({
-      where: { eventId: invalidEventId, userId: invalidUserId },
+    expect(pointsEntryAfterGen2?.points).toBe(50);
+  });
+
+  test("coordinator handleScoreCalcFailed marks job as failed and reports status", async () => {
+    const { userId, eventId } = await setupTestEvent();
+
+    const { jobId, generation } = await submitCalc({
+      eventId,
+      userIds: [userId],
     });
-    // Task should remain in FAILED status, never calculated again
-    expect(tasks[0].status).toBe("FAILED");
-    expect(tasks[0].retryCount).toBe(5);
+
+    // Process failed event
+    await handleScoreCalcFailed({
+      version: 1,
+      jobId,
+      eventId,
+      generation,
+      failedAt: new Date().toISOString(),
+      errorCode: "TEST_ERROR",
+      errorMessage: "Something went wrong during computation",
+      retryable: false,
+    });
+
+    const finalJob = await prisma.scoreCalcJob.findUnique({
+      where: { id: jobId },
+    });
+    expect(finalJob?.status).toBe("FAILED");
+    expect(finalJob?.lastError).toBe("Something went wrong during computation");
   });
 });
