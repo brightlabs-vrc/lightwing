@@ -324,20 +324,32 @@ model EventLadderEntry {
   @@map("event_ladder_entry")
 }
 
-model ScoreCalcTask {
-  id         String   @id @db.Text
-  eventId    String   @db.Text
-  userId     String   @db.Text
-  status     String   @db.Text @default("PENDING")
-  retryCount Int      @default(0)
-  nextRunAt  DateTime @default(now()) @db.Timestamp(6)
-  createdAt  DateTime @default(now()) @db.Timestamp(6)
-  updatedAt  DateTime @updatedAt @db.Timestamp(6)
+model ScoreCalcJob {
+  id               String   @id @db.Text
+  eventId          String   @db.Text
+  generation       Int      @default(1)
+  requestedUserIds Json?
+  status           String   @db.Text // pending | processing | completed | failed | superseded
+  attempts         Int      @default(0)
+  requestedAt      DateTime @default(now()) @db.Timestamp(6)
+  startedAt        DateTime? @db.Timestamp(6)
+  completedAt      DateTime? @db.Timestamp(6)
+  lastError        String?  @db.Text
+  resultChecksum   String?  @db.Text
 
-  @@index([status])
-  @@index([nextRunAt])
-  @@index([createdAt])
+  @@unique([eventId, generation])
+  @@index([eventId, generation])
+  @@index([status, requestedAt])
   @@map("score_calc_task")
+}
+
+model ScoreCalcState {
+  eventId              String   @id @db.Text
+  latestGeneration     Int
+  acceptedGeneration   Int      @default(0)
+  updatedAt            DateTime @updatedAt @db.Timestamp(6)
+
+  @@map("score_calc_state")
 }
 
 enum DatasetStatus {

@@ -1,12 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { api } from "encore.dev/api";
-import { Topic } from "encore.dev/pubsub";
-import { CronJob } from "encore.dev/cron";
-import { appMeta } from "encore.dev";
+import { api, APIError } from "encore.dev/api";
+import { Topic, Subscription } from "encore.dev/pubsub";
 import log from "encore.dev/log";
 import { prisma } from "./prisma";
 import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
 import { cluster } from "../cache";
+
+import {
+  scoreCalcRequestedTopic,
+  scoreCalcCompletedTopic,
+  scoreCalcFailedTopic,
+  type ScoreCalcRequested,
+  type ScoreCalcCompleted,
+  type ScoreCalcFailed,
+  type ScoreCalcProjection,
+} from "./events";
 
 interface DummyEventDetail {
   id: string;
@@ -35,30 +43,77 @@ export interface SubmitCalcParams {
   userIds: string[];
 }
 
-// Submits a list of user IDs for score calculation for an event.
-// Enqueues them in a FIFO queue table and reports status via pub/sub.
+export interface SubmitCalcResponse {
+  jobId: string;
+  generation: number;
+}
+
+// Submits a request for score calculation for an event.
+// Increments generation and publishes ScoreCalcRequested.
 export const submitCalc = api(
   { method: "POST", expose: false },
-  async (params: SubmitCalcParams): Promise<void> => {
+  async (params: SubmitCalcParams): Promise<SubmitCalcResponse> => {
     if (params.userIds.length === 0) {
-      return;
+      throw APIError.invalidArgument("userIds list cannot be empty");
     }
 
-    // 1. Enqueue each calculation request in the FIFO table
-    for (const userId of params.userIds) {
-      await prisma.scoreCalcTask.create({
-        data: {
-          id: randomUUID(),
+    // 1. Validate event and check scoringType
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+      select: { id: true, scoringType: true },
+    });
+
+    if (!event) {
+      throw APIError.notFound(`Event ${params.eventId} not found`);
+    }
+
+    if (event.scoringType !== 1) {
+      log.info(`Defensively rejecting submitCalc for non-points event ${params.eventId} (scoringType=${event.scoringType})`);
+      return { jobId: "no-op", generation: 0 };
+    }
+
+    // 2. Coalesce/increment generation and create pending job in transaction
+    const { jobId, generation } = await prisma.$transaction(async (tx) => {
+      const state = await tx.scoreCalcState.upsert({
+        where: { eventId: params.eventId },
+        create: {
           eventId: params.eventId,
-          userId,
-          status: "PENDING",
-          retryCount: 0,
-          nextRunAt: new Date(),
+          latestGeneration: 1,
+          acceptedGeneration: 0,
+        },
+        update: {
+          latestGeneration: { increment: 1 },
         },
       });
-    }
 
-    // 2. Report the score calculation status to the pub/sub topic
+      const nextGen = state.latestGeneration;
+      const id = randomUUID();
+
+      await tx.scoreCalcJob.create({
+        data: {
+          id,
+          eventId: params.eventId,
+          generation: nextGen,
+          requestedUserIds: params.userIds,
+          status: "PENDING",
+          attempts: 0,
+          requestedAt: new Date(),
+        },
+      });
+
+      return { jobId: id, generation: nextGen };
+    });
+
+    // 3. Publish request event to scorecalc-requested topic
+    await scoreCalcRequestedTopic.publish({
+      version: 1,
+      jobId,
+      eventId: params.eventId,
+      generation,
+      requestedAt: new Date().toISOString(),
+    });
+
+    // 4. Report status to public topic
     await scoreCalcStatusTopic.publish({
       eventId: params.eventId,
       userIds: params.userIds,
@@ -66,138 +121,172 @@ export const submitCalc = api(
       timestamp: new Date().toISOString(),
     });
 
-    // 3. Trigger queue processing in the background (except in tests to prevent race conditions)
-    let isTest = false;
-    try {
-      isTest = appMeta().environment.type === "test";
-    } catch {
-      // fallback
-    }
-
-    if (!isTest) {
-      processQueue().catch((err) => {
-        log.error(err, "failed to process score calculation queue in background");
-      });
-    }
+    return { jobId, generation };
   }
 );
 
-export const cronProcessQueue = api(
-  { expose: false, method: "POST" },
-  async (): Promise<void> => {
-    await processQueue();
-  }
-);
+// Subscription handler for completed calculations
+export async function handleScoreCalcCompleted(event: ScoreCalcCompleted): Promise<void> {
+  const { jobId, eventId, generation, result, resultChecksum } = event;
 
-const _ = new CronJob("scorecalc-queue-processor", {
-  title: "Process pending score calculation tasks",
-  every: "1m",
-  endpoint: cronProcessQueue,
-});
+  log.info(`Received ScoreCalcCompleted message: jobId=${jobId}, eventId=${eventId}, gen=${generation}`);
 
-const BATCH_SIZE = 50;
-
-// Processes the pending tasks in the queue in FIFO order (by batches).
-export async function processQueue(): Promise<void> {
-  while (true) {
-    const tasks = await prisma.$transaction(async (tx) => {
-      const pendingTasks = await tx.scoreCalcTask.findMany({
-        where: {
-          status: "PENDING",
-          retryCount: { lt: 5 },
-          nextRunAt: { lte: new Date() },
-        },
-        orderBy: { createdAt: "asc" },
-        take: BATCH_SIZE,
+  try {
+    const processed = await prisma.$transaction(async (tx) => {
+      const job = await tx.scoreCalcJob.findUnique({
+        where: { id: jobId },
       });
 
-      if (pendingTasks.length === 0) {
-        return [];
+      if (!job) {
+        log.warn(`Job ${jobId} not found in database. Skipping.`);
+        return { success: false };
       }
 
-      const taskIds = pendingTasks.map((t) => t.id);
-      await tx.scoreCalcTask.updateMany({
-        where: { id: { in: taskIds } },
-        data: { status: "PROCESSING" },
+      if (job.status === "COMPLETED" || job.status === "SUPERSEDED") {
+        log.info(`Job ${jobId} is already ${job.status}. Skipping.`);
+        return { success: false };
+      }
+
+      const state = await tx.scoreCalcState.findUnique({
+        where: { eventId },
       });
 
-      return pendingTasks;
+      if (!state) {
+        log.error(`ScoreCalcState not found for event ${eventId}. Skipping.`);
+        return { success: false };
+      }
+
+      // Fencing check: stale calculation cannot overwrite a newer generation
+      if (generation < state.latestGeneration) {
+        log.info(`Ignoring stale completion: generation ${generation} is older than latest ${state.latestGeneration}.`);
+        await tx.scoreCalcJob.update({
+          where: { id: jobId },
+          data: { status: "SUPERSEDED" },
+        });
+        return { success: false };
+      }
+
+      // Apply results and update job status
+      for (const entry of result.entries) {
+        await tx.eventPointsEntry.upsert({
+          where: { eventId_userId: { eventId, userId: entry.userId } },
+          create: {
+            id: randomUUID(),
+            eventId,
+            userId: entry.userId,
+            points: entry.points,
+          },
+          update: {
+            points: entry.points,
+          },
+        });
+      }
+
+      // Update state and job atomically
+      await tx.scoreCalcState.update({
+        where: { eventId },
+        data: { acceptedGeneration: generation },
+      });
+
+      await tx.scoreCalcJob.update({
+        where: { id: jobId },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+          resultChecksum,
+        },
+      });
+
+      const requestedUserIds = job.requestedUserIds as string[] | null;
+      return { success: true, userIds: requestedUserIds ?? [] };
     });
 
-    if (tasks.length === 0) {
-      break;
+    if (processed.success) {
+      // Post-commit cache invalidation
+      await eventDetailCache.delete({ id: eventId });
+
+      // Publish status event with originally requested userIds
+      await scoreCalcStatusTopic.publish({
+        eventId,
+        userIds: processed.userIds,
+        status: "completed",
+        timestamp: new Date().toISOString(),
+      });
+      log.info(`Successfully persisted score projection for jobId=${jobId}`);
     }
 
-    for (const task of tasks) {
-      try {
-        await recomputeEventPointsInternal(task.eventId, task.userId);
-        await prisma.scoreCalcTask.update({
-          where: { id: task.id },
-          data: { status: "COMPLETED" },
-        });
-
-        // Publish completed status to pub/sub
-        await scoreCalcStatusTopic.publish({
-          eventId: task.eventId,
-          userIds: [task.userId],
-          status: "completed",
-          timestamp: new Date().toISOString(),
-        });
-      } catch (err) {
-        log.error(err, `Failed to compute points for event ${task.eventId}, user ${task.userId}`);
-        const nextRetryCount = task.retryCount + 1;
-        if (nextRetryCount >= 5) {
-          await prisma.scoreCalcTask.update({
-            where: { id: task.id },
-            data: {
-              status: "FAILED",
-              retryCount: nextRetryCount,
-            },
-          });
-
-          // Publish failed status to pub/sub on final retry failure
-          await scoreCalcStatusTopic.publish({
-            eventId: task.eventId,
-            userIds: [task.userId],
-            status: "failed",
-            timestamp: new Date().toISOString(),
-          });
-        } else {
-          const delaySeconds = getBackoffDelaySeconds(nextRetryCount);
-          const nextRunAt = new Date(Date.now() + delaySeconds * 1000);
-          await prisma.scoreCalcTask.update({
-            where: { id: task.id },
-            data: {
-              status: "PENDING",
-              retryCount: nextRetryCount,
-              nextRunAt,
-            },
-          });
-        }
-      }
-    }
+  } catch (err: any) {
+    log.error(err, `Failed to handle ScoreCalcCompleted for Job ${jobId}`);
+    throw err;
   }
 }
 
-const BACKOFF_SECONDS = [0, 5, 10, 30, 60] as const;
+// Subscription handler for failed calculations
+export async function handleScoreCalcFailed(event: ScoreCalcFailed): Promise<void> {
+  const { jobId, eventId, generation, errorMessage } = event;
 
-function getBackoffDelaySeconds(attempt: number): number {
-  return BACKOFF_SECONDS[Math.min(attempt, BACKOFF_SECONDS.length - 1)];
+  log.info(`Received ScoreCalcFailed message: jobId=${jobId}, eventId=${eventId}, gen=${generation}`);
+
+  try {
+    const processed = await prisma.$transaction(async (tx) => {
+      const job = await tx.scoreCalcJob.findUnique({
+        where: { id: jobId },
+      });
+
+      if (!job) {
+        log.warn(`Job ${jobId} not found. Skipping.`);
+        return { success: false };
+      }
+
+      if (job.status === "COMPLETED" || job.status === "SUPERSEDED") {
+        return { success: false };
+      }
+
+      const state = await tx.scoreCalcState.findUnique({
+        where: { eventId },
+      });
+
+      // Ensure stale failures don't regress newer generation's status
+      if (state && generation < state.latestGeneration) {
+        await tx.scoreCalcJob.update({
+          where: { id: jobId },
+          data: { status: "SUPERSEDED" },
+        });
+        return { success: false };
+      }
+
+      await tx.scoreCalcJob.update({
+        where: { id: jobId },
+        data: {
+          status: "FAILED",
+          lastError: errorMessage,
+          completedAt: new Date(),
+        },
+      });
+
+      const requestedUserIds = job.requestedUserIds as string[] | null;
+      return { success: true, userIds: requestedUserIds ?? [] };
+    });
+
+    if (processed.success) {
+      await scoreCalcStatusTopic.publish({
+        eventId,
+        userIds: processed.userIds,
+        status: "failed",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+  } catch (err: any) {
+    log.error(err, `Failed to handle ScoreCalcFailed for Job ${jobId}`);
+    throw err;
+  }
 }
 
-// Recomputes the event-level points aggregate for a participant.
-async function recomputeEventPointsInternal(eventId: string, userId: string): Promise<void> {
-  const aggregate = await prisma.raceResult.aggregate({
-    where: { userId, raceEvent: { eventId } },
-    _sum: { points: true },
-  });
-  const total = aggregate._sum.points ?? 0;
+const _onCompleted = new Subscription(scoreCalcCompletedTopic, "scorecalc-completed-handler", {
+  handler: handleScoreCalcCompleted,
+});
 
-  await prisma.eventPointsEntry.upsert({
-    where: { eventId_userId: { eventId, userId } },
-    create: { id: randomUUID(), eventId, userId, points: total },
-    update: { points: total },
-  });
-
-  await eventDetailCache.delete({ id: eventId });
-}
+const _onFailed = new Subscription(scoreCalcFailedTopic, "scorecalc-failed-handler", {
+  handler: handleScoreCalcFailed,
+});
