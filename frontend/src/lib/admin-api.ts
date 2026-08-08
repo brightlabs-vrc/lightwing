@@ -25,6 +25,7 @@ const mockRaceEventsList: (eventmanager.RaceEventView & { members: eventmanager.
     classRestriction: 'OP',
     startsAt: null,
     endsAt: null,
+    participantLimit: null,
     members: [],
   },
   {
@@ -39,6 +40,7 @@ const mockRaceEventsList: (eventmanager.RaceEventView & { members: eventmanager.
     classRestriction: 'G1',
     startsAt: now,
     endsAt: null, // Ongoing
+    participantLimit: null,
     members: [
       { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
       { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
@@ -112,6 +114,9 @@ let mockEvents: eventmanager.EventDetail[] = [
     classRestriction: 'OP',
     granularParticipation: true,
     signupsLocked: false,
+    scheduledAt: null,
+    participantLimit: null,
+    maxConcurrentRaceParticipations: null,
     raceEvents: mockRaceEventsList,
     members: mockEventMembers,
     schedules: [],
@@ -139,6 +144,9 @@ let mockEvents: eventmanager.EventDetail[] = [
     classRestriction: null,
     granularParticipation: false,
     signupsLocked: false,
+    scheduledAt: null,
+    participantLimit: null,
+    maxConcurrentRaceParticipations: null,
     raceEvents: [],
     members: [
       { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
@@ -282,6 +290,7 @@ export function hydrateRaceEvent(eventId: string, race: eventmanager.RaceEventVi
     classRestriction: race.classRestriction,
     startsAt: race.startsAt,
     endsAt: race.endsAt,
+    participantLimit: race.participantLimit ?? null,
     createdAt: now,
     updatedAt: now,
     members: mockRaceMembersMap.get(race.id) ?? [],
@@ -316,6 +325,9 @@ export async function listAdminEvents(
     classRestriction: e.classRestriction,
     granularParticipation: e.granularParticipation,
     signupsLocked: e.signupsLocked,
+    scheduledAt: e.scheduledAt,
+    participantLimit: e.participantLimit,
+    maxConcurrentRaceParticipations: e.maxConcurrentRaceParticipations,
     raceCount: e.raceEvents.length,
     memberCount: e.members.length,
     createdAt: e.createdAt,
@@ -446,9 +458,11 @@ export async function updateAdminEvent(
     name?: string
     description?: string | null
     classRestriction?: eventmanager.ClassTier | null
-    granularParticipation?: boolean
     scoringRulesMode?: string | null
     customScoringTables?: any | null
+    scheduledAt?: string | null
+    participantLimit?: number | null
+    maxConcurrentRaceParticipations?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
@@ -458,9 +472,11 @@ export async function updateAdminEvent(
       name: params.name,
       description: params.description,
       classRestriction: params.classRestriction,
-      granularParticipation: params.granularParticipation,
       scoringRulesMode: params.scoringRulesMode,
       customScoringTables: params.customScoringTables,
+      scheduledAt: params.scheduledAt,
+      participantLimit: params.participantLimit,
+      maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
     })
   }
 
@@ -471,9 +487,11 @@ export async function updateAdminEvent(
         name: params.name ?? evt.name,
         description: params.description !== undefined ? params.description : evt.description,
         classRestriction: params.classRestriction !== undefined ? params.classRestriction : evt.classRestriction,
-        granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : evt.granularParticipation,
         scoringRulesMode: params.scoringRulesMode !== undefined ? params.scoringRulesMode : evt.scoringRulesMode,
         customScoringTables: params.customScoringTables !== undefined ? params.customScoringTables : evt.customScoringTables,
+        scheduledAt: params.scheduledAt !== undefined ? params.scheduledAt : evt.scheduledAt,
+        participantLimit: params.participantLimit !== undefined ? params.participantLimit : evt.participantLimit,
+        maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations !== undefined ? params.maxConcurrentRaceParticipations : evt.maxConcurrentRaceParticipations,
         updatedAt: new Date().toISOString(),
       }
     }
@@ -499,7 +517,6 @@ export async function updateAdminEvent(
       name: params.name ?? publicEvents[pubEvtIndex].name,
       description: params.description !== undefined ? params.description : publicEvents[pubEvtIndex].description,
       classRestriction: params.classRestriction !== undefined ? params.classRestriction : publicEvents[pubEvtIndex].classRestriction,
-      granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : publicEvents[pubEvtIndex].granularParticipation,
       scoringRulesMode: params.scoringRulesMode !== undefined ? params.scoringRulesMode : publicEvents[pubEvtIndex].scoringRulesMode,
       customScoringTables: params.customScoringTables !== undefined ? params.customScoringTables : publicEvents[pubEvtIndex].customScoringTables,
       updatedAt: new Date().toISOString()
@@ -524,6 +541,9 @@ export async function createAdminEvent(
     granularParticipation?: boolean
     scoringRulesMode?: string | null
     customScoringTables?: any | null
+    scheduledAt?: string | null
+    participantLimit?: number | null
+    maxConcurrentRaceParticipations?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
@@ -540,6 +560,9 @@ export async function createAdminEvent(
       granularParticipation: params.granularParticipation,
       scoringRulesMode: params.scoringRulesMode,
       customScoringTables: params.customScoringTables,
+      scheduledAt: params.scheduledAt,
+      participantLimit: params.participantLimit,
+      maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
     })
   }
 
@@ -559,6 +582,9 @@ export async function createAdminEvent(
     classRestriction: params.classRestriction ?? null,
     granularParticipation: params.granularParticipation ?? false,
     signupsLocked: false,
+    scheduledAt: params.scheduledAt ?? null,
+    participantLimit: params.participantLimit ?? null,
+    maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations ?? null,
     raceEvents: [],
     members: [],
     schedules: [],
@@ -621,6 +647,7 @@ export async function createRaceEvent(
     classRestriction?: eventmanager.ClassTier | null
     scoringType?: number | null
     grade?: string | null
+    participantLimit?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
@@ -637,6 +664,7 @@ export async function createRaceEvent(
       classRestriction: params.classRestriction,
       scoringType: params.scoringType,
       grade: params.grade,
+      participantLimit: params.participantLimit,
     })
   }
 
@@ -660,6 +688,7 @@ export async function createRaceEvent(
     classRestriction: params.classRestriction ?? null,
     startsAt: params.startsAt ?? null,
     endsAt: params.endsAt ?? null,
+    participantLimit: params.participantLimit ?? null,
     members: [],
   }
 
@@ -729,6 +758,7 @@ export async function updateRaceEvent(
     classRestriction?: eventmanager.ClassTier | null
     scoringType?: number | null
     grade?: string | null
+    participantLimit?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
@@ -757,6 +787,7 @@ export async function updateRaceEvent(
             classRestriction: params.classRestriction === undefined ? race.classRestriction : params.classRestriction,
             scoringType: params.scoringType === undefined ? race.scoringType : params.scoringType,
             grade: params.grade === undefined ? race.grade : params.grade,
+            participantLimit: params.participantLimit === undefined ? race.participantLimit : params.participantLimit,
           }
           return updatedRace!
         }

@@ -293,6 +293,11 @@ export function RaceDetailPane({
               <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '11px', textTransform: 'none' }}>
                 Class Restriction: <strong>{formatClassTier(selectedRace.classRestriction)}</strong>
               </span>
+              {selectedEvent.granularParticipation && (
+                <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '11px', textTransform: 'none' }}>
+                  Capacity: <strong>{selectedRace.participantLimit !== null ? `${(selectedRace.members ?? []).length} / ${selectedRace.participantLimit}` : `${(selectedRace.members ?? []).length}`}</strong>
+                </span>
+              )}
             </div>
           </div>
 

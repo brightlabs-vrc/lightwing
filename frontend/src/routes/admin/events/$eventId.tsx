@@ -17,6 +17,7 @@ import { EventSummaryTab } from '../../../components/EventSummaryTab'
 import { EventMembersTab } from '../../../components/EventMembersTab'
 import { EventRacesTab } from '../../../components/EventRacesTab'
 import { DEFAULT_SCORING_TABLES } from '../../../lib/scoringDefaults'
+import { toLocalISOString } from '../../../lib/datetime'
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   beforeLoad: async ({ location }) => {
@@ -93,6 +94,7 @@ function AdminEventDetailPage() {
   const [raceEditTrackType, setRaceEditTrackType] = useState('Turf')
   const [raceEditClassRestriction, setRaceEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
   const [raceEditGrade, setRaceEditGrade] = useState<string | null>(null)
+  const [raceEditParticipantLimit, setRaceEditParticipantLimit] = useState<string>('')
   const [showRaceGradeConfirm, setShowRaceGradeConfirm] = useState(false)
   const [raceEditError, setRaceEditError] = useState<string | null>(null)
 
@@ -101,6 +103,9 @@ function AdminEventDetailPage() {
   const [editClassRestriction, setEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
   const [editGranularParticipation, setEditGranularParticipation] = useState(false)
   const [editSignupsLocked, setEditSignupsLocked] = useState(false)
+  const [editScheduledAt, setEditScheduledAt] = useState<string>('')
+  const [editParticipantLimit, setEditParticipantLimit] = useState<string>('')
+  const [editMaxConcurrentRaceParticipations, setEditMaxConcurrentRaceParticipations] = useState<string>('')
   const [editScoringRulesMode, setEditScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -114,6 +119,7 @@ function AdminEventDetailPage() {
       setRaceEditTrackType(selectedRace.trackType)
       setRaceEditClassRestriction(selectedRace.classRestriction)
       setRaceEditGrade(selectedRace.grade)
+      setRaceEditParticipantLimit(selectedRace.participantLimit !== null ? String(selectedRace.participantLimit) : '')
       setRaceEditError(null)
     }
   }, [showEditRaceModal, selectedRace])
@@ -126,6 +132,9 @@ function AdminEventDetailPage() {
       setEditClassRestriction(selectedEvent.classRestriction)
       setEditGranularParticipation(selectedEvent.granularParticipation)
       setEditSignupsLocked(selectedEvent.signupsLocked)
+      setEditScheduledAt(selectedEvent.scheduledAt ? toLocalISOString(selectedEvent.scheduledAt) : '')
+      setEditParticipantLimit(selectedEvent.participantLimit !== null ? String(selectedEvent.participantLimit) : '')
+      setEditMaxConcurrentRaceParticipations(selectedEvent.maxConcurrentRaceParticipations !== null ? String(selectedEvent.maxConcurrentRaceParticipations) : '')
       setEditScoringRulesMode((selectedEvent.scoringRulesMode as 'STANDARD' | 'CUSTOM') || 'STANDARD')
       if (selectedEvent.customScoringTables) {
         setEditCustomScoringTables(selectedEvent.customScoringTables)
@@ -136,11 +145,26 @@ function AdminEventDetailPage() {
   }, [showEditEventModal, selectedEvent])
 
   const performSaveEventDetails = async () => {
+    const limitNum = editParticipantLimit.trim() ? Number(editParticipantLimit) : null
+    const maxConcurrentNum = editMaxConcurrentRaceParticipations.trim() ? Number(editMaxConcurrentRaceParticipations) : null
+
+    if (!editGranularParticipation && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
+      window.alert('Participant limit must be a positive whole number.')
+      return
+    }
+
+    if (editGranularParticipation && maxConcurrentNum !== null && (isNaN(maxConcurrentNum) || !Number.isSafeInteger(maxConcurrentNum) || maxConcurrentNum <= 0)) {
+      window.alert('Max races per participant must be a positive whole number.')
+      return
+    }
+
     await handleUpdateEventDetails({
       name: editName,
       description: editDescription || null,
       classRestriction: editClassRestriction || null,
-      granularParticipation: editGranularParticipation,
+      scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
+      participantLimit: editGranularParticipation ? null : limitNum,
+      maxConcurrentRaceParticipations: editGranularParticipation ? maxConcurrentNum : null,
       scoringRulesMode: editScoringRulesMode,
       customScoringTables: editScoringRulesMode === 'CUSTOM' ? editCustomScoringTables : null,
     })
@@ -191,6 +215,12 @@ function AdminEventDetailPage() {
 
   const performSaveRaceDetails = async () => {
     if (!selectedRace) return
+    const limitNum = raceEditParticipantLimit.trim() ? Number(raceEditParticipantLimit) : null
+    if (limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
+      setRaceEditError('Race participant limit must be a positive whole number.')
+      return
+    }
+
     await handleUpdateRace(selectedRace.id, {
       name: raceEditName.trim(),
       location: raceEditLocation.trim(),
@@ -198,6 +228,7 @@ function AdminEventDetailPage() {
       trackType: raceEditTrackType.trim(),
       classRestriction: raceEditClassRestriction,
       grade: raceEditGrade,
+      participantLimit: limitNum,
     })
     setShowEditRaceModal(false)
   }
@@ -691,6 +722,33 @@ function AdminEventDetailPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Optional Race participantLimit */}
+                    {selectedEvent && selectedEvent.granularParticipation && (
+                      <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="race-participant-limit">
+                          Race participant limit
+                        </label>
+                        <div className="slds-form-element__control">
+                          <input
+                            id="race-participant-limit"
+                            type="number"
+                            min="1"
+                            placeholder="e.g. 10"
+                            value={newRaceForm.participantLimit !== null ? String(newRaceForm.participantLimit) : ''}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setNewRaceForm((c) => ({ ...c, participantLimit: val ? Number(val) : null }))
+                            }}
+                            className="slds-input"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          />
+                        </div>
+                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
+                          Maximum participants for this race. Leave blank for unlimited.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -812,6 +870,23 @@ function AdminEventDetailPage() {
                       </div>
                     )}
 
+                    {/* Optional Event Date/Time */}
+                    <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-event-scheduled-at">
+                        Scheduled Date / Time ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="edit-event-scheduled-at"
+                          type="datetime-local"
+                          value={editScheduledAt}
+                          onChange={(e) => setEditScheduledAt(e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        />
+                      </div>
+                    </div>
+
                     <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem', borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
                       <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
                         <div className="slds-form-element">
@@ -837,20 +912,11 @@ function AdminEventDetailPage() {
 
                       <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
                         <div className="slds-form-element">
+                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }}>Participation Model</label>
                           <div className="slds-form-element__control">
-                            <div className="slds-checkbox">
-                              <input
-                                type="checkbox"
-                                id="edit-granular-participation"
-                                checked={editGranularParticipation}
-                                onChange={(e) => setEditGranularParticipation(e.target.checked)}
-                                style={{ marginRight: '8px' }}
-                              />
-                              <label className="slds-checkbox__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-granular-participation">
-                                <span className="slds-checkbox_faux"></span>
-                                <span className="slds-form-element__label">Enable Granular Participation</span>
-                              </label>
-                            </div>
+                            <span className="slds-badge slds-theme_light" style={{ fontSize: '12px', padding: '4px 12px' }}>
+                              {editGranularParticipation ? 'Granular (Per-Race)' : 'Regular (Event-wide)'}
+                            </span>
                           </div>
                         </div>
 
@@ -873,6 +939,51 @@ function AdminEventDetailPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Capacity and Limits fields */}
+                    {!editGranularParticipation ? (
+                      <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-participant-limit">
+                          Participant limit
+                        </label>
+                        <div className="slds-form-element__control">
+                          <input
+                            id="edit-participant-limit"
+                            type="number"
+                            min="1"
+                            placeholder="e.g. 20"
+                            value={editParticipantLimit}
+                            onChange={(e) => setEditParticipantLimit(e.target.value)}
+                            className="slds-input"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          />
+                        </div>
+                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
+                          Maximum participants for the whole event. Leave blank for unlimited.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-max-concurrent-participations">
+                          Max races per participant
+                        </label>
+                        <div className="slds-form-element__control">
+                          <input
+                            id="edit-max-concurrent-participations"
+                            type="number"
+                            min="1"
+                            placeholder="e.g. 3"
+                            value={editMaxConcurrentRaceParticipations}
+                            onChange={(e) => setEditMaxConcurrentRaceParticipations(e.target.value)}
+                            className="slds-input"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          />
+                        </div>
+                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
+                          Maximum races one participant may join in this event. Leave blank for unlimited.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1129,6 +1240,30 @@ function AdminEventDetailPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Edit Race participantLimit */}
+                    {selectedEvent && selectedEvent.granularParticipation && (
+                      <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="edit-race-participant-limit">
+                          Race participant limit
+                        </label>
+                        <div className="slds-form-element__control">
+                          <input
+                            id="edit-race-participant-limit"
+                            type="number"
+                            min="1"
+                            placeholder="e.g. 10"
+                            value={raceEditParticipantLimit}
+                            onChange={(e) => setRaceEditParticipantLimit(e.target.value)}
+                            className="slds-input"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          />
+                        </div>
+                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
+                          Maximum participants for this race. Leave blank for unlimited.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

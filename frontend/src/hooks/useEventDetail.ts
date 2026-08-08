@@ -140,9 +140,11 @@ export function useEventDetail(eventId: string) {
       name: string
       description: string | null
       classRestriction: eventmanager.ClassTier | null
-      granularParticipation: boolean
       scoringRulesMode?: string | null
       customScoringTables?: any | null
+      scheduledAt?: string | null
+      participantLimit?: number | null
+      maxConcurrentRaceParticipations?: number | null
     }) => {
       if (!authHeader) return
       setGlobalError(null)

@@ -8,10 +8,22 @@ interface EventSummaryTabProps {
   selectedEvent: eventmanager.EventDetail
 }
 
+import { formatLocalDateTime } from '../lib/datetime'
+
 export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
   return (
     <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
       <div className={styles.summaryGrid}>
+        {selectedEvent.scheduledAt && (
+          <div>
+            <p className={styles.titleCaps}>Scheduled Time</p>
+            <p className={styles.bodyRegular}>
+              <time dateTime={selectedEvent.scheduledAt}>
+                <strong>{formatLocalDateTime(selectedEvent.scheduledAt)}</strong>
+              </time>
+            </p>
+          </div>
+        )}
         <div>
           <p className={styles.titleCaps}>Description</p>
           <p className={styles.bodyRegular}>

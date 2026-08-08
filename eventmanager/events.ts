@@ -50,6 +50,9 @@ export interface EventListItem {
   classRestriction: ClassTier | null;
   granularParticipation: boolean;
   signupsLocked: boolean;
+  scheduledAt: string | null;
+  participantLimit: number | null;
+  maxConcurrentRaceParticipations: number | null;
   raceCount: number;
   memberCount: number;
   createdAt: string;
@@ -105,6 +108,8 @@ export interface RaceEventMemberView {
   classTier: ClassTier | null;
 }
 
+import { parseOptionalPositiveInt, ERROR_CODES } from "./participation-limits";
+
 export interface RaceEventView {
   id: string;
   name: string;
@@ -117,6 +122,7 @@ export interface RaceEventView {
   classRestriction: ClassTier | null;
   startsAt: string | null;
   endsAt: string | null;
+  participantLimit: number | null;
   members: RaceEventMemberView[];
 }
 
@@ -135,6 +141,9 @@ export interface EventDetail {
   classRestriction: ClassTier | null;
   granularParticipation: boolean;
   signupsLocked: boolean;
+  scheduledAt: string | null;
+  participantLimit: number | null;
+  maxConcurrentRaceParticipations: number | null;
   raceEvents: RaceEventView[];
   members: EventMemberView[];
   schedules: EventScheduleView[];
@@ -156,6 +165,9 @@ interface CreateEventParams {
   customScoringTables?: any | null;
   classRestriction?: ClassTier | null;
   granularParticipation?: boolean;
+  scheduledAt?: string | null;
+  participantLimit?: number | null;
+  maxConcurrentRaceParticipations?: number | null;
 }
 
 // Creates an event owned by either an organization or a single user (issue #4).
@@ -219,6 +231,20 @@ export const createEvent = api(
       }
     }
 
+    const isGranular = params.granularParticipation ?? false;
+    const participantLimitParsed = parseOptionalPositiveInt(params.participantLimit, "participantLimit");
+    const maxConcurrentRaceParticipationsParsed = parseOptionalPositiveInt(params.maxConcurrentRaceParticipations, "maxConcurrentRaceParticipations");
+
+    if (isGranular) {
+      if (participantLimitParsed !== undefined && participantLimitParsed !== null) {
+        throw APIError.invalidArgument("Granular events cannot have an event-level participant limit");
+      }
+    } else {
+      if (maxConcurrentRaceParticipationsParsed !== undefined && maxConcurrentRaceParticipationsParsed !== null) {
+        throw APIError.invalidArgument("Regular events cannot have a maxConcurrentRaceParticipations limit");
+      }
+    }
+
     const event = await prisma.event.create({
       data: {
         id: randomUUID(),
@@ -231,7 +257,10 @@ export const createEvent = api(
         scoringRulesMode,
         customScoringTables,
         classRestriction: params.classRestriction ?? null,
-        granularParticipation: params.granularParticipation ?? false,
+        granularParticipation: isGranular,
+        scheduledAt: params.scheduledAt ? new Date(params.scheduledAt) : null,
+        participantLimit: participantLimitParsed ?? null,
+        maxConcurrentRaceParticipations: maxConcurrentRaceParticipationsParsed ?? null,
       },
     });
 
@@ -267,6 +296,9 @@ function toListItem(event: any): EventListItem {
     classRestriction: event.classRestriction,
     granularParticipation: event.granularParticipation,
     signupsLocked: event.signupsLocked,
+    scheduledAt: event.scheduledAt ? event.scheduledAt.toISOString() : null,
+    participantLimit: event.participantLimit,
+    maxConcurrentRaceParticipations: event.maxConcurrentRaceParticipations,
     raceCount: event._count?.raceEvents ?? 0,
     memberCount: event._count?.members ?? 0,
     createdAt: event.createdAt.toISOString(),
@@ -598,6 +630,9 @@ export async function loadEvent(id: string): Promise<EventDetail> {
     classRestriction: event.classRestriction,
     granularParticipation: event.granularParticipation,
     signupsLocked: event.signupsLocked,
+    scheduledAt: event.scheduledAt ? event.scheduledAt.toISOString() : null,
+    participantLimit: event.participantLimit,
+    maxConcurrentRaceParticipations: event.maxConcurrentRaceParticipations,
     raceEvents: event.raceEvents.map((race) => ({
       id: race.id,
       name: race.name,
@@ -610,6 +645,7 @@ export async function loadEvent(id: string): Promise<EventDetail> {
       classRestriction: race.classRestriction,
       startsAt: race.startsAt ? race.startsAt.toISOString() : null,
       endsAt: race.endsAt ? race.endsAt.toISOString() : null,
+      participantLimit: race.participantLimit,
       members: race.raceMembers
         ? race.raceMembers.map((rm) => ({
             userId: rm.userId,

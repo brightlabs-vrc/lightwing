@@ -17,6 +17,8 @@ export interface RaceEventMemberView {
 // type (free-text) and location. Authorization for every mutation is delegated
 // to the parent event via requireEventPermission, so both organization-owned
 // and user-owned events (and site admins) are handled uniformly.
+import { parseOptionalPositiveInt, assertLimitCanBeReduced, ERROR_CODES } from "./participation-limits";
+
 export interface RaceEventDetail {
   id: string;
   eventId: string;
@@ -30,6 +32,7 @@ export interface RaceEventDetail {
   classRestriction: ClassTier | null;
   startsAt: string | null;
   endsAt: string | null;
+  participantLimit: number | null;
   createdAt: string;
   updatedAt: string;
   members: RaceEventMemberView[];
@@ -48,6 +51,7 @@ interface CreateRaceEventParams {
   classRestriction?: ClassTier | null;
   startsAt?: string | null;
   endsAt?: string | null;
+  participantLimit?: number | null;
 }
 
 // Adds a race to an event. Gated by event-update permission on the parent event.
@@ -59,6 +63,21 @@ export const createRaceEvent = api(
       eventId: params.eventId,
       action: "create",
     });
+
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+    });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
+    const participantLimitParsed = parseOptionalPositiveInt(params.participantLimit, "participantLimit");
+
+    if (participantLimitParsed !== undefined && participantLimitParsed !== null) {
+      if (!event.granularParticipation) {
+        throw APIError.invalidArgument("Race participant limit can only be configured for granular events");
+      }
+    }
 
     const maxRace = await prisma.raceEvent.findFirst({
       where: { eventId: params.eventId },
@@ -81,6 +100,7 @@ export const createRaceEvent = api(
         classRestriction: params.classRestriction ?? null,
         startsAt: params.startsAt ? new Date(params.startsAt) : null,
         endsAt: params.endsAt ? new Date(params.endsAt) : null,
+        participantLimit: participantLimitParsed ?? null,
       },
     });
 
@@ -235,6 +255,7 @@ interface UpdateRaceEventParams {
   classRestriction?: ClassTier | null;
   startsAt?: string | null;
   endsAt?: string | null;
+  participantLimit?: number | null;
 }
 
 // Updates a race's editable fields. Gated by event-update permission.
@@ -242,11 +263,38 @@ export const updateRaceEvent = api(
   { expose: true, auth: true, method: "PATCH", path: "/api/events/:eventId/races/:raceId" },
   async (params: UpdateRaceEventParams): Promise<RaceEventDetail> => {
     const existing = await requireRaceEvent(params.eventId, params.raceId);
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+    });
+    if (!event) {
+      throw APIError.notFound("event not found");
+    }
+
     await requireEventPermission(prisma, {
       authorization: params.authorization,
       eventId: params.eventId,
       action: "update",
     });
+
+    const participantLimitParsed = parseOptionalPositiveInt(params.participantLimit, "participantLimit");
+
+    if (participantLimitParsed !== undefined && participantLimitParsed !== null) {
+      if (!event.granularParticipation) {
+        throw APIError.invalidArgument("Race participant limit can only be configured for granular events");
+      }
+    }
+
+    if (participantLimitParsed !== undefined && participantLimitParsed !== null) {
+      const currentCount = await prisma.raceEventMember.count({
+        where: { raceEventId: params.raceId },
+      });
+      assertLimitCanBeReduced(
+        currentCount,
+        participantLimitParsed,
+        ERROR_CODES.PARTICIPANT_LIMIT_BELOW_CURRENT_ENROLLMENT,
+        "Participant limit cannot be lower than the current enrollment"
+      );
+    }
 
     let triggerRecomputation = false;
     if (params.grade !== undefined && params.grade !== existing.grade) {
@@ -277,6 +325,7 @@ export const updateRaceEvent = api(
             : params.endsAt
               ? new Date(params.endsAt)
               : null,
+        participantLimit: participantLimitParsed,
       },
     });
 
@@ -351,6 +400,7 @@ type RaceEventRow = {
   classRestriction: ClassTier | null;
   startsAt: Date | null;
   endsAt: Date | null;
+  participantLimit: number | null;
   createdAt: Date;
   updatedAt: Date;
   raceMembers?: {
@@ -376,6 +426,7 @@ function toRaceEventDetail(race: RaceEventRow): RaceEventDetail {
     classRestriction: race.classRestriction,
     startsAt: race.startsAt ? race.startsAt.toISOString() : null,
     endsAt: race.endsAt ? race.endsAt.toISOString() : null,
+    participantLimit: race.participantLimit,
     createdAt: race.createdAt.toISOString(),
     updatedAt: race.updatedAt.toISOString(),
     members: race.raceMembers
@@ -399,50 +450,87 @@ interface AddRaceMemberParams {
 export const addRaceEventMember = api(
   { expose: true, auth: true, method: "POST", path: "/api/events/:eventId/races/:raceId/members" },
   async ({ eventId, raceId, authorization, userId }: AddRaceMemberParams): Promise<RaceEventDetail> => {
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event) {
-      throw APIError.notFound("event not found");
-    }
-
-    await requireEventPermission(prisma, {
-      authorization,
-      eventId,
-      action: "update",
-    });
-
-    const race = await prisma.raceEvent.findUnique({ where: { id: raceId } });
-    if (!race || race.eventId !== eventId) {
-      throw APIError.notFound("race not found");
-    }
-
-    // User must be an event member first
-    const member = await prisma.eventMember.findUnique({
-      where: { eventId_userId: { eventId, userId } },
-    });
-    if (!member) {
-      throw APIError.failedPrecondition("user is not a member of this event");
-    }
-
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw APIError.notFound("user not found");
     }
 
-    // Enforce the race's class restriction (fall back to event restriction)
-    const targetRestriction = race.classRestriction ?? event.classRestriction;
-    if (!isEligible(user.classTier, targetRestriction)) {
-      throw APIError.failedPrecondition(
-        "participant class tier does not satisfy the race class restriction",
-      );
-    }
+    await prisma.$transaction(async (tx) => {
+      const event = await tx.event.findUnique({ where: { id: eventId } });
+      if (!event) {
+        throw APIError.notFound("event not found");
+      }
 
-    await prisma.raceEventMember.upsert({
-      where: { raceEventId_userId: { raceEventId: raceId, userId } },
-      create: { id: randomUUID(), raceEventId: raceId, userId },
-      update: {},
+      await requireEventPermission(tx, {
+        authorization,
+        eventId,
+        action: "update",
+      });
+
+      const race = await tx.raceEvent.findUnique({ where: { id: raceId } });
+      if (!race || race.eventId !== eventId) {
+        throw APIError.notFound("race not found");
+      }
+
+      // User must be an event member first
+      const member = await tx.eventMember.findUnique({
+        where: { eventId_userId: { eventId, userId } },
+      });
+      if (!member) {
+        throw APIError.failedPrecondition("user is not a member of this event");
+      }
+
+      // Enforce the race's class restriction (fall back to event restriction)
+      const targetRestriction = race.classRestriction ?? event.classRestriction;
+      if (!isEligible(user.classTier, targetRestriction)) {
+        throw APIError.failedPrecondition(
+          "participant class tier does not satisfy the race class restriction",
+        );
+      }
+
+      const existingRaceMember = await tx.raceEventMember.findUnique({
+        where: { raceEventId_userId: { raceEventId: raceId, userId } },
+      });
+
+      if (!existingRaceMember) {
+        // Enforce race limit
+        if (race.participantLimit !== null) {
+          const currentCount = await tx.raceEventMember.count({
+            where: { raceEventId: raceId },
+          });
+          if (currentCount >= race.participantLimit) {
+            throw new APIError("failed_precondition", "Race participant capacity has been reached", {
+              code: ERROR_CODES.RACE_PARTICIPANT_LIMIT_REACHED,
+              limit: race.participantLimit,
+              currentCount,
+            });
+          }
+        }
+
+        // Enforce maxConcurrentRaceParticipations limit
+        if (event.maxConcurrentRaceParticipations !== null) {
+          const currentJoinedCount = await tx.raceEventMember.count({
+            where: {
+              userId,
+              raceEvent: { eventId },
+            },
+          });
+          if (currentJoinedCount >= event.maxConcurrentRaceParticipations) {
+            throw new APIError("failed_precondition", "User maximum race enrollment count reached", {
+              code: ERROR_CODES.GRANULAR_USER_RACE_LIMIT_REACHED,
+              limit: event.maxConcurrentRaceParticipations,
+              currentCount: currentJoinedCount,
+            });
+          }
+        }
+
+        await tx.raceEventMember.create({
+          data: { id: randomUUID(), raceEventId: raceId, userId },
+        });
+      }
+
+      await ensureEventStandingsRow(tx, eventId, userId, event.scoringType);
     });
-
-    await ensureEventStandingsRow(prisma, eventId, userId, event.scoringType);
 
     await eventDetailCache.delete({ id: eventId });
     await publicEventsCache.delete({ key: PUBLIC_EVENTS_KEY });
@@ -553,63 +641,103 @@ interface JoinRaceEventParams {
 export const joinRaceEvent = api(
   { expose: true, auth: true, method: "POST", path: "/api/events/:eventId/races/:raceId/join" },
   async ({ eventId, raceId, authorization }: JoinRaceEventParams): Promise<RaceEventDetail> => {
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event) {
-      throw APIError.notFound("event not found");
-    }
-
-    if (event.signupsLocked) {
-      throw APIError.failedPrecondition("signups are locked for this event");
-    }
-
-    const race = await prisma.raceEvent.findUnique({ where: { id: raceId } });
-    if (!race || race.eventId !== eventId) {
-      throw APIError.notFound("race not found");
-    }
-
     // Resolve actor
     const actor = await resolveActor(prisma, authorization);
     const userId = actor.userId;
-
-    // Check if user is an event member
-    const member = await prisma.eventMember.findUnique({
-      where: { eventId_userId: { eventId, userId } },
-    });
-
-    // If user is not an event member and event does not allow granular participation, throw error
-    if (!member && !event.granularParticipation) {
-      throw APIError.failedPrecondition("user is not a member of this event");
-    }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw APIError.notFound("user not found");
     }
 
-    // Enforce class restriction
-    const targetRestriction = race.classRestriction ?? event.classRestriction;
-    if (!isEligible(user.classTier, targetRestriction)) {
-      throw APIError.failedPrecondition(
-        "participant class tier does not satisfy the race class restriction",
-      );
-    }
-
     await prisma.$transaction(async (tx) => {
-      if (!member && event.granularParticipation) {
-        await tx.eventMember.upsert({
-          where: { eventId_userId: { eventId, userId } },
-          create: { id: randomUUID(), eventId, userId },
-          update: {},
+      const event = await tx.event.findUnique({ where: { id: eventId } });
+      if (!event) {
+        throw APIError.notFound("event not found");
+      }
+
+      if (event.signupsLocked) {
+        throw APIError.failedPrecondition("signups are locked for this event");
+      }
+
+      const race = await tx.raceEvent.findUnique({ where: { id: raceId } });
+      if (!race || race.eventId !== eventId) {
+        throw APIError.notFound("race not found");
+      }
+
+      // Check if user is an event member
+      const member = await tx.eventMember.findUnique({
+        where: { eventId_userId: { eventId, userId } },
+      });
+
+      // If user is not an event member and event does not allow granular participation, throw error
+      if (!member && !event.granularParticipation) {
+        throw APIError.failedPrecondition("user is not a member of this event");
+      }
+
+      // Enforce class restriction
+      const targetRestriction = race.classRestriction ?? event.classRestriction;
+      if (!isEligible(user.classTier, targetRestriction)) {
+        throw APIError.failedPrecondition(
+          "participant class tier does not satisfy the race class restriction",
+        );
+      }
+
+      const existingRaceMember = await tx.raceEventMember.findUnique({
+        where: { raceEventId_userId: { raceEventId: raceId, userId } },
+      });
+
+      if (!existingRaceMember) {
+        // Enforce race limit
+        if (race.participantLimit !== null) {
+          const currentCount = await tx.raceEventMember.count({
+            where: { raceEventId: raceId },
+          });
+          if (currentCount >= race.participantLimit) {
+            throw new APIError("failed_precondition", "Race participant capacity has been reached", {
+              code: ERROR_CODES.RACE_PARTICIPANT_LIMIT_REACHED,
+              limit: race.participantLimit,
+              currentCount,
+            });
+          }
+        }
+
+        // Enforce maxConcurrentRaceParticipations limit
+        if (event.maxConcurrentRaceParticipations !== null) {
+          const currentJoinedCount = await tx.raceEventMember.count({
+            where: {
+              userId,
+              raceEvent: { eventId },
+            },
+          });
+          if (currentJoinedCount >= event.maxConcurrentRaceParticipations) {
+            throw new APIError("failed_precondition", "User maximum race enrollment count reached", {
+              code: ERROR_CODES.GRANULAR_USER_RACE_LIMIT_REACHED,
+              limit: event.maxConcurrentRaceParticipations,
+              currentCount: currentJoinedCount,
+            });
+          }
+        }
+
+        if (!member && event.granularParticipation) {
+          // If we auto-join event, we also need to respect event participantLimit?
+          // Actually, the objective says:
+          // participant capacity:
+          //   - regular events: one capacity for the entire event;
+          //   - granular events: a separate capacity for each race.
+          // Wait, does event.participantLimit apply for granular events? No, we validate that
+          // granular events cannot have event-level participantLimit. So we can just join cleanly.
+          await tx.eventMember.create({
+            data: { id: randomUUID(), eventId, userId },
+          });
+        }
+
+        await tx.raceEventMember.create({
+          data: { id: randomUUID(), raceEventId: raceId, userId },
         });
       }
 
       await ensureEventStandingsRow(tx, eventId, userId, event.scoringType);
-
-      await tx.raceEventMember.upsert({
-        where: { raceEventId_userId: { raceEventId: raceId, userId } },
-        create: { id: randomUUID(), raceEventId: raceId, userId },
-        update: {},
-      });
     });
 
     await eventDetailCache.delete({ id: eventId });
