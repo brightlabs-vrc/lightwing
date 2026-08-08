@@ -4,17 +4,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { requireAuth } from '../../lib/auth-guard'
 import { getMyProfile, updateMyProfile } from '../../lib/public-api'
-import {
-  PixelContainer,
-  PixelStack,
-  PixelCard,
-  PixelInput,
-  PixelTextarea,
-  PixelButton,
-  PixelSectionHeader,
-  PixelAlert,
-  useToast,
-} from '@pxlkit/ui-kit'
+import { useNotification } from '../../hooks/useNotification'
+import { Heading, Text, Button, TextInput, FormControl, Textarea, Spinner } from '@primer/react'
 
 export const Route = createFileRoute('/profile/')({
   beforeLoad: async ({ location }) => {
@@ -25,7 +16,7 @@ export const Route = createFileRoute('/profile/')({
 
 function ProfilePage() {
   const { session } = useAuth()
-  const { toast } = useToast()
+  const { addToast } = useNotification()
   const [biography, setBiography] = useState('')
   const [careerOverview, setCareerOverview] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
@@ -37,7 +28,6 @@ function ProfilePage() {
     enabled: !!session,
   })
 
-  // Initialize form values when profile loads
   useEffect(() => {
     if (profile) {
       setBiography(profile.biography ?? '')
@@ -60,84 +50,123 @@ function ProfilePage() {
         `Bearer ${session?.session.token ?? ''}`,
       ),
     onSuccess: () => {
-      toast({ tone: 'green', title: 'Profile updated successfully!' })
+      addToast({ severity: 'success', message: 'Profile updated successfully!' })
     },
+    onError: (err) => {
+      addToast({ severity: 'error', message: err instanceof Error ? err.message : 'Failed to update profile' })
+    }
   })
 
   if (isLoading) {
     return (
-      <PixelContainer maxWidth="md" padding="md">
-        <PixelAlert tone="neutral" message="LOADING PROFILE..." />
-      </PixelContainer>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', gap: '0.5rem', color: '#57606a' }}>
+        <Spinner size="medium" />
+        <span>Loading Profile...</span>
+      </div>
     )
   }
 
+  const handleSave = () => {
+    const trimmedSlug = slug.trim()
+    if (trimmedSlug && (trimmedSlug.length < 4 || trimmedSlug.length > 24)) {
+      addToast({ severity: 'error', message: 'Slug must be between 4 and 24 characters.' })
+      return
+    }
+    if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
+      addToast({ severity: 'error', message: 'Slug must contain only lowercase letters and numbers.' })
+      return
+    }
+    updateMutation.mutate({ biography, careerOverview, vrchatUsername, slug: trimmedSlug })
+  }
+
   return (
-    <PixelContainer maxWidth="md" padding="md">
-      <PixelSectionHeader title="EDIT PROFILE" titleTone="purple" size="lg" className="mb-6" />
+    <div style={{ maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <Heading as="h1" style={{ fontSize: '28px', color: 'var(--color-accent-fg)', margin: 0 }}>
+        Edit Profile
+      </Heading>
 
-      <PixelCard className="">
-        <PixelStack gap={5}>
-          {updateMutation.isError && (
-            <PixelAlert tone="red" message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update profile'} />
-          )}
+      <div style={{
+        backgroundColor: 'var(--color-canvas-default)',
+        border: '1px solid var(--color-border-default)',
+        borderRadius: '8px',
+        padding: '2rem',
+        boxShadow: 'var(--color-shadow-small)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.5rem'
+      }}>
+        {updateMutation.isError && (
+          <div style={{
+            backgroundColor: 'var(--color-danger-subtle)',
+            border: '1px solid var(--color-danger-border)',
+            borderRadius: '6px',
+            padding: '1rem',
+            color: 'var(--color-danger-fg)',
+            fontSize: '14px'
+          }}>
+            {updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update profile'}
+          </div>
+        )}
 
-          <PixelInput label="NAME" value={profile?.name ?? ''} disabled />
+        <FormControl disabled>
+          <FormControl.Label style={{ fontWeight: 'bold' }}>Name</FormControl.Label>
+          <TextInput value={profile?.name ?? ''} disabled width="100%" />
+        </FormControl>
 
-          <PixelInput
-            label="HANDLE"
+        <FormControl>
+          <FormControl.Label style={{ fontWeight: 'bold' }}>Handle</FormControl.Label>
+          <TextInput
             placeholder="e.g. competitorhandle"
-            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters and numbers only)."
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
+            width="100%"
           />
+          <FormControl.Caption>
+            Your unique Handle must be between 4 and 24 characters (lowercase letters and numbers only).
+          </FormControl.Caption>
+        </FormControl>
 
-          <PixelTextarea
-            label="BIOGRAPHY"
-            rows={3}
+        <FormControl>
+          <FormControl.Label style={{ fontWeight: 'bold' }}>Biography</FormControl.Label>
+          <Textarea
+            rows={4}
             value={biography}
             onChange={(e) => setBiography(e.target.value)}
             placeholder="Tell us about yourself..."
+            style={{ width: '100%' }}
           />
+        </FormControl>
 
-          <PixelTextarea
-            label="CAREER OVERVIEW"
-            rows={3}
+        <FormControl>
+          <FormControl.Label style={{ fontWeight: 'bold' }}>Career Overview</FormControl.Label>
+          <Textarea
+            rows={4}
             value={careerOverview}
             onChange={(e) => setCareerOverview(e.target.value)}
             placeholder="Summarize your competitive career..."
+            style={{ width: '100%' }}
           />
+        </FormControl>
 
-          <PixelInput
-            label="VRCHAT USERNAME"
+        <FormControl>
+          <FormControl.Label style={{ fontWeight: 'bold' }}>VRChat Username</FormControl.Label>
+          <TextInput
             placeholder="e.g. user123"
             value={vrchatUsername}
             onChange={(e) => setVrchatUsername(e.target.value)}
+            width="100%"
           />
+        </FormControl>
 
-          <PixelButton
-            variant="solid"
-            tone="purple"
-            className="w-full"
-            loading={updateMutation.isPending}
-            disabled={updateMutation.isPending}
-            onClick={() => {
-              const trimmedSlug = slug.trim()
-              if (trimmedSlug && (trimmedSlug.length < 4 || trimmedSlug.length > 24)) {
-                toast({ tone: 'red', title: 'Slug must be between 4 and 24 characters.' })
-                return
-              }
-              if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
-                toast({ tone: 'red', title: 'Slug must contain only lowercase letters and numbers.' })
-                return
-              }
-              updateMutation.mutate({ biography, careerOverview, vrchatUsername, slug: trimmedSlug })
-            }}
-          >
-            {updateMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}
-          </PixelButton>
-        </PixelStack>
-      </PixelCard>
-    </PixelContainer>
+        <Button
+          variant="primary"
+          onClick={handleSave}
+          disabled={updateMutation.isPending}
+          style={{ width: '100%', padding: '12px' }}
+        >
+          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </div>
+    </div>
   )
 }

@@ -1,68 +1,15 @@
-@import "tailwindcss";
-@import "@pxlkit/ui-kit/styles.css";
+/* Cleaned up global stylesheet for Lightwing adopting Primer */
 
-/* Tell Tailwind to scan the pxlkit package for its utility classes */
-@source "../node_modules/@pxlkit/ui-kit";
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
 
 table {
   border-collapse: collapse;
-}
-
-td,
-th {
-  border-style: solid;
-}
-
-.site-header-container {
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-}
-
-.site-header-inner {
-  min-height: 2.75rem;
-}
-
-.site-brand {
-  flex-shrink: 0;
-}
-
-.site-nav {
-  min-width: 0;
-  row-gap: 0.25rem;
-}
-
-.site-account {
-  flex-shrink: 0;
-}
-
-@media (max-width: 639px) {
-  .site-header-inner {
-    align-items: flex-start;
-    row-gap: 0.5rem;
-  }
-
-  .site-brand {
-    flex-basis: 100%;
-  }
-
-  .site-nav {
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
-
-.public-table {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.public-table table {
-  min-width: 32rem;
-}
-
-/* Neutralize the pxlkit pixel-surface offset shadow on buttons (illegible on text) */
-.pxl-btn-flat {
-  filter: none !important;
 }
 
 /* Hide number input spinners inside standings table */
@@ -75,20 +22,35 @@ th {
   -moz-appearance: textfield;
 }
 
-/* Custom overrides for toast notifications to allow long error messages to display fully */
-[data-pxl-toast] {
-  max-width: 36rem !important; /* Increase width from max-w-sm (24rem) to 36rem for better readability of long errors */
-  width: calc(100vw - 2rem) !important; /* Safe padding on viewport edge on mobile devices */
+/* Toast container style overrides */
+.lightwing-toast-container {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
 }
 
 @media (min-width: 640px) {
-  [data-pxl-toast] {
-    width: 36rem !important;
+  .lightwing-toast-container {
+    top: 1rem;
+    right: 1rem;
+    max-width: 36rem;
+    width: 36rem;
   }
 }
 
-[data-pxl-toast] p.truncate {
-  white-space: normal !important;
-  overflow: visible !important;
-  text-overflow: unset !important;
+@media (max-width: 639px) {
+  .lightwing-toast-container {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+    width: calc(100vw - 2rem);
+  }
+}
+
+.lightwing-toast-item {
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }

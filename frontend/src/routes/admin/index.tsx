@@ -2,6 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
+import { Heading, Text, Label, Button } from '@primer/react'
 
 export const Route = createFileRoute('/admin/')({
   beforeLoad: async ({ location }) => {
@@ -18,127 +19,130 @@ function AdminPage() {
       title="Admin Dashboard"
       subtitle="Welcome to the Project Lightwing control center. Oversee system entities, manage dynamic event results, and verify ingestion pipelines."
     >
-      <div className="slds-grid slds-wrap slds-gutters">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Active Session summary card */}
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_large">
-          <article className="slds-card" style={{ border: '1px solid #dddbda', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-user" style={{ fontSize: '18px' }}>👤</span>
-                </div>
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.05rem', fontWeight: 'bold' }}>
-                      Active Administrator Session
-                    </span>
-                  </h2>
-                </div>
-              </header>
+        <div style={{
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '6px',
+          backgroundColor: 'var(--color-canvas-default)',
+          boxShadow: 'var(--color-shadow-small)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '20px' }}>👤</span>
+            <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
+              Active Administrator Session
+            </Heading>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
+            <div>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Name</span>
+              <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.name}</span>
             </div>
-            <div className="slds-card__body slds-card__body_inner">
-              <div className="slds-grid slds-wrap" style={{ gap: '24px' }}>
-                <div>
-                  <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Name</p>
-                  <p className="slds-text-body_regular font-medium" style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.name}</p>
-                </div>
-                <div>
-                  <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Authorization Role</p>
-                  <span className="slds-badge slds-theme_success" style={{ padding: '2px 10px', fontSize: '11px', borderRadius: '4px', background: '#2e7d32', color: '#fff' }}>
-                    {session?.user.siteRole ?? 'SITE_ADMIN'}
-                  </span>
-                </div>
-              </div>
+            <div>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Authorization Role</span>
+              <Label variant="success">
+                {session?.user.siteRole ?? 'SITE_ADMIN'}
+              </Label>
             </div>
-          </article>
+          </div>
         </div>
 
         {/* Section Cards */}
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
-          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-event" style={{ fontSize: '20px' }}>🏆</span>
-                </div>
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                      Events & Race Management
-                    </span>
-                  </h2>
-                </div>
-              </header>
-            </div>
-            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
-              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '1.5rem'
+        }}>
+          {/* Events */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-canvas-default)',
+            boxShadow: 'var(--color-shadow-small)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ padding: '1.5rem', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '24px' }}>🏆</span>
+                <Heading as="h3" style={{ fontSize: '18px', margin: 0 }}>
+                  Events & Race Management
+                </Heading>
+              </div>
+              <span style={{ color: '#57606a', fontSize: '14px', lineHeight: '1.5' }}>
                 View complete details for competition events. Register event participants, configure race events, and update race results in real-time or batch format.
-              </p>
+              </span>
             </div>
-            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
-              <Link to="/admin/events" className="slds-button slds-button_brand" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
+              <Button as={Link} to="/admin/events" variant="primary" style={{ width: '100%', textAlign: 'center' }}>
                 Manage Events
-              </Link>
-            </footer>
-          </article>
-        </div>
-
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
-          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-people" style={{ fontSize: '20px' }}>👥</span>
-                </div>
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                      User Administration
-                    </span>
-                  </h2>
-                </div>
-              </header>
+              </Button>
             </div>
-            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
-              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+          </div>
+
+          {/* Users */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-canvas-default)',
+            boxShadow: 'var(--color-shadow-small)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ padding: '1.5rem', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '24px' }}>👥</span>
+                <Heading as="h3" style={{ fontSize: '18px', margin: 0 }}>
+                  User Administration
+                </Heading>
+              </div>
+              <span style={{ color: '#57606a', fontSize: '14px', lineHeight: '1.5' }}>
                 Lookup platform user accounts, view skill class tier parameters, check team affiliations, and modify administrative system access.
-              </p>
+              </span>
             </div>
-            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
-              <Link to="/admin/users" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
+              <Button as={Link} to="/admin/users" style={{ width: '100%', textAlign: 'center' }}>
                 Manage Users
-              </Link>
-            </footer>
-          </article>
-        </div>
+              </Button>
+            </div>
+          </div>
 
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
-          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
-                  <span className="slds-icon_container slds-icon-standard-groups" style={{ fontSize: '20px' }}>👥</span>
-                </div>
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                      Teams & Organizations
-                    </span>
-                  </h2>
-                </div>
-              </header>
-            </div>
-            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
-              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+          {/* Teams */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-canvas-default)',
+            boxShadow: 'var(--color-shadow-small)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ padding: '1.5rem', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '24px' }}>🛡️</span>
+                <Heading as="h3" style={{ fontSize: '18px', margin: 0 }}>
+                  Teams & Organizations
+                </Heading>
+              </div>
+              <span style={{ color: '#57606a', fontSize: '14px', lineHeight: '1.5' }}>
                 Register and oversee competitive teams and organizations. Track demographics, update statistics, and manage team member rosters and roles.
-              </p>
+              </span>
             </div>
-            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
-              <Link to="/admin/teams" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
+              <Button as={Link} to="/admin/teams" style={{ width: '100%', textAlign: 'center' }}>
                 Manage Teams
-              </Link>
-            </footer>
-          </article>
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </AdminLayout>

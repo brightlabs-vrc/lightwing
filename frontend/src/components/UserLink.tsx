@@ -12,17 +12,20 @@ interface UserLinkProps {
 export const UserLink: React.FC<UserLinkProps> = ({
   userId,
   name,
-  className = '',
-  style,
   clickable = true,
+  style,
 }) => {
   if (clickable && userId) {
     return (
       <Link
         to="/admin/users/$userId"
         params={{ userId }}
-        className={`text-blue-600 hover:underline font-bold ${className}`}
-        style={style}
+        style={{
+          color: 'var(--color-accent-fg)',
+          fontWeight: 'bold',
+          textDecoration: 'underline',
+          ...style,
+        }}
       >
         {name}
       </Link>
@@ -30,7 +33,13 @@ export const UserLink: React.FC<UserLinkProps> = ({
   }
 
   return (
-    <span className={`text-slate-800 font-semibold ${className}`} style={style}>
+    <span
+      style={{
+        color: 'var(--color-fg-default)',
+        fontWeight: '600',
+        ...style,
+      }}
+    >
       {name}
     </span>
   )
