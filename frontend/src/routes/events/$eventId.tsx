@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
+import { formatLocalDateTime } from '../../lib/datetime'
 import {
   PixelContainer,
   PixelStack,
@@ -146,7 +147,14 @@ function EventDetailPage() {
       <PixelCard className="mb-6">
         <PixelStack gap={4}>
           <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
-            <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">{event.name}</h1>
+            <PixelStack gap={1}>
+              <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">{event.name}</h1>
+              {event.scheduledAt && (
+                <div className="font-pixel text-xs text-retro-gold">
+                  SCHEDULED: <time dateTime={event.scheduledAt}>{formatLocalDateTime(event.scheduledAt)}</time>
+                </div>
+              )}
+            </PixelStack>
             <PixelBadge tone={STATUS_TONE[event.status]}>{event.status.toUpperCase()}</PixelBadge>
           </PixelStack>
 
@@ -178,7 +186,7 @@ function EventDetailPage() {
                     variant="solid"
                     tone={isMember ? 'red' : 'green'}
                     className="pxl-btn-flat"
-                    disabled={isConcluded || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending}
+                    disabled={isConcluded || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending || (!isMember && event.participantLimit !== null && event.members.length >= event.participantLimit)}
                     loading={joinMutation.isPending || leaveMutation.isPending}
                     onClick={() => {
                       if (isConcluded) return
@@ -189,7 +197,7 @@ function EventDetailPage() {
                       }
                     }}
                   >
-                    {isMember ? 'WITHDRAW FROM EVENT' : 'SIGN UP FOR EVENT'}
+                    {isMember ? 'WITHDRAW FROM EVENT' : (event.participantLimit !== null && event.members.length >= event.participantLimit) ? 'EVENT FULL' : 'SIGN UP FOR EVENT'}
                   </PixelButton>
                   {event.signupsLocked && (
                     <div className="text-retro-muted font-pixel text-xs mt-2">
@@ -206,7 +214,11 @@ function EventDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
         {/* Participants Panel */}
         <div>
-          <PixelSectionHeader title={`PARTICIPANTS (${event.members.length})`} size="sm" spacing="tight" />
+          <PixelSectionHeader
+            title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit ? ` / ${event.participantLimit}` : ''})`}
+            size="sm"
+            spacing="tight"
+          />
           <PixelTable
             columns={participantColumns}
             data={event.members}
@@ -490,6 +502,11 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                     CLASS:{' '}
                     {race.classRestriction && race.classRestriction !== 'PRE_OP' && race.classRestriction !== 'OP' ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
                   </PixelBadge>
+                    {race.participantLimit !== null && (
+                      <PixelBadge tone="neutral">
+                        CAPACITY: {(race.members ?? []).length} / {race.participantLimit}
+                      </PixelBadge>
+                    )}
                   {event.granularParticipation && (
                     <>
                       {!session ? (
@@ -504,7 +521,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                           tone={isRaceMember ? 'red' : 'green'}
                           size="sm"
                           className="pxl-btn-flat font-pixel text-[10px]"
-                          disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
+                            disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending || (!isRaceMember && race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit)}
                           onClick={() => {
                             if (isRaceMember) {
                               leaveRaceMutation.mutate({ raceId: race.id })
@@ -513,7 +530,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                             }
                           }}
                         >
-                          {isRaceMember ? 'WITHDRAW' : 'SIGN UP'}
+                            {isRaceMember ? 'WITHDRAW' : (race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit) ? 'FULL' : 'SIGN UP'}
                         </PixelButton>
                       )}
                     </>

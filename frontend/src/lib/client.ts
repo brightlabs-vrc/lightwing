@@ -336,6 +336,9 @@ export namespace eventmanager {
         customScoringTables?: any
         classRestriction?: ClassTier | null
         granularParticipation?: boolean
+        scheduledAt?: string | null
+        participantLimit?: number | null
+        maxConcurrentRaceParticipations?: number | null
     }
 
     export interface CreateRaceEventParams {
@@ -350,6 +353,7 @@ export namespace eventmanager {
         classRestriction?: ClassTier | null
         startsAt?: string | null
         endsAt?: string | null
+        participantLimit?: number | null
     }
 
     export type DatasetStatus = "PENDING" | "RUNNING" | "DONE" | "FAILED"
@@ -412,6 +416,9 @@ export namespace eventmanager {
         classRestriction: ClassTier | null
         granularParticipation: boolean
         signupsLocked: boolean
+        scheduledAt: string | null
+        participantLimit: number | null
+        maxConcurrentRaceParticipations: number | null
         raceEvents: RaceEventView[]
         members: EventMemberView[]
         schedules: EventScheduleView[]
@@ -434,6 +441,9 @@ export namespace eventmanager {
         classRestriction: ClassTier | null
         granularParticipation: boolean
         signupsLocked: boolean
+        scheduledAt: string | null
+        participantLimit: number | null
+        maxConcurrentRaceParticipations: number | null
         raceCount: number
         memberCount: number
         createdAt: string
@@ -542,6 +552,7 @@ export namespace eventmanager {
         classRestriction: ClassTier | null
         startsAt: string | null
         endsAt: string | null
+        participantLimit: number | null
         createdAt: string
         updatedAt: string
         members: RaceEventMemberView[]
@@ -571,6 +582,7 @@ export namespace eventmanager {
         classRestriction: ClassTier | null
         startsAt: string | null
         endsAt: string | null
+        participantLimit: number | null
         members: RaceEventMemberView[]
     }
 
@@ -665,7 +677,9 @@ export namespace eventmanager {
         scoringRulesMode?: string | null
         customScoringTables?: any
         classRestriction?: any
-        granularParticipation?: boolean
+        scheduledAt?: string | null
+        participantLimit?: number | null
+        maxConcurrentRaceParticipations?: number | null
     }
 
     export interface UpdateRaceEventParams {
@@ -680,6 +694,7 @@ export namespace eventmanager {
         classRestriction?: ClassTier | null
         startsAt?: string | null
         endsAt?: string | null
+        participantLimit?: number | null
     }
 
     export class ServiceClient {
@@ -875,16 +890,19 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                classRestriction:      params.classRestriction,
-                customScoringTables:   params.customScoringTables,
-                description:           params.description,
-                granularParticipation: params.granularParticipation,
-                name:                  params.name,
-                organizationId:        params.organizationId,
-                ownerType:             params.ownerType,
-                ownerUserId:           params.ownerUserId,
-                scoringRulesMode:      params.scoringRulesMode,
-                scoringType:           params.scoringType,
+                classRestriction:                params.classRestriction,
+                customScoringTables:             params.customScoringTables,
+                description:                     params.description,
+                granularParticipation:           params.granularParticipation,
+                name:                            params.name,
+                organizationId:                  params.organizationId,
+                ownerType:                       params.ownerType,
+                ownerUserId:                     params.ownerUserId,
+                scoringRulesMode:                params.scoringRulesMode,
+                scoringType:                     params.scoringType,
+                scheduledAt:                     params.scheduledAt,
+                participantLimit:                params.participantLimit,
+                maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
             }
 
             // Now make the actual call to the API
@@ -913,6 +931,7 @@ export namespace eventmanager {
                 sequence:         params.sequence,
                 startsAt:         params.startsAt,
                 trackType:        params.trackType,
+                participantLimit: params.participantLimit,
             }
 
             // Now make the actual call to the API
@@ -1462,12 +1481,15 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                classRestriction:      params.classRestriction,
-                customScoringTables:   params.customScoringTables,
-                description:           params.description,
-                granularParticipation: params.granularParticipation,
-                name:                  params.name,
-                scoringRulesMode:      params.scoringRulesMode,
+                classRestriction:                params.classRestriction,
+                customScoringTables:             params.customScoringTables,
+                description:                     params.description,
+                granularParticipation:           params.granularParticipation,
+                name:                            params.name,
+                scoringRulesMode:                params.scoringRulesMode,
+                scheduledAt:                     params.scheduledAt,
+                participantLimit:                params.participantLimit,
+                maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
             }
 
             // Now make the actual call to the API
@@ -1496,6 +1518,7 @@ export namespace eventmanager {
                 sequence:         params.sequence,
                 startsAt:         params.startsAt,
                 trackType:        params.trackType,
+                participantLimit: params.participantLimit,
             }
 
             // Now make the actual call to the API

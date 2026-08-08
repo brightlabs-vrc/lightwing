@@ -163,6 +163,9 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       classRestriction: 'OP',
       granularParticipation: true,
       signupsLocked: false,
+      scheduledAt: null,
+      participantLimit: null,
+      maxConcurrentRaceParticipations: null,
       raceEvents: [
         {
           id: 'race_mock_001',
@@ -176,6 +179,7 @@ function loadMockEvents(): eventmanager.EventDetail[] {
           classRestriction: 'OP',
           startsAt: now,
           endsAt: now,
+          participantLimit: null,
           createdAt: now,
           updatedAt: now,
           members: [
@@ -195,6 +199,7 @@ function loadMockEvents(): eventmanager.EventDetail[] {
           classRestriction: null,
           startsAt: now,
           endsAt: now,
+          participantLimit: null,
           createdAt: now,
           updatedAt: now,
           members: [
@@ -231,6 +236,9 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       classRestriction: null,
       granularParticipation: false,
       signupsLocked: false,
+      scheduledAt: null,
+      participantLimit: null,
+      maxConcurrentRaceParticipations: null,
       raceEvents: [],
       members: [],
       schedules: [],

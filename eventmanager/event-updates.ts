@@ -6,6 +6,8 @@ import { invalidateEventCaches } from "./cache-utils";
 import { validateCustomScoringTables } from "./scoring";
 import { SCORING_POINTS } from "../lib/constants";
 
+import { parseOptionalPositiveInt, assertLimitCanBeReduced, ERROR_CODES } from "./participation-limits";
+
 interface UpdateEventParams {
   id: string;
   authorization: Header<"Authorization">;
@@ -14,7 +16,9 @@ interface UpdateEventParams {
   scoringRulesMode?: string | null;
   customScoringTables?: any | null;
   classRestriction?: any | null;
-  granularParticipation?: boolean;
+  scheduledAt?: string | null;
+  participantLimit?: number | null;
+  maxConcurrentRaceParticipations?: number | null;
 }
 
 // Updates an event's editable fields (scoring type is immutable once set).
@@ -30,6 +34,54 @@ export const updateEvent = api(
       eventId: params.id,
       action: "update",
     });
+
+    const participantLimitParsed = parseOptionalPositiveInt(params.participantLimit, "participantLimit");
+    const maxConcurrentRaceParticipationsParsed = parseOptionalPositiveInt(params.maxConcurrentRaceParticipations, "maxConcurrentRaceParticipations");
+
+    const isGranular = existingEvent.granularParticipation;
+
+    if (isGranular) {
+      if (participantLimitParsed !== undefined && participantLimitParsed !== null) {
+        throw APIError.invalidArgument("Granular events cannot have an event-level participant limit");
+      }
+    } else {
+      if (maxConcurrentRaceParticipationsParsed !== undefined && maxConcurrentRaceParticipationsParsed !== null) {
+        throw APIError.invalidArgument("Regular events cannot have a maxConcurrentRaceParticipations limit");
+      }
+    }
+
+    // Capacity checks before reducing a limit
+    if (!isGranular && participantLimitParsed !== undefined && participantLimitParsed !== null) {
+      const currentCount = await prisma.eventMember.count({
+        where: { eventId: params.id },
+      });
+      assertLimitCanBeReduced(
+        currentCount,
+        participantLimitParsed,
+        ERROR_CODES.PARTICIPANT_LIMIT_BELOW_CURRENT_ENROLLMENT,
+        "Participant limit cannot be lower than the current enrollment"
+      );
+    }
+
+    if (isGranular && maxConcurrentRaceParticipationsParsed !== undefined && maxConcurrentRaceParticipationsParsed !== null) {
+      // highest number of currently joined races for any user in this event
+      const rawCounts = await prisma.raceEventMember.groupBy({
+        by: ["userId"],
+        where: {
+          raceEvent: { eventId: params.id },
+        },
+        _count: {
+          raceEventId: true,
+        },
+      });
+      const maxJoined = rawCounts.reduce((max, group) => Math.max(max, group._count.raceEventId), 0);
+      assertLimitCanBeReduced(
+        maxJoined,
+        maxConcurrentRaceParticipationsParsed,
+        ERROR_CODES.PARTICIPANT_LIMIT_BELOW_CURRENT_ENROLLMENT,
+        "Max races limit cannot be lower than any member's current race enrollment count"
+      );
+    }
 
     let updatedScoringRulesMode: string | undefined = undefined;
     let updatedCustomScoringTables: any | undefined = undefined;
@@ -73,8 +125,9 @@ export const updateEvent = api(
         customScoringTables: updatedCustomScoringTables,
         classRestriction:
           params.classRestriction === undefined ? undefined : params.classRestriction,
-        granularParticipation:
-          params.granularParticipation === undefined ? undefined : params.granularParticipation,
+        scheduledAt: params.scheduledAt === undefined ? undefined : params.scheduledAt ? new Date(params.scheduledAt) : null,
+        participantLimit: participantLimitParsed,
+        maxConcurrentRaceParticipations: maxConcurrentRaceParticipationsParsed,
       },
     });
 
