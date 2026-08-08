@@ -54,3 +54,70 @@ table {
   pointer-events: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
+/*
+ * Primer design-system color variables.
+ *
+ * The @primer/react ThemeProvider injects data-color-mode="light|dark"
+ * attributes on a wrapping div. These CSS custom properties provide the
+ * GitHub-style color tokens that Primer components and inline styles
+ * reference via var(--color-*).
+ */
+
+/* Light theme color palette */
+[data-color-mode='light'],
+[data-color-mode='day'] {
+  --color-canvas-default: #ffffff;
+  --color-canvas-subtle: #f6f8fa;
+  --color-canvas-inset: #f6f8fa;
+  --color-canvas-overlay: #ffffff;
+  --color-fg-default: #1f2328;
+  --color-fg-muted: #656d76;
+  --color-fg-subtle: #6e7781;
+  --color-border-default: #d0d7de;
+  --color-border-muted: #d0d7de;
+  --color-accent-fg: #0969da;
+  --color-accent-emphasis: #0969da;
+  --color-accent-subtle: #ddf4ff;
+  --color-danger-fg: #cf222e;
+  --color-danger-border: #d3a6a6;
+  --color-danger-subtle: #ffebe9;
+  --color-success-fg: #116329;
+  --color-success-border: #a6f3c1;
+  --color-success-subtle: #dafbe1;
+  --color-attention-fg: #9a6700;
+  --color-attention-border: #d3a669;
+  --color-attention-subtle: #fff8c5;
+  --color-shadow-small: 0 1px 0 rgba(31, 35, 40, 0.04);
+  --color-shadow-medium: 0 3px 6px rgba(140, 149, 159, 0.15);
+  --color-shadow-large: 0 8px 24px rgba(140, 149, 159, 0.2);
+}
+
+/* Dark theme color palette */
+[data-color-mode='dark'],
+[data-color-mode='night'] {
+  --color-canvas-default: #0d1117;
+  --color-canvas-subtle: #161b22;
+  --color-canvas-inset: #1c2330;
+  --color-canvas-overlay: #161b22;
+  --color-fg-default: #c9d1d9;
+  --color-fg-muted: #8b949e;
+  --color-fg-subtle: #6e7781;
+  --color-border-default: #21262d;
+  --color-border-muted: #21262d;
+  --color-accent-fg: #54aeff;
+  --color-accent-emphasis: #54aeff;
+  --color-accent-subtle: #1f4588;
+  --color-danger-fg: #ff8080;
+  --color-danger-border: #4c2228;
+  --color-danger-subtle: #3f1f25;
+  --color-success-fg: #4ac26b;
+  --color-success-border: #2a5c3a;
+  --color-success-subtle: #1a3a2a;
+  --color-attention-fg: #d4a72c;
+  --color-attention-border: #5a3c0f;
+  --color-attention-subtle: #5a3c0f;
+  --color-shadow-small: 0 1px 0 rgba(1, 4, 9, 0.05);
+  --color-shadow-medium: 0 3px 6px rgba(136, 146, 157, 0.15);
+  --color-shadow-large: 0 8px 24px rgba(136, 146, 157, 0.2);
+}
