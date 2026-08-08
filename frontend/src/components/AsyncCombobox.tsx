@@ -36,7 +36,7 @@ export const AsyncCombobox: React.FC<AsyncComboboxProps> = ({
   const [loading, setLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const currentRequestIdRef = useRef(0)
 
   const [displayLabel, setDisplayLabel] = useState(selectedLabel || selectedValue || '')
