@@ -215,7 +215,7 @@ function EventDetailPage() {
         {/* Participants Panel */}
         <div>
           <PixelSectionHeader
-            title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit ? ` / ${event.participantLimit}` : ''})`}
+            title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit !== null ? ` / ${event.participantLimit}` : ''})`}
             size="sm"
             spacing="tight"
           />
