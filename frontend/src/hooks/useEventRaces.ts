@@ -14,6 +14,7 @@ export interface NewRaceForm {
   location: string
   classRestriction: eventmanager.ClassTier | null
   grade?: string
+  participantLimit?: number | null
 }
 
 interface UseEventRacesProps {
@@ -133,6 +134,7 @@ export function useEventRaces({
         location?: string
         classRestriction?: eventmanager.ClassTier | null
         grade?: string | null
+        participantLimit?: number | null
       }
     ) => {
       if (!authHeader) return

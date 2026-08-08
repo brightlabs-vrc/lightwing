@@ -44,6 +44,9 @@ function AdminEventsListPage() {
   const [formScoringType, setFormScoringType] = useState<number>(1)
   const [formClassRestriction, setFormClassRestriction] = useState<string>('')
   const [formGranularParticipation, setFormGranularParticipation] = useState(false)
+  const [formScheduledAt, setFormScheduledAt] = useState<string>('')
+  const [formParticipantLimit, setFormParticipantLimit] = useState<string>('')
+  const [formMaxConcurrentRaceParticipations, setFormMaxConcurrentRaceParticipations] = useState<string>('')
   const [formScoringRulesMode, setFormScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [submitting, setSubmitting] = useState(false)
@@ -82,6 +85,9 @@ function AdminEventsListPage() {
       setFormScoringType(1)
       setFormClassRestriction('')
       setFormGranularParticipation(false)
+      setFormScheduledAt('')
+      setFormParticipantLimit('')
+      setFormMaxConcurrentRaceParticipations('')
       setFormScoringRulesMode('STANDARD')
       setFormCustomScoringTables(DEFAULT_SCORING_TABLES)
     }
@@ -125,6 +131,19 @@ function AdminEventsListPage() {
       return
     }
 
+    const limitNum = formParticipantLimit.trim() ? Number(formParticipantLimit) : null
+    const maxConcurrentNum = formMaxConcurrentRaceParticipations.trim() ? Number(formMaxConcurrentRaceParticipations) : null
+
+    if (limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
+      setFormError('Participant limit must be a positive whole number.')
+      return
+    }
+
+    if (maxConcurrentNum !== null && (isNaN(maxConcurrentNum) || !Number.isSafeInteger(maxConcurrentNum) || maxConcurrentNum <= 0)) {
+      setFormError('Max races per participant must be a positive whole number.')
+      return
+    }
+
     setSubmitting(true)
     setFormError(null)
 
@@ -141,6 +160,9 @@ function AdminEventsListPage() {
           granularParticipation: formGranularParticipation,
           scoringRulesMode: formScoringType === 1 ? formScoringRulesMode : null,
           customScoringTables: (formScoringType === 1 && formScoringRulesMode === 'CUSTOM') ? formCustomScoringTables : null,
+          scheduledAt: formScheduledAt ? new Date(formScheduledAt).toISOString() : null,
+          participantLimit: formGranularParticipation ? null : limitNum,
+          maxConcurrentRaceParticipations: formGranularParticipation ? maxConcurrentNum : null,
         },
         authHeader,
       )
@@ -423,6 +445,23 @@ function AdminEventsListPage() {
                       </div>
                     )}
 
+                    {/* Optional Event Date/Time */}
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="event-scheduled-at">
+                        Scheduled Date / Time ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+                      </label>
+                      <div className="slds-form-element__control">
+                        <input
+                          id="event-scheduled-at"
+                          type="datetime-local"
+                          value={formScheduledAt}
+                          onChange={(e) => setFormScheduledAt(e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        />
+                      </div>
+                    </div>
+
                     {/* Granular Participation Toggle */}
                     <div className="slds-form-element slds-m-bottom_medium" style={{ display: 'flex', alignItems: 'center' }}>
                       <div className="slds-form-element__control">
@@ -432,7 +471,15 @@ function AdminEventsListPage() {
                             name="options"
                             id="granular-participation"
                             checked={formGranularParticipation}
-                            onChange={(e) => setFormGranularParticipation(e.target.checked)}
+                            onChange={(e) => {
+                              const checked = e.target.checked
+                              setFormGranularParticipation(checked)
+                              if (checked) {
+                                setFormParticipantLimit('')
+                              } else {
+                                setFormMaxConcurrentRaceParticipations('')
+                              }
+                            }}
                             style={{ marginRight: '8px' }}
                           />
                           <label className="slds-checkbox__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="granular-participation">
@@ -445,6 +492,51 @@ function AdminEventsListPage() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Capacity and Limits fields */}
+                    {!formGranularParticipation ? (
+                      <div className="slds-form-element slds-m-bottom_medium">
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="participant-limit">
+                          Participant limit
+                        </label>
+                        <div className="slds-form-element__control">
+                          <input
+                            id="participant-limit"
+                            type="number"
+                            min="1"
+                            placeholder="e.g. 20"
+                            value={formParticipantLimit}
+                            onChange={(e) => setFormParticipantLimit(e.target.value)}
+                            className="slds-input"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          />
+                        </div>
+                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
+                          Maximum participants for the whole event. Leave blank for unlimited.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="slds-form-element slds-m-bottom_medium">
+                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="max-concurrent-participations">
+                          Max races per participant
+                        </label>
+                        <div className="slds-form-element__control">
+                          <input
+                            id="max-concurrent-participations"
+                            type="number"
+                            min="1"
+                            placeholder="e.g. 3"
+                            value={formMaxConcurrentRaceParticipations}
+                            onChange={(e) => setFormMaxConcurrentRaceParticipations(e.target.value)}
+                            className="slds-input"
+                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                          />
+                        </div>
+                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
+                          Maximum races one participant may join in this event. Leave blank for unlimited.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Owner Parameters */}
                     <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>

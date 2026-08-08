@@ -600,3 +600,191 @@ describe("Granular Race Signup Persistence", () => {
     expect(loadedEvent.members.length).toBe(0);
   });
 });
+
+describe("Event Time and Participation Controls", () => {
+  test("optional event date/time schedule behaves correctly", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const adminToken = await createSession(creatorId);
+
+    const eventId = `event-${randomUUID()}`;
+    const isoString = "2026-12-25T18:00:00.000Z";
+    await prisma.event.create({
+      data: {
+        id: eventId,
+        name: "Scheduled Event",
+        ownerType: "USER",
+        ownerUserId: creatorId,
+        status: "UNOFFICIAL",
+        scoringType: 1,
+        scheduledAt: new Date(isoString),
+      },
+    });
+    createdEventIds.push(eventId);
+
+    const loaded = await getEvent({ id: eventId });
+    expect(loaded.scheduledAt).toBe(isoString);
+  });
+
+  test("rejects invalid, 0, fractional, and negative participant limit values", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const adminToken = await createSession(creatorId);
+
+    // Create Event API parameters validation
+    const eventId = `event-${randomUUID()}`;
+    await expect(
+      prisma.event.create({
+        data: {
+          id: eventId,
+          name: "Invalid limit event",
+          ownerType: "USER",
+          ownerUserId: creatorId,
+          scoringType: 1,
+          participantLimit: 0,
+        },
+      })
+    ).rejects.toThrow();
+
+    await expect(
+      prisma.event.create({
+        data: {
+          id: eventId,
+          name: "Invalid limit event",
+          ownerType: "USER",
+          ownerUserId: creatorId,
+          scoringType: 1,
+          participantLimit: -5,
+        },
+      })
+    ).rejects.toThrow();
+  });
+
+  test("regular event enforces participantLimit correctly", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const adminToken = await createSession(creatorId);
+
+    const eventId = `event-${randomUUID()}`;
+    await prisma.event.create({
+      data: {
+        id: eventId,
+        name: "Cap 2 Event",
+        ownerType: "USER",
+        ownerUserId: creatorId,
+        status: "UNOFFICIAL",
+        scoringType: 1,
+        participantLimit: 2,
+      },
+    });
+    createdEventIds.push(eventId);
+
+    const u1 = await createUser("u1", "User 1", "OP");
+    const u2 = await createUser("u2", "User 2", "OP");
+    const u3 = await createUser("u3", "User 3", "OP");
+
+    const t1 = await createSession(u1);
+    const t2 = await createSession(u2);
+    const t3 = await createSession(u3);
+
+    // Join 1st
+    await joinEvent({ id: eventId, authorization: `Bearer ${t1}` });
+    // Join 2nd
+    await joinEvent({ id: eventId, authorization: `Bearer ${t2}` });
+
+    // Join 3rd must fail
+    await expect(
+      joinEvent({ id: eventId, authorization: `Bearer ${t3}` })
+    ).rejects.toThrow(/capacity has been reached/);
+  });
+
+  test("granular race enforces participantLimit and maxConcurrentRaceParticipations correctly", async () => {
+    const creatorId = await createUser("creator", "Creator User");
+    const adminToken = await createSession(creatorId);
+
+    const eventId = `event-${randomUUID()}`;
+    await prisma.event.create({
+      data: {
+        id: eventId,
+        name: "Granular Cap Event",
+        ownerType: "USER",
+        ownerUserId: creatorId,
+        status: "UNOFFICIAL",
+        scoringType: 1,
+        granularParticipation: true,
+        maxConcurrentRaceParticipations: 2,
+      },
+    });
+    createdEventIds.push(eventId);
+
+    // Race 1 cap 2
+    const raceId1 = `race-${randomUUID()}`;
+    await prisma.raceEvent.create({
+      data: {
+        id: raceId1,
+        eventId,
+        name: "Race 1",
+        distanceMeters: 1200,
+        trackType: "Turf",
+        location: "Tokyo",
+        participantLimit: 2,
+      },
+    });
+
+    // Race 2 cap 2
+    const raceId2 = `race-${randomUUID()}`;
+    await prisma.raceEvent.create({
+      data: {
+        id: raceId2,
+        eventId,
+        name: "Race 2",
+        distanceMeters: 1200,
+        trackType: "Turf",
+        location: "Tokyo",
+        participantLimit: 2,
+      },
+    });
+
+    // Race 3
+    const raceId3 = `race-${randomUUID()}`;
+    await prisma.raceEvent.create({
+      data: {
+        id: raceId3,
+        eventId,
+        name: "Race 3",
+        distanceMeters: 1200,
+        trackType: "Turf",
+        location: "Tokyo",
+        participantLimit: null,
+      },
+    });
+
+    const u1 = await createUser("u1", "User 1", "OP");
+    const u2 = await createUser("u2", "User 2", "OP");
+    const u3 = await createUser("u3", "User 3", "OP");
+
+    const t1 = await createSession(u1);
+    const t2 = await createSession(u2);
+    const t3 = await createSession(u3);
+
+    // Join Race 1: user1, user2
+    await joinRaceEvent({ eventId, raceId: raceId1, authorization: `Bearer ${t1}` });
+    await joinRaceEvent({ eventId, raceId: raceId1, authorization: `Bearer ${t2}` });
+
+    // Join Race 1: user3 (must fail, capacity 2 reached)
+    await expect(
+      joinRaceEvent({ eventId, raceId: raceId1, authorization: `Bearer ${t3}` })
+    ).rejects.toThrow(/capacity has been reached/);
+
+    // Join Race 2: user1 (already has 1 race)
+    await joinRaceEvent({ eventId, raceId: raceId2, authorization: `Bearer ${t1}` });
+
+    // Join Race 3: user1 (already has 2 races, must fail concurrent cap of 2)
+    await expect(
+      joinRaceEvent({ eventId, raceId: raceId3, authorization: `Bearer ${t1}` })
+    ).rejects.toThrow(/User maximum race enrollment count reached/);
+
+    // Withdraw user1 from Race 1
+    await leaveRaceEvent({ eventId, raceId: raceId1, authorization: `Bearer ${t1}` });
+
+    // Join Race 3: user1 (now should succeed since they only have 1 active race registration)
+    await joinRaceEvent({ eventId, raceId: raceId3, authorization: `Bearer ${t1}` });
+  });
+});

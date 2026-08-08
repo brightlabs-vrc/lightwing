@@ -170,6 +170,9 @@ model Event {
   classRestriction ClassTier?
   granularParticipation Boolean @default(false)
   signupsLocked    Boolean        @default(false)
+  scheduledAt      DateTime?
+  participantLimit Int?
+  maxConcurrentRaceParticipations Int?
   createdAt        DateTime       @default(now()) @db.Timestamp(6)
   updatedAt        DateTime       @updatedAt @db.Timestamp(6)
   organization     Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -200,6 +203,7 @@ model RaceEvent {
   classRestriction ClassTier?
   startsAt         DateTime?  @db.Timestamp(6)
   endsAt           DateTime?  @db.Timestamp(6)
+  participantLimit Int?
   createdAt        DateTime   @default(now()) @db.Timestamp(6)
   updatedAt        DateTime   @updatedAt @db.Timestamp(6)
   event            Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)

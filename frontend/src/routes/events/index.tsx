@@ -4,6 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { listPublicEvents } from '../../lib/public-api'
 import { Pagination } from '../../components/Pagination'
+import { formatLocalDateTime } from '../../lib/datetime'
 import {
   PixelContainer,
   PixelStack,
@@ -120,6 +121,11 @@ function EventsPage() {
                           <h2 className="text-xl font-pixel tracking-wide text-retro-text">
                             {event.name}
                           </h2>
+                          {event.scheduledAt && (
+                            <div className="font-pixel text-[11px] text-retro-gold">
+                              SCHEDULED: {formatLocalDateTime(event.scheduledAt)}
+                            </div>
+                          )}
                           {event.description && (
                             <p className="text-base text-retro-muted max-w-2xl font-sans leading-relaxed">
                               {event.description}
