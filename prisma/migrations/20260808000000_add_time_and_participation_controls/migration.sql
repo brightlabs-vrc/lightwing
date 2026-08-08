@@ -21,6 +21,7 @@ WITH first_schedules AS (
         "eventId",
         "startsAt"
     FROM "event_schedule"
+    WHERE "startsAt" IS NOT NULL
     ORDER BY "eventId", "startsAt", "id"
 )
 UPDATE "event" AS event
