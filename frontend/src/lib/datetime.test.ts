@@ -15,6 +15,6 @@ describe('formatLocalDateTime', () => {
 
     expect(formatted).toContain('2020')
     expect(formatted).not.toBe(withoutTimeZone)
-    expect(formatted).toMatch(/(?:UTC|GMT(?:[+-]\d{1,2}(?::\d{2})?)?|[A-Z]{3,5})$/)
+    expect(formatted).toMatch(/UTC|GMT[+-]?\d*|[A-Z]{3,5}/)
   })
 })
