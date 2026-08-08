@@ -325,6 +325,9 @@ export async function listAdminEvents(
     classRestriction: e.classRestriction,
     granularParticipation: e.granularParticipation,
     signupsLocked: e.signupsLocked,
+    scheduledAt: e.scheduledAt,
+    participantLimit: e.participantLimit,
+    maxConcurrentRaceParticipations: e.maxConcurrentRaceParticipations,
     raceCount: e.raceEvents.length,
     memberCount: e.members.length,
     createdAt: e.createdAt,
@@ -455,7 +458,6 @@ export async function updateAdminEvent(
     name?: string
     description?: string | null
     classRestriction?: eventmanager.ClassTier | null
-    granularParticipation?: boolean
     scoringRulesMode?: string | null
     customScoringTables?: any | null
     scheduledAt?: string | null
@@ -470,7 +472,6 @@ export async function updateAdminEvent(
       name: params.name,
       description: params.description,
       classRestriction: params.classRestriction,
-      granularParticipation: params.granularParticipation,
       scoringRulesMode: params.scoringRulesMode,
       customScoringTables: params.customScoringTables,
       scheduledAt: params.scheduledAt,
@@ -486,7 +487,6 @@ export async function updateAdminEvent(
         name: params.name ?? evt.name,
         description: params.description !== undefined ? params.description : evt.description,
         classRestriction: params.classRestriction !== undefined ? params.classRestriction : evt.classRestriction,
-        granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : evt.granularParticipation,
         scoringRulesMode: params.scoringRulesMode !== undefined ? params.scoringRulesMode : evt.scoringRulesMode,
         customScoringTables: params.customScoringTables !== undefined ? params.customScoringTables : evt.customScoringTables,
         scheduledAt: params.scheduledAt !== undefined ? params.scheduledAt : evt.scheduledAt,
@@ -517,7 +517,6 @@ export async function updateAdminEvent(
       name: params.name ?? publicEvents[pubEvtIndex].name,
       description: params.description !== undefined ? params.description : publicEvents[pubEvtIndex].description,
       classRestriction: params.classRestriction !== undefined ? params.classRestriction : publicEvents[pubEvtIndex].classRestriction,
-      granularParticipation: params.granularParticipation !== undefined ? params.granularParticipation : publicEvents[pubEvtIndex].granularParticipation,
       scoringRulesMode: params.scoringRulesMode !== undefined ? params.scoringRulesMode : publicEvents[pubEvtIndex].scoringRulesMode,
       customScoringTables: params.customScoringTables !== undefined ? params.customScoringTables : publicEvents[pubEvtIndex].customScoringTables,
       updatedAt: new Date().toISOString()

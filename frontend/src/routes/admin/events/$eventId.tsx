@@ -162,7 +162,6 @@ function AdminEventDetailPage() {
       name: editName,
       description: editDescription || null,
       classRestriction: editClassRestriction || null,
-      granularParticipation: undefined, // Immutable, omit from payload
       scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
       participantLimit: editGranularParticipation ? null : limitNum,
       maxConcurrentRaceParticipations: editGranularParticipation ? maxConcurrentNum : null,

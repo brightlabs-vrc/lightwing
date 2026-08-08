@@ -1484,7 +1484,6 @@ export namespace eventmanager {
                 classRestriction:                params.classRestriction,
                 customScoringTables:             params.customScoringTables,
                 description:                     params.description,
-                granularParticipation:           params.granularParticipation,
                 name:                            params.name,
                 scoringRulesMode:                params.scoringRulesMode,
                 scheduledAt:                     params.scheduledAt,
