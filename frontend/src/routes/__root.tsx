@@ -53,9 +53,9 @@ function RootLayout() {
     <>
       <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
         <header className="border-b-2 border-retro-border-strong bg-retro-surface">
-          <PixelContainer maxWidth="full" padding="sm">
-            <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
-              <PixelButton asChild variant="ghost" tone="neutral">
+          <PixelContainer maxWidth="full" padding="sm" className="site-header-container">
+            <PixelStack direction="row" gap={4} align="center" justify="between" wrap className="site-header-inner">
+              <PixelButton asChild variant="ghost" tone="neutral" className="site-brand">
                 <Link to="/">
                   <PixelStack direction="row" gap={2} align="center">
                     <span className="font-pixel text-sm tracking-wider leading-none">LIGHTWING</span>
@@ -63,7 +63,7 @@ function RootLayout() {
                 </Link>
               </PixelButton>
 
-              <PixelStack direction="row" gap={2} align="center" wrap>
+              <PixelStack direction="row" gap={2} align="center" wrap className="site-nav">
                 <PixelButton asChild variant="ghost" tone="neutral" size="sm">
                   <Link to="/">HOME</Link>
                 </PixelButton>
@@ -81,7 +81,7 @@ function RootLayout() {
                 ) : null}
 
                 {!loading && session ? (
-                  <PixelStack direction="row" gap={2} align="center">
+                  <PixelStack direction="row" gap={2} align="center" className="site-account">
                     <PixelButton asChild variant="outline" tone="neutral" size="sm">
                       <Link to="/profile" title="Edit Profile">
                         {session.user.name.toUpperCase()}
