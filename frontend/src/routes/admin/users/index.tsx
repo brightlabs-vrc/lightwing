@@ -5,8 +5,9 @@ import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { listAdminUsers } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
-import { Pagination } from '../../../components/Pagination'
+import { PaginationBar } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
+import { Heading, Text, Label, Button, TextInput, FormControl, Spinner } from '@primer/react'
 import type { auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/')({
@@ -57,149 +58,127 @@ function AdminUsersPage() {
       title="User Account Directory"
       subtitle="Verify system competitor profiles, review site role authorization levels, and manage global system privileges."
     >
-      <div className="slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <article className="slds-card" style={{ border: '1px solid #dddbda' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Registered System Competitors
-                    </span>
-                  </h2>
-                </div>
-              </header>
-            </div>
+      <div style={{
+        border: '1px solid var(--color-border-default)',
+        borderRadius: '6px',
+        backgroundColor: 'var(--color-canvas-default)',
+        boxShadow: 'var(--color-shadow-small)',
+        overflow: 'hidden'
+      }}>
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border-default)' }}>
+          <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
+            Registered System Competitors
+          </Heading>
+        </div>
 
-            <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-              {/* Search Control */}
-              <div className="slds-form-element slds-m-bottom_large" style={{ maxWidth: '400px' }}>
-                <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="user-search-input">
-                  Search by Name
-                </label>
-                <div className="slds-form-element__control">
-                  <input
-                    id="user-search-input"
-                    value={search}
-                    onChange={(evt) => setSearch(evt.target.value)}
-                    placeholder="Search competitors..."
-                    className="slds-input"
-                    style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                  />
-                </div>
+        <div style={{ padding: '1.5rem' }}>
+          {/* Search Control */}
+          <div style={{ maxWidth: '400px', marginBottom: '1.5rem' }}>
+            <FormControl>
+              <FormControl.Label style={{ fontWeight: 'bold' }}>Search by Name</FormControl.Label>
+              <TextInput
+                value={search}
+                onChange={(evt) => {
+                  setSearch(evt.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search competitors..."
+                width="100%"
+              />
+            </FormControl>
+          </div>
+
+          {error && (
+            <div style={{ marginBottom: '1rem' }}>
+              <AlertBanner variant="error">{error}</AlertBanner>
+            </div>
+          )}
+
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.5rem', color: '#57606a' }}>
+              <Spinner size="small" />
+              <span>Loading competitor records...</span>
+            </div>
+          ) : users.length > 0 ? (
+            <>
+              <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px', marginBottom: '1rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                      <th style={{ padding: '12px', fontWeight: 'bold' }}>VRChat Username</th>
+                      <th style={{ padding: '12px', fontWeight: 'bold' }}>Discord Name</th>
+                      <th style={{ padding: '12px', fontWeight: 'bold' }}>Site Role</th>
+                      <th style={{ padding: '12px', fontWeight: 'bold' }}>Class Tier</th>
+                      <th style={{ padding: '12px', fontWeight: 'bold' }}>Team Affiliations</th>
+                      <th style={{ padding: '12px', fontWeight: 'bold' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user) => (
+                      <tr key={user.id} style={{ borderBottom: '1px solid #d0d7de' }}>
+                        <td style={{ padding: '12px', fontWeight: 'bold' }}>
+                          <UserLink userId={user.id} name={user.vrchatUsername || '—'} />
+                          {user.id === session?.user.id && (
+                            <Label variant="default" style={{ marginLeft: '8px' }}>
+                              You
+                            </Label>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px' }}>{user.name}</td>
+                        <td style={{ padding: '12px' }}>
+                          <Label variant={user.siteRole === 'SITE_ADMIN' ? 'success' : 'default'}>
+                            {user.siteRole}
+                          </Label>
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          {!user.classTier || user.classTier === 'PRE_OP' || user.classTier === 'OP' ? 'None' : user.classTier}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          {user.teams.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {user.teams.map((t) => (
+                                <Label key={t.organizationId} variant="accent">
+                                  {t.name} ({t.role})
+                                </Label>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ color: '#8c959f' }}>None</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <Button
+                            size="small"
+                            onClick={() => navigate({ to: '/admin/users/$userId', params: { userId: user.id } })}
+                          >
+                            Manage
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
-              {error && (
-                <div className="slds-m-bottom_medium">
-                  <AlertBanner variant="error">{error}</AlertBanner>
-                </div>
-              )}
-
-              {loading ? (
-                <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-                  <p>Loading competitor records...</p>
-                </div>
-              ) : users.length > 0 ? (
-                <>
-                  <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Competitors Directory Table" style={{ width: '100%' }}>
-                      <thead>
-                        <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '200px' }}>
-                            <div className="slds-truncate font-bold" title="VRChat Username" style={{ fontWeight: 'bold' }}>VRChat Username</div>
-                          </th>
-                          <th scope="col" style={{ width: '200px' }}>
-                            <div className="slds-truncate font-bold" title="Discord Name" style={{ fontWeight: 'bold' }}>Discord Name</div>
-                          </th>
-                          <th scope="col" style={{ width: '150px' }}>
-                            <div className="slds-truncate font-bold" title="Site Role" style={{ fontWeight: 'bold' }}>Site Role</div>
-                          </th>
-                          <th scope="col" style={{ width: '150px' }}>
-                            <div className="slds-truncate font-bold" title="Class Tier" style={{ fontWeight: 'bold' }}>Class Tier</div>
-                          </th>
-                          <th scope="col">
-                            <div className="slds-truncate font-bold" title="Team Affiliations" style={{ fontWeight: 'bold' }}>Team Affiliations</div>
-                          </th>
-                          <th scope="col" style={{ width: '120px' }}>
-                            <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((user) => (
-                          <tr key={user.id} className="slds-hint-parent hover:bg-slate-50">
-                            <th scope="row">
-                              <div className="slds-truncate font-bold" title={user.vrchatUsername || 'No VRChat Name'}>
-                                <UserLink userId={user.id} name={user.vrchatUsername || '—'} />
-                                {user.id === session?.user.id && (
-                                  <span className="slds-badge slds-m-left_small" style={{ fontSize: '10px', padding: '1px 4px' }}>
-                                    You
-                                  </span>
-                                )}
-                              </div>
-                            </th>
-                            <td>
-                              <div className="slds-truncate" title={user.name}>
-                                {user.name}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`slds-badge ${user.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                                {user.siteRole}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="slds-truncate" title={!user.classTier || user.classTier === 'PRE_OP' || user.classTier === 'OP' ? 'None' : user.classTier}>
-                                {!user.classTier || user.classTier === 'PRE_OP' || user.classTier === 'OP' ? 'None' : user.classTier}
-                              </div>
-                            </td>
-                            <td>
-                              <div className="slds-truncate" title={user.teams.map((t) => `${t.name} (${t.role})`).join(', ')}>
-                                {user.teams.length > 0 ? (
-                                  <div className="slds-grid slds-wrap" style={{ gap: '4px' }}>
-                                    {user.teams.map((t) => (
-                                      <span key={t.organizationId} className="slds-badge slds-theme_light" style={{ fontSize: '11px', padding: '1px 6px' }}>
-                                        {t.name} ({t.role})
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400">None</span>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                onClick={() => navigate({ to: '/admin/users/$userId', params: { userId: user.id } })}
-                                className="slds-button slds-button_neutral"
-                                style={{ fontSize: '12px', padding: '2px 10px' }}
-                              >
-                                Manage
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <Pagination
-                    page={page}
-                    pageSize={pageSize}
-                    total={totalUsers}
-                    onPageChange={setPage}
-                    onPageSizeChange={setPageSize}
-                  />
-                </>
-              ) : (
-                <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                  <p>No competitor accounts match the current query filter.</p>
-                </div>
-              )}
+              <PaginationBar
+                page={page}
+                pageSize={pageSize}
+                total={totalUsers}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </>
+          ) : (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem',
+              color: '#57606a',
+              border: '1px dashed #d0d7de',
+              borderRadius: '6px'
+            }}>
+              <span>No competitor accounts match the current query filter.</span>
             </div>
-          </article>
+          )}
         </div>
       </div>
     </AdminLayout>

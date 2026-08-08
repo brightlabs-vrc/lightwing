@@ -3,21 +3,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import { formatLocalDateTime } from '../../lib/datetime'
-import {
-  PixelContainer,
-  PixelStack,
-  PixelCard,
-  PixelButton,
-  PixelBadge,
-  PixelTable,
-  PixelSpinner,
-  PixelSectionHeader,
-  PixelEmptyState,
-  type PixelTableColumn,
-  useToast,
-} from '@pxlkit/ui-kit'
+import { useNotification } from '../../hooks/useNotification'
+import { Heading, Text, Label, Button, Spinner } from '@primer/react'
 import type { eventmanager } from '../../lib/client'
-import { PixelSkeletonDetail } from '../../components/LoadingSkeleton'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
   PRE_OP: 'PRE-OP',
@@ -32,11 +20,11 @@ const SCORING_LABELS: Record<number, string> = {
   2: 'LADDER-ELO',
 }
 
-const STATUS_TONE: Record<eventmanager.EventStatus, 'neutral' | 'cyan' | 'green' | 'pink'> = {
-  DRAFT: 'neutral',
-  UNOFFICIAL: 'cyan',
-  OFFICIAL: 'green',
-  CONCLUDED: 'pink',
+const STATUS_TONE: Record<eventmanager.EventStatus, 'default' | 'accent' | 'success' | 'severe'> = {
+  DRAFT: 'default',
+  UNOFFICIAL: 'accent',
+  OFFICIAL: 'success',
+  CONCLUDED: 'severe',
 }
 
 export const Route = createFileRoute('/events/$eventId')({
@@ -47,6 +35,7 @@ function EventDetailPage() {
   const { eventId } = Route.useParams()
   const queryClient = useQueryClient()
   const { session } = useAuth()
+  const { addToast } = useNotification()
 
   const { data: event, isLoading, error } = useQuery({
     queryKey: ['public-event', eventId],
@@ -57,264 +46,342 @@ function EventDetailPage() {
     mutationFn: (id: string) => joinEvent(id, `Bearer ${session?.session.token ?? ''}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['public-event', eventId] })
+      addToast({ severity: 'success', message: 'Successfully signed up for this event!' })
     },
+    onError: (err) => {
+      addToast({ severity: 'error', message: err instanceof Error ? err.message : 'Failed to join event' })
+    }
   })
 
   const leaveMutation = useMutation({
     mutationFn: (id: string) => leaveEvent(id, `Bearer ${session?.session.token ?? ''}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['public-event', eventId] })
+      addToast({ severity: 'success', message: 'Successfully withdrew from this event!' })
     },
+    onError: (err) => {
+      addToast({ severity: 'error', message: err instanceof Error ? err.message : 'Failed to withdraw from event' })
+    }
   })
 
   if (isLoading) {
     return (
-      <PixelContainer maxWidth="full" padding="md">
-        <PixelSkeletonDetail />
-      </PixelContainer>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', gap: '0.5rem', color: '#57606a' }}>
+          <Spinner size="medium" />
+          <span>Loading event details...</span>
+        </div>
+      </div>
     )
   }
-  if (error) {
+
+  if (error || !event) {
     return (
-      <PixelContainer maxWidth="md" padding="md">
-        <PixelEmptyState
-          title="Error loading event"
-          description="Something went wrong while fetching the event details."
-
-        />
-      </PixelContainer>
+      <div style={{ maxWidth: '640px', margin: '4rem auto', textAlign: 'center' }}>
+        <Heading as="h2" style={{ fontSize: '20px', color: 'var(--color-danger-fg)' }}>
+          Error loading event
+        </Heading>
+        <Text style={{ fontSize: '14px', color: '#57606a', marginTop: '8px', display: 'block' }}>
+          Something went wrong while fetching the event details.
+        </Text>
+      </div>
     )
   }
-
-  if (!event) return null
 
   const isMember = session && event.members.some((m) => m.userId === session.user.id)
   const isConcluded = event.status === 'CONCLUDED'
   const isGranular = event.granularParticipation
 
-  const participantColumns: PixelTableColumn<eventmanager.EventMemberView>[] = [
-    { key: 'name', header: 'NAME', render: (m) => <span className="font-medium">{m.name}</span> },
-    {
-      key: 'classTier',
-      header: 'CLASS TIER',
-      render: (m) =>
-        m.classTier ? (
-          <PixelBadge tone="neutral">{CLASS_TIER_LABELS[m.classTier as any]}</PixelBadge>
-        ) : (
-          <span className="text-retro-muted">-</span>
-        ),
-    },
-  ]
-
-  const pointsColumns: PixelTableColumn<eventmanager.PointsEntryView>[] = [
-    { key: 'rank', header: '#', width: 64, render: (_e, idx) => idx + 1 },
-    { key: 'name', header: 'PARTICIPANT', render: (e) => <span className="font-medium">{e.name}</span> },
-    {
-      key: 'points',
-      header: 'TOTAL POINTS',
-      align: 'right',
-      width: 128,
-      render: (e) => <span className="text-retro-primary">{e.points}</span>,
-    },
-  ]
-
-  const ladderColumns: PixelTableColumn<eventmanager.LadderEntryView>[] = [
-    { key: 'rank', header: 'RANK', width: 64, render: (e) => e.rank },
-    { key: 'name', header: 'PARTICIPANT', render: (e) => <span className="font-medium">{e.name}</span> },
-    {
-      key: 'elo',
-      header: 'ELO',
-      align: 'right',
-      width: 96,
-      render: (e) => <span className="text-retro-gold">{e.elo}</span>,
-    },
-    {
-      key: 'wl',
-      header: 'W-L',
-      align: 'right',
-      width: 96,
-      render: (e) => `${e.wins}-${e.losses}`,
-    },
-  ]
-
   return (
-    <PixelContainer maxWidth="full" padding="md">
-      <PixelButton asChild variant="ghost" tone="neutral" size="sm" className="mb-6">
-        <Link to="/events">&lt; BACK TO EVENTS</Link>
-      </PixelButton>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div>
+        <Button as={Link as any} to="/events" size="small">
+          &lt; Back to Events
+        </Button>
+      </div>
 
       {/* Main Info Card */}
-      <PixelCard className="mb-6">
-        <PixelStack gap={4}>
-          <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
-            <PixelStack gap={1}>
-              <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">{event.name}</h1>
-              {event.scheduledAt && (
-                <div className="font-pixel text-xs text-retro-gold">
-                  SCHEDULED: <time dateTime={event.scheduledAt}>{formatLocalDateTime(event.scheduledAt)}</time>
-                </div>
-              )}
-            </PixelStack>
-            <PixelBadge tone={STATUS_TONE[event.status]}>{event.status.toUpperCase()}</PixelBadge>
-          </PixelStack>
+      <div style={{
+        backgroundColor: 'var(--color-canvas-default)',
+        border: '1px solid var(--color-border-default)',
+        borderRadius: '8px',
+        padding: '1.5rem',
+        boxShadow: 'var(--color-shadow-small)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <Heading as="h1" style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, color: 'var(--color-fg-default)' }}>
+              {event.name}
+            </Heading>
+            {event.scheduledAt && (
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-attention-fg)' }}>
+                SCHEDULED: <time dateTime={event.scheduledAt}>{formatLocalDateTime(event.scheduledAt)}</time>
+              </span>
+            )}
+          </div>
+          <Label variant={STATUS_TONE[event.status]}>{event.status.toUpperCase()}</Label>
+        </div>
 
-          {event.description && (
-            <p className="text-retro-text font-sans leading-relaxed text-sm">{event.description}</p>
-          )}
+        {event.description && (
+          <Text style={{ fontSize: '14px', color: '#57606a', lineHeight: '1.5', display: 'block' }}>
+            {event.description}
+          </Text>
+        )}
 
-          <PixelStack direction="row" gap={4} wrap>
-            <PixelBadge tone="neutral">
-              SCORING TYPE: {SCORING_LABELS[event.scoringType] ?? 'UNKNOWN'}
-            </PixelBadge>
-            <PixelBadge tone="neutral">
-              CLASS RESTRICTION:{' '}
-              {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP' ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN TO ALL'}
-            </PixelBadge>
-          </PixelStack>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Label variant="default">
+            SCORING TYPE: {SCORING_LABELS[event.scoringType] ?? 'UNKNOWN'}
+          </Label>
+          <Label variant="default">
+            CLASS RESTRICTION:{' '}
+            {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP' ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN TO ALL'}
+          </Label>
+        </div>
 
-          {!isGranular && (
-            <div className="pt-4 border-t-2 border-retro-border">
-              {!session ? (
-                <PixelButton asChild variant="solid" tone="purple" className="pxl-btn-flat">
-                  <Link to="/auth" search={{ redirect: `/events/${eventId}` }}>
-                    SIGN IN TO JOIN
-                  </Link>
-                </PixelButton>
-              ) : (
-                <PixelStack gap={2}>
-                  <PixelButton
-                    variant="solid"
-                    tone={isMember ? 'red' : 'green'}
-                    className="pxl-btn-flat"
-                    disabled={isConcluded || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending || (!isMember && event.participantLimit !== null && event.members.length >= event.participantLimit)}
-                    loading={joinMutation.isPending || leaveMutation.isPending}
-                    onClick={() => {
-                      if (isConcluded) return
-                      if (isMember) {
-                        leaveMutation.mutate(eventId)
-                      } else {
-                        joinMutation.mutate(eventId)
-                      }
-                    }}
-                  >
-                    {isMember ? 'WITHDRAW FROM EVENT' : (event.participantLimit !== null && event.members.length >= event.participantLimit) ? 'EVENT FULL' : 'SIGN UP FOR EVENT'}
-                  </PixelButton>
-                  {event.signupsLocked && (
-                    <div className="text-retro-muted font-pixel text-xs mt-2">
-                      SIGNUPS ARE LOCKED FOR THIS EVENT
-                    </div>
-                  )}
-                </PixelStack>
-              )}
+        {!isGranular && (
+          <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--color-border-default)' }}>
+            {!session ? (
+              <Button as={Link as any} to="/auth" search={{ redirect: `/events/${eventId}` } as any} variant="primary">
+                Sign in to join
+              </Button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <Button
+                  variant={isMember ? 'danger' : 'primary'}
+                  disabled={isConcluded || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending || (!isMember && event.participantLimit !== null && event.members.length >= event.participantLimit)}
+                  onClick={() => {
+                    if (isConcluded) return
+                    if (isMember) {
+                      leaveMutation.mutate(eventId)
+                    } else {
+                      joinMutation.mutate(eventId)
+                    }
+                  }}
+                >
+                  {isMember ? 'Withdraw from event' : (event.participantLimit !== null && event.members.length >= event.participantLimit) ? 'Event Full' : 'Sign up for event'}
+                </Button>
+                {event.signupsLocked && (
+                  <span style={{ fontSize: '12px', color: 'var(--color-danger-fg)', fontWeight: 'bold', marginTop: '4px' }}>
+                    SIGNUPS ARE LOCKED FOR THIS EVENT
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        {/* Participants Panel */}
+        <div style={{
+          backgroundColor: 'var(--color-canvas-default)',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: 'var(--color-shadow-small)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+        }}>
+          <Heading as="h3" style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>
+            Participants ({event.members.length}{!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})
+          </Heading>
+          {event.members.length === 0 ? (
+            <span style={{ fontSize: '12px', color: '#57606a', fontStyle: 'italic' }}>NO MEMBERS YET</span>
+          ) : (
+            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Name</th>
+                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Class Tier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {event.members.map((m) => (
+                    <tr key={m.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                      <td style={{ padding: '8px', fontWeight: 'bold' }}>{m.name}</td>
+                      <td style={{ padding: '8px' }}>
+                        {m.classTier ? (
+                          <Label variant="default">{CLASS_TIER_LABELS[m.classTier as any]}</Label>
+                        ) : (
+                          <span style={{ color: '#8c959f' }}>-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </PixelStack>
-      </PixelCard>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        {/* Participants Panel */}
-        <div>
-          <PixelSectionHeader
-            title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
-            size="sm"
-            spacing="tight"
-          />
-          <div className="public-table">
-            <PixelTable
-              columns={participantColumns}
-              data={event.members}
-              emptyState={<span className="font-pixel text-xs text-retro-muted">NO MEMBERS YET</span>}
-            />
-          </div>
         </div>
 
         {/* Schedule Panel */}
         {event.schedules && event.schedules.length > 0 && (
-          <div>
-            <PixelSectionHeader title="SCHEDULE" size="sm" spacing="tight" />
-            <PixelCard className="">
-              <PixelStack gap={4}>
-                {event.schedules.map((schedule) => (
-                  <PixelStack
-                    key={schedule.id}
-                    gap={2}
-                    className="border-b-2 border-retro-border last:border-b-0 pb-3 last:pb-0"
-                  >
-                    <div className="font-pixel text-xs text-retro-primary">
-                      {schedule.title || 'UNTITLED'}
-                    </div>
-                    <div className="text-xs text-retro-muted font-sans">
-                      {new Date(schedule.startsAt).toLocaleString()}
-                      {schedule.location && (
-                        <span className="block mt-1 font-pixel text-[11px] text-retro-text bg-retro-surface px-2 py-0.5 border border-retro-border pxl-corner-sm inline-block">
-                          📍 {schedule.location}
-                        </span>
-                      )}
-                    </div>
-                  </PixelStack>
-                ))}
-              </PixelStack>
-            </PixelCard>
+          <div style={{
+            backgroundColor: 'var(--color-canvas-default)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '8px',
+            padding: '1.5rem',
+            boxShadow: 'var(--color-shadow-small)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+          }}>
+            <Heading as="h3" style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>
+              Schedule
+            </Heading>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {event.schedules.map((schedule) => (
+                <div
+                  key={schedule.id}
+                  style={{
+                    borderBottom: '1px solid var(--color-border-default)',
+                    paddingBottom: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--color-accent-fg)' }}>
+                    {schedule.title || 'UNTITLED'}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#57606a' }}>
+                    {new Date(schedule.startsAt).toLocaleString()}
+                    {schedule.location && (
+                      <span style={{
+                        display: 'block',
+                        marginTop: '4px',
+                        fontSize: '11px',
+                        color: 'var(--color-fg-default)',
+                        backgroundColor: 'var(--color-canvas-subtle)',
+                        padding: '2px 8px',
+                        border: '1px solid var(--color-border-default)',
+                        borderRadius: '6px',
+                        width: 'fit-content'
+                      }}>
+                        📍 {schedule.location}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
       {/* Standings (Points) */}
       {event.pointsOverview && (
-        <div className="mt-8">
-          <PixelStack direction="row" gap={3} align="center" wrap className="mb-4">
-            <h2 className="font-pixel text-sm tracking-wider text-retro-text">
+        <div style={{
+          backgroundColor: 'var(--color-canvas-default)',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: 'var(--color-shadow-small)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <Heading as="h2" style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>
               STANDINGS (POINTS)
-            </h2>
+            </Heading>
             {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
-              <PixelBadge tone="green">FINAL</PixelBadge>
+              <Label variant="success">FINAL</Label>
             ) : (
-              <PixelBadge tone="gold">PROVISIONAL</PixelBadge>
+              <Label variant="attention">PROVISIONAL</Label>
             )}
-          </PixelStack>
-          <div className="public-table">
-            <PixelTable
-              columns={pointsColumns}
-              data={event.pointsOverview}
-              emptyState={
-                <span className="font-pixel text-xs text-retro-muted">NO RESULTS RECORDED</span>
-              }
-            />
           </div>
+          {event.pointsOverview.length === 0 ? (
+            <span style={{ fontSize: '12px', color: '#57606a', fontStyle: 'italic' }}>NO RESULTS RECORDED</span>
+          ) : (
+            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
+                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
+                    <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>Total Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {event.pointsOverview.map((e, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                      <td style={{ padding: '8px' }}>{idx + 1}</td>
+                      <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
+                      <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>{e.points}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
       {/* Standings (Ladder) */}
       {event.ladderOverview && (
-        <div className="mt-8">
-          <PixelStack direction="row" gap={3} align="center" wrap className="mb-4">
-            <h2 className="font-pixel text-sm tracking-wider text-retro-text">
+        <div style={{
+          backgroundColor: 'var(--color-canvas-default)',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: 'var(--color-shadow-small)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <Heading as="h2" style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>
               STANDINGS (LADDER)
-            </h2>
+            </Heading>
             {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
-              <PixelBadge tone="green">FINAL</PixelBadge>
+              <Label variant="success">FINAL</Label>
             ) : (
-              <PixelBadge tone="gold">PROVISIONAL</PixelBadge>
+              <Label variant="attention">PROVISIONAL</Label>
             )}
-          </PixelStack>
-          <div className="public-table">
-            <PixelTable
-              columns={ladderColumns}
-              data={event.ladderOverview}
-              emptyState={
-                <span className="font-pixel text-xs text-retro-muted">NO LADDER RECORDS</span>
-              }
-            />
           </div>
+          {event.ladderOverview.length === 0 ? (
+            <span style={{ fontSize: '12px', color: '#57606a', fontStyle: 'italic' }}>NO LADDER RECORDS</span>
+          ) : (
+            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
+                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
+                    <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>ELO</th>
+                    <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>W-L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {event.ladderOverview.map((e, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                      <td style={{ padding: '8px' }}>{e.rank}</td>
+                      <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
+                      <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-attention-fg)' }}>{e.elo}</td>
+                      <td style={{ padding: '8px', textAlign: 'right' }}>{e.wins}-{e.losses}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
       {/* RACES SECTION */}
-      <div className="mt-8">
-        <PixelSectionHeader title="RACES" size="sm" spacing="tight" />
+      <div>
+        <Heading as="h2" style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '1rem' }}>
+          Races
+        </Heading>
         <EventRacesList event={event} />
       </div>
-    </PixelContainer>
+    </div>
   )
 }
 
@@ -334,81 +401,62 @@ function RaceStandingsTable({
 
   if (isLoading) {
     return (
-      <PixelStack align="center" justify="center" gap={2} className="py-4">
-        <PixelSpinner size="sm" label="Loading standings..." />
-      </PixelStack>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem', gap: '0.5rem', color: '#57606a' }}>
+        <Spinner size="small" />
+        <span>Loading standings...</span>
+      </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="text-retro-muted font-pixel text-xs py-2">
-        ERROR LOADING STANDINGS
-      </div>
+      <span style={{ fontSize: '12px', color: 'var(--color-danger-fg)' }}>ERROR LOADING STANDINGS</span>
     )
   }
 
   const results = data.results
 
-  const columns: PixelTableColumn<eventmanager.RaceResultView>[] = [
-    {
-      key: 'position',
-      header: 'POS',
-      width: 64,
-      render: (r) => <span className="font-pixel">{r.position ?? '-'}</span>,
-    },
-    {
-      key: 'gateNumber',
-      header: 'DRAW',
-      width: 64,
-      render: (r) => <span>{r.gateNumber ?? '-'}</span>,
-    },
-    {
-      key: 'participant',
-      header: 'PARTICIPANT',
-      render: (r) => {
-        const member = members.find((m) => m.userId === r.userId)
-        return <span className="font-medium">{member?.name ?? r.userId}</span>
-      },
-    },
-    {
-      key: 'points',
-      header: 'POINTS',
-      align: 'right',
-      width: 96,
-      render: (r) => <span className="text-retro-primary">{r.points}</span>,
-    },
-    {
-      key: 'finishTime',
-      header: 'FINISH TIME',
-      render: (r) => <span>{r.finishTime ?? '-'}</span>,
-    },
-    {
-      key: 'margin',
-      header: 'MARGIN',
-      render: (r) => <span>{r.margin ?? '-'}</span>,
-    },
-    {
-      key: 'passingOrder',
-      header: 'PASSING ORDER',
-      render: (r) => <span>{r.passingOrder ?? '-'}</span>,
-    },
-    {
-      key: 'final3F',
-      header: 'FINAL 3F',
-      render: (r) => <span>{r.final3F ?? '-'}</span>,
-    },
-  ]
-
   return (
-    <div className="public-table">
-      <PixelTable
-        columns={columns}
-        data={results}
-        emptyState={
-          <span className="font-pixel text-xs text-retro-muted">NO STANDINGS RECORDED</span>
-        }
-      />
+    <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+        <thead>
+          <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>POS</th>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>DRAW</th>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>PARTICIPANT</th>
+            <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>POINTS</th>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>FINISH TIME</th>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>MARGIN</th>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>PASSING ORDER</th>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>FINAL 3F</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.length === 0 ? (
+            <tr>
+              <td colSpan={8} style={{ padding: '12px', textAlign: 'center', color: '#57606a', fontStyle: 'italic' }}>
+                NO STANDINGS RECORDED
+              </td>
+            </tr>
+          ) : (
+            results.map((r, idx) => {
+              const member = members.find((m) => m.userId === r.userId)
+              return (
+                <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                  <td style={{ padding: '8px', fontWeight: 'bold' }}>{r.position ?? '-'}</td>
+                  <td style={{ padding: '8px' }}>{r.gateNumber ?? '-'}</td>
+                  <td style={{ padding: '8px', fontWeight: 'bold' }}>{member?.name ?? r.userId}</td>
+                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>{r.points}</td>
+                  <td style={{ padding: '8px' }}>{r.finishTime ?? '-'}</td>
+                  <td style={{ padding: '8px' }}>{r.margin ?? '-'}</td>
+                  <td style={{ padding: '8px' }}>{r.passingOrder ?? '-'}</td>
+                  <td style={{ padding: '8px' }}>{r.final3F ?? '-'}</td>
+                </tr>
+              )
+            })
+          )}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -416,7 +464,7 @@ function RaceStandingsTable({
 function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
   const queryClient = useQueryClient()
   const { session } = useAuth()
-  const { toast } = useToast()
+  const { addToast } = useNotification()
   const isMember = session && event.members.some((m) => m.userId === session.user.id)
 
   const joinRaceMutation = useMutation({
@@ -426,13 +474,11 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
       queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+      addToast({ severity: 'success', message: 'Successfully signed up for this race!' })
     },
     onError: (err: any) => {
       const msg = err?.message || err?.toString() || 'Unknown error'
-      toast({
-        tone: 'red',
-        title: `Could not sign up for this race: ${msg}`,
-      })
+      addToast({ severity: 'error', message: `Could not sign up for this race: ${msg}` })
     },
   })
 
@@ -443,13 +489,11 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
       queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
       queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+      addToast({ severity: 'success', message: 'Successfully withdrew from this race!' })
     },
     onError: (err: any) => {
       const msg = err?.message || err?.toString() || 'Unknown error'
-      toast({
-        tone: 'red',
-        title: `Could not withdraw from this race: ${msg}`,
-      })
+      addToast({ severity: 'error', message: `Could not withdraw from this race: ${msg}` })
     },
   })
 
@@ -460,18 +504,18 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
 
   if (isLoading) {
     return (
-      <PixelStack align="center" justify="center" gap={4} className="py-8">
-        <PixelSpinner size="md" label="Loading races..." />
-      </PixelStack>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem', gap: '0.5rem', color: '#57606a' }}>
+        <Spinner size="medium" />
+        <span>Loading races...</span>
+      </div>
     )
   }
 
   if (error || !data) {
     return (
-      <PixelEmptyState
-        title="Error loading races"
-        description="Something went wrong while fetching the race events list."
-      />
+      <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-danger-fg)' }}>
+        <span>Error loading races.</span>
+      </div>
     )
   }
 
@@ -479,100 +523,106 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
 
   if (races.length === 0) {
     return (
-      <PixelEmptyState
-        title="No races scheduled"
-        description="There are no individual race events configured for this competition."
-      />
+      <div style={{ textAlign: 'center', padding: '2rem', color: '#57606a' }}>
+        <span>There are no individual race events configured for this competition.</span>
+      </div>
     )
   }
 
   return (
-    <PixelStack gap={6} className="mt-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {races.map((race) => {
         const isRaceMember = session && (race.members ?? []).some((rm) => rm.userId === session.user.id)
 
         return (
-          <PixelCard key={race.id}>
-            <PixelStack gap={4}>
-              {/* Race Header Info */}
-              <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
-                <PixelStack gap={2}>
-                  <h3 className="text-lg font-pixel tracking-wide text-retro-text">
-                    #{race.sequence}. {race.name}
-                  </h3>
-                  <div className="text-xs text-retro-muted font-sans flex flex-wrap gap-x-4 gap-y-1">
-                    <span>TRACK: <strong>{race.trackType}</strong> ({race.distanceMeters}m)</span>
-                    <span>LOCATION: <strong>{race.location}</strong></span>
-                  </div>
-                </PixelStack>
-                <PixelStack direction="row" gap={2} align="center">
-                  <PixelBadge tone="neutral">
-                    CLASS:{' '}
-                    {race.classRestriction && race.classRestriction !== 'PRE_OP' && race.classRestriction !== 'OP' ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
-                  </PixelBadge>
-                    {race.participantLimit !== null && (
-                      <PixelBadge tone="neutral">
-                        CAPACITY: {(race.members ?? []).length} / {race.participantLimit}
-                      </PixelBadge>
+          <div
+            key={race.id}
+            style={{
+              backgroundColor: 'var(--color-canvas-default)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '8px',
+              padding: '1.5rem',
+              boxShadow: 'var(--color-shadow-small)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+            }}
+          >
+            {/* Race Header Info */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <Heading as="h3" style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: 'var(--color-fg-default)' }}>
+                  #{race.sequence}. {race.name}
+                </Heading>
+                <div style={{ fontSize: '12px', color: '#57606a', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                  <span>TRACK: <strong>{race.trackType}</strong> ({race.distanceMeters}m)</span>
+                  <span>LOCATION: <strong>{race.location}</strong></span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignSelf: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Label variant="default">
+                  CLASS:{' '}
+                  {race.classRestriction && race.classRestriction !== 'PRE_OP' && race.classRestriction !== 'OP' ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
+                </Label>
+                {race.participantLimit !== null && (
+                  <Label variant="default">
+                    CAPACITY: {(race.members ?? []).length} / {race.participantLimit}
+                  </Label>
+                )}
+
+                {event.granularParticipation && (
+                  <>
+                    {!session ? (
+                      <Button as={Link as any} to="/auth" search={{ redirect: `/events/${event.id}` } as any} size="small">
+                        Sign In
+                      </Button>
+                    ) : (
+                      <Button
+                        variant={isRaceMember ? 'danger' : 'primary'}
+                        size="small"
+                        disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending || (!isRaceMember && race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit)}
+                        onClick={() => {
+                          if (isRaceMember) {
+                            leaveRaceMutation.mutate({ raceId: race.id })
+                          } else {
+                            joinRaceMutation.mutate({ raceId: race.id })
+                          }
+                        }}
+                      >
+                        {isRaceMember ? 'Withdraw' : (race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit) ? 'Full' : 'Sign Up'}
+                      </Button>
                     )}
-                  {event.granularParticipation && (
-                    <>
-                      {!session ? (
-                        <PixelButton asChild variant="solid" tone="purple" size="sm" className="pxl-btn-flat font-pixel text-[10px]">
-                          <Link to="/auth" search={{ redirect: `/events/${event.id}` }}>
-                            SIGN IN
-                          </Link>
-                        </PixelButton>
-                      ) : (
-                        <PixelButton
-                          variant="solid"
-                          tone={isRaceMember ? 'red' : 'green'}
-                          size="sm"
-                          className="pxl-btn-flat font-pixel text-[10px]"
-                            disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending || (!isRaceMember && race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit)}
-                          onClick={() => {
-                            if (isRaceMember) {
-                              leaveRaceMutation.mutate({ raceId: race.id })
-                            } else {
-                              joinRaceMutation.mutate({ raceId: race.id })
-                            }
-                          }}
-                        >
-                            {isRaceMember ? 'WITHDRAW' : (race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit) ? 'FULL' : 'SIGN UP'}
-                        </PixelButton>
-                      )}
-                    </>
-                  )}
-                  {!event.granularParticipation && isMember && (
-                    <PixelButton
-                      variant="solid"
-                      tone={isRaceMember ? 'red' : 'green'}
-                      size="sm"
-                      className="pxl-btn-flat font-pixel text-[10px]"
-                      disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
-                      onClick={() => {
-                        if (isRaceMember) {
-                          leaveRaceMutation.mutate({ raceId: race.id })
-                        } else {
-                          joinRaceMutation.mutate({ raceId: race.id })
-                        }
-                      }}
-                    >
-                      {isRaceMember ? 'WITHDRAW' : 'SIGN UP'}
-                    </PixelButton>
-                  )}
-                </PixelStack>
-              </PixelStack>
+                  </>
+                )}
+
+                {!event.granularParticipation && isMember && (
+                  <Button
+                    variant={isRaceMember ? 'danger' : 'primary'}
+                    size="small"
+                    disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
+                    onClick={() => {
+                      if (isRaceMember) {
+                        leaveRaceMutation.mutate({ raceId: race.id })
+                      } else {
+                        joinRaceMutation.mutate({ raceId: race.id })
+                      }
+                    }}
+                  >
+                    {isRaceMember ? 'Withdraw' : 'Sign Up'}
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {/* Standings Table */}
-            <div className="mt-2">
-              <div className="font-pixel text-[11px] text-retro-text mb-2">RACE STANDINGS</div>
+            <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#57606a', marginBottom: '8px' }}>RACE STANDINGS</div>
               <RaceStandingsTable eventId={event.id} raceId={race.id} members={event.members} />
             </div>
-          </PixelStack>
-        </PixelCard>
+          </div>
         )
       })}
-    </PixelStack>
+    </div>
   )
 }
