@@ -1,6 +1,6 @@
 {
-  "name": "Ubi9",
-  "image": "registry.access.redhat.com/ubi9/ubi",
+  "name": "Bun",
+  "image": "mcr.microsoft.com/devcontainers/base:debian",
   "forwardPorts": [4000, 9400, 9500, 9900],
   "portsAttributes": {
     "4000": { "label": "Encore API", "onAutoForward": "notify" },
@@ -12,11 +12,14 @@
     "ghcr.io/devcontainers/features/common-utils:2": {
       "upgradePackages": true,
       "username": "vscode",
-      "userUid": "1000",
-      "userGid": "1000"
+      "userUid": 1000,
+      "userGid": 1000
+    },
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+      "packages": "ca-certificates,socat"
     },
     "ghcr.io/devcontainers-extra/features/bash-command:1": {
-      "command": "dnf install -y ca-certificates socat && update-ca-trust extract"
+      "command": "sudo update-ca-certificates --fresh"
     },
     "ghcr.io/devcontainers/features/node:2": {
       "version": "lts",
@@ -41,6 +44,5 @@
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.encore/bin",
     "ENCORE_RUNTIME_LIB": "/home/vscode/.encore/runtimes/js/encore-runtime.node"
-  },
-  "remoteUser": "vscode"
+  }
 }
