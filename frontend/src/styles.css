@@ -13,6 +13,53 @@ th {
   border-style: solid;
 }
 
+.site-header-container {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.site-header-inner {
+  min-height: 2.75rem;
+}
+
+.site-brand {
+  flex-shrink: 0;
+}
+
+.site-nav {
+  min-width: 0;
+  row-gap: 0.25rem;
+}
+
+.site-account {
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .site-header-inner {
+    align-items: flex-start;
+    row-gap: 0.5rem;
+  }
+
+  .site-brand {
+    flex-basis: 100%;
+  }
+
+  .site-nav {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.public-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.public-table table {
+  min-width: 32rem;
+}
+
 /* Neutralize the pxlkit pixel-surface offset shadow on buttons (illegible on text) */
 .pxl-btn-flat {
   filter: none !important;

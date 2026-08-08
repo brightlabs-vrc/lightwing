@@ -219,11 +219,13 @@ function EventDetailPage() {
             size="sm"
             spacing="tight"
           />
-          <PixelTable
-            columns={participantColumns}
-            data={event.members}
-            emptyState={<span className="font-pixel text-xs text-retro-muted">NO MEMBERS YET</span>}
-          />
+          <div className="public-table">
+            <PixelTable
+              columns={participantColumns}
+              data={event.members}
+              emptyState={<span className="font-pixel text-xs text-retro-muted">NO MEMBERS YET</span>}
+            />
+          </div>
         </div>
 
         {/* Schedule Panel */}
@@ -270,13 +272,15 @@ function EventDetailPage() {
               <PixelBadge tone="gold">PROVISIONAL</PixelBadge>
             )}
           </PixelStack>
-          <PixelTable
-            columns={pointsColumns}
-            data={event.pointsOverview}
-            emptyState={
-              <span className="font-pixel text-xs text-retro-muted">NO RESULTS RECORDED</span>
-            }
-          />
+          <div className="public-table">
+            <PixelTable
+              columns={pointsColumns}
+              data={event.pointsOverview}
+              emptyState={
+                <span className="font-pixel text-xs text-retro-muted">NO RESULTS RECORDED</span>
+              }
+            />
+          </div>
         </div>
       )}
 
@@ -293,13 +297,15 @@ function EventDetailPage() {
               <PixelBadge tone="gold">PROVISIONAL</PixelBadge>
             )}
           </PixelStack>
-          <PixelTable
-            columns={ladderColumns}
-            data={event.ladderOverview}
-            emptyState={
-              <span className="font-pixel text-xs text-retro-muted">NO LADDER RECORDS</span>
-            }
-          />
+          <div className="public-table">
+            <PixelTable
+              columns={ladderColumns}
+              data={event.ladderOverview}
+              emptyState={
+                <span className="font-pixel text-xs text-retro-muted">NO LADDER RECORDS</span>
+              }
+            />
+          </div>
         </div>
       )}
 
@@ -395,13 +401,15 @@ function RaceStandingsTable({
   ]
 
   return (
-    <PixelTable
-      columns={columns}
-      data={results}
-      emptyState={
-        <span className="font-pixel text-xs text-retro-muted">NO STANDINGS RECORDED</span>
-      }
-    />
+    <div className="public-table">
+      <PixelTable
+        columns={columns}
+        data={results}
+        emptyState={
+          <span className="font-pixel text-xs text-retro-muted">NO STANDINGS RECORDED</span>
+        }
+      />
+    </div>
   )
 }
 
