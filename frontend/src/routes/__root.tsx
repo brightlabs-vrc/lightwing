@@ -1,9 +1,8 @@
 import React, { Suspense } from 'react'
 import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { PixelContainer, PixelStack, PixelButton, PixelBadge } from '@pxlkit/ui-kit'
-import { PxlKitIcon } from '@pxlkit/core'
-import { Trophy } from '@pxlkit/gamification'
+import { Header, Button, Text } from '@primer/react'
 import { useAuth } from '../hooks/useAuth'
+import { ColorModeSelector } from '../components/ThemeAndStatus'
 
 const TanStackRouterDevtools =
   import.meta.env.PROD
@@ -30,7 +29,7 @@ function RootLayout() {
       <>
         <Outlet />
         <Suspense>
-          <TanStackRouterDevtools position='bottom-right' />
+          <TanStackRouterDevtools position="bottom-right" />
         </Suspense>
       </>
     )
@@ -39,89 +38,97 @@ function RootLayout() {
   if (isAuthArea) {
     return (
       <>
-        <div className='min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_28%,_#f8fafc_62%,_#ffffff_100%)] text-slate-900'>
+        <div style={{ backgroundColor: 'var(--color-canvas-subtle)', minHeight: '100vh', color: 'var(--color-fg-default)' }}>
           <Outlet />
         </div>
         <Suspense>
-          <TanStackRouterDevtools position='bottom-right' />
+          <TanStackRouterDevtools position="bottom-right" />
         </Suspense>
       </>
     )
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
-        <header className="border-b-2 border-retro-border-strong bg-retro-surface">
-          <PixelContainer maxWidth="full" padding="sm" className="site-header-container">
-            <PixelStack direction="row" gap={4} align="center" justify="between" wrap className="site-header-inner">
-              <PixelButton asChild variant="ghost" tone="neutral" className="site-brand">
-                <Link to="/">
-                  <PixelStack direction="row" gap={2} align="center">
-                    <span className="font-pixel text-sm tracking-wider leading-none">LIGHTWING</span>
-                  </PixelStack>
-                </Link>
-              </PixelButton>
+    <div style={{
+      backgroundColor: 'var(--color-canvas-subtle)',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      color: 'var(--color-fg-default)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif'
+    }}>
+      {/* Global Application Header */}
+      <Header>
+        <Header.Item>
+          <Header.Link as={Link as any} to="/" style={{ fontSize: '18px', fontWeight: 'bold' }}>
+            LIGHTWING
+          </Header.Link>
+        </Header.Item>
+        <Header.Item>
+          <Header.Link as={Link as any} to="/">
+            Home
+          </Header.Link>
+        </Header.Item>
+        <Header.Item>
+          <Header.Link as={Link as any} to="/events">
+            Events
+          </Header.Link>
+        </Header.Item>
+        {isSiteAdmin ? (
+          <Header.Item>
+            <Header.Link as={Link as any} to="/admin" style={{ color: 'var(--color-attention-fg)', fontWeight: 'bold' }}>
+              Admin
+            </Header.Link>
+          </Header.Item>
+        ) : null}
 
-              <PixelStack direction="row" gap={2} align="center" wrap className="site-nav">
-                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
-                  <Link to="/">HOME</Link>
-                </PixelButton>
-                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
-                  <Link to="/events">EVENTS</Link>
-                </PixelButton>
-                {isSiteAdmin ? (
-                  <PixelButton asChild variant="soft" tone="gold" size="sm">
-                    <Link to="/admin">ADMIN</Link>
-                  </PixelButton>
-                ) : null}
+        <Header.Item full />
 
-                {loading ? (
-                  <PixelBadge tone="neutral">LOADING...</PixelBadge>
-                ) : null}
+        <Header.Item style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {loading ? (
+            <span style={{ fontSize: '12px', color: '#57606a' }}>LOADING...</span>
+          ) : session ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Button as={Link as any} to="/profile" size="small">
+                {session.user.name.toUpperCase()}
+              </Button>
+              <Button
+                variant="danger"
+                size="small"
+                onClick={() => void signOutUser('/auth')}
+              >
+                Sign Out
+              </Button>
+            </div>
+          ) : (
+            <Button as={Link as any} to="/auth" variant="primary" size="small">
+              Sign In
+            </Button>
+          )}
+          <ColorModeSelector />
+        </Header.Item>
+      </Header>
 
-                {!loading && session ? (
-                  <PixelStack direction="row" gap={2} align="center" className="site-account">
-                    <PixelButton asChild variant="outline" tone="neutral" size="sm">
-                      <Link to="/profile" title="Edit Profile">
-                        {session.user.name.toUpperCase()}
-                      </Link>
-                    </PixelButton>
-                    <PixelButton
-                      variant="solid"
-                      tone="red"
-                      size="sm"
-                      onClick={() => void signOutUser('/auth')}
-                    >
-                      SIGN OUT
-                    </PixelButton>
-                  </PixelStack>
-                ) : null}
+      {/* Main page body slot */}
+      <main style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '2rem 1.5rem', flexGrow: 1, boxSizing: 'border-box' }}>
+        <Outlet />
+      </main>
 
-                {!loading && !session ? (
-                  <PixelStack direction="row" gap={2} align="center">
-                    <PixelBadge tone="neutral">OFFLINE</PixelBadge>
-                    <PixelButton asChild variant="solid" tone="purple" size="sm">
-                      <Link to="/auth">SIGN IN</Link>
-                    </PixelButton>
-                  </PixelStack>
-                ) : null}
-              </PixelStack>
-            </PixelStack>
-          </PixelContainer>
-        </header>
+      {/* Footer bar */}
+      <footer style={{
+        textAlign: 'center',
+        padding: '2rem 1.5rem',
+        fontSize: '12px',
+        color: '#57606a',
+        borderTop: '1px solid var(--color-border-default)',
+        backgroundColor: 'var(--color-canvas-default)'
+      }}>
+        Lightwing Prototype &copy; 2026, Umamusume Racing Society. All rights reserved. Neigh.
+      </footer>
 
-        <main className="w-full px-6 py-8">
-          <Outlet />
-        </main>
-
-        <footer className="w-full px-6 pb-12 text-center font-pixel text-xs text-retro-muted border-t-2 border-retro-border pt-6">
-          Lightwing Prototype &copy; 2026, Umamusume Racing Society. All rights reserved. Neigh.
-        </footer>
-      </div>
       <Suspense>
-        <TanStackRouterDevtools position='bottom-right' />
+        <TanStackRouterDevtools position="bottom-right" />
       </Suspense>
-    </>
+    </div>
   )
 }

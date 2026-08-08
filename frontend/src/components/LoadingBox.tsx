@@ -1,3 +1,6 @@
+import React from 'react'
+import { Spinner } from '@primer/react'
+
 interface LoadingBoxProps {
   message: string
 }
@@ -5,18 +8,21 @@ interface LoadingBoxProps {
 export function LoadingBox({ message }: LoadingBoxProps) {
   return (
     <div
-      className="slds-box bg-white slds-align_absolute-center"
       style={{
-        background: '#ffffff',
-        borderRadius: '4px',
-        border: '1px solid #dddbda',
+        backgroundColor: 'var(--color-canvas-default)',
+        borderRadius: '6px',
+        border: '1px solid var(--color-border-default)',
         minHeight: '400px',
         display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
         justifyContent: 'center',
         alignItems: 'center',
       }}
     >
-      <p className="slds-text-heading_small">{message}</p>
+      <Spinner size="medium" />
+      <p style={{ fontSize: '14px', color: '#57606a', margin: 0 }}>{message}</p>
     </div>
   )
 }
+export default LoadingBox

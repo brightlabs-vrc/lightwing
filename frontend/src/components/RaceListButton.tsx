@@ -1,4 +1,5 @@
 import type { eventmanager } from '../lib/client'
+import { Button } from '@primer/react'
 
 interface RaceListButtonProps {
   race: eventmanager.RaceEventDetail
@@ -9,28 +10,24 @@ interface RaceListButtonProps {
 
 export function RaceListButton({ race, isSelected, label, onSelect }: RaceListButtonProps) {
   return (
-    <button
-      type="button"
+    <Button
       onClick={onSelect}
-      className="slds-button slds-button_neutral"
+      variant={isSelected ? 'primary' : 'default'}
       style={{
         width: '100%',
         textAlign: 'left',
-        padding: '8px 12px',
-        background: isSelected ? '#0176d3' : '#ffffff',
-        color: isSelected ? '#ffffff' : '#0176d3',
-        fontWeight: isSelected ? 'bold' : 'normal',
-        border: isSelected ? '1px solid #0176d3' : '1px solid #dddbda',
-        borderRadius: '4px',
+        justifyContent: 'space-between',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        padding: '8px 12px',
+        fontWeight: isSelected ? 'bold' : 'normal',
       }}
     >
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>
         #{race.sequence}. {race.name}
       </span>
       <span style={{ fontSize: '10px', opacity: 0.85 }}>{label}</span>
-    </button>
+    </Button>
   )
 }
+export default RaceListButton
