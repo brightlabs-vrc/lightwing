@@ -57,7 +57,7 @@ th {
   -webkit-overflow-scrolling: touch;
 }
 
-.public-table > table {
+.public-table table {
   min-width: 32rem;
 }
 
