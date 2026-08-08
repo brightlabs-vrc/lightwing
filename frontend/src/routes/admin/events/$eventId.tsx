@@ -287,15 +287,7 @@ function AdminEventDetailPage() {
   }
 
   return (
-    <AdminLayout
-      title="Event & Race Operations"
-      subtitle="Manage event lifecycle, register competitors, construct race tracks, and perform dynamic batch or in-place results entry."
-      actions={
-        <Button as={Link as any} to="/admin/events">
-          &larr; Back to Events
-        </Button>
-      }
-    >
+    <AdminLayout>
       {globalError && (
         <AlertBanner variant="error">{globalError}</AlertBanner>
       )}
@@ -352,8 +344,13 @@ function AdminEventDetailPage() {
       {loadingEventDetail ? (
         <SldsSkeletonDetail />
       ) : selectedEvent ? (
-        <div style={{
-          backgroundColor: 'var(--color-canvas-default)',
+        <>
+          <div style={{ marginBottom: '1rem' }}>
+            <Button as={Link as any} to="/admin/events">
+              &larr; Back to Events
+            </Button>
+          </div>
+          <div style={{
           border: '1px solid var(--color-border-default)',
           borderRadius: '6px',
           padding: '1.5rem',
@@ -507,6 +504,7 @@ function AdminEventDetailPage() {
             )}
           </div>
         </div>
+        </>
       ) : (
         <div style={{
           textAlign: 'center',
@@ -532,8 +530,6 @@ function AdminEventDetailPage() {
           </div>
         </div>
       )}
-
-      {/* RACE CREATION DIALOG MODAL */}
       {showCreateRaceModal && (
         <Dialog
           onClose={() => setShowCreateRaceModal(false)}

@@ -97,8 +97,8 @@ test.describe('Layout parity between legacy and Primer migrations', () => {
     await page.goto('/admin/')
     await page.waitForLoadState('networkidle')
 
-    // Admin dashboard heading preserved
-    await expect(page.locator('text=Admin Dashboard')).toBeVisible()
+    // Admin dashboard heading preserved (inline content heading)
+    await expect(page.locator('text=Active Administrator Session')).toBeVisible()
 
     // Navigation sections preserved (content hierarchy)
     await expect(page.locator('text=Events & Race Management')).toBeVisible()
@@ -116,8 +116,8 @@ test.describe('Layout parity between legacy and Primer migrations', () => {
     await page.goto('/admin/events')
     await page.waitForLoadState('networkidle')
 
-    // Event table heading preserved
-    await expect(page.locator('text=Event & Race Operations')).toBeVisible()
+    // Event list container heading preserved (inline content heading)
+    await expect(page.locator('text=Competition Events')).toBeVisible()
     // "Create Event" button preserved (action priority)
     await expect(page.locator('text=Create Event')).toBeVisible()
   })
@@ -127,7 +127,8 @@ test.describe('Layout parity between legacy and Primer migrations', () => {
     await page.goto('/admin/users')
     await page.waitForLoadState('networkidle')
 
-    await expect(page.locator('text=User Account Directory')).toBeVisible()
+    // User table heading preserved (inline content heading)
+    await expect(page.locator('text=Registered System Competitors')).toBeVisible()
     await expect(page.locator('table')).toBeVisible()
   })
 

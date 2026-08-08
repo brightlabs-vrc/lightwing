@@ -91,24 +91,8 @@ function AdminTeamsPage() {
     }
   }
 
-  const actions = (
-    <Button
-      variant="primary"
-      onClick={() => {
-        setCreateError(null)
-        setIsModalOpen(true)
-      }}
-    >
-      New Team
-    </Button>
-  )
-
   return (
-    <AdminLayout
-      title="Team Directory"
-      subtitle="Oversee competition teams, review historical statistics, and manage organizational memberships."
-      actions={actions}
-    >
+    <AdminLayout>
       <div style={{
         border: '1px solid var(--color-border-default)',
         borderRadius: '6px',
@@ -116,10 +100,25 @@ function AdminTeamsPage() {
         boxShadow: 'var(--color-shadow-small)',
         overflow: 'hidden'
       }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border-default)' }}>
+        <div style={{
+          padding: '1.5rem',
+          borderBottom: '1px solid var(--color-border-default)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
           <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
             Registered Organization Teams
           </Heading>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setCreateError(null)
+              setIsModalOpen(true)
+            }}
+          >
+            New Team
+          </Button>
         </div>
 
         <div style={{ padding: '1.5rem' }}>

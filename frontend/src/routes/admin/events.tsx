@@ -178,33 +178,11 @@ function AdminEventsListPage() {
     return <Outlet />
   }
 
-  const actions = (
-    <div style={{ display: 'flex', gap: '8px' }}>
-      <Button onClick={() => void loadEvents()}>
-        Refresh
-      </Button>
-      <Button
-        variant="primary"
-        onClick={() => {
-          setShowCreateModal(true)
-          setFormError(null)
-        }}
-      >
-        ➕ Create Event
-      </Button>
-    </div>
-  )
-
   return (
-    <AdminLayout
-      title="Event & Race Operations"
-      subtitle="Select a competition event to manage its lifecycle, competitors, race tracks, and results."
-      actions={actions}
-    >
+    <AdminLayout>
       {globalError && (
         <AlertBanner variant="error">{globalError}</AlertBanner>
       )}
-
       <div style={{
         border: '1px solid var(--color-border-default)',
         borderRadius: '6px',
@@ -212,10 +190,30 @@ function AdminEventsListPage() {
         boxShadow: 'var(--color-shadow-small)',
         overflow: 'hidden'
       }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border-default)' }}>
+        <div style={{
+          padding: '1.5rem',
+          borderBottom: '1px solid var(--color-border-default)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
           <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
             Competition Events
           </Heading>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button onClick={() => void loadEvents()}>
+              Refresh
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setShowCreateModal(true)
+                setFormError(null)
+              }}
+            >
+              Create Event
+            </Button>
+          </div>
         </div>
 
         <div style={{ padding: '1.5rem' }}>

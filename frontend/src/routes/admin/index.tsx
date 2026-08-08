@@ -15,10 +15,7 @@ function AdminPage() {
   const { session } = useAuth()
 
   return (
-    <AdminLayout
-      title="Admin Dashboard"
-      subtitle="Welcome to the Project Lightwing control center. Oversee system entities, manage dynamic event results, and verify ingestion pipelines."
-    >
+    <AdminLayout>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Active Session summary card */}
         <div style={{

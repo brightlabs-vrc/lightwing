@@ -54,10 +54,7 @@ function AdminUsersPage() {
   }, [authHeader, search, page, pageSize])
 
   return (
-    <AdminLayout
-      title="User Account Directory"
-      subtitle="Verify system competitor profiles, review site role authorization levels, and manage global system privileges."
-    >
+    <AdminLayout>
       <div style={{
         border: '1px solid var(--color-border-default)',
         borderRadius: '6px',

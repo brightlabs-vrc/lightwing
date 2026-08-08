@@ -275,11 +275,7 @@ function AdminTeamDetailPage() {
   )
 
   return (
-    <AdminLayout
-      title={team ? team.name : 'Team Detail'}
-      subtitle={team ? `Manage demographics, statistics, and organizational roles for team: ${team.slug}` : 'Demographics and roles details'}
-      actions={team ? actions : undefined}
-    >
+    <AdminLayout>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {error && (
           <AlertBanner variant="error">{error}</AlertBanner>

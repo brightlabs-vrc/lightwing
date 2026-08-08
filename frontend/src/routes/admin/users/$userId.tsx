@@ -172,10 +172,7 @@ function AdminUserDetailPage() {
   }
 
   return (
-    <AdminLayout
-      title="User Profile Detail"
-      subtitle={profile ? `Displaying identity parameters and system privileges for user: ${profile.name}` : `Displaying administrative system attributes for user: ${userId}`}
-    >
+    <AdminLayout>
       <div style={{
         border: '1px solid var(--color-border-default)',
         borderRadius: '6px',
