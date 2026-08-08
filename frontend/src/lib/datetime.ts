@@ -1,7 +1,10 @@
 export function formatLocalDateTime(iso: string): string {
   return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
     timeZoneName: 'short',
   }).format(new Date(iso));
 }
