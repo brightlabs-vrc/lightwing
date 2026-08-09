@@ -109,6 +109,17 @@ test.describe('Layout parity between legacy and Primer migrations', () => {
     await expect(page.locator('text=Manage Events')).toBeVisible()
     await expect(page.locator('text=Manage Users')).toBeVisible()
     await expect(page.locator('text=Manage Teams')).toBeVisible()
+
+    // System statistics cards present
+    await expect(page.getByText('Competition Events', { exact: true })).toBeVisible()
+    await expect(page.getByText('Registered Users', { exact: true })).toBeVisible()
+    await expect(page.getByText('Organization Teams', { exact: true })).toBeVisible()
+
+    // Sidebar navigation visible (not hidden behind dropdown)
+    await expect(page.locator('nav nav a[href="/admin"]')).toBeVisible()
+    await expect(page.locator('nav nav a[href="/admin/events"]')).toBeVisible()
+    await expect(page.locator('nav nav a[href="/admin/users"]')).toBeVisible()
+    await expect(page.locator('nav nav a[href="/admin/teams"]')).toBeVisible()
   })
 
   test('admin events list — event table preserved', async ({ page }) => {

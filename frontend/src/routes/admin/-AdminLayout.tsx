@@ -109,7 +109,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           }}
         >
           <div style={{ padding: '1.5rem 0' }}>
-            <NavList>
+            <NavList aria-label="Admin">
               {navItems.map((item) => (
                 <NavList.Item
                   key={item.to}

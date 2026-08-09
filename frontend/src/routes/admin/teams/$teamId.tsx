@@ -285,7 +285,7 @@ function AdminTeamDetailPage() {
         )}
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.5rem', color: '#57606a' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
             <Spinner size="small" />
             <span>Loading team detail panel...</span>
           </div>
@@ -318,19 +318,19 @@ function AdminTeamDetailPage() {
                   borderRadius: '6px',
                   padding: '1rem'
                 }}>
-                  <p style={{ fontWeight: 'bold', margin: 0, fontSize: '14px', color: team.administratorSlotsRemaining > 0 ? '#065f46' : '#991b1b' }}>
+                  <p style={{ fontWeight: 'bold', margin: 0, fontSize: '14px', color: team.administratorSlotsRemaining > 0 ? 'var(--color-success-emphasis)' : 'var(--color-danger-emphasis)' }}>
                     Administrator Slots Remaining
                   </p>
-                  <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '4px 0 0 0', color: team.administratorSlotsRemaining > 0 ? '#047857' : '#dc2626' }}>
+                  <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '4px 0 0 0', color: team.administratorSlotsRemaining > 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)' }}>
                     {team.administratorSlotsRemaining} / 3 slots
                   </p>
-                  <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: '#57606a' }}>
+                  <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: 'var(--color-fg-muted)' }}>
                     An organization may have at most three administrators belonging to it.
                   </p>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Slug Identifier</span>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Slug Identifier</span>
                   <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>{team.slug}</span>
                 </div>
 
@@ -339,19 +339,19 @@ function AdminTeamDetailPage() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
-                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Season Rank</span>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Season Rank</span>
                       <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.seasonRank ?? 'None'}</span>
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Points Average</span>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Points Average</span>
                       <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.pointsAverage ?? 'None'}</span>
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Ranking Average</span>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Ranking Average</span>
                       <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.rankingAverage ?? 'None'}</span>
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Points / Event</span>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Points / Event</span>
                       <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.averagePointsPerEvent ?? 'None'}</span>
                     </div>
                   </div>
@@ -455,8 +455,8 @@ function AdminTeamDetailPage() {
                   <div style={{
                     textAlign: 'center',
                     padding: '3rem',
-                    color: '#57606a',
-                    border: '1px dashed #d0d7de',
+                    color: 'var(--color-fg-muted)',
+                    border: '1px dashed var(--color-border-default)',
                     borderRadius: '6px'
                   }}>
                     <p>This team does not have any roster members. Click "Add Team Member" to populate the team roster.</p>
@@ -472,7 +472,7 @@ function AdminTeamDetailPage() {
             </div>
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#57606a', border: '1px dashed var(--color-border-default)', borderRadius: '6px' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)', border: '1px dashed var(--color-border-default)', borderRadius: '6px' }}>
             <p>Team data structure could not be mapped.</p>
           </div>
         )}

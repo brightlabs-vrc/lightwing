@@ -114,7 +114,7 @@ function AuthPage() {
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '1.5rem' }}>
               <Spinner size="medium" />
-              <span style={{ fontSize: '14px', color: '#57606a' }}>Checking your session...</span>
+              <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>Checking your session...</span>
             </div>
           ) : null}
 
@@ -131,8 +131,8 @@ function AuthPage() {
                 gap: '0.25rem'
               }}>
                 <span style={{ fontWeight: 'bold', color: 'var(--color-success-fg)' }}>{session.user.name}</span>
-                <span style={{ color: '#57606a' }}>{session.user.email}</span>
-                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '0.5rem', color: '#57606a' }}>
+                <span style={{ color: 'var(--color-fg-muted)' }}>{session.user.email}</span>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '0.5rem', color: 'var(--color-fg-muted)' }}>
                   {session.user.siteRole ?? 'USER'} session active
                 </span>
               </div>

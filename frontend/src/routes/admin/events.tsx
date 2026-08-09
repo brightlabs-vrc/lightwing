@@ -218,12 +218,12 @@ function AdminEventsListPage() {
 
         <div style={{ padding: '1.5rem' }}>
           {loadingEvents ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem', gap: '0.5rem', color: '#57606a' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
               <Spinner size="small" />
               <span>Loading competition events...</span>
             </div>
           ) : events.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#57606a', border: '1px dashed #d0d7de', borderRadius: '6px' }}>
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)', border: '1px dashed var(--color-border-default)', borderRadius: '6px' }}>
               <span>No events found.</span>
             </div>
           ) : (
@@ -256,7 +256,7 @@ function AdminEventsListPage() {
                           {evt.status}
                         </Label>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#57606a', display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--color-fg-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
                         <span>Type: {evt.scoringTypeLabel}</span>
                         <span>Tier: {evt.classRestriction && evt.classRestriction !== 'PRE_OP' && evt.classRestriction !== 'OP' ? evt.classRestriction : 'Any'}</span>
                       </div>
@@ -405,7 +405,7 @@ function AdminEventsListPage() {
                     Enable Granular Per-Race Participation
                   </label>
                 </div>
-                <p style={{ fontSize: '11px', margin: 0, color: '#57606a' }}>
+                <p style={{ fontSize: '11px', margin: 0, color: 'var(--color-fg-muted)' }}>
                   If enabled, participants must be registered separately for each individual race. Otherwise, registrations are event-wide.
                 </p>
               </div>

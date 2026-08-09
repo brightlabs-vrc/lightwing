@@ -378,7 +378,7 @@ function AdminEventDetailPage() {
                   </Button>
                 )}
               </div>
-              <p style={{ fontSize: '12px', color: '#57606a', margin: '4px 0 0 0' }}>ID: {selectedEvent.id}</p>
+              <p style={{ fontSize: '12px', color: 'var(--color-fg-muted)', margin: '4px 0 0 0' }}>ID: {selectedEvent.id}</p>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
@@ -489,7 +489,7 @@ function AdminEventDetailPage() {
               <div style={{
                 textAlign: 'center',
                 padding: '3rem',
-                color: '#57606a',
+                color: 'var(--color-fg-muted)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -521,7 +521,7 @@ function AdminEventDetailPage() {
             <Heading as="h2" style={{ fontSize: '20px', fontWeight: 'bold' }}>
               Event Not Found
             </Heading>
-            <Text style={{ fontSize: '14px', color: '#57606a', display: 'block', margin: '8px 0 1.5rem 0' }}>
+            <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', display: 'block', margin: '8px 0 1.5rem 0' }}>
               The requested event could not be loaded. It may have been deleted.
             </Text>
             <Button as={Link as any} to="/admin/events" variant="primary">
@@ -541,7 +541,7 @@ function AdminEventDetailPage() {
                 <AlertBanner variant="error">{createRaceError}</AlertBanner>
               )}
 
-              <p style={{ fontSize: '13px', color: '#57606a', fontStyle: 'italic', margin: 0 }}>
+              <p style={{ fontSize: '13px', color: 'var(--color-fg-muted)', fontStyle: 'italic', margin: 0 }}>
                 New races are added to the end of the event schedule. You can reorder them later from the race list.
               </p>
 

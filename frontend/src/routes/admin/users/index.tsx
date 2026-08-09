@@ -92,16 +92,16 @@ function AdminUsersPage() {
           )}
 
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.5rem', color: '#57606a' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
               <Spinner size="small" />
               <span>Loading competitor records...</span>
             </div>
           ) : users.length > 0 ? (
             <>
-              <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px', marginBottom: '1rem' }}>
+              <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px', marginBottom: '1rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                   <thead>
-                    <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                    <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                       <th style={{ padding: '12px', fontWeight: 'bold' }}>VRChat Username</th>
                       <th style={{ padding: '12px', fontWeight: 'bold' }}>Discord Name</th>
                       <th style={{ padding: '12px', fontWeight: 'bold' }}>Site Role</th>
@@ -112,7 +112,7 @@ function AdminUsersPage() {
                   </thead>
                   <tbody>
                     {users.map((user) => (
-                      <tr key={user.id} style={{ borderBottom: '1px solid #d0d7de' }}>
+                      <tr key={user.id} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                         <td style={{ padding: '12px', fontWeight: 'bold' }}>
                           <UserLink userId={user.id} name={user.vrchatUsername || '—'} />
                           {user.id === session?.user.id && (
@@ -140,7 +140,7 @@ function AdminUsersPage() {
                               ))}
                             </div>
                           ) : (
-                            <span style={{ color: '#8c959f' }}>None</span>
+                            <span style={{ color: 'var(--color-fg-muted)' }}>None</span>
                           )}
                         </td>
                         <td style={{ padding: '12px' }}>
@@ -169,7 +169,7 @@ function AdminUsersPage() {
             <div style={{
               textAlign: 'center',
               padding: '3rem',
-              color: '#57606a',
+              color: 'var(--color-fg-muted)',
               border: '1px dashed #d0d7de',
               borderRadius: '6px'
             }}>

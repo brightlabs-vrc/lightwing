@@ -199,7 +199,7 @@ function AdminUserDetailPage() {
           )}
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#57606a' }}>
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)' }}>
               <p>Loading user profile...</p>
             </div>
           ) : profile ? (
@@ -348,8 +348,8 @@ function AdminUserDetailPage() {
                               width: '110px',
                               height: '110px',
                               borderRadius: '50%',
-                              backgroundColor: '#cbd5e1',
-                              color: '#475569',
+                              backgroundColor: 'var(--color-canvas-subtle)',
+                              color: 'var(--color-fg-muted)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -369,25 +369,25 @@ function AdminUserDetailPage() {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                           {/* Full Name */}
                           <div>
-                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Full Name</span>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Full Name</span>
                             <span style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>{profile.name || 'None'}</span>
                           </div>
 
                           {/* Slug */}
                           <div>
-                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Slug (Handle)</span>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Slug (Handle)</span>
                             <span style={{ fontSize: '16px', color: 'var(--color-fg-muted)' }}>@{profile.slug || 'None'}</span>
                           </div>
 
                           {/* VRChat Username */}
                           <div>
-                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>VRChat Username</span>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>VRChat Username</span>
                             <span style={{ fontSize: '16px', color: 'var(--color-fg-muted)' }}>{profile.vrchatUsername || 'None'}</span>
                           </div>
 
                           {/* Skill Class Tier */}
                           <div>
-                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Skill Class Tier</span>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Skill Class Tier</span>
                             <Label variant="default">
                               {profile.classTier || 'None / PRE_OP'}
                             </Label>
@@ -395,7 +395,7 @@ function AdminUserDetailPage() {
 
                           {/* System Site Role */}
                           <div>
-                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>System Site Role</span>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>System Site Role</span>
                             <Label variant={profile.siteRole === 'SITE_ADMIN' ? 'success' : 'default'}>
                               {profile.siteRole}
                             </Label>
@@ -403,7 +403,7 @@ function AdminUserDetailPage() {
 
                           {/* Active Competitor ID */}
                           <div>
-                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Active Competitor ID</span>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Active Competitor ID</span>
                             <code style={{ fontSize: '12px', display: 'block', padding: '4px 0' }}>{profile.id}</code>
                           </div>
                         </div>
@@ -413,17 +413,17 @@ function AdminUserDetailPage() {
 
                   {/* Biography */}
                   <div style={{ marginBottom: '1.5rem' }}>
-                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Biography</span>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Biography</span>
                     <div style={{ whiteSpace: 'pre-wrap', backgroundColor: 'var(--color-canvas-subtle)', padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border-default)', minHeight: '60px', color: 'var(--color-fg-default)' }}>
-                      {profile.biography ? profile.biography : <span style={{ color: '#8c959f', fontStyle: 'italic' }}>No biography registered.</span>}
+                      {profile.biography ? profile.biography : <span style={{ color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>No biography registered.</span>}
                     </div>
                   </div>
 
                   {/* Career Overview */}
                   <div style={{ marginBottom: '1.5rem' }}>
-                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Career Overview</span>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Career Overview</span>
                     <div style={{ whiteSpace: 'pre-wrap', backgroundColor: 'var(--color-canvas-subtle)', padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border-default)', minHeight: '60px', color: 'var(--color-fg-default)' }}>
-                      {profile.careerOverview ? profile.careerOverview : <span style={{ color: '#8c959f', fontStyle: 'italic' }}>No career overview highlights registered.</span>}
+                      {profile.careerOverview ? profile.careerOverview : <span style={{ color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>No career overview highlights registered.</span>}
                     </div>
                   </div>
 
@@ -438,55 +438,55 @@ function AdminUserDetailPage() {
 
               {/* Active Team Affiliations */}
               <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
-                <p style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', marginBottom: '0.5rem' }}>Active Team Affiliations</p>
+                <p style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>Active Team Affiliations</p>
                 {profile.teams && profile.teams.length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {profile.teams.map((t) => (
                       <div key={t.organizationId} style={{ backgroundColor: 'var(--color-canvas-subtle)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--color-border-default)' }}>
                         <p style={{ fontWeight: 'bold', margin: 0 }}>{t.name}</p>
-                        <p style={{ color: '#57606a', fontSize: '11px', margin: '4px 0 0 0' }}>Role: <span style={{ fontWeight: 'bold' }}>{t.role}</span></p>
+                        <p style={{ color: 'var(--color-fg-muted)', fontSize: '11px', margin: '4px 0 0 0' }}>Role: <span style={{ fontWeight: 'bold' }}>{t.role}</span></p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p style={{ color: '#57606a', fontSize: '14px' }}>This competitor is not currently affiliated with any registered organization teams.</p>
+                  <p style={{ color: 'var(--color-fg-muted)', fontSize: '14px' }}>This competitor is not currently affiliated with any registered organization teams.</p>
                 )}
               </div>
 
               {/* SITE ROLE ADJUSTMENT ACTIONS */}
               {userId !== session?.user.id ? (
                 <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '1.5rem' }}>
-                  <p style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', marginBottom: '0.5rem' }}>Adjust Global Authorization Privilege</p>
+                  <p style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>Adjust Global Authorization Privilege</p>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <Button
                       onClick={() => adjustSiteRole('SITE_ADMIN')}
                       disabled={updatingRole || profile.siteRole === 'SITE_ADMIN'}
-                      style={{ backgroundColor: '#2e7d32', color: '#fff' }}
+                      style={{ backgroundColor: 'var(--color-success-emphasis)', color: 'var(--color-fg-onEmphasis)' }}
                     >
                       Grant SITE_ADMIN Privilege
                     </Button>
                     <Button
                       onClick={() => adjustSiteRole('USER')}
                       disabled={updatingRole || profile.siteRole === 'USER'}
-                      style={{ backgroundColor: '#d32f2f', color: '#fff' }}
+                      style={{ backgroundColor: 'var(--color-danger-emphasis)', color: 'var(--color-fg-onEmphasis)' }}
                     >
                       Revoke to USER Privilege
                     </Button>
                   </div>
                 </div>
               ) : (
-                <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '6px', padding: '1rem', marginTop: '1.5rem' }}>
-                  <p style={{ color: '#92400e', fontWeight: 'bold', margin: 0 }}>
+                <div style={{ backgroundColor: 'var(--color-attention-subtle)', border: '1px solid var(--color-attention-border)', borderRadius: '6px', padding: '1rem', marginTop: '1.5rem' }}>
+                  <p style={{ color: 'var(--color-attention-fg)', fontWeight: 'bold', margin: 0 }}>
                     Self-Privilege Safeguard
                   </p>
-                  <p style={{ color: '#b45309', fontSize: '12px', margin: '4px 0 0 0' }}>
+                  <p style={{ color: 'var(--color-fg-muted)', fontSize: '12px', margin: '4px 0 0 0' }}>
                     You cannot modify your own global siteRole privileges while active in your current session.
                   </p>
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#57606a', border: '1px dashed var(--color-border-default)', borderRadius: '6px' }}>
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)', border: '1px dashed var(--color-border-default)', borderRadius: '6px' }}>
               <p>Profile was not found or is empty.</p>
             </div>
           )}
