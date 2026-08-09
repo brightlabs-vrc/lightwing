@@ -117,7 +117,7 @@ export function StandingsEditor({
         {isRaceOngoing && (
           <div style={{ marginBottom: '1rem' }}>
             <AlertBanner variant="warning">
-              <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
                 Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
               </span>
             </AlertBanner>
@@ -408,7 +408,7 @@ function StandingsTable({
                           Remove
                         </Button>
                       ) : (
-                        <span style={{ fontSize: '11px', color: '#8c959f', fontStyle: 'italic', padding: '2px 8px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--fgColor-muted)', fontStyle: 'italic', padding: '2px 8px' }}>
                           No changes
                         </span>
                       )}

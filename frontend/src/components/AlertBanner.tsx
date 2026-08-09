@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react'
 import { Flash } from '@primer/react'
+import { AlertIcon, CheckCircleIcon, InfoIcon } from '@primer/octicons-react'
 
 type AlertVariant = 'error' | 'success' | 'warning'
 
@@ -15,6 +16,9 @@ export function AlertBanner({ variant, children, action }: AlertBannerProps) {
   else if (variant === 'error') scheme = 'danger'
   else if (variant === 'warning') scheme = 'warning'
 
+  const icon =
+    variant === 'error' ? <AlertIcon /> : variant === 'success' ? <CheckCircleIcon /> : <InfoIcon />
+
   return (
     <Flash
       variant={scheme}
@@ -28,9 +32,7 @@ export function AlertBanner({ variant, children, action }: AlertBannerProps) {
       }}
     >
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <span>
-          {variant === 'error' ? '⚠️' : variant === 'success' ? '✓' : '📝'}
-        </span>
+        <span>{icon}</span>
         <div style={{ fontSize: '14px' }}>{children}</div>
       </div>
       {action}
