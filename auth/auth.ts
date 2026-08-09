@@ -211,7 +211,9 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
-const frontendUrlFromEnv = getFrontendUrl();
+const configuredFrontendUrl = getFrontendUrl();
+const frontendUrlFromEnv =
+  typeof configuredFrontendUrl === "string" ? configuredFrontendUrl : undefined;
 
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),

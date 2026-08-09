@@ -1,4 +1,4 @@
-import { describe, expect, test, afterEach } from "vitest";
+import { describe, expect, test, afterEach, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { prisma } from "./prisma";
 import {
@@ -10,6 +10,10 @@ import {
   generateUniqueOrgSlug,
 } from "../lib/slugs";
 import { ensureUserSlug } from "./auth";
+
+vi.mock("encore.dev/config", () => ({
+  secret: () => () => "test-secret-at-least-32-chars-long-abcdef",
+}));
 
 describe("Slug Helpers and Recovery", () => {
   const createdUserIds: string[] = [];
