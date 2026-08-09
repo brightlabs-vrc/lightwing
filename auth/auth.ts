@@ -8,6 +8,7 @@ import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
 import log from "encore.dev/log";
 import { prisma } from "./prisma";
+import { getFrontendUrl } from "./frontend-url";
 import {
   administratorRole,
   administratorRoleLimit,
@@ -210,7 +211,7 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
-const frontendUrlFromEnv = process.env.FRONTEND_URL?.replace(/\/$/, "");
+const frontendUrlFromEnv = getFrontendUrl();
 
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
@@ -221,7 +222,8 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     "http://localhost:4000",
     "http://localhost:3000",
     "http://localhost:5173",
-    // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
+    // This is set either by the Encore platform at deploy time or via the
+    // optional FRONTEND_URL secret when the frontend needs a separate origin.
     appMeta().apiBaseUrl,
     ...(frontendUrlFromEnv ? [frontendUrlFromEnv] : []),
   ],
