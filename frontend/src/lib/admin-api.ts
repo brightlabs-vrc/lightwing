@@ -953,6 +953,7 @@ export async function replaceRaceResults(
     finishTime: r.finishTime ?? null,
     margin: r.margin ?? null,
     passingOrder: r.passingOrder ?? null,
+    final3F: r.final3F ?? null,
     resultStatus: r.resultStatus ?? null,
     createdAt: now,
     updatedAt: now,
@@ -993,6 +994,7 @@ export async function mergeRaceResults(
       margin: r.margin ?? null,
       passingOrder: r.passingOrder ?? null,
       final3F: r.final3F ?? null,
+      resultStatus: r.resultStatus ?? null,
       createdAt: idx >= 0 ? updatedList[idx].createdAt : now,
       updatedAt: now,
     }
