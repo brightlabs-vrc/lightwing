@@ -8,6 +8,7 @@ export type EditedResult = {
   margin: string
   passingOrder: string
   final3F: string
+  resultStatus: string
 }
 
 export const EMPTY_EDIT: EditedResult = {
@@ -18,6 +19,7 @@ export const EMPTY_EDIT: EditedResult = {
   margin: '',
   passingOrder: '',
   final3F: '',
+  resultStatus: '',
 }
 
 export type RowState = 'unchanged' | 'new' | 'modified' | 'pending_delete'
@@ -48,6 +50,7 @@ export function editsFromResults(results: eventmanager.RaceResultView[]): Record
       margin: res.margin ?? '',
       passingOrder: res.passingOrder ?? '',
       final3F: res.final3F ?? '',
+      resultStatus: res.resultStatus ?? '',
     }
   }
   return nextEdits
@@ -77,6 +80,7 @@ export function deriveRows(
       const savedMargin = savedResult.margin ?? ''
       const savedPassing = savedResult.passingOrder ?? ''
       const savedFinal3F = savedResult.final3F ?? ''
+      const savedStatus = savedResult.resultStatus ?? ''
 
       if (
         edit.position !== savedPos ||
@@ -85,7 +89,8 @@ export function deriveRows(
         edit.finishTime !== savedFinish ||
         edit.margin !== savedMargin ||
         edit.passingOrder !== savedPassing ||
-        edit.final3F !== savedFinal3F
+        edit.final3F !== savedFinal3F ||
+        edit.resultStatus !== savedStatus
       ) {
         rowState = 'modified'
       }
@@ -97,7 +102,8 @@ export function deriveRows(
         edit.finishTime === '' &&
         edit.margin === '' &&
         edit.passingOrder === '' &&
-        edit.final3F === ''
+        edit.final3F === '' &&
+        edit.resultStatus === ''
 
       if (!isDefault) {
         rowState = 'new'
@@ -184,7 +190,11 @@ export function inferFinishTimes(
   rows: DerivedRow[],
   editedResults: Record<string, EditedResult>,
 ): { error: string } | { edits: Record<string, EditedResult>; inferredCount: number } {
-  const activeRows = rows.filter((d) => d.rowState !== 'pending_delete')
+  // DSQ/DNF rows are excluded — they have no valid position and cannot have
+  // inferred finish times.
+  const activeRows = rows.filter(
+    (d) => d.rowState !== 'pending_delete' && d.edit.resultStatus !== 'DSQ' && d.edit.resultStatus !== 'DNF'
+  )
 
   // 1. Verify all rows have valid numeric positions
   for (const d of activeRows) {
@@ -274,6 +284,7 @@ export function editedToRaceResultInput(userId: string, edit: EditedResult): eve
     margin: edit.margin.trim() !== '' ? edit.margin.trim() : null,
     passingOrder: edit.passingOrder.trim() !== '' ? edit.passingOrder.trim() : null,
     final3F: edit.final3F.trim() !== '' ? edit.final3F.trim() : null,
+    resultStatus: edit.resultStatus.trim() !== '' ? edit.resultStatus.trim() : null,
   }
 }
 
@@ -288,5 +299,6 @@ export function savedToRaceResultInput(saved: eventmanager.RaceResultView): even
     margin: saved.margin,
     passingOrder: saved.passingOrder,
     final3F: saved.final3F,
+    resultStatus: saved.resultStatus,
   }
 }

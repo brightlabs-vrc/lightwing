@@ -98,6 +98,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                   <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Name</div></th>
                   <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
                   <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Total Points</div></th>
+                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status</div></th>
                 </tr>
               </thead>
               <tbody>
@@ -107,6 +108,9 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                     <td><UserLink userId={item.userId} name={item.name} /></td>
                     <td><code className="text-xs">{item.userId}</code></td>
                     <td><strong>{item.points} pts</strong></td>
+                    <td>
+                      {item.resultStatus === 'DSQ' ? 'DSQ' : item.resultStatus === 'DNF' ? 'DNF' : ''}
+                    </td>
                   </tr>
                 ))}
               </tbody>

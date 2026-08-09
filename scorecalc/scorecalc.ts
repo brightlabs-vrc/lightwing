@@ -175,9 +175,11 @@ export async function handleScoreCalcCompleted(event: ScoreCalcCompleted): Promi
             eventId,
             userId: entry.userId,
             points: entry.points,
+            resultStatus: entry.resultStatus ?? null,
           },
           update: {
             points: entry.points,
+            resultStatus: entry.resultStatus ?? null,
           },
         });
       }

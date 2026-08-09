@@ -116,6 +116,16 @@ function EventDetailPage() {
       width: 128,
       render: (e) => <span className="text-retro-primary">{e.points}</span>,
     },
+    {
+      key: 'resultStatus',
+      header: 'STATUS',
+      width: 96,
+      render: (e) => {
+        if (e.resultStatus === 'DSQ') return <span className="text-red-600 font-bold">DSQ</span>
+        if (e.resultStatus === 'DNF') return <span className="text-orange-600 font-bold">DNF</span>
+        return null
+      },
+    },
   ]
 
   const ladderColumns: PixelTableColumn<eventmanager.LadderEntryView>[] = [

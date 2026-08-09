@@ -61,6 +61,7 @@ export const replaceRaceResults = api(
           customScoringTables: event.customScoringTables,
           grade: race.grade,
           position: entry.position ?? null,
+          resultStatus: entry.resultStatus ?? null,
         });
       }
 
@@ -129,6 +130,7 @@ export const mergeRaceResults = api(
           customScoringTables: event.customScoringTables,
           grade: race.grade,
           position: entry.position ?? null,
+          resultStatus: entry.resultStatus ?? null,
         });
       }
 

@@ -114,22 +114,42 @@ describe("Scorecalc Asynchronous Event-Driven Pipeline", () => {
       eventId: "test-event",
       members: ["user-c", "user-a", "user-b"],
       raceResults: [
-        { userId: "user-a", points: 10 },
-        { userId: "user-b", points: 5 },
-        { userId: "user-a", points: 20 },
+        { userId: "user-a", points: 10, resultStatus: null },
+        { userId: "user-b", points: 5, resultStatus: null },
+        { userId: "user-a", points: 20, resultStatus: null },
       ],
     });
 
     // Output is sorted alphabetically by userId
     expect(projection.entries).toEqual([
-      { userId: "user-a", points: 30 },
-      { userId: "user-b", points: 5 },
-      { userId: "user-c", points: 0 },
+      { userId: "user-a", points: 30, resultStatus: null },
+      { userId: "user-b", points: 5, resultStatus: null },
+      { userId: "user-c", points: 0, resultStatus: null },
     ]);
 
     const checksum1 = computeChecksum(projection.entries);
     const checksum2 = computeChecksum(projection.entries);
     expect(checksum1).toBe(checksum2);
+  });
+
+  test("DSQ and DNF results carry resultStatus through projection with 0 points", () => {
+    const projection = calculateEventProjection({
+      eventId: "test-event-dsq-dnf",
+      members: ["user-a", "user-b", "user-c", "user-d"],
+      raceResults: [
+        { userId: "user-a", points: 10, resultStatus: null },
+        { userId: "user-b", points: 0, resultStatus: "DSQ" },
+        { userId: "user-c", points: 0, resultStatus: "DNF" },
+        { userId: "user-d", points: 5, resultStatus: null },
+      ],
+    });
+
+    expect(projection.entries).toEqual([
+      { userId: "user-a", points: 10, resultStatus: null },
+      { userId: "user-b", points: 0, resultStatus: "DSQ" },
+      { userId: "user-c", points: 0, resultStatus: "DNF" },
+      { userId: "user-d", points: 5, resultStatus: null },
+    ]);
   });
 
   test("submitting calculation creates a job, increments generation, and publishes ScoreCalcRequested", async () => {
@@ -232,7 +252,7 @@ describe("Scorecalc Asynchronous Event-Driven Pipeline", () => {
     const computedAt = new Date().toISOString();
     const result = {
       eventId,
-      entries: [{ userId, points: 40 }], // 25 + 15
+      entries: [{ userId, points: 40, resultStatus: null }], // 25 + 15
     };
     const resultChecksum = computeChecksum(result.entries);
 
@@ -301,7 +321,7 @@ describe("Scorecalc Asynchronous Event-Driven Pipeline", () => {
     // Now, we receive a delayed completed event for Gen 1 (e.g. slow network)
     const resultGen1 = {
       eventId,
-      entries: [{ userId, points: 10 }],
+      entries: [{ userId, points: 10, resultStatus: null }],
     };
     await handleScoreCalcCompleted({
       version: 1,
@@ -328,7 +348,7 @@ describe("Scorecalc Asynchronous Event-Driven Pipeline", () => {
     // Now, process Gen 2 completion
     const resultGen2 = {
       eventId,
-      entries: [{ userId, points: 50 }],
+      entries: [{ userId, points: 50, resultStatus: null }],
     };
     await handleScoreCalcCompleted({
       version: 1,

@@ -67,6 +67,7 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
         margin: '—',
         passingOrder: '3-2-1',
         final3F: '34.5',
+        resultStatus: null,
         createdAt: now,
         updatedAt: now,
       },
@@ -81,6 +82,7 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
         margin: '2 lengths',
         passingOrder: '1-1-2',
         final3F: '35.0',
+        resultStatus: null,
         createdAt: now,
         updatedAt: now,
       },
@@ -121,9 +123,9 @@ let mockEvents: eventmanager.EventDetail[] = [
     members: mockEventMembers,
     schedules: [],
     pointsOverview: [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10 },
-      { userId: 'mock-user-2', name: 'Shadow Runner', points: 6 },
-      { userId: 'mock-user-3', name: 'Swift Galloper', points: 0 },
+      { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10, resultStatus: null },
+      { userId: 'mock-user-2', name: 'Shadow Runner', points: 6, resultStatus: null },
+      { userId: 'mock-user-3', name: 'Swift Galloper', points: 0, resultStatus: null },
     ],
     ladderOverview: null,
     createdAt: now,
@@ -881,6 +883,7 @@ export async function assignRaceResult(
     margin?: string | null
     passingOrder?: string | null
     final3F?: string | null
+    resultStatus?: string | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceResultView> {
@@ -894,6 +897,7 @@ export async function assignRaceResult(
       margin: params.margin,
       passingOrder: params.passingOrder,
       final3F: params.final3F,
+      resultStatus: params.resultStatus ?? null,
     })
   }
 
@@ -911,6 +915,7 @@ export async function assignRaceResult(
     margin: params.margin ?? null,
     passingOrder: params.passingOrder ?? null,
     final3F: params.final3F ?? null,
+    resultStatus: params.resultStatus ?? null,
     createdAt: existingResult?.createdAt ?? now,
     updatedAt: now,
   }
@@ -948,7 +953,7 @@ export async function replaceRaceResults(
     finishTime: r.finishTime ?? null,
     margin: r.margin ?? null,
     passingOrder: r.passingOrder ?? null,
-    final3F: r.final3F ?? null,
+    resultStatus: r.resultStatus ?? null,
     createdAt: now,
     updatedAt: now,
   }))
@@ -1183,10 +1188,14 @@ function recomputeMockOverview(eventId: string) {
 
   // Accumulate points across all races of this event
   const pointsTotals: Record<string, number> = {}
+  const statusTotals: Record<string, string | null> = {}
   for (const race of event.raceEvents) {
     const results = mockRaceResultsMap.get(race.id) ?? []
     for (const res of results) {
       pointsTotals[res.userId] = (pointsTotals[res.userId] ?? 0) + res.points
+      if (res.resultStatus === 'DSQ' || res.resultStatus === 'DNF') {
+        statusTotals[res.userId] = res.resultStatus
+      }
     }
   }
 
@@ -1195,6 +1204,7 @@ function recomputeMockOverview(eventId: string) {
       userId: member.userId,
       name: member.name,
       points: pointsTotals[member.userId] ?? 0,
+      resultStatus: statusTotals[member.userId] ?? null,
     })).sort((a, b) => b.points - a.points)
   }
 }

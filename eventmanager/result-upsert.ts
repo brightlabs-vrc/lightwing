@@ -39,6 +39,7 @@ export function buildRaceResultUpsert(
       margin: entry.margin === undefined ? undefined : entry.margin,
       passingOrder: entry.passingOrder === undefined ? undefined : entry.passingOrder,
       final3F: entry.final3F === undefined ? undefined : entry.final3F,
+      resultStatus: entry.resultStatus === undefined ? undefined : entry.resultStatus,
     },
   };
 }

@@ -191,7 +191,11 @@ function StandingsTable({
   raceGrade,
   isRaceNotStarted = false,
 }: StandingsTableProps) {
-  const getPreviewPoints = (positionStr: string): number => {
+  const getPreviewPoints = (positionStr: string, resultStatus: string): number => {
+    // DSQ/DNF always resolve to 0 points
+    if (resultStatus === 'DSQ' || resultStatus === 'DNF') {
+      return 0
+    }
     const position = parseInt(positionStr, 10);
     if (isNaN(position) || position < 1 || position > 10) return 0;
     if (!raceGrade) return 0;
@@ -217,7 +221,8 @@ function StandingsTable({
             <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Finish Time</div></th>
             <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Behind</div></th>
             <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Passing Order</div></th>
-            <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Final 3F</div></th>
+            <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Final 3F</div></th>
+            <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Outcome</div></th>
             <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status</div></th>
             <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate">Staged Actions</div></th>
           </tr>
@@ -277,7 +282,7 @@ function StandingsTable({
                 <td>
                   {scoringType === 1 ? (
                     <div style={{ fontWeight: 'bold', color: '#0176d3', fontSize: '13px', textAlign: 'center' }}>
-                      {getPreviewPoints(edit.position)} pts <span style={{ fontSize: '9px', color: '#64748b', display: 'block' }}>(Auto)</span>
+                      {getPreviewPoints(edit.position, edit.resultStatus)} pts <span style={{ fontSize: '9px', color: '#64748b', display: 'block' }}>(Auto)</span>
                     </div>
                   ) : (
                     <div className="slds-form-element">
@@ -356,6 +361,19 @@ function StandingsTable({
                   </div>
                 </td>
                 <td>
+                  <select
+                    disabled={isDeleted}
+                    value={edit.resultStatus}
+                    onChange={(e) => onResultChange(member.userId, 'resultStatus', e.target.value)}
+                    className="slds-input"
+                    style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                  >
+                    <option value="">Normal</option>
+                    <option value="DSQ">DSQ — Did Not Qualify</option>
+                    <option value="DNF">DNF — Did Not Finish</option>
+                  </select>
+                </td>
+                <td>
                   {isDeleted ? (
                     <span className="slds-badge slds-theme_error" style={{ padding: '2px 8px', background: '#dc2626', color: '#fff', borderRadius: '4px' }}>
                       Pending Deletion
@@ -370,7 +388,7 @@ function StandingsTable({
                     </span>
                   ) : savedResult ? (
                     <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', background: '#2e7d32', color: '#fff', borderRadius: '4px' }}>
-                      {isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
+                      {savedResult.resultStatus === 'DSQ' ? 'DSQ' : savedResult.resultStatus === 'DNF' ? 'DNF' : isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
                     </span>
                   ) : (
                     <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', background: '#e0e0e0', color: '#555', borderRadius: '4px' }}>
