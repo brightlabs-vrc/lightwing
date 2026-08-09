@@ -44,7 +44,7 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { resolvedColorMode } = useColorMode()
 
   return (
-    <ThemeProvider colorMode={resolvedColorMode}>
+    <ThemeProvider colorMode={resolvedColorMode === 'dark' ? 'night' : 'day'}>
       <BaseStyles style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {children}
       </BaseStyles>
