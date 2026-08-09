@@ -210,7 +210,7 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
-const frontendUrlFromEnv = process.env.FRONTEND_URL?.replace(/\/$/, "") || secret("FRONTEND_URL");
+const frontendUrlFromEnv = process.env.FRONTEND_URL?.replace(/\/$/, "") || secret("FRONTEND_URL")();
 
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
