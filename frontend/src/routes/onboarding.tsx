@@ -4,14 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { requireAuth } from '../lib/auth-guard'
 import { updateMyProfile } from '../lib/public-api'
-import {
-  PixelContainer,
-  PixelStack,
-  PixelCard,
-  PixelInput,
-  PixelButton,
-  PixelSectionHeader,
-} from '@pxlkit/ui-kit'
+import { Heading, Text, Button, TextInput, FormControl } from '@primer/react'
 
 export const Route = createFileRoute('/onboarding')({
   beforeLoad: async ({ location }) => {
@@ -32,7 +25,6 @@ function OnboardingPage() {
         `Bearer ${session?.session.token ?? ''}`,
       ),
     onSuccess: () => {
-      // Redirect to events after completing onboarding
       window.location.href = '/events'
     },
   })
@@ -43,39 +35,56 @@ function OnboardingPage() {
   }
 
   return (
-    <PixelContainer maxWidth="md" padding="lg" className="min-h-screen flex items-center justify-center">
-      <PixelCard className="w-full">
-        <PixelStack gap={4}>
-          <PixelSectionHeader
-            title="WELCOME TO LIGHTWING!"
-            titleTone="purple"
-            size="md"
-            description="Please set your VRChat username to complete your profile."
-          />
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <PixelInput
-              label="VRCHAT USERNAME"
+    <div style={{
+      minHeight: '80vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem',
+    }}>
+      <div style={{
+        maxWidth: '480px',
+        width: '100%',
+        backgroundColor: 'var(--color-canvas-default)',
+        border: '1px solid var(--color-border-default)',
+        borderRadius: '12px',
+        padding: '2rem',
+        boxShadow: 'var(--color-shadow-large)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.5rem',
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'center' }}>
+          <Heading as="h1" style={{ fontSize: '28px', color: 'var(--color-accent-fg)' }}>
+            Welcome to Lightwing!
+          </Heading>
+          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>
+            Please set your VRChat username to complete your profile.
+          </Text>
+        </div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <FormControl required>
+            <FormControl.Label style={{ fontWeight: 'bold' }}>VRChat Username</FormControl.Label>
+            <TextInput
               placeholder="e.g. user123"
               value={vrchatUsername}
               onChange={(e) => setVrchatUsername(e.target.value)}
               autoFocus
               required
+              width="100%"
             />
+          </FormControl>
 
-            <PixelButton
-              type="submit"
-              variant="solid"
-              tone="green"
-              className="w-full"
-              loading={updateMutation.isPending}
-              disabled={updateMutation.isPending}
-            >
-              {updateMutation.isPending ? 'SAVING...' : 'CONTINUE TO EVENTS'}
-            </PixelButton>
-          </form>
-        </PixelStack>
-      </PixelCard>
-    </PixelContainer>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={updateMutation.isPending}
+            style={{ width: '100%', padding: '12px' }}
+          >
+            {updateMutation.isPending ? 'Saving...' : 'Continue to Events'}
+          </Button>
+        </form>
+      </div>
+    </div>
   )
 }

@@ -2,6 +2,8 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { eventmanager } from '../lib/client'
 import { getRaceStatusLabel } from '../lib/raceStatus'
+import { Label, Button, IconButton } from '@primer/react'
+import { ChevronUpIcon, ChevronDownIcon } from '@primer/octicons-react'
 
 export interface SortableRaceItemProps {
   race: eventmanager.RaceEventDetail
@@ -35,15 +37,15 @@ export function SortableRaceItem({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    border: '1px solid #dddbda',
-    borderRadius: '4px',
-    background: isSelected ? '#0176d3' : '#ffffff',
+    border: '1px solid var(--color-border-default)',
+    borderRadius: '6px',
+    background: isSelected ? 'var(--color-accent-emphasis)' : 'var(--color-canvas-default)',
     padding: '8px',
     marginBottom: '8px',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    boxShadow: isDragging ? '0 5px 15px rgba(0,0,0,0.15)' : 'none',
+    boxShadow: isDragging ? 'var(--color-shadow-large)' : 'none',
     zIndex: isDragging ? 1000 : 'auto',
   }
 
@@ -51,16 +53,16 @@ export function SortableRaceItem({
 
   return (
     <div ref={setNodeRef} style={style}>
-      {/* Left side: Drag handle. Only the drag handle should initiate drag behavior */}
+      {/* Left side: Drag handle */}
       <div
         {...attributes}
         {...listeners}
         style={{
           cursor: 'grab',
           padding: '4px 8px',
-          background: '#f1f5f9',
-          border: '1px solid #cbd5e1',
-          borderRadius: '4px',
+          backgroundColor: 'var(--color-canvas-subtle)',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '6px',
           userSelect: 'none',
           display: 'flex',
           alignItems: 'center',
@@ -68,10 +70,10 @@ export function SortableRaceItem({
         }}
         title="Drag to reorder"
       >
-        <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#64748b' }}>☰</span>
+        <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--color-fg-muted)' }}>☰</span>
       </div>
 
-      {/* Center: main body. Clicking anywhere else selects the race */}
+      {/* Center: main body */}
       <div
         onClick={onSelect}
         style={{
@@ -81,65 +83,44 @@ export function SortableRaceItem({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px', color: isSelected ? '#ffffff' : '#1e293b' }}>
+          <span style={{
+            fontWeight: 'bold',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontSize: '13px',
+            color: isSelected ? 'var(--color-fg-on-emphasis)' : 'var(--color-fg-default)'
+          }}>
             #{race.sequence}. {race.name}
           </span>
-          <span
-            className="slds-badge"
-            style={{
-              padding: '1px 6px',
-              fontSize: '10px',
-              backgroundColor: statusText === 'Live' ? '#2e7d32' : statusText === 'Done' ? '#475569' : '#0284c7',
-              color: '#ffffff',
-            }}
-          >
+          <Label variant={statusText === 'Live' ? 'success' : statusText === 'Done' ? 'default' : 'accent'}>
             {statusText}
-          </span>
+          </Label>
         </div>
       </div>
 
       {/* Right side: fallback controls */}
       <div style={{ display: 'flex', gap: '4px' }}>
-        <button
-          type="button"
+        <IconButton
+          icon={ChevronUpIcon}
+          aria-label="Move up"
           disabled={isFirst}
           onClick={(e) => {
             e.stopPropagation()
             if (onMoveUp) onMoveUp()
           }}
-          className="slds-button slds-button_neutral"
-          style={{
-            padding: '2px 6px',
-            fontSize: '11px',
-            height: '24px',
-            lineHeight: '20px',
-            borderRadius: '3px',
-            color: isSelected ? '#1e293b' : undefined,
-          }}
-          title="Move up"
-        >
-          &uarr;
-        </button>
-        <button
-          type="button"
+          size="small"
+        />
+        <IconButton
+          icon={ChevronDownIcon}
+          aria-label="Move down"
           disabled={isLast}
           onClick={(e) => {
             e.stopPropagation()
             if (onMoveDown) onMoveDown()
           }}
-          className="slds-button slds-button_neutral"
-          style={{
-            padding: '2px 6px',
-            fontSize: '11px',
-            height: '24px',
-            lineHeight: '20px',
-            borderRadius: '3px',
-            color: isSelected ? '#1e293b' : undefined,
-          }}
-          title="Move down"
-        >
-          &darr;
-        </button>
+          size="small"
+        />
       </div>
     </div>
   )

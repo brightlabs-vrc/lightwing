@@ -3,6 +3,7 @@ import type { eventmanager } from '../lib/client'
 import { SortableRaceItem } from './SortableRaceItem'
 import { RaceListButton } from './RaceListButton'
 import { getRaceStatusLabel } from '../lib/raceStatus'
+import { Heading, Text, Button } from '@primer/react'
 import {
   DndContext,
   closestCenter,
@@ -106,24 +107,30 @@ export function RaceListPanel({
   }
 
   return (
-    <div style={{ flex: '1 1 300px', maxWidth: '360px', background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
+    <div style={{
+      flex: '1 1 300px',
+      maxWidth: '360px',
+      backgroundColor: 'var(--color-canvas-subtle)',
+      border: '1px solid var(--color-border-default)',
+      borderRadius: '6px',
+      padding: '16px'
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
+        <Heading as="h3" style={{ fontSize: '14px', margin: 0, fontWeight: 'bold' }}>
           Configure / Manage Tracks
-        </h3>
-        <button
-          type="button"
+        </Heading>
+        <Button
+          size="small"
           onClick={() => setIsReordering(!isReordering)}
-          className={`slds-button ${isReordering ? 'slds-button_brand' : 'slds-button_neutral'}`}
-          style={{ padding: '2px 10px', fontSize: '11px', height: '28px' }}
+          variant={isReordering ? 'primary' : 'default'}
         >
           {isReordering ? 'Done' : 'Reorder'}
-        </button>
+        </Button>
       </div>
 
       {isReordering ? (
         <div style={{ marginBottom: '16px' }}>
-          <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px', lineHeight: '1.4', fontStyle: 'italic' }}>
+          <p style={{ fontSize: '12px', color: 'var(--color-fg-muted)', marginBottom: '12px', lineHeight: '1.4', fontStyle: 'italic' }}>
             Drag items or use the arrows to reorder. Changes are saved automatically.
           </p>
           {(() => {
@@ -157,16 +164,16 @@ export function RaceListPanel({
           })()}
         </div>
       ) : (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Group: Ongoing */}
           {ongoingRaces.length > 0 && (
-            <div className="slds-m-bottom_medium">
-              <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
+            <div>
+              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: 'var(--color-fg-muted)', margin: '0 0 8px 0' }}>
                 Ongoing ({ongoingRaces.length})
               </h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {ongoingRaces.map((race) => (
-                  <li key={race.id} className="slds-m-bottom_xx-small">
+                  <li key={race.id}>
                     <RaceListButton
                       race={race}
                       isSelected={selectedRaceId === race.id}
@@ -181,13 +188,13 @@ export function RaceListPanel({
 
           {/* Group: Concluded */}
           {concludedRaces.length > 0 && (
-            <div className="slds-m-bottom_medium">
-              <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
+            <div>
+              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: 'var(--color-fg-muted)', margin: '0 0 8px 0' }}>
                 Concluded ({concludedRaces.length})
               </h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {concludedRaces.map((race) => (
-                  <li key={race.id} className="slds-m-bottom_xx-small">
+                  <li key={race.id}>
                     <RaceListButton
                       race={race}
                       isSelected={selectedRaceId === race.id}
@@ -203,12 +210,12 @@ export function RaceListPanel({
           {/* Group: Not Started */}
           {notStartedRaces.length > 0 && (
             <div>
-              <h4 className="slds-text-title_caps text-slate-500 font-bold slds-m-bottom_xx-small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em' }}>
+              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: 'var(--color-fg-muted)', margin: '0 0 8px 0' }}>
                 Not Started ({notStartedRaces.length})
               </h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {notStartedRaces.map((race) => (
-                  <li key={race.id} className="slds-m-bottom_xx-small">
+                  <li key={race.id}>
                     <RaceListButton
                       race={race}
                       isSelected={selectedRaceId === race.id}
@@ -220,7 +227,7 @@ export function RaceListPanel({
               </ul>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

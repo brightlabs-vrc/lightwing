@@ -3,19 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { listPublicEvents } from '../../lib/public-api'
-import { Pagination } from '../../components/Pagination'
+import { PaginationBar } from '../../components/Pagination'
 import { formatLocalDateTime } from '../../lib/datetime'
-import {
-  PixelContainer,
-  PixelStack,
-  PixelCard,
-  PixelBadge,
-  PixelSectionHeader,
-  PixelSpinner,
-  PixelEmptyState,
-} from '@pxlkit/ui-kit'
+import { Heading, Text, Label, Button, Spinner } from '@primer/react'
 import type { eventmanager } from '../../lib/client'
-import { PixelSkeletonList } from '../../components/LoadingSkeleton'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
   PRE_OP: 'PRE-OP',
@@ -37,11 +28,11 @@ const STATUS_LABELS: Record<eventmanager.EventStatus, string> = {
   CONCLUDED: 'Concluded',
 }
 
-const STATUS_TONE: Record<eventmanager.EventStatus, 'neutral' | 'cyan' | 'green' | 'pink'> = {
-  DRAFT: 'neutral',
-  UNOFFICIAL: 'cyan',
-  OFFICIAL: 'green',
-  CONCLUDED: 'pink',
+const STATUS_TONE: Record<eventmanager.EventStatus, 'default' | 'accent' | 'success' | 'severe'> = {
+  DRAFT: 'default',
+  UNOFFICIAL: 'accent',
+  OFFICIAL: 'success',
+  CONCLUDED: 'severe',
 }
 
 export const Route = createFileRoute('/events/')({
@@ -61,49 +52,54 @@ function EventsPage() {
 
   if (isLoading) {
     return (
-      <PixelContainer maxWidth="full" padding="md">
-        <PixelSectionHeader
-          title="COMPETITIVE EVENTS"
-          titleTone="purple"
-          size="lg"
-        />
-        <div className="mt-6">
-          <PixelSkeletonList count={3} />
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <Heading as="h1" style={{ fontSize: '28px', color: 'var(--color-accent-fg)' }}>
+          Competitive Events
+        </Heading>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
+          <Spinner size="medium" />
+          <span>Loading events...</span>
         </div>
-      </PixelContainer>
-    )
-  }
-  if (error) {
-    return (
-      <PixelContainer maxWidth="md" padding="md">
-        <PixelEmptyState
-          title="Error loading events"
-          description="Something went wrong while fetching the event list."
-        />
-      </PixelContainer>
+      </div>
     )
   }
 
-  // Filter events to exclude DRAFT
+  if (error) {
+    return (
+      <div style={{ maxWidth: '640px', margin: '4rem auto', textAlign: 'center' }}>
+        <Heading as="h2" style={{ fontSize: '20px', color: 'var(--color-danger-fg)' }}>
+          Error loading events
+        </Heading>
+        <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', marginTop: '8px', display: 'block' }}>
+          Something went wrong while fetching the event list.
+        </Text>
+      </div>
+    )
+  }
+
   const publicEvents = data?.events.filter((event) => event.status !== 'DRAFT') || []
 
   return (
-    <PixelContainer maxWidth="full" padding="md">
-      <PixelSectionHeader
-        title="COMPETITIVE EVENTS"
-        titleTone="purple"
-        size="lg"
-        actions={
-          <PixelBadge tone="neutral">{publicEvents.length} ACTIVE</PixelBadge>
-        }
-      />
+    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <Heading as="h1" style={{ fontSize: '28px', color: 'var(--color-accent-fg)', margin: 0 }}>
+          Competitive Events
+        </Heading>
+        <Label variant="default">{publicEvents.length} ACTIVE</Label>
+      </div>
 
-      <PixelStack gap={6} className="mt-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {publicEvents.length === 0 ? (
-          <PixelEmptyState
-            title="No public events active"
-            description="There are no public events running at this moment."
-          />
+          <div style={{
+            textAlign: 'center',
+            padding: '4rem',
+            border: '1px dashed var(--color-border-default)',
+            borderRadius: '8px',
+            color: 'var(--color-fg-muted)'
+          }}>
+            <Heading as="h3" style={{ fontSize: '18px', margin: '0 0 8px 0' }}>No public events active</Heading>
+            <Text style={{ fontSize: '14px' }}>There are no public events running at this moment.</Text>
+          </div>
         ) : (
           <>
             {publicEvents.map((event) => {
@@ -112,61 +108,76 @@ function EventsPage() {
                   key={event.id}
                   to="/events/$eventId"
                   params={{ eventId: event.id }}
-                  className="block"
+                  style={{ textDecoration: 'none', display: 'block' }}
                 >
-                  <PixelCard className="hover:border-retro-primary transition-all duration-150">
-                    <PixelStack gap={4}>
-                      <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
-                        <PixelStack gap={2}>
-                          <h2 className="text-xl font-pixel tracking-wide text-retro-text">
-                            {event.name}
-                          </h2>
-                          {event.scheduledAt && (
-                            <div className="font-pixel text-[11px] text-retro-gold">
-                              SCHEDULED: {formatLocalDateTime(event.scheduledAt)}
-                            </div>
-                          )}
-                          {event.description && (
-                            <p className="text-base text-retro-muted max-w-2xl font-sans leading-relaxed">
-                              {event.description}
-                            </p>
-                          )}
-                        </PixelStack>
-                        <PixelBadge tone={STATUS_TONE[event.status]}>
-                          {STATUS_LABELS[event.status].toUpperCase()}
-                        </PixelBadge>
-                      </PixelStack>
-
-                      <PixelStack direction="row" gap={4} wrap>
-                        <PixelBadge tone="neutral">
-                          SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
-                        </PixelBadge>
-                        <PixelBadge tone="neutral">
-                          CLASS:{' '}
-                          {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP'
-                            ? CLASS_TIER_LABELS[event.classRestriction as any]
-                            : 'OPEN'}
-                        </PixelBadge>
-                        <PixelBadge tone="neutral">RACES: {event.raceCount}</PixelBadge>
-                        <PixelBadge tone="neutral">MEMBERS: {event.memberCount}</PixelBadge>
-                      </PixelStack>
-                    </PixelStack>
-                  </PixelCard>
+                  <div
+                    style={{
+                      backgroundColor: 'var(--color-canvas-default)',
+                      border: '1px solid var(--color-border-default)',
+                      borderRadius: '8px',
+                      padding: '1.5rem',
+                      boxShadow: 'var(--color-shadow-small)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-accent-emphasis)'
+                      e.currentTarget.style.boxShadow = 'var(--color-shadow-medium)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-border-default)'
+                      e.currentTarget.style.boxShadow = 'var(--color-shadow-small)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <Heading as="h2" style={{ fontSize: '20px', fontWeight: 'bold', margin: 0, color: 'var(--color-fg-default)' }}>
+                          {event.name}
+                        </Heading>
+                        {event.scheduledAt && (
+                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-attention-fg)' }}>
+                            SCHEDULED: {formatLocalDateTime(event.scheduledAt)}
+                          </span>
+                        )}
+                        {event.description && (
+                          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', marginTop: '4px', display: 'block' }}>
+                            {event.description}
+                          </Text>
+                        )}
+                      </div>
+                      <Label variant={STATUS_TONE[event.status]}>
+                        {STATUS_LABELS[event.status].toUpperCase()}
+                      </Label>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <Label variant="default">
+                        SCORING: {SCORING_LABELS[event.scoringType]?.toUpperCase() || 'UNKNOWN'}
+                      </Label>
+                      <Label variant="default">
+                        CLASS:{' '}
+                        {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP'
+                          ? CLASS_TIER_LABELS[event.classRestriction as any]
+                          : 'OPEN'}
+                      </Label>
+                      <Label variant="default">RACES: {event.raceCount}</Label>
+                      <Label variant="default">MEMBERS: {event.memberCount}</Label>
+                    </div>
+                  </div>
                 </Link>
               )
             })}
-
-            <Pagination
+            <PaginationBar
               page={page}
               pageSize={pageSize}
               total={data?.total || 0}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              variant="pixel"
             />
           </>
         )}
-      </PixelStack>
-    </PixelContainer>
+      </div>
+    </div>
   )
 }

@@ -64,3 +64,40 @@ jobs:
 
       - name: Run backend unit tests
         run: encore test
+
+  frontend-visual:
+    name: Frontend Visual Tests (Playwright)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm ci
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install-deps chromium && npx playwright install chromium
+
+      - name: Start frontend in mock mode
+        working-directory: frontend
+        run: pnpm dev:mock &
+
+      - name: Wait for server
+        working-directory: frontend
+        run: npx wait-on http://localhost:5173
+
+      - name: Run visual layout parity tests
+        working-directory: frontend
+        run: npx playwright test e2e/visual/layout-parity.spec.ts

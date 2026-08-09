@@ -3,3 +3,10 @@ dist/
 
 # Local env overrides (must not be committed — would force mock mode in prod builds)
 .env
+
+# Playwright artifacts
+test-results/
+playwright-report/
+.playwright/
+e2e/visual/primer-candidates/
+e2e/visual/legacy-baselines/

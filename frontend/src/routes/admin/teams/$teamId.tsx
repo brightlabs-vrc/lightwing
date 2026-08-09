@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
@@ -9,15 +9,15 @@ import {
   addAdminTeamMember,
   updateAdminTeamMemberRole,
   removeAdminTeamMember,
-  listAdminUsers,
   listAdminTeamMembers,
 } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { UserSearchCombobox } from '../../../components/UserSearchCombobox'
-import { Pagination } from '../../../components/Pagination'
+import { PaginationBar } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
-import type { teammanager, auth } from '../../../lib/client'
+import { Heading, Text, Label, Button, TextInput, FormControl, Spinner, Dialog, Select } from '@primer/react'
+import type { teammanager } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/teams/$teamId')({
   beforeLoad: async ({ location }) => {
@@ -29,6 +29,7 @@ export const Route = createFileRoute('/admin/teams/$teamId')({
 function AdminTeamDetailPage() {
   const { teamId } = Route.useParams()
   const { session } = useAuth()
+  const navigate = useNavigate()
   const [team, setTeam] = useState<teammanager.Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -245,249 +246,233 @@ function AdminTeamDetailPage() {
 
   const actions = (
     <div style={{ display: 'flex', gap: '8px' }}>
-      <button
-        type="button"
+      <Button
         onClick={() => {
           setTeamError(null)
           setIsTeamModalOpen(true)
         }}
-        className="slds-button slds-button_neutral"
       >
         Edit Team Parameters
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
         onClick={() => {
           setStatsError(null)
           setIsStatsModalOpen(true)
         }}
-        className="slds-button slds-button_neutral"
       >
         Edit Statistics
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="primary"
         onClick={() => {
           setMemberError(null)
           setIsMemberModalOpen(true)
         }}
-        className="slds-button slds-button_brand"
       >
         Add Team Member
-      </button>
+      </Button>
     </div>
   )
 
   return (
-    <AdminLayout
-      title={team ? team.name : 'Team Detail'}
-      subtitle={team ? `Manage demographics, statistics, and organizational roles for team: ${team.slug}` : 'Demographics and roles details'}
-      actions={team ? actions : undefined}
-    >
-      <div className="slds-grid slds-wrap slds-gutters">
+    <AdminLayout>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {error && (
-          <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-            <AlertBanner variant="error">{error}</AlertBanner>
-          </div>
+          <AlertBanner variant="error">{error}</AlertBanner>
         )}
         {success && (
-          <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-            <AlertBanner variant="success">{success}</AlertBanner>
-          </div>
+          <AlertBanner variant="success">{success}</AlertBanner>
         )}
 
         {loading ? (
-          <div className="slds-col slds-size_1-of-1 slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-            <p>Loading team detail panel...</p>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
+            <Spinner size="small" />
+            <span>Loading team detail panel...</span>
           </div>
         ) : team ? (
-          <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '1.5rem',
+            alignItems: 'start'
+          }}>
             {/* Left Column: Demographics & Stats summary */}
-            <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
-              <article className="slds-card" style={{ border: '1px solid #dddbda', height: '100%' }}>
-                <div className="slds-card__header slds-grid">
-                  <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                    <div className="slds-media__body">
-                      <h2 className="slds-card__header-title">
-                        <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                          Team Profile & Statistics
-                        </span>
-                      </h2>
-                    </div>
-                  </header>
+            <div style={{
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--color-canvas-default)',
+              boxShadow: 'var(--color-shadow-small)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border-default)' }}>
+                <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
+                  Team Profile & Statistics
+                </Heading>
+              </div>
+
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Administrator Slots Remaining info */}
+                <div style={{
+                  backgroundColor: team.administratorSlotsRemaining > 0 ? 'var(--color-success-subtle)' : 'var(--color-danger-subtle)',
+                  border: team.administratorSlotsRemaining > 0 ? '1px solid var(--color-success-border)' : '1px solid var(--color-danger-border)',
+                  borderRadius: '6px',
+                  padding: '1rem'
+                }}>
+                  <p style={{ fontWeight: 'bold', margin: 0, fontSize: '14px', color: team.administratorSlotsRemaining > 0 ? 'var(--color-success-emphasis)' : 'var(--color-danger-emphasis)' }}>
+                    Administrator Slots Remaining
+                  </p>
+                  <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '4px 0 0 0', color: team.administratorSlotsRemaining > 0 ? 'var(--color-success-fg)' : 'var(--color-danger-fg)' }}>
+                    {team.administratorSlotsRemaining} / 3 slots
+                  </p>
+                  <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: 'var(--color-fg-muted)' }}>
+                    An organization may have at most three administrators belonging to it.
+                  </p>
                 </div>
 
-                <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.25rem' }}>
-                  {/* Administrator Slots Remaining info */}
-                  <div className="slds-box slds-m-bottom_medium" style={{ background: team.administratorSlotsRemaining > 0 ? '#ecfdf5' : '#fef2f2', border: team.administratorSlotsRemaining > 0 ? '1px solid #a7f3d0' : '1px solid #fecaca', borderRadius: '4px' }}>
-                    <p className="font-bold text-sm" style={{ fontWeight: 'bold', color: team.administratorSlotsRemaining > 0 ? '#065f46' : '#991b1b' }}>
-                      Administrator Slots Remaining
-                    </p>
-                    <p className="text-xl font-extrabold slds-m-top_xx-small" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: team.administratorSlotsRemaining > 0 ? '#047857' : '#dc2626' }}>
-                      {team.administratorSlotsRemaining} / 3 slots
-                    </p>
-                    <p className="text-xs slds-m-top_xx-small text-slate-500">
-                      An organization may have at most three administrators belonging to it.
-                    </p>
-                  </div>
+                <div>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Slug Identifier</span>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>{team.slug}</span>
+                </div>
 
-                  <div className="slds-m-bottom_medium">
-                    <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Slug Identifier</p>
-                    <p className="font-semibold text-slate-900">{team.slug}</p>
-                  </div>
+                <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '1rem' }}>
+                  <Heading as="h3" style={{ fontSize: '16px', marginBottom: '1rem' }}>Historical Statistics</Heading>
 
-                  <div className="slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '10px' }}>
-                    <h3 className="font-bold text-slate-700 slds-m-bottom_small" style={{ fontWeight: 'bold' }}>Historical Statistics</h3>
-
-                    <div className="slds-grid slds-wrap slds-gutters">
-                      <div className="slds-col slds-size_1-of-2 slds-m-bottom_small">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px' }}>Season Rank</p>
-                        <p className="text-lg font-bold">{team.stats.seasonRank ?? 'None'}</p>
-                      </div>
-                      <div className="slds-col slds-size_1-of-2 slds-m-bottom_small">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px' }}>Points Average</p>
-                        <p className="text-lg font-bold">{team.stats.pointsAverage ?? 'None'}</p>
-                      </div>
-                      <div className="slds-col slds-size_1-of-2 slds-m-bottom_small">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px' }}>Ranking Average</p>
-                        <p className="text-lg font-bold">{team.stats.rankingAverage ?? 'None'}</p>
-                      </div>
-                      <div className="slds-col slds-size_1-of-2 slds-m-bottom_small">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px' }}>Points / Event</p>
-                        <p className="text-lg font-bold">{team.stats.averagePointsPerEvent ?? 'None'}</p>
-                      </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Season Rank</span>
+                      <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.seasonRank ?? 'None'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Points Average</span>
+                      <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.pointsAverage ?? 'None'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Ranking Average</span>
+                      <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.rankingAverage ?? 'None'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Points / Event</span>
+                      <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{team.stats.averagePointsPerEvent ?? 'None'}</span>
                     </div>
                   </div>
                 </div>
-              </article>
+              </div>
             </div>
 
             {/* Right Column: Members list with roles & actions */}
-            <div className="slds-col slds-size_1-of-1 slds-medium-size_2-of-3 slds-m-bottom_medium">
-              <article className="slds-card" style={{ border: '1px solid #dddbda', height: '100%' }}>
-                <div className="slds-card__header slds-grid">
-                  <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                    <div className="slds-media__body">
-                      <h2 className="slds-card__header-title">
-                        <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                          Team Roster ({totalMembers} Competitors)
-                        </span>
-                      </h2>
-                    </div>
-                  </header>
+            <div style={{
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--color-canvas-default)',
+              boxShadow: 'var(--color-shadow-small)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border-default)' }}>
+                <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
+                  Team Roster ({totalMembers} Competitors)
+                </Heading>
+              </div>
+
+              <div style={{ padding: '1.5rem' }}>
+                {/* Search Bar */}
+                <div style={{ maxWidth: '300px', marginBottom: '1.5rem' }}>
+                  <TextInput
+                    placeholder="Search roster by name/slug..."
+                    value={memberSearch}
+                    onChange={(e) => {
+                      setMemberSearch(e.target.value)
+                      setMemberPage(1)
+                    }}
+                    width="100%"
+                  />
                 </div>
 
-                <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-                  {/* Search Bar */}
-                  <div className="slds-form-element slds-m-bottom_medium" style={{ maxWidth: '300px' }}>
-                    <div className="slds-form-element__control">
-                      <input
-                        type="text"
-                        placeholder="Search roster by name/slug..."
-                        value={memberSearch}
-                        onChange={(e) => {
-                          setMemberSearch(e.target.value)
-                          setMemberPage(1)
-                        }}
-                        className="slds-input"
-                        style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                      />
-                    </div>
-                  </div>
-
-                  {members.length > 0 ? (
-                    <>
-                      <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                        <table className="slds-table slds-table_cell-buffer slds-table_bordered" aria-label="Team Roster Table" style={{ width: '100%' }}>
-                          <thead>
-                            <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                              <th scope="col" style={{ width: '250px' }}>
-                                <div className="slds-truncate font-bold" title="Competitor Name" style={{ fontWeight: 'bold' }}>Competitor Name</div>
-                              </th>
-                              <th scope="col" style={{ width: '250px' }}>
-                                <div className="slds-truncate font-bold" title="Roster Role" style={{ fontWeight: 'bold' }}>Roster Role</div>
-                              </th>
-                              <th scope="col" style={{ width: '150px' }}>
-                                <div className="slds-truncate font-bold" title="Role Action" style={{ fontWeight: 'bold' }}>Change Role</div>
-                              </th>
-                              <th scope="col" style={{ width: '120px' }}>
-                                <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {members.map((member) => (
-                              <tr key={member.userId} className="slds-hint-parent hover:bg-slate-50">
-                                <th scope="row">
-                                  <div className="slds-truncate font-bold" title={member.name}>
-                                    <UserLink userId={member.userId} name={member.name} />
-                                    {member.slug && (
-                                      <span style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
-                                        @{member.slug}
-                                      </span>
-                                    )}
-                                  </div>
-                                </th>
-                                <td>
-                                  <span className={`slds-badge ${member.role === 'administrator' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                                    {member.role}
+                {members.length > 0 ? (
+                  <>
+                    <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px', marginBottom: '1rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
+                            <th style={{ padding: '12px', fontWeight: 'bold' }}>Competitor Name</th>
+                            <th style={{ padding: '12px', fontWeight: 'bold' }}>Roster Role</th>
+                            <th style={{ padding: '12px', fontWeight: 'bold' }}>Change Role</th>
+                            <th style={{ padding: '12px', fontWeight: 'bold' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {members.map((member) => (
+                            <tr key={member.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
+                              <td style={{ padding: '12px', fontWeight: 'bold' }}>
+                                <UserLink userId={member.userId} name={member.name} />
+                                {member.slug && (
+                                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-fg-muted)', fontWeight: 'normal' }}>
+                                    @{member.slug}
                                   </span>
-                                </td>
-                                <td>
-                                  <select
-                                    value={member.role}
-                                    onChange={(e) => handleChangeRole(member.userId, e.target.value)}
-                                    className="slds-select"
-                                    style={{ padding: '2px 8px', height: '28px', fontSize: '12px', minWidth: '150px' }}
-                                  >
-                                    {roleOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveMember(member.userId)}
-                                    className="slds-button slds-button_destructive"
-                                    style={{ fontSize: '12px', padding: '2px 10px', background: '#d32f2f', color: '#fff' }}
-                                  >
-                                    Remove
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <Pagination
-                        page={memberPage}
-                        pageSize={memberPageSize}
-                        total={totalMembers}
-                        onPageChange={setMemberPage}
-                        onPageSizeChange={setMemberPageSize}
-                      />
-                    </>
-                  ) : (
-                    <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                      <p>This team does not have any roster members. Click "Add Team Member" to populate the team roster.</p>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px' }}>
+                                <Label variant={member.role === 'administrator' ? 'success' : 'default'}>
+                                  {member.role}
+                                </Label>
+                              </td>
+                              <td style={{ padding: '12px' }}>
+                                <Select
+                                  value={member.role}
+                                  onChange={(e) => handleChangeRole(member.userId, e.target.value)}
+                                  size="small"
+                                >
+                                  {roleOptions.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </Select>
+                              </td>
+                              <td style={{ padding: '12px' }}>
+                                <Button
+                                  variant="danger"
+                                  size="small"
+                                  onClick={() => handleRemoveMember(member.userId)}
+                                >
+                                  Remove
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
 
-                <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '1rem' }}>
-                  <Link to="/admin/teams" className="slds-button slds-button_neutral" style={{ textDecoration: 'none' }}>
-                    Back to Team Directory
-                  </Link>
-                </footer>
-              </article>
+                    <PaginationBar
+                      page={memberPage}
+                      pageSize={memberPageSize}
+                      total={totalMembers}
+                      onPageChange={setMemberPage}
+                      onPageSizeChange={setMemberPageSize}
+                    />
+                  </>
+                ) : (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '3rem',
+                    color: 'var(--color-fg-muted)',
+                    border: '1px dashed var(--color-border-default)',
+                    borderRadius: '6px'
+                  }}>
+                    <p>This team does not have any roster members. Click "Add Team Member" to populate the team roster.</p>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
+                <Button as={Link} to="/admin/teams">
+                  Back to Team Directory
+                </Button>
+              </div>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="slds-col slds-size_1-of-1 slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)', border: '1px dashed var(--color-border-default)', borderRadius: '6px' }}>
             <p>Team data structure could not be mapped.</p>
           </div>
         )}
@@ -495,358 +480,208 @@ function AdminTeamDetailPage() {
 
       {/* Edit Stats Modal */}
       {isStatsModalOpen && (
-        <>
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  type="button"
-                  onClick={() => setIsStatsModalOpen(false)}
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                  style={{
-                    position: 'absolute',
-                    top: '0.5rem',
-                    right: '0.5rem',
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '1.25rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  X
-                </button>
-                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Configure Team Historical Statistics
-                </h2>
-              </header>
+        <Dialog
+          onClose={() => setIsStatsModalOpen(false)}
+          title="Configure Team Historical Statistics"
+        >
+          <form onSubmit={(e) => void handleUpdateStats(e)}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {statsError && (
+                <AlertBanner variant="error">{statsError}</AlertBanner>
+              )}
 
-              <form onSubmit={(e) => void handleUpdateStats(e)}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {statsError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{statsError}</AlertBanner>
-                    </div>
-                  )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <FormControl>
+                  <FormControl.Label style={{ fontWeight: 'bold' }}>Season Rank</FormControl.Label>
+                  <TextInput
+                    type="number"
+                    value={seasonRank}
+                    onChange={(e) => setSeasonRank(e.target.value)}
+                    placeholder="e.g. 1"
+                    width="100%"
+                  />
+                </FormControl>
 
-                  <div className="slds-form slds-form_stacked">
-                    <div className="slds-grid slds-wrap slds-gutters">
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                        <div className="slds-form-element">
-                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="season-rank-input">
-                            Season Rank
-                          </label>
-                          <div className="slds-form-element__control">
-                            <input
-                              id="season-rank-input"
-                              type="number"
-                              value={seasonRank}
-                              onChange={(e) => setSeasonRank(e.target.value)}
-                              placeholder="e.g. 1"
-                              className="slds-input"
-                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                <FormControl>
+                  <FormControl.Label style={{ fontWeight: 'bold' }}>Points Average</FormControl.Label>
+                  <TextInput
+                    type="number"
+                    step="any"
+                    value={pointsAverage}
+                    onChange={(e) => setPointsAverage(e.target.value)}
+                    placeholder="e.g. 112.4"
+                    width="100%"
+                  />
+                </FormControl>
 
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                        <div className="slds-form-element">
-                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="points-average-input">
-                            Points Average
-                          </label>
-                          <div className="slds-form-element__control">
-                            <input
-                              id="points-average-input"
-                              type="number"
-                              step="any"
-                              value={pointsAverage}
-                              onChange={(e) => setPointsAverage(e.target.value)}
-                              placeholder="e.g. 112.4"
-                              className="slds-input"
-                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                <FormControl>
+                  <FormControl.Label style={{ fontWeight: 'bold' }}>Ranking Average</FormControl.Label>
+                  <TextInput
+                    type="number"
+                    step="any"
+                    value={rankingAverage}
+                    onChange={(e) => setRankingAverage(e.target.value)}
+                    placeholder="e.g. 3.2"
+                    width="100%"
+                  />
+                </FormControl>
 
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                        <div className="slds-form-element">
-                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="ranking-average-input">
-                            Ranking Average
-                          </label>
-                          <div className="slds-form-element__control">
-                            <input
-                              id="ranking-average-input"
-                              type="number"
-                              step="any"
-                              value={rankingAverage}
-                              onChange={(e) => setRankingAverage(e.target.value)}
-                              placeholder="e.g. 3.2"
-                              className="slds-input"
-                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_medium">
-                        <div className="slds-form-element">
-                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="avg-pts-event-input">
-                            Average Points Per Event
-                          </label>
-                          <div className="slds-form-element__control">
-                            <input
-                              id="avg-pts-event-input"
-                              type="number"
-                              step="any"
-                              value={averagePointsPerEvent}
-                              onChange={(e) => setAveragePointsPerEvent(e.target.value)}
-                              placeholder="e.g. 14.5"
-                              className="slds-input"
-                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsStatsModalOpen(false)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updatingStats}
-                    className="slds-button slds-button_brand"
-                  >
-                    {updatingStats ? 'Updating...' : 'Save Statistics'}
-                  </button>
-                </footer>
-              </form>
+                <FormControl>
+                  <FormControl.Label style={{ fontWeight: 'bold' }}>Average Points Per Event</FormControl.Label>
+                  <TextInput
+                    type="number"
+                    step="any"
+                    value={averagePointsPerEvent}
+                    onChange={(e) => setAveragePointsPerEvent(e.target.value)}
+                    placeholder="e.g. 14.5"
+                    width="100%"
+                  />
+                </FormControl>
+              </div>
             </div>
-          </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
-        </>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--color-border-default)',
+              backgroundColor: 'var(--color-canvas-subtle)',
+            }}>
+              <Button type="button" onClick={() => setIsStatsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={updatingStats}>
+                {updatingStats ? 'Updating...' : 'Save Statistics'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
 
       {/* Add Member Modal */}
       {isMemberModalOpen && (
-        <>
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  type="button"
-                  onClick={() => setIsMemberModalOpen(false)}
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                  style={{
-                    position: 'absolute',
-                    top: '0.5rem',
-                    right: '0.5rem',
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '1.25rem',
-                    cursor: 'pointer',
-                  }}
+        <Dialog
+          onClose={() => setIsMemberModalOpen(false)}
+          title="Add Team Member"
+        >
+          <form onSubmit={(e) => void handleAddMember(e)}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {memberError && (
+                <AlertBanner variant="error">{memberError}</AlertBanner>
+              )}
+
+              <FormControl required>
+                <FormControl.Label style={{ fontWeight: 'bold' }}>Select System Competitor</FormControl.Label>
+                <UserSearchCombobox
+                  value={selectedUserId}
+                  onChange={(val) => setSelectedUserId(val)}
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormControl.Label style={{ fontWeight: 'bold' }}>Initial Roster Role</FormControl.Label>
+                <Select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  width="100%"
                 >
-                  X
-                </button>
-                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Add Team Member
-                </h2>
-              </header>
-
-              <form onSubmit={(e) => void handleAddMember(e)}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {memberError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{memberError}</AlertBanner>
-                    </div>
-                  )}
-
-                  <div className="slds-form slds-form_stacked">
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="select-user-dropdown">
-                        Select System Competitor
-                      </label>
-                      <div className="slds-form-element__control">
-                        <UserSearchCombobox
-                          value={selectedUserId}
-                          onChange={(val) => setSelectedUserId(val)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="select-role-dropdown">
-                        Initial Roster Role
-                      </label>
-                      <div className="slds-form-element__control">
-                        <select
-                          id="select-role-dropdown"
-                          value={selectedRole}
-                          onChange={(e) => setSelectedRole(e.target.value)}
-                          className="slds-select"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        >
-                          {roleOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsMemberModalOpen(false)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={addingMember}
-                    className="slds-button slds-button_brand"
-                  >
-                    {addingMember ? 'Adding...' : 'Add Member'}
-                  </button>
-                </footer>
-              </form>
+                  {roleOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
             </div>
-          </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
-        </>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--color-border-default)',
+              backgroundColor: 'var(--color-canvas-subtle)',
+            }}>
+              <Button type="button" onClick={() => setIsMemberModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={addingMember}>
+                {addingMember ? 'Adding...' : 'Add Member'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
 
       {/* Edit Team Modal */}
       {isTeamModalOpen && (
-        <>
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  type="button"
-                  onClick={() => setIsTeamModalOpen(false)}
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                  style={{
-                    position: 'absolute',
-                    top: '0.5rem',
-                    right: '0.5rem',
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '1.25rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  X
-                </button>
-                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Configure Team Parameters
-                </h2>
-              </header>
+        <Dialog
+          onClose={() => setIsTeamModalOpen(false)}
+          title="Configure Team Parameters"
+        >
+          <form onSubmit={(e) => void handleUpdateTeam(e)}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {teamError && (
+                <AlertBanner variant="error">{teamError}</AlertBanner>
+              )}
 
-              <form onSubmit={(e) => void handleUpdateTeam(e)}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {teamError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{teamError}</AlertBanner>
-                    </div>
-                  )}
+              <FormControl required>
+                <FormControl.Label style={{ fontWeight: 'bold' }}>Team Name</FormControl.Label>
+                <TextInput
+                  type="text"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="e.g. My Racing Team"
+                  required
+                  width="100%"
+                />
+              </FormControl>
 
-                  <div className="slds-form slds-form_stacked">
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-name-input">
-                        Team Name
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="team-name-input"
-                          type="text"
-                          value={teamName}
-                          onChange={(e) => setTeamName(e.target.value)}
-                          placeholder="e.g. My Racing Team"
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                          required
-                        />
-                      </div>
-                    </div>
+              <FormControl required>
+                <FormControl.Label style={{ fontWeight: 'bold' }}>Team Slug</FormControl.Label>
+                <TextInput
+                  type="text"
+                  value={teamSlug}
+                  onChange={(e) => setTeamSlug(e.target.value)}
+                  placeholder="e.g. my-racing-team"
+                  required
+                  width="100%"
+                />
+                <FormControl.Caption>
+                  Slug must be 24 characters or fewer.
+                </FormControl.Caption>
+              </FormControl>
 
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-slug-input">
-                        Team Slug
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="team-slug-input"
-                          type="text"
-                          value={teamSlug}
-                          onChange={(e) => setTeamSlug(e.target.value)}
-                          placeholder="e.g. my-racing-team"
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                          required
-                        />
-                      </div>
-                      <div className="slds-m-top_xx-small text-slate-400" style={{ fontSize: '11px' }}>
-                        Slug must be 24 characters or fewer.
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="team-logo-input">
-                        Team Logo URL
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="team-logo-input"
-                          type="text"
-                          value={teamLogo}
-                          onChange={(e) => setTeamLogo(e.target.value)}
-                          placeholder="e.g. https://example.com/logo.png"
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsTeamModalOpen(false)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updatingTeam}
-                    className="slds-button slds-button_brand"
-                  >
-                    {updatingTeam ? 'Updating...' : 'Save Parameters'}
-                  </button>
-                </footer>
-              </form>
+              <FormControl>
+                <FormControl.Label style={{ fontWeight: 'bold' }}>Team Logo URL</FormControl.Label>
+                <TextInput
+                  type="text"
+                  value={teamLogo}
+                  onChange={(e) => setTeamLogo(e.target.value)}
+                  placeholder="e.g. https://example.com/logo.png"
+                  width="100%"
+                />
+              </FormControl>
             </div>
-          </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
-        </>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--color-border-default)',
+              backgroundColor: 'var(--color-canvas-subtle)',
+            }}>
+              <Button type="button" onClick={() => setIsTeamModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={updatingTeam}>
+                {updatingTeam ? 'Updating...' : 'Save Parameters'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
     </AdminLayout>
   )

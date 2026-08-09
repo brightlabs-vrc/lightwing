@@ -1,43 +1,39 @@
 {
   "name": "Ubi9",
   "image": "registry.access.redhat.com/ubi9/ubi",
-  "forwardPorts": [4000, 9400, 9500, 9900],
+  "forwardPorts": [3000, 4000, 9400, 9500, 9900],
   "portsAttributes": {
+    "3000": { "label": "Frontend", "onAutoForward": "openBrowser" },
     "4000": { "label": "Encore API", "onAutoForward": "notify" },
-    "9400": { "label": "Encore Dashboard", "onAutoForward": "notify" },
-    "3000": { "label": "Frontend", "onAutoForward": "openBrowser" }
+    "9400": { "label": "Encore Dashboard", "onAutoForward": "notify" }
   },
-  "runArgs": ["--privileged", "--cap-add=NET_ADMIN", "--cap-add=NET_RAW"],
+  "runArgs": ["--privileged"],
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
-      "upgradePackages": true,
       "username": "vscode",
       "userUid": "1000",
-      "userGid": "1000"
-    },
-    "ghcr.io/devcontainers-extra/features/bash-command:1": {
-      "command": "dnf install -y ca-certificates socat && update-ca-trust extract"
+      "userGid": "1000",
+      "upgradePackages": true
     },
     "ghcr.io/devcontainers/features/node:2": {
       "version": "lts",
       "pnpmVersion": "latest"
-    },
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-      "moby": false
     }
   },
   "customizations": {
     "vscode": {
       "extensions": [
-        "EditorConfig.EditorConfig",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "Prisma.prisma"
+        "Prisma.prisma",
+        "EditorConfig.EditorConfig"
       ]
     }
   },
-  "postCreateCommand": "curl -L https://encore.dev/install.sh | bash && echo 'export PATH=\"$HOME/.encore/bin:$PATH\"' >> ~/.bashrc && echo 'export PATH=\"$HOME/.encore/bin:$PATH\"' >> ~/.profile",
-  "postStartCommand": "sudo rm -f /var/run/docker.pid && ( sudo dockerd --iptables=false > /dev/null 2>&1 & ) && sleep 15",
+  "postCreateCommand": "dnf install -y dnf-plugins-core && dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo && dnf install -y docker-ce-cli docker-compose-plugin && curl -fsSL https://encore.dev/install.sh | bash && echo 'export PATH=\"$HOME/.encore/bin:$PATH\"' >> ~/.bashrc",
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.encore/bin",
     "ENCORE_RUNTIME_LIB": "/home/vscode/.encore/runtimes/js/encore-runtime.node"

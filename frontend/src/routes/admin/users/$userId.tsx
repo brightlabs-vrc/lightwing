@@ -5,6 +5,7 @@ import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { getAdminUserProfile, updateAdminUserSiteRole, updateAdminUserProfile, updateAdminUserClass } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
+import { Heading, Text, Label, Button, TextInput, FormControl, Textarea, Select } from '@primer/react'
 import type { auth, eventmanager } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/$userId')({
@@ -24,10 +25,8 @@ function AdminUserDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // Mode state: false = Details view, true = Edit view
   const [isEditing, setIsEditing] = useState(false)
 
-  // Local state for editable fields
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [biography, setBiography] = useState('')
@@ -108,7 +107,6 @@ function AdminUserDetailPage() {
     try {
       let currentProfile = profile
 
-      // 1. Update Profile Fields if changed
       const profileChanged =
         name !== (profile.name || '') ||
         trimmedSlug !== (profile.slug || '') ||
@@ -132,13 +130,11 @@ function AdminUserDetailPage() {
         )
       }
 
-      // 2. Update Class Tier if changed
       const nextTier = classTier === '' ? null : (classTier as eventmanager.ClassTier)
       const classTierChanged = nextTier !== profile.classTier
 
       if (classTierChanged) {
         await updateAdminUserClass(profile.id, nextTier, authHeader)
-        // Refresh profile state with the new class tier
         currentProfile = {
           ...currentProfile,
           classTier: nextTier,
@@ -176,372 +172,330 @@ function AdminUserDetailPage() {
   }
 
   return (
-    <AdminLayout
-      title="User Profile Detail"
-      subtitle={profile ? `Displaying identity parameters and system privileges for user: ${profile.name}` : `Displaying administrative system attributes for user: ${userId}`}
-    >
-      <div className="slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-1 slds-medium-size_2-of-3 slds-m-bottom_medium">
-          <article className="slds-card" style={{ border: '1px solid #dddbda' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      {isEditing ? 'Configure Competitor Account Parameters' : 'Competitor Account Details'}
-                    </span>
-                  </h2>
-                </div>
-              </header>
+    <AdminLayout>
+      <div style={{
+        border: '1px solid var(--color-border-default)',
+        borderRadius: '6px',
+        backgroundColor: 'var(--color-canvas-default)',
+        boxShadow: 'var(--color-shadow-small)',
+        overflow: 'hidden'
+      }}>
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border-default)' }}>
+          <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
+            {isEditing ? 'Configure Competitor Account Parameters' : 'Competitor Account Details'}
+          </Heading>
+        </div>
+
+        <div style={{ padding: '1.5rem' }}>
+          {error && (
+            <div style={{ marginBottom: '1rem' }}>
+              <AlertBanner variant="error">{error}</AlertBanner>
             </div>
+          )}
+          {success && (
+            <div style={{ marginBottom: '1rem' }}>
+              <AlertBanner variant="success">{success}</AlertBanner>
+            </div>
+          )}
 
-            <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-              {error && (
-                <div className="slds-m-bottom_medium">
-                  <AlertBanner variant="error">{error}</AlertBanner>
-                </div>
-              )}
-              {success && (
-                <div className="slds-m-bottom_medium">
-                  <AlertBanner variant="success">{success}</AlertBanner>
-                </div>
-              )}
-
-              {loading ? (
-                <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-                  <p>Loading user profile...</p>
-                </div>
-              ) : profile ? (
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)' }}>
+              <p>Loading user profile...</p>
+            </div>
+          ) : profile ? (
+            <div>
+              {isEditing ? (
+                /* EDIT MODE FORM */
                 <div>
-                  {isEditing ? (
-                    /* EDIT MODE FORM */
-                    <div>
-                      <div className="slds-box slds-theme_shade" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                        <div className="slds-grid slds-wrap slds-gutters">
-                          {/* Full Name Input */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="user-name">Full Name</label>
-                            <div className="slds-form-element__control slds-m-top_xx-small">
-                              <input
-                                id="user-name"
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="slds-input font-bold"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%', fontWeight: 'bold' }}
-                              />
-                            </div>
-                          </div>
+                  <div style={{
+                    backgroundColor: 'var(--color-canvas-subtle)',
+                    border: '1px solid var(--color-border-default)',
+                    borderRadius: '6px',
+                    padding: '1.5rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                      {/* Full Name Input */}
+                      <FormControl>
+                        <FormControl.Label style={{ fontWeight: 'bold' }}>Full Name</FormControl.Label>
+                        <TextInput
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </FormControl>
 
-                          {/* Slug Input */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="user-slug">Slug (Handle)</label>
-                            <div className="slds-form-element__control slds-m-top_xx-small">
-                              <input
-                                id="user-slug"
-                                type="text"
-                                value={slug}
-                                onChange={(e) => setSlug(e.target.value)}
-                                className="slds-input"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                                placeholder="e.g. thunder"
-                              />
-                            </div>
-                            <div className="slds-m-top_xx-small text-slate-400" style={{ fontSize: '11px' }}>
-                              Slugs must be between 4 and 24 lowercase alphanumeric characters.
-                            </div>
-                          </div>
+                      {/* Slug Input */}
+                      <FormControl>
+                        <FormControl.Label style={{ fontWeight: 'bold' }}>Slug (Handle)</FormControl.Label>
+                        <TextInput
+                          value={slug}
+                          onChange={(e) => setSlug(e.target.value)}
+                          placeholder="e.g. thunder"
+                          style={{ width: '100%' }}
+                        />
+                        <FormControl.Caption>
+                          Slugs must be between 4 and 24 lowercase alphanumeric characters.
+                        </FormControl.Caption>
+                      </FormControl>
 
-                          {/* VRChat Username Input */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="vrchat-username">VRChat Username</label>
-                            <div className="slds-form-element__control slds-m-top_xx-small">
-                              <input
-                                id="vrchat-username"
-                                type="text"
-                                value={vrchatUsername}
-                                onChange={(e) => setVrchatUsername(e.target.value)}
-                                className="slds-input"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                                placeholder="e.g. VRC_User"
-                              />
-                            </div>
-                          </div>
+                      {/* VRChat Username Input */}
+                      <FormControl>
+                        <FormControl.Label style={{ fontWeight: 'bold' }}>VRChat Username</FormControl.Label>
+                        <TextInput
+                          value={vrchatUsername}
+                          onChange={(e) => setVrchatUsername(e.target.value)}
+                          placeholder="e.g. VRC_User"
+                          style={{ width: '100%' }}
+                        />
+                      </FormControl>
 
-                          {/* Profile Image Input */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="profile-image">Profile Image URL</label>
-                            <div className="slds-form-element__control slds-m-top_xx-small">
-                              <input
-                                id="profile-image"
-                                type="text"
-                                value={image}
-                                onChange={(e) => setImage(e.target.value)}
-                                className="slds-input"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                                placeholder="e.g. https://example.com/image.png"
-                              />
-                            </div>
-                          </div>
+                      {/* Profile Image Input */}
+                      <FormControl>
+                        <FormControl.Label style={{ fontWeight: 'bold' }}>Profile Image URL</FormControl.Label>
+                        <TextInput
+                          value={image}
+                          onChange={(e) => setImage(e.target.value)}
+                          placeholder="e.g. https://example.com/image.png"
+                          style={{ width: '100%' }}
+                        />
+                      </FormControl>
 
-                          {/* Skill Class Tier Dropdown Selector */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="skill-class-tier">Skill Class Tier</label>
-                            <div className="slds-form-element__control slds-m-top_xx-small">
-                              <select
-                                id="skill-class-tier"
-                                value={classTier || ''}
-                                onChange={(e) => setClassTier(e.target.value)}
-                                className="slds-select"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                              >
-                                <option value="">None (Default)</option>
-                                <option value="G3">G3</option>
-                                <option value="G2">G2</option>
-                                <option value="G1">G1</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Biography Input Field */}
-                      <div className="slds-m-bottom_large">
-                        <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="biography">Biography</label>
-                        <div className="slds-form-element__control slds-m-top_xx-small">
-                          <textarea
-                            id="biography"
-                            value={biography}
-                            onChange={(e) => setBiography(e.target.value)}
-                            className="slds-textarea"
-                            style={{ padding: '10px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '80px', width: '100%' }}
-                            placeholder="Tell us about yourself..."
-                          />
-                        </div>
-                      </div>
-
-                      {/* Career Overview Input Field */}
-                      <div className="slds-m-bottom_large">
-                        <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="career-overview">Career Overview</label>
-                        <div className="slds-form-element__control slds-m-top_xx-small">
-                          <textarea
-                            id="career-overview"
-                            value={careerOverview}
-                            onChange={(e) => setCareerOverview(e.target.value)}
-                            className="slds-textarea"
-                            style={{ padding: '10px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '80px', width: '100%' }}
-                            placeholder="Detail your competitive history and highlights..."
-                          />
-                        </div>
-                      </div>
-
-                      {/* Form Actions */}
-                      <div className="slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                        <button
-                          type="button"
-                          onClick={handleCancelEdit}
-                          disabled={saving}
-                          className="slds-button slds-button_neutral"
-                          style={{ padding: '8px 24px', fontSize: '14px', borderRadius: '4px' }}
+                      {/* Skill Class Tier Dropdown Selector */}
+                      <FormControl>
+                        <FormControl.Label style={{ fontWeight: 'bold' }}>Skill Class Tier</FormControl.Label>
+                        <Select
+                          value={classTier || ''}
+                          onChange={(e) => setClassTier(e.target.value)}
+                          style={{ width: '100%' }}
                         >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSaveChanges}
-                          disabled={saving || loading}
-                          className="slds-button slds-button_brand"
-                          style={{ padding: '8px 24px', fontSize: '14px', borderRadius: '4px' }}
-                        >
-                          {saving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                      </div>
+                          <option value="">None (Default)</option>
+                          <option value="G3">G3</option>
+                          <option value="G2">G2</option>
+                          <option value="G1">G1</option>
+                        </Select>
+                      </FormControl>
                     </div>
-                  ) : (
-                    /* DETAILS VIEW (READ-focused) */
-                    <div>
-                      <div className="slds-box slds-theme_shade" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                        <div className="slds-grid slds-wrap slds-gutters" style={{ alignItems: 'center' }}>
-                          {/* Avatar Column */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-4 slds-m-bottom_small slds-align_absolute-center" style={{ display: 'flex', justifyContent: 'center' }}>
-                            {profile.image ? (
-                              <img
-                                src={profile.image}
-                                alt={`${profile.name}'s Avatar`}
-                                style={{
-                                  width: '110px',
-                                  height: '110px',
-                                  borderRadius: '50%',
-                                  objectFit: 'cover',
-                                  border: '2px solid #dddbda',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: '110px',
-                                  height: '110px',
-                                  borderRadius: '50%',
-                                  background: '#cbd5e1',
-                                  color: '#475569',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '2.5rem',
-                                  fontWeight: 'bold',
-                                  border: '2px solid #dddbda',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                }}
-                              >
-                                {profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Details Column */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_3-of-4">
-                            <div className="slds-grid slds-wrap slds-gutters">
-                              {/* Full Name */}
-                              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Full Name</p>
-                                <p className="text-lg font-bold text-slate-800" style={{ fontWeight: 'bold' }}>{profile.name || 'None'}</p>
-                              </div>
-
-                              {/* Slug */}
-                              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Slug (Handle)</p>
-                                <p className="text-md font-semibold text-slate-700">@{profile.slug || 'None'}</p>
-                              </div>
-
-                              {/* VRChat Username */}
-                              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>VRChat Username</p>
-                                <p className="text-md text-slate-700">{profile.vrchatUsername || 'None'}</p>
-                              </div>
-
-                              {/* Skill Class Tier */}
-                              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Skill Class Tier</p>
-                                <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', borderRadius: '4px', display: 'inline-block', marginTop: '2px' }}>
-                                  {profile.classTier || 'None / PRE_OP'}
-                                </span>
-                              </div>
-
-                              {/* System Site Role */}
-                              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>System Site Role</p>
-                                <span className={`slds-badge ${profile.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px', display: 'inline-block', marginTop: '2px' }}>
-                                  {profile.siteRole}
-                                </span>
-                              </div>
-
-                              {/* Active Competitor ID */}
-                              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Active Competitor ID</p>
-                                <code className="text-xs" style={{ fontSize: '12px', display: 'block', padding: '4px 0' }}>{profile.id}</code>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Biography */}
-                      <div className="slds-m-bottom_large">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Biography</p>
-                        <div className="slds-m-top_xx-small" style={{ whiteSpace: 'pre-wrap', background: '#f8fafc', padding: '12px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '60px', color: '#334155' }}>
-                          {profile.biography ? profile.biography : <span className="text-slate-400 italic">No biography registered.</span>}
-                        </div>
-                      </div>
-
-                      {/* Career Overview */}
-                      <div className="slds-m-bottom_large">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Career Overview</p>
-                        <div className="slds-m-top_xx-small" style={{ whiteSpace: 'pre-wrap', background: '#f8fafc', padding: '12px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '60px', color: '#334155' }}>
-                          {profile.careerOverview ? profile.careerOverview : <span className="text-slate-400 italic">No career overview highlights registered.</span>}
-                        </div>
-                      </div>
-
-                      {/* Trigger Edit Button */}
-                      <div className="slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditing(true)}
-                          className="slds-button slds-button_brand"
-                          style={{ padding: '8px 24px', fontSize: '14px', borderRadius: '4px' }}
-                        >
-                          Edit Profile Details
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Active Team Affiliations */}
-                  <div className="slds-m-bottom_large" style={{ borderTop: '1px solid #dddbda', paddingTop: '1.5rem' }}>
-                    <p className="slds-text-title text-slate-500 slds-m-bottom_small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Active Team Affiliations</p>
-                    {profile.teams && profile.teams.length > 0 ? (
-                      <div className="slds-grid slds-wrap" style={{ gap: '8px' }}>
-                        {profile.teams.map((t) => (
-                          <div key={t.organizationId} className="slds-box" style={{ background: '#f3f2f1', padding: '8px 12px', borderRadius: '4px', border: '1px solid #dddbda' }}>
-                            <p className="font-bold" style={{ fontWeight: 'bold' }}>{t.name}</p>
-                            <p className="text-slate-500 text-xs" style={{ fontSize: '11px' }}>Role: <span className="font-semibold">{t.role}</span></p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-slate-500 text-sm">This competitor is not currently affiliated with any registered organization teams.</p>
-                    )}
                   </div>
 
-                  {/* SITE ROLE ADJUSTMENT ACTIONS */}
-                  {userId !== session?.user.id ? (
-                    <div style={{ borderTop: '1px solid #dddbda', paddingTop: '1.5rem' }}>
-                      <p className="slds-text-title text-slate-500 slds-m-bottom_small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Adjust Global Authorization Privilege</p>
-                      <div className="slds-grid slds-wrap" style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => adjustSiteRole('SITE_ADMIN')}
-                          disabled={updatingRole || profile.siteRole === 'SITE_ADMIN'}
-                          className="slds-button slds-button_success"
-                          style={{ padding: '6px 16px', background: '#2e7d32', color: '#fff' }}
-                        >
-                          Grant SITE_ADMIN Privilege
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => adjustSiteRole('USER')}
-                          disabled={updatingRole || profile.siteRole === 'USER'}
-                          className="slds-button slds-button_destructive"
-                          style={{ padding: '6px 16px', background: '#d32f2f', color: '#fff' }}
-                        >
-                          Revoke to USER Privilege
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="slds-box slds-theme_shade" style={{ background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '4px', padding: '1rem', marginTop: '1.5rem' }}>
-                      <p className="text-amber-800 text-sm font-semibold" style={{ color: '#92400e', fontWeight: 'bold' }}>
-                        Self-Privilege Safeguard
-                      </p>
-                      <p className="text-amber-700 text-xs slds-m-top_xx-small" style={{ color: '#b45309' }}>
-                        You cannot modify your own global siteRole privileges while active in your current session.
-                      </p>
-                    </div>
-                  )}
+                  {/* Biography Input Field */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <FormControl>
+                      <FormControl.Label style={{ fontWeight: 'bold' }}>Biography</FormControl.Label>
+                      <Textarea
+                        value={biography}
+                        onChange={(e) => setBiography(e.target.value)}
+                        placeholder="Tell us about yourself..."
+                        style={{ width: '100%' }}
+                        rows={4}
+                      />
+                    </FormControl>
+                  </div>
+
+                  {/* Career Overview Input Field */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <FormControl>
+                      <FormControl.Label style={{ fontWeight: 'bold' }}>Career Overview</FormControl.Label>
+                      <Textarea
+                        value={careerOverview}
+                        onChange={(e) => setCareerOverview(e.target.value)}
+                        placeholder="Detail your competitive history and highlights..."
+                        style={{ width: '100%' }}
+                        rows={4}
+                      />
+                    </FormControl>
+                  </div>
+
+                  {/* Form Actions */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginBottom: '1.5rem' }}>
+                    <Button onClick={handleCancelEdit} disabled={saving}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" onClick={handleSaveChanges} disabled={saving || loading}>
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                  <p>Profile was not found or is empty.</p>
+                /* DETAILS VIEW (READ-focused) */
+                <div>
+                  <div style={{
+                    backgroundColor: 'var(--color-canvas-subtle)',
+                    border: '1px solid var(--color-border-default)',
+                    borderRadius: '6px',
+                    padding: '1.5rem',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2rem' }}>
+                      {/* Avatar Column */}
+                      <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        {profile.image ? (
+                          <img
+                            src={profile.image}
+                            alt={`${profile.name}'s Avatar`}
+                            style={{
+                              width: '110px',
+                              height: '110px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '2px solid var(--color-border-default)',
+                              boxShadow: 'var(--color-shadow-medium)',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '110px',
+                              height: '110px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--color-canvas-subtle)',
+                              color: 'var(--color-fg-muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '2.5rem',
+                              fontWeight: 'bold',
+                              border: '2px solid var(--color-border-default)',
+                              boxShadow: 'var(--color-shadow-medium)',
+                            }}
+                          >
+                            {profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Details Column */}
+                      <div style={{ flexGrow: 1 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                          {/* Full Name */}
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Full Name</span>
+                            <span style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>{profile.name || 'None'}</span>
+                          </div>
+
+                          {/* Slug */}
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Slug (Handle)</span>
+                            <span style={{ fontSize: '16px', color: 'var(--color-fg-muted)' }}>@{profile.slug || 'None'}</span>
+                          </div>
+
+                          {/* VRChat Username */}
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>VRChat Username</span>
+                            <span style={{ fontSize: '16px', color: 'var(--color-fg-muted)' }}>{profile.vrchatUsername || 'None'}</span>
+                          </div>
+
+                          {/* Skill Class Tier */}
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Skill Class Tier</span>
+                            <Label variant="default">
+                              {profile.classTier || 'None / PRE_OP'}
+                            </Label>
+                          </div>
+
+                          {/* System Site Role */}
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>System Site Role</span>
+                            <Label variant={profile.siteRole === 'SITE_ADMIN' ? 'success' : 'default'}>
+                              {profile.siteRole}
+                            </Label>
+                          </div>
+
+                          {/* Active Competitor ID */}
+                          <div>
+                            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Active Competitor ID</span>
+                            <code style={{ fontSize: '12px', display: 'block', padding: '4px 0' }}>{profile.id}</code>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Biography */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Biography</span>
+                    <div style={{ whiteSpace: 'pre-wrap', backgroundColor: 'var(--color-canvas-subtle)', padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border-default)', minHeight: '60px', color: 'var(--color-fg-default)' }}>
+                      {profile.biography ? profile.biography : <span style={{ color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>No biography registered.</span>}
+                    </div>
+                  </div>
+
+                  {/* Career Overview */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Career Overview</span>
+                    <div style={{ whiteSpace: 'pre-wrap', backgroundColor: 'var(--color-canvas-subtle)', padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border-default)', minHeight: '60px', color: 'var(--color-fg-default)' }}>
+                      {profile.careerOverview ? profile.careerOverview : <span style={{ color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>No career overview highlights registered.</span>}
+                    </div>
+                  </div>
+
+                  {/* Trigger Edit Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+                    <Button variant="primary" onClick={() => setIsEditing(true)}>
+                      Edit Profile Details
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Team Affiliations */}
+              <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+                <p style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>Active Team Affiliations</p>
+                {profile.teams && profile.teams.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {profile.teams.map((t) => (
+                      <div key={t.organizationId} style={{ backgroundColor: 'var(--color-canvas-subtle)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--color-border-default)' }}>
+                        <p style={{ fontWeight: 'bold', margin: 0 }}>{t.name}</p>
+                        <p style={{ color: 'var(--color-fg-muted)', fontSize: '11px', margin: '4px 0 0 0' }}>Role: <span style={{ fontWeight: 'bold' }}>{t.role}</span></p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--color-fg-muted)', fontSize: '14px' }}>This competitor is not currently affiliated with any registered organization teams.</p>
+                )}
+              </div>
+
+              {/* SITE ROLE ADJUSTMENT ACTIONS */}
+              {userId !== session?.user.id ? (
+                <div style={{ borderTop: '1px solid var(--color-border-default)', paddingTop: '1.5rem' }}>
+                  <p style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', marginBottom: '0.5rem' }}>Adjust Global Authorization Privilege</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      onClick={() => adjustSiteRole('SITE_ADMIN')}
+                      disabled={updatingRole || profile.siteRole === 'SITE_ADMIN'}
+                      style={{ backgroundColor: 'var(--color-success-emphasis)', color: 'var(--color-fg-onEmphasis)' }}
+                    >
+                      Grant SITE_ADMIN Privilege
+                    </Button>
+                    <Button
+                      onClick={() => adjustSiteRole('USER')}
+                      disabled={updatingRole || profile.siteRole === 'USER'}
+                      style={{ backgroundColor: 'var(--color-danger-emphasis)', color: 'var(--color-fg-onEmphasis)' }}
+                    >
+                      Revoke to USER Privilege
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ backgroundColor: 'var(--color-attention-subtle)', border: '1px solid var(--color-attention-border)', borderRadius: '6px', padding: '1rem', marginTop: '1.5rem' }}>
+                  <p style={{ color: 'var(--color-attention-fg)', fontWeight: 'bold', margin: 0 }}>
+                    Self-Privilege Safeguard
+                  </p>
+                  <p style={{ color: 'var(--color-fg-muted)', fontSize: '12px', margin: '4px 0 0 0' }}>
+                    You cannot modify your own global siteRole privileges while active in your current session.
+                  </p>
                 </div>
               )}
             </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)', border: '1px dashed var(--color-border-default)', borderRadius: '6px' }}>
+              <p>Profile was not found or is empty.</p>
+            </div>
+          )}
+        </div>
 
-            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '1rem' }}>
-              <Link to="/admin/users" className="slds-button slds-button_neutral" style={{ textDecoration: 'none' }}>
-                Back to Competitor Directory
-              </Link>
-            </footer>
-          </article>
+        <div style={{ padding: '1rem', borderTop: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
+          <Button as={Link} to="/admin/users">
+            Back to Competitor Directory
+          </Button>
         </div>
       </div>
     </AdminLayout>
