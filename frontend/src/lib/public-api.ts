@@ -218,9 +218,9 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       ],
       schedules: [],
       pointsOverview: [
-        { userId: 'mock-user-1', name: 'Bolt', points: 10, resultStatus: null },
-        { userId: 'mock-user-2', name: 'Shadow', points: 6, resultStatus: null },
-        { userId: 'mock-user-3', name: 'Galloper', points: 0, resultStatus: 'DNF' },
+        { userId: 'mock-user-1', name: 'Bolt', points: 10 },
+        { userId: 'mock-user-2', name: 'Shadow', points: 6 },
+        { userId: 'mock-user-3', name: 'Galloper', points: 0 },
       ],
       ladderOverview: null,
       createdAt: now,
