@@ -66,51 +66,49 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
             padding: '1.5rem 1rem',
           }}>
             <NavList>
-              <NavList.Group title="Dashboard Nav">
-                <NavList.Item
-                  as={Link}
-                  to="/admin"
-                  aria-current={isCurrent('/admin') && !isCurrent('/admin/events') && !isCurrent('/admin/users') && !isCurrent('/admin/teams') ? 'page' : undefined}
-                >
-                  <NavList.LeadingVisual>
-                    <HomeIcon />
-                  </NavList.LeadingVisual>
-                  Home
-                </NavList.Item>
+              <NavList.Item
+                as={Link}
+                to="/admin"
+                aria-current={isCurrent('/admin') && !isCurrent('/admin/events') && !isCurrent('/admin/users') && !isCurrent('/admin/teams') ? 'page' : undefined}
+              >
+                <NavList.LeadingVisual>
+                  <HomeIcon />
+                </NavList.LeadingVisual>
+                Home
+              </NavList.Item>
 
-                <NavList.Item
-                  as={Link}
-                  to="/admin/events"
-                  aria-current={isCurrent('/admin/events') ? 'page' : undefined}
-                >
-                  <NavList.LeadingVisual>
-                    <CalendarIcon />
-                  </NavList.LeadingVisual>
-                  Events & Races
-                </NavList.Item>
+              <NavList.Item
+                as={Link}
+                to="/admin/events"
+                aria-current={isCurrent('/admin/events') ? 'page' : undefined}
+              >
+                <NavList.LeadingVisual>
+                  <CalendarIcon />
+                </NavList.LeadingVisual>
+                Events & Races
+              </NavList.Item>
 
-                <NavList.Item
-                  as={Link}
-                  to="/admin/users"
-                  aria-current={isCurrent('/admin/users') ? 'page' : undefined}
-                >
-                  <NavList.LeadingVisual>
-                    <PeopleIcon />
-                  </NavList.LeadingVisual>
-                  Users
-                </NavList.Item>
+              <NavList.Item
+                as={Link}
+                to="/admin/users"
+                aria-current={isCurrent('/admin/users') ? 'page' : undefined}
+              >
+                <NavList.LeadingVisual>
+                  <PeopleIcon />
+                </NavList.LeadingVisual>
+                Users
+              </NavList.Item>
 
-                <NavList.Item
-                  as={Link}
-                  to="/admin/teams"
-                  aria-current={isCurrent('/admin/teams') ? 'page' : undefined}
-                >
-                  <NavList.LeadingVisual>
-                    <OrganizationIcon />
-                  </NavList.LeadingVisual>
-                  Teams
-                </NavList.Item>
-              </NavList.Group>
+              <NavList.Item
+                as={Link}
+                to="/admin/teams"
+                aria-current={isCurrent('/admin/teams') ? 'page' : undefined}
+              >
+                <NavList.LeadingVisual>
+                  <OrganizationIcon />
+                </NavList.LeadingVisual>
+                Teams
+              </NavList.Item>
 
               <NavList.Divider style={{ margin: '1.5rem 0' }} />
 
@@ -128,33 +126,16 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
           </PageLayout.Pane>
 
           <PageLayout.Content style={{ padding: '2rem' }}>
-            {/* Page Header block */}
-            <div style={{
-              backgroundColor: 'var(--color-canvas-default)',
-              border: '1px solid var(--color-border-default)',
-              borderRadius: '6px',
-              padding: '1.5rem',
-              marginBottom: '2rem',
-              boxShadow: 'var(--color-shadow-small)',
-            }}>
-              <PageHeader>
-                <PageHeader.TitleArea>
-                  <PageHeader.Title>
-                    <Heading as="h1" style={{ fontSize: '24px', margin: 0 }}>{title}</Heading>
-                  </PageHeader.Title>
-                  {subtitle && (
-                    <PageHeader.Description>
-                      <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>{subtitle}</span>
-                    </PageHeader.Description>
-                  )}
-                </PageHeader.TitleArea>
-                {actions && (
-                  <PageHeader.Actions>
-                    <div style={{ display: 'flex', gap: '8px' }}>{actions}</div>
-                  </PageHeader.Actions>
-                )}
-              </PageHeader>
-            </div>
+            {actions && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '8px',
+                marginBottom: '1.5rem',
+              }}>
+                {actions}
+              </div>
+            )}
 
             {/* Content body slot */}
             <div>

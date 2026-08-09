@@ -1,7 +1,9 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
+import { listAdminUsers, listAdminTeams, listAdminEvents } from '../../lib/admin-api'
 import { Heading, Text, Label, Button } from '@primer/react'
 
 export const Route = createFileRoute('/admin/')({
@@ -13,6 +15,50 @@ export const Route = createFileRoute('/admin/')({
 
 function AdminPage() {
   const { session } = useAuth()
+  const [stats, setStats] = useState<{ users: number | null; teams: number | null; events: number | null }>({
+    users: null,
+    teams: null,
+    events: null,
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  const authHeader = useMemo(() => {
+    const token = session?.session.token
+    return token ? `Bearer ${token}` : null
+  }, [session?.session.token])
+
+  useEffect(() => {
+    if (!authHeader) return
+    let active = true
+
+    async function fetchStats() {
+      try {
+        const [usersRes, teamsRes, eventsRes] = await Promise.all([
+          listAdminUsers(authHeader!, undefined, 1, 0),
+          listAdminTeams(undefined, 1, 0),
+          listAdminEvents(undefined, undefined, 1, 0),
+        ])
+        if (active) {
+          setStats({
+            users: usersRes.total,
+            teams: teamsRes.total,
+            events: eventsRes.total,
+          })
+          setStatsLoading(false)
+        }
+      } catch (err) {
+        console.error('Failed to fetch stats:', err)
+        if (active) {
+          setStatsLoading(false)
+        }
+      }
+    }
+
+    void fetchStats()
+    return () => {
+      active = false
+    }
+  }, [authHeader])
 
   return (
     <AdminLayout
@@ -47,6 +93,73 @@ function AdminPage() {
               <Label variant="success">
                 {session?.user.siteRole ?? 'SITE_ADMIN'}
               </Label>
+            </div>
+          </div>
+        </div>
+
+        {/* System Statistics Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1.5rem',
+        }}>
+          {/* Total Users */}
+          <div style={{
+            padding: '1.5rem',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-canvas-default)',
+            boxShadow: 'var(--color-shadow-small)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+          }}>
+            <span style={{ fontSize: '12px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold' }}>Total Users</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '28px' }}>👤</span>
+              <Heading as="h2" style={{ fontSize: '32px', margin: 0, fontWeight: '800' }}>
+                {statsLoading ? '...' : stats.users ?? 0}
+              </Heading>
+            </div>
+          </div>
+
+          {/* Total Teams */}
+          <div style={{
+            padding: '1.5rem',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-canvas-default)',
+            boxShadow: 'var(--color-shadow-small)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+          }}>
+            <span style={{ fontSize: '12px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold' }}>Total Teams</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '28px' }}>🛡️</span>
+              <Heading as="h2" style={{ fontSize: '32px', margin: 0, fontWeight: '800' }}>
+                {statsLoading ? '...' : stats.teams ?? 0}
+              </Heading>
+            </div>
+          </div>
+
+          {/* Total Events */}
+          <div style={{
+            padding: '1.5rem',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: '6px',
+            backgroundColor: 'var(--color-canvas-default)',
+            boxShadow: 'var(--color-shadow-small)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+          }}>
+            <span style={{ fontSize: '12px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold' }}>Total Events</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '28px' }}>🏆</span>
+              <Heading as="h2" style={{ fontSize: '32px', margin: 0, fontWeight: '800' }}>
+                {statsLoading ? '...' : stats.events ?? 0}
+              </Heading>
             </div>
           </div>
         </div>
