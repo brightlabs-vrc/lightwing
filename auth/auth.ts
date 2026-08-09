@@ -222,6 +222,9 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     "http://localhost:4000",
     "http://localhost:3000",
     "http://localhost:5173",
+    "https://lightwing.urs.deno.net",
+    "https://lightwing-canary.urs.deno.net",
+    "https://comp.cosyne.jp.eu.org",
     // This is set either by the Encore platform at deploy time or via the
     // optional FRONTEND_URL secret when the frontend needs a separate origin.
     appMeta().apiBaseUrl,
