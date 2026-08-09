@@ -29,7 +29,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
     image: null,
     biography: 'A rapid competitor on the turf.',
     careerOverview: 'Sprinting specialist.',
-    vrchatUsername: null,
+    vrchatUsername: 'Bolt',
     classTier: 'OP',
     siteRole: 'USER',
     teams: [],
@@ -44,7 +44,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
     image: null,
     biography: 'Silent but swift.',
     careerOverview: 'Distance running.',
-    vrchatUsername: null,
+    vrchatUsername: 'Shadow',
     classTier: 'G3',
     siteRole: 'USER',
     teams: [],
@@ -57,15 +57,15 @@ const mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
   [
     'race_mock_001',
     [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+      { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP' },
+      { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3' },
     ],
   ],
   [
     'race_mock_002',
     [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+      { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP' },
+      { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3' },
     ],
   ],
 ])
@@ -183,8 +183,8 @@ function loadMockEvents(): eventmanager.EventDetail[] {
           createdAt: now,
           updatedAt: now,
           members: [
-            { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-            { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+            { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP' },
+            { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3' },
           ],
         } as any,
         {
@@ -203,19 +203,19 @@ function loadMockEvents(): eventmanager.EventDetail[] {
           createdAt: now,
           updatedAt: now,
           members: [
-            { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-            { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+            { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP' },
+            { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3' },
           ],
         } as any,
       ],
       members: [
-        { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-        { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+        { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP' },
+        { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3' },
       ],
       schedules: [],
       pointsOverview: [
-        { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10 },
-        { userId: 'mock-user-2', name: 'Shadow Runner', points: 6 },
+        { userId: 'mock-user-1', name: 'Bolt', points: 10 },
+        { userId: 'mock-user-2', name: 'Shadow', points: 6 },
       ],
       ladderOverview: null,
       createdAt: now,
@@ -393,7 +393,7 @@ export async function joinEvent(
   if (!isAlreadyMember) {
     mockPublicEvents[eventIndex] = {
       ...event,
-      members: [...event.members, { userId, name: user.name, classTier: userTier }],
+      members: [...event.members, { userId, name: user.vrchatUsername ?? user.name, classTier: userTier }],
     }
   }
 
@@ -466,7 +466,7 @@ export async function updateMyProfile(
 
   const updated: auth.UserProfile = {
     ...existing,
-    name: params.name ?? existing.name,
+    name: params.name ?? (existing.vrchatUsername ?? existing.name),
     slug: params.slug !== undefined ? params.slug : existing.slug,
     biography: params.biography !== undefined ? params.biography : existing.biography,
     careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
@@ -569,7 +569,7 @@ export async function joinRaceEvent(
       throw new Error('User is not a member of this event')
     }
     // Auto-enroll user as event member
-    event.members = [...event.members, { userId, name: user.name, classTier: user.classTier }]
+    event.members = [...event.members, { userId, name: user.vrchatUsername ?? user.name, classTier: user.classTier }]
   }
 
   const targetRestriction = event.raceEvents[raceIndex].classRestriction ?? event.classRestriction
@@ -581,7 +581,7 @@ export async function joinRaceEvent(
 
   let raceMembers = mockRaceMembersMap.get(raceId) ?? []
   if (!raceMembers.some((m) => m.userId === userId)) {
-    raceMembers = [...raceMembers, { userId, name: user.name, classTier: userTier }]
+    raceMembers = [...raceMembers, { userId, name: user.vrchatUsername ?? user.name, classTier: userTier }]
     mockRaceMembersMap.set(raceId, raceMembers)
   }
 

@@ -79,13 +79,20 @@ export function getActiveScoringTable(params: {
 }
 
 // Resolves position to points based on event rules and race grade.
+// DSQ/DNF results always resolve to 0 points regardless of position.
 export function resolvePoints(params: {
   scoringRulesMode?: ScoringRulesMode | string | null;
   customScoringTables?: any | null;
   grade?: RaceGrade | string | null;
   position?: number | null;
+  resultStatus?: string | null;
 }): number {
-  const { position } = params;
+  const { position, resultStatus } = params;
+
+  // DSQ (Did Not Qualify) and DNF (Did Not Finish) always resolve to 0 points
+  if (resultStatus === "DSQ" || resultStatus === "DNF") {
+    return 0;
+  }
 
   if (!position || position < 1 || position > 10) {
     return 0;

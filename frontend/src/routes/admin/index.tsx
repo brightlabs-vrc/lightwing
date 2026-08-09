@@ -16,7 +16,7 @@ function AdminPage() {
   return (
     <AdminLayout
       title="Admin Dashboard"
-      subtitle="Welcome to the Project Lightwing control center. Oversee system entities, manage dynamic event results, and verify ingestion pipelines."
+      subtitle="Welcome to the control center. Oversee system entities, manage dynamic event results, and verify ingestion pipelines."
     >
       <div className="slds-grid slds-wrap slds-gutters">
         {/* Active Session summary card */}
@@ -40,7 +40,7 @@ function AdminPage() {
               <div className="slds-grid slds-wrap" style={{ gap: '24px' }}>
                 <div>
                   <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Name</p>
-                  <p className="slds-text-body_regular font-medium" style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.name}</p>
+                  <p className="slds-text-body_regular font-medium" style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.vrchatUsername ?? session?.user.name}</p>
                 </div>
                 <div>
                   <p className="slds-text-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: '#514f4d' }}>Authorization Role</p>

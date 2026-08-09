@@ -78,7 +78,7 @@ function AuthPage() {
           {!loading && session ? (
             <div className='space-y-7'>
               <div className='space-y-1.5 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-5 text-sm text-slate-700'>
-                <p className='font-medium text-slate-900'>{session.user.name}</p>
+                <p className='font-medium text-slate-900'>{session.user.vrchatUsername ?? session.user.name}</p>
                 <p className='text-slate-600'>{session.user.email}</p>
                 <p className='mt-3 text-xs uppercase tracking-[0.2em] text-emerald-700'>
                   {session.user.siteRole ?? 'USER'} session active

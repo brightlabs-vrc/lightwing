@@ -34,16 +34,19 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
                 ⚙️
               </span>
             </div>
-            <span className="slds-text-heading_small slds-truncate" style={{ fontWeight: 'bold', color: '#180505', fontSize: '1.1rem' }}>
-              Project Lightwing Admin
-            </span>
+            <div className="slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src="/favicon.png" alt="Lightwing" className="w-5 h-5" />
+              <span className="slds-text-heading_small slds-truncate" style={{ fontWeight: 'bold', color: '#180505', fontSize: '1.1rem' }}>
+                Admin
+              </span>
+            </div>
           </div>
 
           <div className="slds-global-header__item slds-grid slds-grid_vertical-align-center">
             {session ? (
               <div className="slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span className="slds-text-body_small slds-text-color_weak">
-                  Signed in as <strong>{session.user.name}</strong> ({session.user.siteRole})
+                  Signed in as <strong>{session.user.vrchatUsername ?? session.user.name}</strong> ({session.user.siteRole})
                 </span>
                 <button
                   type="button"

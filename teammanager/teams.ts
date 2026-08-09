@@ -11,7 +11,7 @@ import { ADMINISTRATOR_ROLE, ADMINISTRATOR_ROLE_LIMIT } from "../lib/constants";
 
 export const TEAM_WITH_MEMBERS_INCLUDE = {
   members: {
-    include: { user: { select: { name: true } } },
+    include: { user: { select: { name: true, vrchatUsername: true } } },
     orderBy: { createdAt: "asc" as const },
   },
 } satisfies Prisma.OrganizationInclude;
@@ -121,7 +121,7 @@ type OrganizationWithMembers = {
   pointsAverage: number | null;
   seasonRank: number | null;
   averagePointsPerEvent: number | null;
-  members: { id: string; userId: string; role: string; user: { name: string } }[];
+  members: { id: string; userId: string; role: string; user: { name: string; vrchatUsername: string | null } }[];
 };
 
 interface ListTeamsParams {
@@ -241,7 +241,7 @@ export function toTeam(organization: OrganizationWithMembers): Team {
     ),
     members: organization.members.map((member) => ({
       userId: member.userId,
-      name: member.user.name,
+      name: member.user.vrchatUsername ?? member.user.name,
       role: member.role,
     })),
   };

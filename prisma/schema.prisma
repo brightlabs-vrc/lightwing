@@ -241,6 +241,9 @@ model RaceResult {
   margin      String?   @db.Text // Distance Behind / Margin (JP: 着差), e.g. "1/2 length", "nose"
   passingOrder String?  @db.Text // Passing Order at calls (JP: 通過順), e.g. "3-2-1"
   final3F     String?   @db.Text // Final 3F split (JP: 上がり3F), e.g. "34.5"
+  // Race outcome status. NULL = normal finish. 'DSQ' = Did Not Qualify, 'DNF' = Did Not Finish.
+  // Descriptive only and excluded from scoring calculations — resolves to 0 points.
+  resultStatus String?   @db.Text
   createdAt   DateTime  @default(now()) @db.Timestamp(6)
   updatedAt   DateTime  @updatedAt @db.Timestamp(6)
   raceEvent   RaceEvent @relation(fields: [raceEventId], references: [id], onDelete: Cascade)
@@ -299,6 +302,9 @@ model EventPointsEntry {
   eventId   String   @db.Text
   userId    String   @db.Text
   points    Int      @default(0)
+  // Race outcome status carried from race_result rows. NULL = normal finish.
+  // 'DSQ' or 'DNF' indicates the participant did not finish/qualify.
+  resultStatus String?  @db.Text
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @updatedAt @db.Timestamp(6)
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)

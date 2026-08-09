@@ -10,6 +10,7 @@ export interface RaceResultInput {
   margin?: string | null;
   passingOrder?: string | null;
   final3F?: string | null;
+  resultStatus?: string | null;
 }
 
 export function buildRaceResultUpsert(
@@ -25,6 +26,7 @@ export function buildRaceResultUpsert(
     margin: entry.margin ?? null,
     passingOrder: entry.passingOrder ?? null,
     final3F: entry.final3F ?? null,
+    resultStatus: entry.resultStatus ?? null,
   };
   return {
     where: { raceEventId_userId: { raceEventId, userId: entry.userId } },
