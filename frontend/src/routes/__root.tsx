@@ -58,7 +58,7 @@ function RootLayout() {
               <PixelButton asChild variant="ghost" tone="neutral" className="site-brand">
                 <Link to="/">
                   <PixelStack direction="row" gap={2} align="center">
-                    <span className="font-pixel text-sm tracking-wider leading-none">LIGHTWING</span>
+                    <img src="/favicon.png" alt="Lightwing" className="w-6 h-6" />
                   </PixelStack>
                 </Link>
               </PixelButton>
@@ -84,7 +84,7 @@ function RootLayout() {
                   <PixelStack direction="row" gap={2} align="center" className="site-account">
                     <PixelButton asChild variant="outline" tone="neutral" size="sm">
                       <Link to="/profile" title="Edit Profile">
-                        {session.user.name.toUpperCase()}
+                        {session.user.vrchatUsername ?? session.user.name.toUpperCase()}
                       </Link>
                     </PixelButton>
                     <PixelButton

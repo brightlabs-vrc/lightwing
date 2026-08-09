@@ -183,6 +183,7 @@ export const reorderRaceEvents = api(
             user: {
               select: {
                 name: true,
+                vrchatUsername: true,
                 classTier: true,
               },
             },
@@ -215,6 +216,7 @@ export const listRaceEvents = api(
             user: {
               select: {
                 name: true,
+                vrchatUsername: true,
                 classTier: true,
               },
             },
@@ -374,6 +376,7 @@ async function requireRaceEvent(eventId: string, raceId: string) {
           user: {
             select: {
               name: true,
+              vrchatUsername: true,
               classTier: true,
             },
           },
@@ -407,6 +410,7 @@ type RaceEventRow = {
     userId: string;
     user: {
       name: string;
+      vrchatUsername: string | null;
       classTier: ClassTier | null;
     };
   }[];
@@ -432,7 +436,7 @@ function toRaceEventDetail(race: RaceEventRow): RaceEventDetail {
     members: race.raceMembers
       ? race.raceMembers.map((rm) => ({
           userId: rm.userId,
-          name: rm.user.name,
+          name: rm.user.vrchatUsername ?? rm.user.name,
           classTier: rm.user.classTier,
         }))
       : [],
@@ -615,6 +619,7 @@ export const listRaceEventMembers = api(
         user: {
           select: {
             name: true,
+            vrchatUsername: true,
             classTier: true,
           },
         },
@@ -624,7 +629,7 @@ export const listRaceEventMembers = api(
     return {
       members: members.map((m) => ({
         userId: m.userId,
-        name: m.user.name,
+        name: m.user.vrchatUsername ?? m.user.name,
         classTier: m.user.classTier,
       })),
     };
