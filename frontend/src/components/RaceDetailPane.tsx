@@ -166,7 +166,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
           }}
         >
           {filtered.length === 0 && (
-            <div style={{ padding: '6px 12px', color: '#57606a', fontSize: '12px' }}>
+            <div style={{ padding: '6px 12px', color: 'var(--color-fg-muted)', fontSize: '12px' }}>
               No matches found
             </div>
           )}
@@ -187,7 +187,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
               }}
             >
               <div style={{ fontWeight: '600', color: 'var(--color-fg-default)' }}>{member.name}</div>
-              <div style={{ fontSize: '10px', color: '#57606a' }}>
+              <div style={{ fontSize: '10px', color: 'var(--color-fg-muted)' }}>
                 ID: {member.userId} | Class: {formatClassTier(member.classTier)}
               </div>
             </div>
@@ -272,7 +272,7 @@ export function RaceDetailPane({
           <Heading as="h3" style={{ fontSize: '20px', fontWeight: 'bold' }}>
             No race selected
           </Heading>
-          <Text style={{ fontSize: '14px', color: '#57606a', display: 'block', maxWidth: '360px', margin: '8px auto 0 auto', lineHeight: '1.5' }}>
+          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', display: 'block', maxWidth: '360px', margin: '8px auto 0 auto', lineHeight: '1.5' }}>
             Select a race track from the left panel to begin managing competitors, recording standings, and starting or concluding races.
           </Text>
           <Button
@@ -303,7 +303,7 @@ export function RaceDetailPane({
               #{selectedRace.sequence}. {selectedRace.name}
             </Heading>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
-              <span style={{ fontSize: '12px', color: '#57606a' }}>
+              <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
                 Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> | Location: <strong>{selectedRace.location}</strong>
               </span>
               <Label variant="default">
@@ -396,7 +396,7 @@ export function RaceDetailPane({
           </div>
         </div>
 
-        <div style={{ fontSize: '11px', color: '#57606a', borderTop: '1px solid var(--color-border-default)', paddingTop: '8px', marginTop: '12px' }}>
+        <div style={{ fontSize: '11px', color: 'var(--color-fg-muted)', borderTop: '1px solid var(--color-border-default)', paddingTop: '8px', marginTop: '12px' }}>
           {selectedRace.startsAt ? `Started: ${new Date(selectedRace.startsAt).toLocaleString()}` : 'Race is currently not started'} <br />
           {selectedRace.endsAt ? `Ended: ${new Date(selectedRace.endsAt).toLocaleString()}` : ''}
           {selectedRace.grade && (
@@ -470,7 +470,7 @@ export function RaceDetailPane({
           </div>
 
           {(selectedRace.members?.length ?? 0) === 0 ? (
-            <p style={{ fontSize: '11px', color: '#57606a', margin: 0 }}>No competitors registered specifically for this race yet.</p>
+            <p style={{ fontSize: '11px', color: 'var(--color-fg-muted)', margin: 0 }}>No competitors registered specifically for this race yet.</p>
           ) : (
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {(selectedRace.members ?? []).map((m) => (

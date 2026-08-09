@@ -130,7 +130,7 @@ export function RaceListPanel({
 
       {isReordering ? (
         <div style={{ marginBottom: '16px' }}>
-          <p style={{ fontSize: '12px', color: '#57606a', marginBottom: '12px', lineHeight: '1.4', fontStyle: 'italic' }}>
+          <p style={{ fontSize: '12px', color: 'var(--color-fg-muted)', marginBottom: '12px', lineHeight: '1.4', fontStyle: 'italic' }}>
             Drag items or use the arrows to reorder. Changes are saved automatically.
           </p>
           {(() => {
@@ -168,7 +168,7 @@ export function RaceListPanel({
           {/* Group: Ongoing */}
           {ongoingRaces.length > 0 && (
             <div>
-              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: '#57606a', margin: '0 0 8px 0' }}>
+              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: 'var(--color-fg-muted)', margin: '0 0 8px 0' }}>
                 Ongoing ({ongoingRaces.length})
               </h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -189,7 +189,7 @@ export function RaceListPanel({
           {/* Group: Concluded */}
           {concludedRaces.length > 0 && (
             <div>
-              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: '#57606a', margin: '0 0 8px 0' }}>
+              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: 'var(--color-fg-muted)', margin: '0 0 8px 0' }}>
                 Concluded ({concludedRaces.length})
               </h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -210,7 +210,7 @@ export function RaceListPanel({
           {/* Group: Not Started */}
           {notStartedRaces.length > 0 && (
             <div>
-              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: '#57606a', margin: '0 0 8px 0' }}>
+              <h4 style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.0625em', color: 'var(--color-fg-muted)', margin: '0 0 8px 0' }}>
                 Not Started ({notStartedRaces.length})
               </h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>

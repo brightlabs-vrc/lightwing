@@ -37,6 +37,10 @@ export const ColorModeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [colorMode])
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-color-mode', resolvedColorMode)
+  }, [resolvedColorMode])
+
   const setColorMode = (mode: ColorMode) => {
     setColorModeState(mode)
     localStorage.setItem('lightwing_color_mode', mode)

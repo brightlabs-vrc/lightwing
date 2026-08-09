@@ -71,7 +71,7 @@ export function StandingsEditor({
           <Heading as="h2" style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>
             Standings Grid: {raceName}
           </Heading>
-          <Text style={{ fontSize: '11px', color: '#57606a', display: 'block' }}>
+          <Text style={{ fontSize: '11px', color: 'var(--color-fg-muted)', display: 'block' }}>
             Assign finishes for registered event participants. Status: {isRaceNotStarted ? 'Not Started' : isRaceOngoing ? 'Ongoing (Live - Provisional Saving Allowed)' : 'Concluded'}
           </Text>
         </div>
@@ -144,9 +144,9 @@ export function StandingsEditor({
         )}
 
         {loadingResults ? (
-          <p style={{ color: '#57606a', fontSize: '14px' }}>Loading race results data...</p>
+          <p style={{ color: 'var(--color-fg-muted)', fontSize: '14px' }}>Loading race results data...</p>
         ) : memberCount === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#57606a' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-fg-muted)' }}>
             No registered event participants found. Add participants under "Event Members" tab first.
           </div>
         ) : (
@@ -275,7 +275,7 @@ function StandingsTable({
                   <td style={{ padding: '8px' }}>
                     {scoringType === 1 ? (
                       <div style={{ fontWeight: 'bold', color: '#0969da', fontSize: '13px', textAlign: 'center' }}>
-                        {getPreviewPoints(edit.position)} pts <span style={{ fontSize: '9px', color: '#57606a', display: 'block', fontWeight: 'normal' }}>(Auto)</span>
+                        {getPreviewPoints(edit.position)} pts <span style={{ fontSize: '9px', color: 'var(--color-fg-muted)', display: 'block', fontWeight: 'normal' }}>(Auto)</span>
                       </div>
                     ) : (
                       <TextInput
@@ -411,7 +411,7 @@ function StandingsTable({
         marginTop: '1.5rem'
       }}>
         <h4 style={{ fontWeight: 'bold', color: 'var(--color-fg-default)', margin: '0 0 4px 0' }}>Explanation of Standings update actions</h4>
-        <ul style={{ paddingLeft: '1.25rem', marginTop: '4px', fontSize: '12px', color: '#57606a', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <ul style={{ paddingLeft: '1.25rem', marginTop: '4px', fontSize: '12px', color: 'var(--color-fg-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <li><strong>Staging Changes</strong> - Edits to the standings are compiled locally. Highlighting shows which rows have modified values or are pending deletion.</li>
           <li><strong>Smart Save Standings</strong> - The system analyzes your edits and executes the safest, most performant update automatically:
             <ul style={{ paddingLeft: '1.25rem', marginTop: '2px', listStyleType: 'circle', display: 'flex', flexDirection: 'column', gap: '2px' }}>

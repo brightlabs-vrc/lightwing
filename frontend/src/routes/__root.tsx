@@ -86,7 +86,7 @@ function RootLayout() {
 
         <Header.Item style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {loading ? (
-            <span style={{ fontSize: '12px', color: '#57606a' }}>LOADING...</span>
+            <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>LOADING...</span>
           ) : session ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Button as={Link as any} to="/profile" size="small">
@@ -119,7 +119,7 @@ function RootLayout() {
         textAlign: 'center',
         padding: '2rem 1.5rem',
         fontSize: '12px',
-        color: '#57606a',
+        color: 'var(--color-fg-muted)',
         borderTop: '1px solid var(--color-border-default)',
         backgroundColor: 'var(--color-canvas-default)'
       }}>

@@ -19,7 +19,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
       }}>
         {selectedEvent.scheduledAt && (
           <div>
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scheduled Time</span>
+            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scheduled Time</span>
             <span style={{ fontSize: '14px' }}>
               <time dateTime={selectedEvent.scheduledAt}>
                 <strong>{formatLocalDateTime(selectedEvent.scheduledAt)}</strong>
@@ -28,13 +28,13 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
           </div>
         )}
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Description</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Description</span>
           <span style={{ fontSize: '14px' }}>
             {selectedEvent.description ?? 'No description registered.'}
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scoring Configuration</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scoring Configuration</span>
           <span style={{ fontSize: '14px', lineHeight: '1.5' }}>
             Scoring Mode: <strong>{selectedEvent.scoringTypeLabel}</strong> ({selectedEvent.scoringType === 1 ? 'Points aggregation' : 'Ladder Rating (ELO)'}) <br />
             {selectedEvent.scoringType === 1 && (
@@ -45,26 +45,26 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Owner Parameters</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Owner Parameters</span>
           <span style={{ fontSize: '14px' }}>
             Ownership Type: {selectedEvent.ownerType} <br />
             ID: {selectedEvent.organizationId ?? selectedEvent.ownerUserId}
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Class restriction</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Class restriction</span>
           <span style={{ fontSize: '14px' }}>
             Tier Restriction: <strong>{selectedEvent.classRestriction ?? 'PRE_OP (Any tier eligibility)'}</strong>
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Participation Model</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Participation Model</span>
           <span style={{ fontSize: '14px' }}>
             Granular Per-Race Participation: <strong>{selectedEvent.granularParticipation ? 'Enabled (Per-Race registration required)' : 'Disabled (Event-wide registration)'}</strong>
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Signups Status</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Signups Status</span>
           <span style={{ fontSize: '14px' }}>
             Signups Lock: <strong>{selectedEvent.signupsLocked ? 'Locked (Self-service signups disabled)' : 'Open (Self-service signups enabled)'}</strong>
           </span>
@@ -117,7 +117,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
               </table>
             </div>
           ) : (
-            <span style={{ fontSize: '14px', color: '#57606a' }}>No participants score standings loaded.</span>
+            <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>No participants score standings loaded.</span>
           )
         ) : (
           selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
@@ -144,7 +144,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
               </table>
             </div>
           ) : (
-            <span style={{ fontSize: '14px', color: '#57606a' }}>No ladder match results computed yet.</span>
+            <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>No ladder match results computed yet.</span>
           )
         )}
       </div>

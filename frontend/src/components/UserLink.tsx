@@ -16,13 +16,28 @@ export const UserLink: React.FC<UserLinkProps> = ({
   style,
   clickable = true,
 }) => {
+  const mergedStyle = {
+    fontWeight: 'bold' as const,
+    ...style,
+  }
+
   if (clickable && userId) {
     return (
       <Link
         to="/admin/users/$userId"
         params={{ userId }}
-        className={`text-blue-600 hover:underline font-bold ${className}`}
-        style={style}
+        className={className}
+        style={{
+          color: 'var(--color-accent-fg)',
+          textDecoration: 'none',
+          ...mergedStyle,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.textDecoration = 'underline'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.textDecoration = 'none'
+        }}
       >
         {name}
       </Link>
@@ -30,7 +45,13 @@ export const UserLink: React.FC<UserLinkProps> = ({
   }
 
   return (
-    <span className={`text-slate-800 font-semibold ${className}`} style={style}>
+    <span
+      className={className}
+      style={{
+        color: 'var(--color-fg-default)',
+        ...mergedStyle,
+      }}
+    >
       {name}
     </span>
   )

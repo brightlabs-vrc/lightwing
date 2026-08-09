@@ -44,7 +44,7 @@ export function EventMembersTab({
             Register Member
           </Button>
         </form>
-        <span style={{ fontSize: '12px', color: '#57606a' }}>
+        <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
           💡 For mock testing, you can input "mock-user-1", "mock-user-2", "mock-user-3" or other valid IDs.
         </span>
       </div>
@@ -52,7 +52,7 @@ export function EventMembersTab({
       {/* List Members */}
       <Heading as="h3" style={{ fontSize: '18px', margin: 0 }}>Registered Participants</Heading>
       {selectedEvent.members.length === 0 ? (
-        <span style={{ fontSize: '14px', color: '#57606a' }}>No participants are currently registered for this competition.</span>
+        <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>No participants are currently registered for this competition.</span>
       ) : (
         <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>

@@ -80,7 +80,7 @@ export function EventRacesTab({
         <div style={{
           textAlign: 'center',
           padding: '3rem',
-          color: '#57606a',
+          color: 'var(--color-fg-muted)',
           border: '1px dashed #d0d7de',
           borderRadius: '6px',
           display: 'flex',
@@ -90,7 +90,7 @@ export function EventRacesTab({
           minHeight: '300px'
         }}>
           <Heading as="h3" style={{ fontSize: '18px', marginBottom: '8px' }}>No races yet</Heading>
-          <Text style={{ fontSize: '14px', color: '#57606a', display: 'block', marginBottom: '1.5rem' }}>
+          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', display: 'block', marginBottom: '1.5rem' }}>
             Configure your first race track using the wizard.
           </Text>
           <Button variant="primary" onClick={() => setShowCreateRaceModal(true)}>

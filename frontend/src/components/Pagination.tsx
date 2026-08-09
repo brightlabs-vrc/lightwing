@@ -37,13 +37,13 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span style={{ fontSize: '14px', color: '#57606a' }}>
+        <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>
           {total > 0 ? `Showing ${startRange}–${endRange} of ${total}` : 'No results'}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '14px', color: '#57606a', whiteSpace: 'nowrap' }}>Rows per page:</span>
+          <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)', whiteSpace: 'nowrap' }}>Rows per page:</span>
           <Select
             size="small"
             value={pageSize}
