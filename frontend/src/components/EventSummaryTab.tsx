@@ -102,6 +102,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Name</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>User ID</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Total Points</th>
+                    <th style={{ padding: '12px', fontWeight: 'bold' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -111,6 +112,9 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                       <td style={{ padding: '12px' }}><UserLink userId={item.userId} name={item.name} /></td>
                       <td style={{ padding: '12px' }}><code style={{ fontSize: '12px' }}>{item.userId}</code></td>
                       <td style={{ padding: '12px' }}><strong>{item.points} pts</strong></td>
+                      <td style={{ padding: '12px' }}>
+                        {item.resultStatus === 'DSQ' ? <Label variant="severe">DSQ</Label> : item.resultStatus === 'DNF' ? <Label variant="attention">DNF</Label> : ''}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -306,6 +306,7 @@ function EventDetailPage() {
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
                     <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>Total Points</th>
+                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -314,6 +315,9 @@ function EventDetailPage() {
                       <td style={{ padding: '8px' }}>{idx + 1}</td>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
                       <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>{e.points}</td>
+                      {e.resultStatus === 'DSQ' && <td style={{ padding: '8px' }}><Label variant="severe">DSQ</Label></td>}
+                      {e.resultStatus === 'DNF' && <td style={{ padding: '8px' }}><Label variant="attention">DNF</Label></td>}
+                      {e.resultStatus !== 'DSQ' && e.resultStatus !== 'DNF' && <td style={{ padding: '8px' }}></td>}
                     </tr>
                   ))}
                 </tbody>

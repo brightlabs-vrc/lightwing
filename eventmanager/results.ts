@@ -23,6 +23,7 @@ export interface RaceResultView {
   margin: string | null;
   passingOrder: string | null;
   final3F: string | null;
+  resultStatus: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +40,7 @@ interface AssignRaceResultParams {
   margin?: string | null;
   passingOrder?: string | null;
   final3F?: string | null;
+  resultStatus?: string | null;
 }
 
 // Assigns (or updates) a participant's result on a race. Gated by event-update
@@ -69,6 +71,7 @@ export const assignRaceResult = api(
         customScoringTables: event.customScoringTables,
         grade: race.grade,
         position: params.position ?? null,
+        resultStatus: params.resultStatus ?? null,
       });
     }
 
@@ -197,6 +200,7 @@ export type RaceResultRow = {
   margin: string | null;
   passingOrder: string | null;
   final3F: string | null;
+  resultStatus: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -213,6 +217,7 @@ export function toRaceResultView(result: RaceResultRow): RaceResultView {
     margin: result.margin,
     passingOrder: result.passingOrder,
     final3F: result.final3F,
+    resultStatus: result.resultStatus ?? null,
     createdAt: result.createdAt.toISOString(),
     updatedAt: result.updatedAt.toISOString(),
   };

@@ -87,6 +87,7 @@ export function useEventResults({
           margin: saved?.margin ?? '',
           passingOrder: saved?.passingOrder ?? '',
           final3F: saved?.final3F ?? '',
+          resultStatus: saved?.resultStatus ?? '',
         },
       }))
       setPendingDeletions((current) => {
@@ -155,6 +156,7 @@ export function useEventResults({
           margin: d.edit.margin.trim() !== '' ? d.edit.margin.trim() : null,
           passingOrder: d.edit.passingOrder.trim() !== '' ? d.edit.passingOrder.trim() : null,
           final3F: d.edit.final3F.trim() !== '' ? d.edit.final3F.trim() : null,
+          resultStatus: d.edit.resultStatus.trim() !== '' ? d.edit.resultStatus.trim() : null,
         }))
 
       let nextResults = [...results]
@@ -182,6 +184,7 @@ export function useEventResults({
               margin: change.margin,
               passingOrder: change.passingOrder,
               final3F: change.final3F,
+              resultStatus: change.resultStatus,
             },
             authHeader,
           )

@@ -5,6 +5,7 @@ export interface ScoreCalcProjection {
   entries: Array<{
     userId: string;
     points: number;
+    resultStatus: string | null;
   }>;
 }
 

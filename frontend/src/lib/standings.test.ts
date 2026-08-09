@@ -279,4 +279,43 @@ describe("inferFinishTimes", () => {
       expect(result.edits.user3.finishTime).toBe("");
     }
   });
+
+  test("DSQ and DNF rows are excluded from time inference", () => {
+    const rows = [
+      {
+        ...makeMockRow("user1", "1", "1:30.0", ""),
+        edit: { ...EMPTY_EDIT, position: "1", finishTime: "1:30.0", margin: "", resultStatus: "" },
+      },
+      {
+        ...makeMockRow("user2", "2", "", "1"),
+        edit: { ...EMPTY_EDIT, position: "2", finishTime: "", margin: "1", resultStatus: "DSQ" },
+      },
+      {
+        ...makeMockRow("user3", "3", "", "1"),
+        edit: { ...EMPTY_EDIT, position: "3", finishTime: "", margin: "1", resultStatus: "DNF" },
+      },
+      {
+        ...makeMockRow("user4", "2", "", "3"),
+        edit: { ...EMPTY_EDIT, position: "2", finishTime: "", margin: "3", resultStatus: "" },
+      },
+    ];
+
+    const result = inferFinishTimes(rows, {
+      user1: rows[0].edit,
+      user2: rows[1].edit,
+      user3: rows[2].edit,
+      user4: rows[3].edit,
+    });
+
+    // DSQ and DNF rows excluded — sequence is now position 1 (user1) and 2 (user4)
+    expect("error" in result).toBe(false);
+    if (!("error" in result)) {
+      expect(result.inferredCount).toBe(1);
+      // user4: 1:30.0 + 3 lengths (1.5s) = 1:31.5
+      expect(result.edits.user4.finishTime).toBe("1:31.5");
+      // DSQ/DNF rows were not modified
+      expect(result.edits.user2.finishTime).toBe("");
+      expect(result.edits.user3.finishTime).toBe("");
+    }
+  });
 });

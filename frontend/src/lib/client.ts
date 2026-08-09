@@ -16,7 +16,7 @@ export const Local: BaseURL = "http://localhost:4000"
  * Environment returns a BaseURL for calling the cloud environment with the given name.
  */
 export function Environment(name: string): BaseURL {
-    return `https://${name}-258wq.encr.app`
+    return `https://${name}-kutwa.encr.app`
 }
 
 /**
@@ -29,7 +29,7 @@ export function PreviewEnv(pr: number | string): BaseURL {
 const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
 
 /**
- * Client is an API client for the 258wq Encore application.
+ * Client is an API client for the kutwa Encore application.
  */
 export default class Client {
     public readonly auth: auth.ServiceClient
@@ -300,6 +300,7 @@ export namespace eventmanager {
         margin?: string | null
         passingOrder?: string | null
         final3F?: string | null
+        resultStatus?: string | null
     }
 
     /**
@@ -530,15 +531,9 @@ export namespace eventmanager {
         userId: string
         name: string
         points: number
+        resultStatus: string | null
     }
 
-    /**
-     * A RaceEvent is a single race contained within an Event. The parent Event acts
-     * as the container/scoreboard; each RaceEvent carries its own distance, track
-     * type (free-text) and location. Authorization for every mutation is delegated
-     * to the parent event via requireEventPermission, so both organization-owned
-     * and user-owned events (and site admins) are handled uniformly.
-     */
     export interface RaceEventDetail {
         id: string
         eventId: string
@@ -595,6 +590,7 @@ export namespace eventmanager {
         margin?: string | null
         passingOrder?: string | null
         final3F?: string | null
+        resultStatus?: string | null
     }
 
     /**
@@ -614,6 +610,7 @@ export namespace eventmanager {
         margin: string | null
         passingOrder: string | null
         final3F: string | null
+        resultStatus: string | null
         createdAt: string
         updatedAt: string
     }
@@ -848,6 +845,7 @@ export namespace eventmanager {
                 passingOrder: params.passingOrder,
                 points:       params.points,
                 position:     params.position,
+                resultStatus: params.resultStatus,
             }
 
             // Now make the actual call to the API
@@ -894,15 +892,15 @@ export namespace eventmanager {
                 customScoringTables:             params.customScoringTables,
                 description:                     params.description,
                 granularParticipation:           params.granularParticipation,
+                maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
                 name:                            params.name,
                 organizationId:                  params.organizationId,
                 ownerType:                       params.ownerType,
                 ownerUserId:                     params.ownerUserId,
+                participantLimit:                params.participantLimit,
+                scheduledAt:                     params.scheduledAt,
                 scoringRulesMode:                params.scoringRulesMode,
                 scoringType:                     params.scoringType,
-                scheduledAt:                     params.scheduledAt,
-                participantLimit:                params.participantLimit,
-                maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
             }
 
             // Now make the actual call to the API
@@ -927,11 +925,11 @@ export namespace eventmanager {
                 grade:            params.grade,
                 location:         params.location,
                 name:             params.name,
+                participantLimit: params.participantLimit,
                 scoringType:      params.scoringType,
                 sequence:         params.sequence,
                 startsAt:         params.startsAt,
                 trackType:        params.trackType,
-                participantLimit: params.participantLimit,
             }
 
             // Now make the actual call to the API
@@ -1484,11 +1482,11 @@ export namespace eventmanager {
                 classRestriction:                params.classRestriction,
                 customScoringTables:             params.customScoringTables,
                 description:                     params.description,
-                name:                            params.name,
-                scoringRulesMode:                params.scoringRulesMode,
-                scheduledAt:                     params.scheduledAt,
-                participantLimit:                params.participantLimit,
                 maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
+                name:                            params.name,
+                participantLimit:                params.participantLimit,
+                scheduledAt:                     params.scheduledAt,
+                scoringRulesMode:                params.scoringRulesMode,
             }
 
             // Now make the actual call to the API
@@ -1513,11 +1511,11 @@ export namespace eventmanager {
                 grade:            params.grade,
                 location:         params.location,
                 name:             params.name,
+                participantLimit: params.participantLimit,
                 scoringType:      params.scoringType,
                 sequence:         params.sequence,
                 startsAt:         params.startsAt,
                 trackType:        params.trackType,
-                participantLimit: params.participantLimit,
             }
 
             // Now make the actual call to the API
@@ -2067,7 +2065,7 @@ class BaseClient {
         // Add User-Agent header if the script is running in the server
         // because browsers do not allow setting User-Agent headers to requests
         if (!BROWSER) {
-            this.headers["User-Agent"] = "258wq-Generated-TS-Client (Encore/v1.57.13)";
+            this.headers["User-Agent"] = "kutwa-Generated-TS-Client (Encore/v1.57.13)";
         }
 
         this.requestInit = options.requestInit ?? {};

@@ -23,7 +23,8 @@ test.describe('Layout parity between legacy and Primer migrations', () => {
     // Header region present (brand + nav)
     const header = page.locator('header').first()
     await expect(header).toBeVisible()
-    await expect(header).toContainText('LIGHTWING')
+    // Header contains favicon image (Lightwing text replaced by favicon)
+    await expect(header.locator('img[alt="Lightwing"]')).toBeVisible()
 
     // Event cards present or empty state
     const eventCard = page.locator('a').filter({ hasText: /Summer Sprint Invitational/i })

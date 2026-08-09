@@ -190,7 +190,11 @@ function StandingsTable({
   raceGrade,
   isRaceNotStarted = false,
 }: StandingsTableProps) {
-  const getPreviewPoints = (positionStr: string): number => {
+  const getPreviewPoints = (positionStr: string, resultStatus: string): number => {
+    // DSQ/DNF always resolve to 0 points
+    if (resultStatus === 'DSQ' || resultStatus === 'DNF') {
+      return 0
+    }
     const position = parseInt(positionStr, 10)
     if (isNaN(position) || position < 1 || position > 10) return 0
     if (!raceGrade) return 0
@@ -216,7 +220,8 @@ function StandingsTable({
               <th style={{ padding: '8px', fontWeight: 'bold', width: '110px' }}>Finish Time</th>
               <th style={{ padding: '8px', fontWeight: 'bold', width: '90px' }}>Behind</th>
               <th style={{ padding: '8px', fontWeight: 'bold', width: '100px' }}>Passing Order</th>
-              <th style={{ padding: '8px', fontWeight: 'bold', width: '90px' }}>Final 3F</th>
+              <th style={{ padding: '8px', fontWeight: 'bold', width: '100px' }}>Final 3F</th>
+              <th style={{ padding: '8px', fontWeight: 'bold', width: '100px' }}>Outcome</th>
               <th style={{ padding: '8px', fontWeight: 'bold' }}>Status</th>
               <th style={{ padding: '8px', fontWeight: 'bold', width: '160px' }}>Staged Actions</th>
             </tr>
@@ -275,7 +280,7 @@ function StandingsTable({
                   <td style={{ padding: '8px' }}>
                     {scoringType === 1 ? (
                       <div style={{ fontWeight: 'bold', color: 'var(--color-accent-fg)', fontSize: '13px', textAlign: 'center' }}>
-                        {getPreviewPoints(edit.position)} pts <span style={{ fontSize: '9px', color: 'var(--color-fg-muted)', display: 'block', fontWeight: 'normal' }}>(Auto)</span>
+                        {getPreviewPoints(edit.position, edit.resultStatus)} pts <span style={{ fontSize: '9px', color: 'var(--color-fg-muted)', display: 'block', fontWeight: 'normal' }}>(Auto)</span>
                       </div>
                     ) : (
                       <TextInput
@@ -335,6 +340,19 @@ function StandingsTable({
                     />
                   </td>
                   <td style={{ padding: '8px' }}>
+                    <Select
+                      disabled={isDeleted}
+                      value={edit.resultStatus}
+                      onChange={(e) => onResultChange(member.userId, 'resultStatus', e.target.value)}
+                      size="small"
+                      style={{ width: '100%' }}
+                    >
+                      <option value="">Normal</option>
+                      <option value="DSQ">DSQ — Did Not Qualify</option>
+                      <option value="DNF">DNF — Did Not Finish</option>
+                    </Select>
+                  </td>
+                  <td style={{ padding: '8px' }}>
                     {isDeleted ? (
                       <Label variant="danger">Pending Deletion</Label>
                     ) : isModified ? (
@@ -343,7 +361,7 @@ function StandingsTable({
                       <Label variant="success">New (Unsaved)</Label>
                     ) : savedResult ? (
                       <Label variant="success">
-                        {isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
+                        {savedResult.resultStatus === 'DSQ' ? 'DSQ' : savedResult.resultStatus === 'DNF' ? 'DNF' : isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
                       </Label>
                     ) : (
                       <Label variant="default">

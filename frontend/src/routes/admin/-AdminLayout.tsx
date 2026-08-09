@@ -176,7 +176,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         }}
       >
         <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
-          Project Lightwing Admin — Authorized access only
+          Admin — Authorized access only
         </span>
       </div>
     </div>
