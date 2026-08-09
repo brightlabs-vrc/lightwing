@@ -121,7 +121,7 @@ export async function handleScoreCalcRequest(event: ScoreCalcRequested): Promise
 
     const raceResults = await prisma.raceResult.findMany({
       where: { raceEvent: { eventId: job.eventId } },
-      select: { userId: true, points: true, resultStatus: true },
+      select: { userId: true, points: true },
     });
 
     // 4. Run calculation
@@ -131,7 +131,6 @@ export async function handleScoreCalcRequest(event: ScoreCalcRequested): Promise
       raceResults: raceResults.map((r) => ({
         userId: r.userId,
         points: r.points,
-        resultStatus: r.resultStatus ?? null,
       })),
     });
 

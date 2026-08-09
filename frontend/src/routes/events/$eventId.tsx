@@ -306,7 +306,6 @@ function EventDetailPage() {
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
                     <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>Total Points</th>
-                    <th style={{ padding: '8px', fontWeight: 'bold' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -315,9 +314,6 @@ function EventDetailPage() {
                       <td style={{ padding: '8px' }}>{idx + 1}</td>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
                       <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>{e.points}</td>
-                      {e.resultStatus === 'DSQ' && <td style={{ padding: '8px' }}><Label variant="severe">DSQ</Label></td>}
-                      {e.resultStatus === 'DNF' && <td style={{ padding: '8px' }}><Label variant="attention">DNF</Label></td>}
-                      {e.resultStatus !== 'DSQ' && e.resultStatus !== 'DNF' && <td style={{ padding: '8px' }}></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -433,12 +429,13 @@ function RaceStandingsTable({
             <th style={{ padding: '8px', fontWeight: 'bold' }}>MARGIN</th>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>PASSING ORDER</th>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>FINAL 3F</th>
+            <th style={{ padding: '8px', fontWeight: 'bold' }}>RESULT</th>
           </tr>
         </thead>
         <tbody>
           {results.length === 0 ? (
             <tr>
-              <td colSpan={8} style={{ padding: '12px', textAlign: 'center', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
+              <td colSpan={9} style={{ padding: '12px', textAlign: 'center', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
                 NO STANDINGS RECORDED
               </td>
             </tr>
@@ -455,6 +452,9 @@ function RaceStandingsTable({
                   <td style={{ padding: '8px' }}>{r.margin ?? '-'}</td>
                   <td style={{ padding: '8px' }}>{r.passingOrder ?? '-'}</td>
                   <td style={{ padding: '8px' }}>{r.final3F ?? '-'}</td>
+                  <td style={{ padding: '8px' }}>
+                    {r.resultStatus === 'DSQ' ? <Label variant="severe">DSQ</Label> : r.resultStatus === 'DNF' ? <Label variant="attention">DNF</Label> : '-'}
+                  </td>
                 </tr>
               )
             })

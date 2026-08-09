@@ -4,7 +4,6 @@ import { type ScoreCalcProjection } from "../events";
 export interface RaceResultInputData {
   userId: string;
   points: number;
-  resultStatus: string | null;
 }
 
 export interface EventScoreInput {
@@ -15,31 +14,24 @@ export interface EventScoreInput {
 
 export function calculateEventProjection(input: EventScoreInput): ScoreCalcProjection {
   const pointsMap = new Map<string, number>();
-  const statusMap = new Map<string, string | null>();
 
-  // Initialize members with 0 points and no result status
+  // Initialize members with 0 points
   for (const userId of input.members) {
     pointsMap.set(userId, 0);
-    statusMap.set(userId, null);
   }
 
-  // Sum points for each user based on race results
-  // Track result status: if a user has DSQ or DNF in any race, that status
-  // is carried through to the projection entry.
+  // Sum points for each user based on race results.
+  // DSQ/DNF is a per-race attribute (stored on race_result) and is NOT
+  // aggregated onto the leaderboard — the standings remain points-only.
   for (const res of input.raceResults) {
     const currentPoints = pointsMap.get(res.userId) ?? 0;
     pointsMap.set(res.userId, currentPoints + res.points);
-
-    if (res.resultStatus === "DSQ" || res.resultStatus === "DNF") {
-      statusMap.set(res.userId, res.resultStatus);
-    }
   }
 
   // Map to entries, sort alphabetically by userId to ensure determinism
   const entries = Array.from(pointsMap.entries()).map(([userId, points]) => ({
     userId,
     points,
-    resultStatus: statusMap.get(userId) ?? null,
   }));
 
   entries.sort((a, b) => a.userId.localeCompare(b.userId));

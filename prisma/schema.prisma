@@ -302,9 +302,6 @@ model EventPointsEntry {
   eventId      String   @db.Text
   userId       String   @db.Text
   points       Int      @default(0)
-  // Race outcome status carried from race_result rows. NULL = normal finish.
-  // 'DSQ' or 'DNF' indicates the participant did not finish/qualify.
-  resultStatus String?  @db.Text
   createdAt    DateTime @default(now()) @db.Timestamp(6)
   updatedAt    DateTime @updatedAt @db.Timestamp(6)
   event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
