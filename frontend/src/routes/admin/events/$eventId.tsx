@@ -835,7 +835,7 @@ function AdminEventDetailPage() {
               Changing the event's scoring tables will trigger an <strong>automatic background recomputation</strong> of points for all existing race results associated with this event.
             </p>
             <p style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--color-danger-fg)', fontWeight: 'bold', margin: 0 }}>
-              ⚠️ This can invalidate previously computed points on recorded standings.
+              This can invalidate previously computed points on recorded standings.
             </p>
             <p style={{ fontSize: '14px', lineHeight: '1.5', margin: 0 }}>
               Are you absolutely sure you want to proceed and save these changes?
@@ -1007,7 +1007,7 @@ function AdminEventDetailPage() {
               Changing this race's grade will trigger an <strong>automatic recomputation of points</strong> for all recorded results in this specific race.
             </p>
             <p style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--color-danger-fg)', fontWeight: 'bold', margin: 0 }}>
-              ⚠️ Existing results will be recalculated immediately based on the new grade's scoring table.
+              Existing results will be recalculated immediately based on the new grade's scoring table.
             </p>
             <p style={{ fontSize: '14px', lineHeight: '1.5', margin: 0 }}>
               Are you sure you want to proceed and update the race grade?

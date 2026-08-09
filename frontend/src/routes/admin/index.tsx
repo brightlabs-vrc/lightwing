@@ -4,19 +4,18 @@ import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents, listAdminUsers, listAdminTeams } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
-import { Heading, Text, Label, Button, Spinner } from '@primer/react'
+import { Heading, Label, Button, Spinner } from '@primer/react'
+import { TrophyIcon, ShieldIcon, PeopleIcon, PersonIcon } from '@primer/octicons-react'
 import { useEffect, useState } from 'react'
 import { MOCK_MODE } from '../../lib/mock-mode'
 
 interface StatCardProps {
   label: string
   value: number
-  suffix?: string
-  icon: string
-  color: string
+  icon: JSX.Element
 }
 
-function StatCard({ label, value, suffix = '', icon, color }: StatCardProps) {
+function StatCard({ label, value, icon }: StatCardProps) {
   return (
     <div style={{
       border: '1px solid var(--color-border-default)',
@@ -28,16 +27,15 @@ function StatCard({ label, value, suffix = '', icon, color }: StatCardProps) {
       alignItems: 'center',
       gap: '0.75rem',
     }}>
-      <span style={{ fontSize: '28px' }}>{icon}</span>
+      <span style={{ fontSize: '24px', display: 'flex', alignItems: 'center' }}>{icon}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', marginBottom: '0.25rem' }}>
           {label}
         </div>
         <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>
-          {value}{suffix}
+          {value}
         </div>
       </div>
-      <span style={{ fontSize: '20px', opacity: 0.3 }}>{color}</span>
     </div>
   )
 }
@@ -98,7 +96,7 @@ function AdminPage() {
           boxShadow: 'var(--color-shadow-small)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '20px' }}>👤</span>
+            <span style={{ fontSize: '20px' }}><PersonIcon /></span>
             <Heading as="h2" style={{ fontSize: '18px', margin: 0 }}>
               Active Administrator Session
             </Heading>
@@ -135,20 +133,17 @@ function AdminPage() {
             <StatCard
               label="Competition Events"
               value={stats.events}
-              icon="🏆"
-              color="🏆"
+              icon={<TrophyIcon />}
             />
             <StatCard
               label="Registered Users"
               value={stats.users}
-              icon="👥"
-              color="👥"
+              icon={<PeopleIcon />}
             />
             <StatCard
               label="Organization Teams"
               value={stats.teams}
-              icon="🛡️"
-              color="🛡️"
+              icon={<ShieldIcon />}
             />
           </div>
         )}
@@ -172,7 +167,7 @@ function AdminPage() {
           }}>
             <div style={{ padding: '1.5rem', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '24px' }}>🏆</span>
+                <span style={{ fontSize: '20px' }}><TrophyIcon /></span>
                 <Heading as="h3" style={{ fontSize: '18px', margin: 0 }}>
                   Events & Race Management
                 </Heading>
@@ -201,7 +196,7 @@ function AdminPage() {
           }}>
             <div style={{ padding: '1.5rem', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '24px' }}>👥</span>
+                <span style={{ fontSize: '20px' }}><PeopleIcon /></span>
                 <Heading as="h3" style={{ fontSize: '18px', margin: 0 }}>
                   User Administration
                 </Heading>
@@ -230,7 +225,7 @@ function AdminPage() {
           }}>
             <div style={{ padding: '1.5rem', flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '24px' }}>🛡️</span>
+                <span style={{ fontSize: '20px' }}><ShieldIcon /></span>
                 <Heading as="h3" style={{ fontSize: '18px', margin: 0 }}>
                   Teams & Organizations
                 </Heading>

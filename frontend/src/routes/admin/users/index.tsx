@@ -170,7 +170,7 @@ function AdminUsersPage() {
               textAlign: 'center',
               padding: '3rem',
               color: 'var(--color-fg-muted)',
-              border: '1px dashed #d0d7de',
+              border: '1px dashed var(--color-border-default)',
               borderRadius: '6px'
             }}>
               <span>No competitor accounts match the current query filter.</span>

@@ -161,7 +161,7 @@ function AdminTeamsPage() {
                   </thead>
                   <tbody>
                     {teams.map((team) => (
-                      <tr key={team.id} style={{ borderBottom: '1px solid #d0d7de' }}>
+                      <tr key={team.id} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                         <td style={{ padding: '12px', fontWeight: 'bold' }}>
                           <Link
                             to="/admin/teams/$teamId"

@@ -313,8 +313,8 @@ function AdminTeamDetailPage() {
               <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {/* Administrator Slots Remaining info */}
                 <div style={{
-                  backgroundColor: team.administratorSlotsRemaining > 0 ? '#ecfdf5' : '#fef2f2',
-                  border: team.administratorSlotsRemaining > 0 ? '1px solid #a7f3d0' : '1px solid #fecaca',
+                  backgroundColor: team.administratorSlotsRemaining > 0 ? 'var(--color-success-subtle)' : 'var(--color-danger-subtle)',
+                  border: team.administratorSlotsRemaining > 0 ? '1px solid var(--color-success-border)' : '1px solid var(--color-danger-border)',
                   borderRadius: '6px',
                   padding: '1rem'
                 }}>
@@ -389,10 +389,10 @@ function AdminTeamDetailPage() {
 
                 {members.length > 0 ? (
                   <>
-                    <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px', marginBottom: '1rem' }}>
+                    <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px', marginBottom: '1rem' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                         <thead>
-                          <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                          <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                             <th style={{ padding: '12px', fontWeight: 'bold' }}>Competitor Name</th>
                             <th style={{ padding: '12px', fontWeight: 'bold' }}>Roster Role</th>
                             <th style={{ padding: '12px', fontWeight: 'bold' }}>Change Role</th>
@@ -401,11 +401,11 @@ function AdminTeamDetailPage() {
                         </thead>
                         <tbody>
                           {members.map((member) => (
-                            <tr key={member.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                            <tr key={member.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                               <td style={{ padding: '12px', fontWeight: 'bold' }}>
                                 <UserLink userId={member.userId} name={member.name} />
                                 {member.slug && (
-                                  <span style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
+                                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-fg-muted)', fontWeight: 'normal' }}>
                                     @{member.slug}
                                   </span>
                                 )}
