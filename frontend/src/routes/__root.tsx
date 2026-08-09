@@ -60,8 +60,8 @@ function RootLayout() {
       {/* Global Application Header */}
       <Header>
         <Header.Item>
-          <Header.Link as={Link as any} to="/" style={{ fontSize: '18px', fontWeight: 'bold' }}>
-            LIGHTWING
+          <Header.Link as={Link as any} to="/" style={{ display: 'flex', alignItems: 'center' }}>
+            <img src="/favicon.png" alt="Lightwing" style={{ width: '24px', height: '24px' }} />
           </Header.Link>
         </Header.Item>
         <Header.Item>
@@ -90,7 +90,7 @@ function RootLayout() {
           ) : session ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Button as={Link as any} to="/profile" size="small">
-                {session.user.name.toUpperCase()}
+                {session.user.vrchatUsername ?? session.user.name}
               </Button>
               <Button
                 variant="danger"

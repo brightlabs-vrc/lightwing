@@ -205,7 +205,7 @@ type UserWithMembers = {
 function toProfile(user: UserWithMembers): UserProfile {
   return {
     id: user.id,
-    name: user.name,
+    name: user.vrchatUsername ?? user.name,
     slug: user.slug,
     email: user.email,
     image: user.image,
@@ -252,6 +252,7 @@ export const listUsers = api(
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
+        { vrchatUsername: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
         { slug: { contains: search, mode: "insensitive" } },
         { vrchatUsername: { contains: search, mode: "insensitive" } },

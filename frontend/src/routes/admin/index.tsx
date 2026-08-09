@@ -104,7 +104,7 @@ function AdminPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
             <div>
               <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Name</span>
-              <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.name}</span>
+              <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{session?.user.vrchatUsername ?? session?.user.name}</span>
             </div>
             <div>
               <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Authorization Role</span>

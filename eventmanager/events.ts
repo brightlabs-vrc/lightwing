@@ -419,13 +419,13 @@ export const listEventAdmins = api(
   async ({ id }: EventIdParams): Promise<{ admins: EventAdminResponse[] }> => {
     const admins = await prisma.eventAdmin.findMany({
       where: { eventId: id },
-      include: { user: { select: { name: true } } },
+      include: { user: { select: { name: true, vrchatUsername: true } } },
     });
 
     return {
       admins: admins.map((admin) => ({
         userId: admin.userId,
-        name: admin.user.name,
+        name: admin.user.vrchatUsername ?? admin.user.name,
       })),
     };
   }
@@ -570,6 +570,7 @@ export async function loadEvent(id: string): Promise<EventDetail> {
               user: {
                 select: {
                   name: true,
+                  vrchatUsername: true,
                   classTier: true,
                 },
               },
@@ -577,14 +578,14 @@ export async function loadEvent(id: string): Promise<EventDetail> {
           },
         },
       },
-      members: { include: { user: { select: { name: true, classTier: true } } } },
+      members: { include: { user: { select: { name: true, vrchatUsername: true, classTier: true } } } },
       schedules: { orderBy: { startsAt: "asc" } },
       pointsEntries: {
-        include: { user: { select: { name: true } } },
+        include: { user: { select: { name: true, vrchatUsername: true } } },
         orderBy: { points: "desc" },
       },
       ladderEntries: {
-        include: { user: { select: { name: true } } },
+        include: { user: { select: { name: true, vrchatUsername: true } } },
         orderBy: { elo: "desc" },
       },
     },
@@ -598,7 +599,7 @@ export async function loadEvent(id: string): Promise<EventDetail> {
     event.scoringType === SCORING_POINTS
       ? event.pointsEntries.map((entry) => ({
           userId: entry.userId,
-          name: entry.user.name,
+          name: entry.user.vrchatUsername ?? entry.user.name,
           points: entry.points,
         }))
       : null;
@@ -607,7 +608,7 @@ export async function loadEvent(id: string): Promise<EventDetail> {
     event.scoringType === SCORING_LADDER
       ? event.ladderEntries.map((entry, index) => ({
           userId: entry.userId,
-          name: entry.user.name,
+          name: entry.user.vrchatUsername ?? entry.user.name,
           elo: entry.elo,
           wins: entry.wins,
           losses: entry.losses,
@@ -649,7 +650,7 @@ export async function loadEvent(id: string): Promise<EventDetail> {
       members: race.raceMembers
         ? race.raceMembers.map((rm) => ({
             userId: rm.userId,
-            name: rm.user.name,
+            name: rm.user.vrchatUsername ?? rm.user.name,
             classTier: rm.user.classTier,
           }))
         : [],
@@ -670,7 +671,7 @@ export async function loadEvent(id: string): Promise<EventDetail> {
         : event.members;
       return filteredMembers.map((member) => ({
         userId: member.userId,
-        name: member.user.name,
+        name: member.user.vrchatUsername ?? member.user.name,
         classTier: member.user.classTier,
       }));
     })(),

@@ -33,6 +33,7 @@ export const listTeamMembers = api(
       where.user = {
         OR: [
           { name: { contains: search, mode: "insensitive" } },
+          { vrchatUsername: { contains: search, mode: "insensitive" } },
           { slug: { contains: search, mode: "insensitive" } },
         ],
       };
@@ -48,6 +49,7 @@ export const listTeamMembers = api(
         user: {
           select: {
             name: true,
+            vrchatUsername: true,
             slug: true,
           },
         },
@@ -58,7 +60,7 @@ export const listTeamMembers = api(
     return {
       members: members.map((m) => ({
         userId: m.userId,
-        name: m.user.name,
+        name: m.user.vrchatUsername ?? m.user.name,
         slug: m.user.slug,
         role: m.role,
       })),

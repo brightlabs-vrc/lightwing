@@ -66,9 +66,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <Header.Item>
           <Header.Link
             href="/admin"
-            style={{ fontSize: '18px', fontWeight: 'bold' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
-            Project Lightwing Admin
+            <img src="/favicon.png" alt="Lightwing" style={{ width: '20px', height: '20px' }} />
+            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>Admin</span>
           </Header.Link>
         </Header.Item>
         <Header.Item full />
@@ -84,7 +85,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               }}
             >
               <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>
-                Signed in as <strong>{session.user.name}</strong> ({' '}
+                Signed in as <strong>{session.user.vrchatUsername ?? session.user.name}</strong> ({' '}
                 {session.user.siteRole})
               </span>
               <Button size="small" onClick={() => void signOutUser('/')}>

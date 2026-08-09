@@ -130,7 +130,7 @@ function AuthPage() {
                 flexDirection: 'column',
                 gap: '0.25rem'
               }}>
-                <span style={{ fontWeight: 'bold', color: 'var(--color-success-fg)' }}>{session.user.name}</span>
+                <span style={{ fontWeight: 'bold', color: 'var(--color-success-fg)' }}>{session.user.vrchatUsername ?? session.user.name}</span>
                 <span style={{ color: 'var(--color-fg-muted)' }}>{session.user.email}</span>
                 <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '0.5rem', color: 'var(--color-fg-muted)' }}>
                   {session.user.siteRole ?? 'USER'} session active
