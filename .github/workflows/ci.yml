@@ -27,14 +27,6 @@ jobs:
         working-directory: frontend
         run: pnpm ci
 
-      - name: Install Encore CLI
-        run: |
-          curl -L https://encore.dev/install.sh | bash
-          echo "$HOME/.encore/bin" >> "$GITHUB_PATH"
-
-      - name: Regenerate frontend API client
-        run: encore gen client --output frontend/src/lib/client.ts --lang ts
-
       - name: Frontend Typecheck
         working-directory: frontend
         run: pnpm typecheck
