@@ -205,9 +205,9 @@ function StandingsTable({
   return (
     <div>
       <div style={{ overflowX: 'auto', width: '100%' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
           <thead>
-            <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+            <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
               <th style={{ padding: '8px', fontWeight: 'bold' }}>Competitor Name</th>
               <th style={{ padding: '8px', fontWeight: 'bold' }}>User ID</th>
               <th style={{ padding: '8px', fontWeight: 'bold', width: '110px' }}>Draw</th>
@@ -228,9 +228,9 @@ function StandingsTable({
               const isNew = rowState === 'new'
 
               let rowBg = 'transparent'
-              if (isDeleted) rowBg = '#fee2e2'
-              else if (isModified) rowBg = '#eff6ff'
-              else if (isNew) rowBg = '#f0fdf4'
+              if (isDeleted) rowBg = 'var(--color-danger-subtle)'
+              else if (isModified) rowBg = 'var(--color-accent-subtle)'
+              else if (isNew) rowBg = 'var(--color-success-subtle)'
 
               return (
                 <tr
@@ -240,7 +240,7 @@ function StandingsTable({
                     transition: 'background-color 0.2s',
                     textDecoration: isDeleted ? 'line-through' : 'none',
                     opacity: isDeleted ? 0.6 : 1,
-                    borderBottom: '1px solid #d0d7de'
+                    borderBottom: '1px solid var(--color-border-default)'
                   }}
                 >
                   <td style={{ padding: '8px' }}>
@@ -274,7 +274,7 @@ function StandingsTable({
                   </td>
                   <td style={{ padding: '8px' }}>
                     {scoringType === 1 ? (
-                      <div style={{ fontWeight: 'bold', color: '#0969da', fontSize: '13px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: 'bold', color: 'var(--color-accent-fg)', fontSize: '13px', textAlign: 'center' }}>
                         {getPreviewPoints(edit.position)} pts <span style={{ fontSize: '9px', color: 'var(--color-fg-muted)', display: 'block', fontWeight: 'normal' }}>(Auto)</span>
                       </div>
                     ) : (

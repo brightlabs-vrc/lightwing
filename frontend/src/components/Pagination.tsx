@@ -33,7 +33,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
         gap: '1rem',
         paddingTop: '1rem',
         paddingBottom: '1rem',
-        borderTop: '1px solid #d0d7de',
+        borderTop: '1px solid var(--color-border-default)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

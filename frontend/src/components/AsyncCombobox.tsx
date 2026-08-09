@@ -113,7 +113,7 @@ export const AsyncCombobox: React.FC<AsyncComboboxProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
         <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{label}</span>
-        {required && <span style={{ color: '#cf222e' }}>*</span>}
+        {required && <span style={{ color: 'var(--color-danger-fg)' }}>*</span>}
       </div>
 
       {selectedValue ? (
@@ -122,10 +122,10 @@ export const AsyncCombobox: React.FC<AsyncComboboxProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            border: '1px solid #d0d7de',
+            border: '1px solid var(--color-border-default)',
             borderRadius: '6px',
             padding: '0.5rem',
-            backgroundColor: '#f6f8fa',
+            backgroundColor: 'var(--color-canvas-subtle)',
           }}
         >
           <span style={{ fontSize: '14px' }}>{displayLabel}</span>
@@ -181,7 +181,7 @@ export const AsyncCombobox: React.FC<AsyncComboboxProps> = ({
         </Autocomplete>
       )}
 
-      {error && <span style={{ color: '#cf222e', fontSize: '12px' }}>{error}</span>}
+      {error && <span style={{ color: 'var(--color-danger-fg)', fontSize: '12px' }}>{error}</span>}
     </div>
   )
 }

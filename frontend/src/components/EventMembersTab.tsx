@@ -54,10 +54,10 @@ export function EventMembersTab({
       {selectedEvent.members.length === 0 ? (
         <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>No participants are currently registered for this competition.</span>
       ) : (
-        <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+        <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
             <thead>
-              <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+              <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                 <th style={{ padding: '12px', fontWeight: 'bold' }}>Competitor Name</th>
                 <th style={{ padding: '12px', fontWeight: 'bold' }}>User ID</th>
                 <th style={{ padding: '12px', fontWeight: 'bold' }}>Skill Tier</th>
@@ -66,7 +66,7 @@ export function EventMembersTab({
             </thead>
             <tbody>
               {selectedEvent.members.map((member) => (
-                <tr key={member.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                <tr key={member.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                   <td style={{ padding: '12px', fontWeight: 'bold' }}><UserLink userId={member.userId} name={member.name} /></td>
                   <td style={{ padding: '12px' }}><code style={{ fontSize: '12px' }}>{member.userId}</code></td>
                   <td style={{ padding: '12px' }}>

@@ -57,7 +57,7 @@ export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> =
                 return (
                   <div key={pos}>
                     <FormControl>
-                      <FormControl.Label style={{ fontSize: '10px', color: '#64748b' }}>
+                      <FormControl.Label style={{ fontSize: '10px', color: 'var(--color-fg-muted)' }}>
                         Position #{pos}
                       </FormControl.Label>
                       <TextInput

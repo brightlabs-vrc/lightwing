@@ -94,10 +94,10 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
         </Heading>
         {selectedEvent.scoringType === 1 ? (
           selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Name</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>User ID</th>
@@ -106,7 +106,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                 </thead>
                 <tbody>
                   {selectedEvent.pointsOverview.map((item, idx) => (
-                    <tr key={item.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={item.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '12px' }}><strong>{idx + 1}</strong></td>
                       <td style={{ padding: '12px' }}><UserLink userId={item.userId} name={item.name} /></td>
                       <td style={{ padding: '12px' }}><code style={{ fontSize: '12px' }}>{item.userId}</code></td>
@@ -121,10 +121,10 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
           )
         ) : (
           selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Name</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Rating (ELO)</th>
@@ -133,7 +133,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                 </thead>
                 <tbody>
                   {selectedEvent.ladderOverview.map((item) => (
-                    <tr key={item.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={item.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '12px' }}><strong>{item.rank}</strong></td>
                       <td style={{ padding: '12px' }}><UserLink userId={item.userId} name={item.name} /></td>
                       <td style={{ padding: '12px' }}><strong>{item.elo}</strong></td>

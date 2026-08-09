@@ -192,23 +192,23 @@ function EventDetailPage() {
           {event.members.length === 0 ? (
             <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>NO MEMBERS YET</span>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Name</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Class Tier</th>
                   </tr>
                 </thead>
                 <tbody>
                   {event.members.map((m) => (
-                    <tr key={m.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={m.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{m.name}</td>
                       <td style={{ padding: '8px' }}>
                         {m.classTier ? (
                           <Label variant="default">{CLASS_TIER_LABELS[m.classTier as any]}</Label>
                         ) : (
-                          <span style={{ color: '#8c959f' }}>-</span>
+                          <span style={{ color: 'var(--color-fg-subtle)' }}>-</span>
                         )}
                       </td>
                     </tr>
@@ -299,10 +299,10 @@ function EventDetailPage() {
           {event.pointsOverview.length === 0 ? (
             <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>NO RESULTS RECORDED</span>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
                     <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>Total Points</th>
@@ -310,7 +310,7 @@ function EventDetailPage() {
                 </thead>
                 <tbody>
                   {event.pointsOverview.map((e, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '8px' }}>{idx + 1}</td>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
                       <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>{e.points}</td>
@@ -348,10 +348,10 @@ function EventDetailPage() {
           {event.ladderOverview.length === 0 ? (
             <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>NO LADDER RECORDS</span>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
                     <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>ELO</th>
@@ -360,7 +360,7 @@ function EventDetailPage() {
                 </thead>
                 <tbody>
                   {event.ladderOverview.map((e, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '8px' }}>{e.rank}</td>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
                       <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-attention-fg)' }}>{e.elo}</td>
@@ -417,10 +417,10 @@ function RaceStandingsTable({
   const results = data.results
 
   return (
-    <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+    <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
         <thead>
-          <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+          <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>POS</th>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>DRAW</th>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>PARTICIPANT</th>
@@ -442,7 +442,7 @@ function RaceStandingsTable({
             results.map((r, idx) => {
               const member = members.find((m) => m.userId === r.userId)
               return (
-                <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                   <td style={{ padding: '8px', fontWeight: 'bold' }}>{r.position ?? '-'}</td>
                   <td style={{ padding: '8px' }}>{r.gateNumber ?? '-'}</td>
                   <td style={{ padding: '8px', fontWeight: 'bold' }}>{member?.name ?? r.userId}</td>

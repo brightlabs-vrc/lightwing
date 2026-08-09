@@ -89,7 +89,7 @@ export function SortableRaceItem({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             fontSize: '13px',
-            color: isSelected ? '#ffffff' : 'var(--color-fg-default)'
+            color: isSelected ? 'var(--color-fg-on-emphasis)' : 'var(--color-fg-default)'
           }}>
             #{race.sequence}. {race.name}
           </span>

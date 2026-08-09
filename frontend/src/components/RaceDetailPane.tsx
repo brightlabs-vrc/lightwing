@@ -138,7 +138,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
               border: 'none',
               background: 'transparent',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: 'var(--color-fg-muted)',
               fontSize: '12px',
               zIndex: 10
             }}
@@ -363,7 +363,7 @@ export function RaceDetailPane({
                 <Button
                   size="small"
                   onClick={() => void handleStartRace(selectedRace.id)}
-                  style={{ backgroundColor: '#2e7d32', color: '#fff' }}
+                  style={{ backgroundColor: 'var(--color-success-emphasis)', color: 'var(--color-fg-on-emphasis)' }}
                 >
                   Start Race
                 </Button>
@@ -372,7 +372,7 @@ export function RaceDetailPane({
                 <Button
                   size="small"
                   onClick={() => void handleEndRace(selectedRace.id)}
-                  style={{ backgroundColor: '#d32f2f', color: '#fff' }}
+                  style={{ backgroundColor: 'var(--color-danger-emphasis)', color: 'var(--color-fg-on-emphasis)' }}
                 >
                   End Race
                 </Button>
@@ -380,7 +380,7 @@ export function RaceDetailPane({
               <Button
                 size="small"
                 onClick={() => void handleDeleteRace(selectedRace.id)}
-                style={{ color: '#d32f2f' }}
+                style={{ color: 'var(--color-danger-fg)' }}
               >
                 Delete
               </Button>
@@ -412,7 +412,7 @@ export function RaceDetailPane({
         <AlertBanner variant="error">
           <div style={{ textAlign: 'left' }}>
             <strong>Missing Race Grade Configuration</strong>
-            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7f1d1d' }}>
+            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--color-danger-fg)' }}>
               This event is points-based, but this race has no grade configured. Points for its results will resolve to <strong>0</strong> until a grade is configured.
             </p>
           </div>
