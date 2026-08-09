@@ -91,7 +91,6 @@ export interface PointsEntryView {
   userId: string;
   name: string;
   points: number;
-  resultStatus: string | null;
 }
 
 export interface LadderEntryView {
@@ -602,7 +601,6 @@ export async function loadEvent(id: string): Promise<EventDetail> {
           userId: entry.userId,
           name: entry.user.vrchatUsername ?? entry.user.name,
           points: entry.points,
-          resultStatus: entry.resultStatus ?? null,
         }))
       : null;
 
