@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { Header, NavList, Button } from '@primer/react'
+import { HomeIcon, TrophyIcon, PeopleIcon, ShieldIcon, ArrowLeftIcon } from '@primer/octicons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ColorModeSelector } from '../../components/ThemeAndStatus'
 
@@ -23,6 +24,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     {
       to: '/admin',
       label: 'Dashboard',
+      icon: HomeIcon,
       isActive:
         isCurrent('/admin') &&
         !isCurrent('/admin/events') &&
@@ -32,16 +34,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     {
       to: '/admin/events',
       label: 'Events & Races',
+      icon: TrophyIcon,
       isActive: isCurrent('/admin/events'),
     },
     {
       to: '/admin/users',
       label: 'Users',
+      icon: PeopleIcon,
       isActive: isCurrent('/admin/users'),
     },
     {
       to: '/admin/teams',
       label: 'Teams',
+      icon: ShieldIcon,
       isActive: isCurrent('/admin/teams'),
     },
   ]
@@ -50,6 +55,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     <div
       style={{
         backgroundColor: 'var(--color-canvas-default)',
+        color: 'var(--color-fg-default)',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -118,6 +124,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   aria-current={item.isActive ? 'page' : undefined}
                   style={{ fontSize: '14px' }}
                 >
+                  <NavList.LeadingVisual>
+                    <item.icon />
+                  </NavList.LeadingVisual>
                   {item.label}
                 </NavList.Item>
               ))}
@@ -134,6 +143,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     color: 'var(--color-accent-fg)',
                   }}
                 >
+                  <NavList.LeadingVisual>
+                    <ArrowLeftIcon />
+                  </NavList.LeadingVisual>
                   Back to Portal
                 </NavList.Item>
               </NavList>

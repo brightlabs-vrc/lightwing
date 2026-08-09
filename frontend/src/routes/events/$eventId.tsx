@@ -67,7 +67,7 @@ function EventDetailPage() {
   if (isLoading) {
     return (
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', gap: '0.5rem', color: '#57606a' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
           <Spinner size="medium" />
           <span>Loading event details...</span>
         </div>
@@ -81,7 +81,7 @@ function EventDetailPage() {
         <Heading as="h2" style={{ fontSize: '20px', color: 'var(--color-danger-fg)' }}>
           Error loading event
         </Heading>
-        <Text style={{ fontSize: '14px', color: '#57606a', marginTop: '8px', display: 'block' }}>
+        <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', marginTop: '8px', display: 'block' }}>
           Something went wrong while fetching the event details.
         </Text>
       </div>
@@ -126,7 +126,7 @@ function EventDetailPage() {
         </div>
 
         {event.description && (
-          <Text style={{ fontSize: '14px', color: '#57606a', lineHeight: '1.5', display: 'block' }}>
+          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', lineHeight: '1.5', display: 'block' }}>
             {event.description}
           </Text>
         )}
@@ -190,25 +190,25 @@ function EventDetailPage() {
             Participants ({event.members.length}{!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})
           </Heading>
           {event.members.length === 0 ? (
-            <span style={{ fontSize: '12px', color: '#57606a', fontStyle: 'italic' }}>NO MEMBERS YET</span>
+            <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>NO MEMBERS YET</span>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Name</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Class Tier</th>
                   </tr>
                 </thead>
                 <tbody>
                   {event.members.map((m) => (
-                    <tr key={m.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={m.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{m.name}</td>
                       <td style={{ padding: '8px' }}>
                         {m.classTier ? (
                           <Label variant="default">{CLASS_TIER_LABELS[m.classTier as any]}</Label>
                         ) : (
-                          <span style={{ color: '#8c959f' }}>-</span>
+                          <span style={{ color: 'var(--color-fg-subtle)' }}>-</span>
                         )}
                       </td>
                     </tr>
@@ -249,7 +249,7 @@ function EventDetailPage() {
                   <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--color-accent-fg)' }}>
                     {schedule.title || 'UNTITLED'}
                   </span>
-                  <span style={{ fontSize: '12px', color: '#57606a' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
                     {new Date(schedule.startsAt).toLocaleString()}
                     {schedule.location && (
                       <span style={{
@@ -297,12 +297,12 @@ function EventDetailPage() {
             )}
           </div>
           {event.pointsOverview.length === 0 ? (
-            <span style={{ fontSize: '12px', color: '#57606a', fontStyle: 'italic' }}>NO RESULTS RECORDED</span>
+            <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>NO RESULTS RECORDED</span>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
                     <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>Total Points</th>
@@ -310,7 +310,7 @@ function EventDetailPage() {
                 </thead>
                 <tbody>
                   {event.pointsOverview.map((e, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '8px' }}>{idx + 1}</td>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
                       <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>{e.points}</td>
@@ -346,12 +346,12 @@ function EventDetailPage() {
             )}
           </div>
           {event.ladderOverview.length === 0 ? (
-            <span style={{ fontSize: '12px', color: '#57606a', fontStyle: 'italic' }}>NO LADDER RECORDS</span>
+            <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>NO LADDER RECORDS</span>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '8px', fontWeight: 'bold' }}>Participant</th>
                     <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>ELO</th>
@@ -360,7 +360,7 @@ function EventDetailPage() {
                 </thead>
                 <tbody>
                   {event.ladderOverview.map((e, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '8px' }}>{e.rank}</td>
                       <td style={{ padding: '8px', fontWeight: 'bold' }}>{e.name}</td>
                       <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-attention-fg)' }}>{e.elo}</td>
@@ -401,7 +401,7 @@ function RaceStandingsTable({
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem', gap: '0.5rem', color: '#57606a' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
         <Spinner size="small" />
         <span>Loading standings...</span>
       </div>
@@ -417,10 +417,10 @@ function RaceStandingsTable({
   const results = data.results
 
   return (
-    <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+    <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
         <thead>
-          <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+          <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>POS</th>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>DRAW</th>
             <th style={{ padding: '8px', fontWeight: 'bold' }}>PARTICIPANT</th>
@@ -434,7 +434,7 @@ function RaceStandingsTable({
         <tbody>
           {results.length === 0 ? (
             <tr>
-              <td colSpan={8} style={{ padding: '12px', textAlign: 'center', color: '#57606a', fontStyle: 'italic' }}>
+              <td colSpan={8} style={{ padding: '12px', textAlign: 'center', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
                 NO STANDINGS RECORDED
               </td>
             </tr>
@@ -442,7 +442,7 @@ function RaceStandingsTable({
             results.map((r, idx) => {
               const member = members.find((m) => m.userId === r.userId)
               return (
-                <tr key={idx} style={{ borderBottom: '1px solid #d0d7de' }}>
+                <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                   <td style={{ padding: '8px', fontWeight: 'bold' }}>{r.position ?? '-'}</td>
                   <td style={{ padding: '8px' }}>{r.gateNumber ?? '-'}</td>
                   <td style={{ padding: '8px', fontWeight: 'bold' }}>{member?.name ?? r.userId}</td>
@@ -504,7 +504,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem', gap: '0.5rem', color: '#57606a' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
         <Spinner size="medium" />
         <span>Loading races...</span>
       </div>
@@ -523,7 +523,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
 
   if (races.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem', color: '#57606a' }}>
+      <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-fg-muted)' }}>
         <span>There are no individual race events configured for this competition.</span>
       </div>
     )
@@ -554,7 +554,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                 <Heading as="h3" style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: 'var(--color-fg-default)' }}>
                   #{race.sequence}. {race.name}
                 </Heading>
-                <div style={{ fontSize: '12px', color: '#57606a', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-fg-muted)', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                   <span>TRACK: <strong>{race.trackType}</strong> ({race.distanceMeters}m)</span>
                   <span>LOCATION: <strong>{race.location}</strong></span>
                 </div>
@@ -617,7 +617,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
 
             {/* Standings Table */}
             <div style={{ marginTop: '0.5rem' }}>
-              <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#57606a', marginBottom: '8px' }}>RACE STANDINGS</div>
+              <div style={{ fontWeight: 'bold', fontSize: '11px', color: 'var(--color-fg-muted)', marginBottom: '8px' }}>RACE STANDINGS</div>
               <RaceStandingsTable eventId={event.id} raceId={race.id} members={event.members} />
             </div>
           </div>

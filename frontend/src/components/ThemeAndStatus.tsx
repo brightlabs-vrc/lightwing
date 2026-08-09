@@ -1,5 +1,5 @@
 import React from 'react'
-import { ThemeProvider, ActionMenu, ActionList } from '@primer/react'
+import { ThemeProvider, BaseStyles, ActionMenu, ActionList } from '@primer/react'
 import { SunIcon, MoonIcon, CpuIcon } from '@primer/octicons-react'
 import { useColorMode } from '../hooks/useColorMode'
 
@@ -44,8 +44,10 @@ export const AppThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { resolvedColorMode } = useColorMode()
 
   return (
-    <ThemeProvider colorMode={resolvedColorMode}>
-      {children}
+    <ThemeProvider colorMode={resolvedColorMode === 'dark' ? 'night' : 'day'}>
+      <BaseStyles style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </BaseStyles>
     </ThemeProvider>
   )
 }

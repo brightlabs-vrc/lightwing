@@ -19,7 +19,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
       }}>
         {selectedEvent.scheduledAt && (
           <div>
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scheduled Time</span>
+            <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scheduled Time</span>
             <span style={{ fontSize: '14px' }}>
               <time dateTime={selectedEvent.scheduledAt}>
                 <strong>{formatLocalDateTime(selectedEvent.scheduledAt)}</strong>
@@ -28,13 +28,13 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
           </div>
         )}
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Description</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Description</span>
           <span style={{ fontSize: '14px' }}>
             {selectedEvent.description ?? 'No description registered.'}
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scoring Configuration</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Scoring Configuration</span>
           <span style={{ fontSize: '14px', lineHeight: '1.5' }}>
             Scoring Mode: <strong>{selectedEvent.scoringTypeLabel}</strong> ({selectedEvent.scoringType === 1 ? 'Points aggregation' : 'Ladder Rating (ELO)'}) <br />
             {selectedEvent.scoringType === 1 && (
@@ -45,26 +45,26 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Owner Parameters</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Owner Parameters</span>
           <span style={{ fontSize: '14px' }}>
             Ownership Type: {selectedEvent.ownerType} <br />
             ID: {selectedEvent.organizationId ?? selectedEvent.ownerUserId}
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Class restriction</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Class restriction</span>
           <span style={{ fontSize: '14px' }}>
             Tier Restriction: <strong>{selectedEvent.classRestriction ?? 'PRE_OP (Any tier eligibility)'}</strong>
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Participation Model</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Participation Model</span>
           <span style={{ fontSize: '14px' }}>
             Granular Per-Race Participation: <strong>{selectedEvent.granularParticipation ? 'Enabled (Per-Race registration required)' : 'Disabled (Event-wide registration)'}</strong>
           </span>
         </div>
         <div>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#57606a', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Signups Status</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-fg-muted)', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>Signups Status</span>
           <span style={{ fontSize: '14px' }}>
             Signups Lock: <strong>{selectedEvent.signupsLocked ? 'Locked (Self-service signups disabled)' : 'Open (Self-service signups enabled)'}</strong>
           </span>
@@ -94,10 +94,10 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
         </Heading>
         {selectedEvent.scoringType === 1 ? (
           selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Name</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>User ID</th>
@@ -106,7 +106,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                 </thead>
                 <tbody>
                   {selectedEvent.pointsOverview.map((item, idx) => (
-                    <tr key={item.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={item.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '12px' }}><strong>{idx + 1}</strong></td>
                       <td style={{ padding: '12px' }}><UserLink userId={item.userId} name={item.name} /></td>
                       <td style={{ padding: '12px' }}><code style={{ fontSize: '12px' }}>{item.userId}</code></td>
@@ -117,14 +117,14 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
               </table>
             </div>
           ) : (
-            <span style={{ fontSize: '14px', color: '#57606a' }}>No participants score standings loaded.</span>
+            <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>No participants score standings loaded.</span>
           )
         ) : (
           selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #d0d7de', borderRadius: '6px' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ background: '#f6f8fa', borderBottom: '1px solid #d0d7de' }}>
+                  <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Rank</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Name</th>
                     <th style={{ padding: '12px', fontWeight: 'bold' }}>Rating (ELO)</th>
@@ -133,7 +133,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                 </thead>
                 <tbody>
                   {selectedEvent.ladderOverview.map((item) => (
-                    <tr key={item.userId} style={{ borderBottom: '1px solid #d0d7de' }}>
+                    <tr key={item.userId} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                       <td style={{ padding: '12px' }}><strong>{item.rank}</strong></td>
                       <td style={{ padding: '12px' }}><UserLink userId={item.userId} name={item.name} /></td>
                       <td style={{ padding: '12px' }}><strong>{item.elo}</strong></td>
@@ -144,7 +144,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
               </table>
             </div>
           ) : (
-            <span style={{ fontSize: '14px', color: '#57606a' }}>No ladder match results computed yet.</span>
+            <span style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>No ladder match results computed yet.</span>
           )
         )}
       </div>

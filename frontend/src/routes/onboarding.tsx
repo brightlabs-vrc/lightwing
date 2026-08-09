@@ -58,7 +58,7 @@ function OnboardingPage() {
           <Heading as="h1" style={{ fontSize: '28px', color: 'var(--color-accent-fg)' }}>
             Welcome to Lightwing!
           </Heading>
-          <Text style={{ fontSize: '14px', color: '#57606a' }}>
+          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)' }}>
             Please set your VRChat username to complete your profile.
           </Text>
         </div>

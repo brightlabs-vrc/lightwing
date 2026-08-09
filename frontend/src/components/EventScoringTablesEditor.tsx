@@ -23,7 +23,7 @@ export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> =
 
   return (
     <div style={{ marginTop: '12px' }}>
-      <p style={{ fontSize: '12px', margin: '4px 0 12px 0', color: '#57606a' }}>
+      <p style={{ fontSize: '12px', margin: '4px 0 12px 0', color: 'var(--color-fg-muted)' }}>
         Configure the points allocated to positions 1-10 for each race grade in custom scoring mode.
       </p>
       {grades.map((grade) => {
@@ -57,7 +57,7 @@ export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> =
                 return (
                   <div key={pos}>
                     <FormControl>
-                      <FormControl.Label style={{ fontSize: '10px', color: '#64748b' }}>
+                      <FormControl.Label style={{ fontSize: '10px', color: 'var(--color-fg-muted)' }}>
                         Position #{pos}
                       </FormControl.Label>
                       <TextInput

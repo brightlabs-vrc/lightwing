@@ -21,7 +21,7 @@ export function LoadingBox({ message }: LoadingBoxProps) {
       }}
     >
       <Spinner size="medium" />
-      <p style={{ fontSize: '14px', color: '#57606a', margin: 0 }}>{message}</p>
+      <p style={{ fontSize: '14px', color: 'var(--color-fg-muted)', margin: 0 }}>{message}</p>
     </div>
   )
 }

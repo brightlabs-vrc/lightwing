@@ -56,7 +56,7 @@ function EventsPage() {
         <Heading as="h1" style={{ fontSize: '28px', color: 'var(--color-accent-fg)' }}>
           Competitive Events
         </Heading>
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', gap: '0.5rem', color: '#57606a' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
           <Spinner size="medium" />
           <span>Loading events...</span>
         </div>
@@ -70,7 +70,7 @@ function EventsPage() {
         <Heading as="h2" style={{ fontSize: '20px', color: 'var(--color-danger-fg)' }}>
           Error loading events
         </Heading>
-        <Text style={{ fontSize: '14px', color: '#57606a', marginTop: '8px', display: 'block' }}>
+        <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', marginTop: '8px', display: 'block' }}>
           Something went wrong while fetching the event list.
         </Text>
       </div>
@@ -95,7 +95,7 @@ function EventsPage() {
             padding: '4rem',
             border: '1px dashed var(--color-border-default)',
             borderRadius: '8px',
-            color: '#57606a'
+            color: 'var(--color-fg-muted)'
           }}>
             <Heading as="h3" style={{ fontSize: '18px', margin: '0 0 8px 0' }}>No public events active</Heading>
             <Text style={{ fontSize: '14px' }}>There are no public events running at this moment.</Text>
@@ -142,7 +142,7 @@ function EventsPage() {
                           </span>
                         )}
                         {event.description && (
-                          <Text style={{ fontSize: '14px', color: '#57606a', marginTop: '4px', display: 'block' }}>
+                          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', marginTop: '4px', display: 'block' }}>
                             {event.description}
                           </Text>
                         )}

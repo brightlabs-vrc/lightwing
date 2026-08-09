@@ -45,7 +45,7 @@ export const GradePointsPreview: React.FC<GradePointsPreviewProps> = ({ grade, t
                 fontSize: '11px',
               }}
             >
-              <div style={{ color: '#57606a', fontSize: '9px' }}>#{pos}</div>
+              <div style={{ color: 'var(--color-fg-muted)', fontSize: '9px' }}>#{pos}</div>
               <div style={{ fontWeight: 'bold', color: 'var(--color-fg-default)' }}>{pts}</div>
             </div>
           )
