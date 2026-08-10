@@ -210,15 +210,6 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
-// NOTE: We intentionally do NOT declare a `FRONTEND_URL` Encore secret. Encore
-// treats every `secret(...)` call as a *required* secret at compile time, so
-// declaring it would force the secret to be set in every environment (local,
-// preview, prod) even though it is only an optional convenience for appending
-// an extra trusted origin. All real frontend origins (localhost dev ports,
-// the Deno Deploy production hosts, and the Encore apiBaseUrl) are already
-// listed explicitly in `trustedOrigins` below, so the secret is redundant.
-// If a one-off extra origin is ever needed, add it to that list directly.
-
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
   baseURL: appMeta().apiBaseUrl,
@@ -249,6 +240,9 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       sameSite: "none",
       secure: true,
     },
+    crossSubDomainCookies: {
+      enabled: true
+    }
   },
   // The frontend is served from a different origin than this API. better-auth
   // runs a two-layer state check at the OAuth callback: a primary DB-verification
@@ -260,6 +254,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
   account: {
     skipStateCookieCheck: true,
+    storeStateStrategy: "database"
   },
   user: {
     additionalFields: {
