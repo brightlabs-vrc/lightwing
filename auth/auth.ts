@@ -230,14 +230,22 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     appMeta().apiBaseUrl,
     ...(frontendUrlFromEnv ? [frontendUrlFromEnv] : []),
   ],
-  advanced: frontendUrlFromEnv
-    ? {
-        defaultCookieAttributes: {
-          sameSite: "none",
-          secure: !frontendUrlFromEnv.startsWith("http://"),
-        },
-      }
-    : undefined,
+  // The frontend is served from a different origin than this API (it is hosted
+  // elsewhere, not inside the Encore backend). For the httpOnly session cookie
+  // to be attached to cross-origin credentialed fetches from the frontend to
+  // /api/auth/*, it MUST be set with `sameSite: "none"`. A `lax` (better-auth
+  // default) or `strict` cookie is dropped on cross-site subrequests, which
+  // leaves the user "logged in to Discord but never authenticated" in the app.
+  // `sameSite: "none"` requires the `Secure` attribute, so we always set it.
+  // (Browsers permit Secure cookies on http://localhost, so local dev still
+  // works; a non-localhost plain-HTTP deployment would not, but that is not a
+  // supported topology for this app.)
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: "none",
+      secure: true,
+    },
+  },
   user: {
     additionalFields: {
       siteRole: {
