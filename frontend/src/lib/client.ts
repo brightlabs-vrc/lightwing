@@ -531,6 +531,7 @@ export namespace eventmanager {
         userId: string
         name: string
         points: number
+        resultStatus: string | null
     }
 
     export interface RaceEventDetail {
