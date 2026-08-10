@@ -8,7 +8,6 @@ import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
 import log from "encore.dev/log";
 import { prisma } from "./prisma";
-import { getFrontendUrl } from "./frontend-url";
 import {
   administratorRole,
   administratorRoleLimit,
@@ -211,8 +210,6 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
-const frontendUrlFromEnv = getFrontendUrl();
-
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
   baseURL: appMeta().apiBaseUrl,
@@ -225,10 +222,8 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     "https://lightwing.urs.deno.net",
     "https://lightwing-canary.urs.deno.net",
     "https://comp.cosyne.jp.eu.org",
-    // This is set either by the Encore platform at deploy time or via the
-    // optional FRONTEND_URL secret when the frontend needs a separate origin.
+    // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
     appMeta().apiBaseUrl,
-    ...(frontendUrlFromEnv ? [frontendUrlFromEnv] : []),
   ],
   // The frontend is served from a different origin than this API (it is hosted
   // elsewhere, not inside the Encore backend). For the httpOnly session cookie
