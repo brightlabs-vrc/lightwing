@@ -6,12 +6,14 @@ import { isMockMode } from '../lib/auth'
 interface AuthSearch {
   redirect?: string
   error?: string
+  error_description?: string
 }
 
 export const Route = createFileRoute('/auth')({
   validateSearch: (search: Record<string, unknown>): AuthSearch => ({
     redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
     error: typeof search.error === 'string' ? search.error : undefined,
+    error_description: typeof search.error_description === 'string' ? search.error_description : undefined,
   }),
   component: AuthPage,
 })
@@ -65,6 +67,15 @@ function AuthPage() {
           {search.error === 'forbidden' ? (
             <p className='rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900'>
               Your account is authenticated, but it does not currently have SITE_ADMIN privileges.
+            </p>
+          ) : search.error === 'oauth' ? (
+            <p className='rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900'>
+              Discord authentication failed{search.error_description ? `: ${search.error_description}` : ''}.
+              This usually happens when the login session expires between steps or is interrupted. Please try signing in again.
+            </p>
+          ) : search.error ? (
+            <p className='rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900'>
+              Authentication error: {search.error}. Please try signing in again.
             </p>
           ) : null}
 
