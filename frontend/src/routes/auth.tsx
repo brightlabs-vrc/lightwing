@@ -68,10 +68,11 @@ function AuthPage() {
             <p className='rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900'>
               Your account is authenticated, but it does not currently have SITE_ADMIN privileges.
             </p>
-          ) : search.error === 'oauth' ? (
+          ) : search.error === 'oauth' || search.error === 'state_mismatch' || search.error === 'state_security_mismatch' ? (
             <p className='rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900'>
               Discord authentication failed{search.error_description ? `: ${search.error_description}` : ''}.
-              This usually happens when the login session expires between steps or is interrupted. Please try signing in again.
+              {!search.error_description ? ` (${search.error})` : ''} This usually happens when the login
+              session expires between steps or is interrupted. Please try signing in again.
             </p>
           ) : search.error ? (
             <p className='rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900'>
