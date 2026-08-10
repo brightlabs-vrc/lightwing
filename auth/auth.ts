@@ -210,7 +210,14 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   }
 }
 
-const frontendUrlFromEnv = process.env.FRONTEND_URL?.replace(/\/$/, "") || secret("FRONTEND_URL")();
+// NOTE: We intentionally do NOT declare a `FRONTEND_URL` Encore secret. Encore
+// treats every `secret(...)` call as a *required* secret at compile time, so
+// declaring it would force the secret to be set in every environment (local,
+// preview, prod) even though it is only an optional convenience for appending
+// an extra trusted origin. All real frontend origins (localhost dev ports,
+// the Deno Deploy production hosts, and the Encore apiBaseUrl) are already
+// listed explicitly in `trustedOrigins` below, so the secret is redundant.
+// If a one-off extra origin is ever needed, add it to that list directly.
 
 const authOptions: Parameters<typeof betterAuth>[0] = {
   secret: authSecret(),
@@ -226,7 +233,6 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     "https://comp.cosyne.jp.eu.org",
     // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
     appMeta().apiBaseUrl,
-    ...(frontendUrlFromEnv ? [frontendUrlFromEnv] : []),
   ],
   // The frontend is served from a different origin than this API (it is hosted
   // elsewhere, not inside the Encore backend). For the httpOnly session cookie
