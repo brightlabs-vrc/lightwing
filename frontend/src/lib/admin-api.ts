@@ -123,9 +123,9 @@ let mockEvents: eventmanager.EventDetail[] = [
     members: mockEventMembers,
     schedules: [],
     pointsOverview: [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10 },
-      { userId: 'mock-user-2', name: 'Shadow Runner', points: 6 },
-      { userId: 'mock-user-3', name: 'Swift Galloper', points: 0 },
+      { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10, resultStatus: null },
+      { userId: 'mock-user-2', name: 'Shadow Runner', points: 6, resultStatus: null },
+      { userId: 'mock-user-3', name: 'Swift Galloper', points: 0, resultStatus: null },
     ],
     ladderOverview: null,
     createdAt: now,
