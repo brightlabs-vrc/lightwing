@@ -100,10 +100,11 @@ function AuthPage() {
             </div>
           ) : null}
 
-          {search.error === 'oauth' ? (
+          {search.error === 'oauth' || search.error === 'state_mismatch' || search.error === 'state_security_mismatch' ? (
             <AlertBanner variant="error">
               Discord authentication failed{search.error_description ? `: ${search.error_description}` : ''}.
-              This usually happens when the login session expires between steps or is interrupted. Please try signing in again.
+              {!search.error_description ? ` (${search.error})` : ''} This usually happens when the login
+              session expires between steps or is interrupted. Please try signing in again.
             </AlertBanner>
           ) : search.error === 'forbidden' ? (
             <AlertBanner variant="error">

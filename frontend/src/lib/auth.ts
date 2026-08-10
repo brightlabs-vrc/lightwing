@@ -124,7 +124,12 @@ export async function signInWithDiscord(redirectPath?: string): Promise<void> {
     body: JSON.stringify({
       provider: 'discord',
       callbackURL,
-      errorCallbackURL: `${window.location.origin}/auth?error=oauth`,
+      // Do NOT pre-bake an `error` param here. better-auth redirects back with
+      // its own `?error=<real_code>&error_description=...` on failure (e.g.
+      // `state_mismatch`); pre-baking `?error=oauth` shadowed that real code so
+      // the auth page could never show what actually went wrong. Keep the
+      // `redirect` so a successful return still continues to the right place.
+      errorCallbackURL: `${window.location.origin}/auth?redirect=${encodeURIComponent(callbackPath)}`,
     }),
   })
 
