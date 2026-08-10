@@ -3,16 +3,19 @@ import { useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { isMockMode } from '../lib/auth'
 import { Heading, Text, Label, Button, Spinner } from '@primer/react'
+import { AlertBanner } from '../components/AlertBanner'
 
 interface AuthSearch {
   redirect?: string
   error?: string
+  error_description?: string
 }
 
 export const Route = createFileRoute('/auth')({
   validateSearch: (search: Record<string, unknown>): AuthSearch => ({
     redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
     error: typeof search.error === 'string' ? search.error : undefined,
+    error_description: typeof search.error_description === 'string' ? search.error_description : undefined,
   }),
   component: AuthPage,
 })
@@ -97,18 +100,19 @@ function AuthPage() {
             </div>
           ) : null}
 
-          {search.error === 'forbidden' ? (
-            <div style={{
-              backgroundColor: 'var(--color-danger-subtle)',
-              border: '1px solid var(--color-danger-border)',
-              padding: '1rem',
-              borderRadius: '8px',
-              color: 'var(--color-danger-fg)',
-              fontSize: '14px',
-              lineHeight: '1.5'
-            }}>
+          {search.error === 'oauth' ? (
+            <AlertBanner variant="error">
+              Discord authentication failed{search.error_description ? `: ${search.error_description}` : ''}.
+              This usually happens when the login session expires between steps or is interrupted. Please try signing in again.
+            </AlertBanner>
+          ) : search.error === 'forbidden' ? (
+            <AlertBanner variant="error">
               Your account is authenticated, but it does not currently have SITE_ADMIN privileges.
-            </div>
+            </AlertBanner>
+          ) : search.error ? (
+            <AlertBanner variant="error">
+              Authentication error: {search.error}. Please try signing in again.
+            </AlertBanner>
           ) : null}
 
           {loading ? (
