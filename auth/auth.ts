@@ -239,17 +239,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     defaultCookieAttributes: {
       sameSite: "none",
       secure: true,
-      // CHIPS: mark the session/state cookies as partitioned so privacy-
-      // hardening browsers (Brave, mobile Safari/Chrome ITP) treat them as
-      // first-party to the FRONTEND origin instead of dropping them as
-      // cross-site. Without this, a decoupled frontend+backend (different
-      // origins) completes the OAuth server-side but the Set-Cookie on the
-      // callback response is blocked, so get-session returns null and the
-      // client never gets a session — desktop Chrome is lenient, Brave/mobile
-      // are not. `partitioned` requires `Secure` (set above) and is serialized
-      // by better-auth to the `Partitioned` attribute.
-      partitioned: true,
-    }
+    },
   },
   // The frontend is served from a different origin than this API. better-auth
   // runs a two-layer state check at the OAuth callback: a primary DB-verification
@@ -260,7 +250,8 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   // cross-origin-fragile signed-cookie check leaves the primary DB verification
   // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
   account: {
-    skipStateCookieCheck: true
+    skipStateCookieCheck: true,
+    storeStateStrategy: "database",
   },
   user: {
     additionalFields: {
