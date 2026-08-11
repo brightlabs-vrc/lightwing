@@ -282,7 +282,15 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
   account: {
     skipStateCookieCheck: true,
-    storeStateStrategy: "cookie",
+    // Store the OAuth anti-CSRF `state` in the `verification` table (database
+    // strategy), NOT in a cookie. In a decoupled frontend/backend the cookie
+    // strategy sets a cross-site `oauth_state` cookie that privacy-hardening
+    // browsers (Brave/mobile) drop even with sameSite:"none" -> intermittent
+    // `state_mismatch` "auth state cookie not found". The database strategy has
+    // no cookie dependency. `skipStateCookieCheck` then disables the fragile
+    // secondary cross-site cookie comparison; the primary DB verification check
+    // remains as real CSRF protection. (better-auth issue #6483: cross-domain.)
+    storeStateStrategy: "database",
   },
   user: {
     additionalFields: {
