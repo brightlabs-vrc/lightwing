@@ -1,5 +1,5 @@
 import { APIError, betterAuth, type Auth } from "better-auth";
-import { createAccessControl, multiSession, organization } from "better-auth/plugins";
+import { createAccessControl, organization } from "better-auth/plugins";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { Prisma } from "@prisma/client";
 import { REST, Routes } from "discord.js";
@@ -367,7 +367,6 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
         },
       },
     }),
-    multiSession(),
   ],
 };
 
