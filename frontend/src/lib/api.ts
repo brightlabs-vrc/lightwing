@@ -1,11 +1,6 @@
 import Client, { Local } from './client'
 
 function resolveApiBaseUrl(): string {
-	const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim()
-	if (configuredBackendUrl) {
-		return configuredBackendUrl
-	}
-
 	const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
 	if (configuredBaseUrl) {
 		return configuredBaseUrl
