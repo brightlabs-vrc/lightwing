@@ -249,12 +249,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       // are not. `partitioned` requires `Secure` (set above) and is serialized
       // by better-auth to the `Partitioned` attribute.
       partitioned: true,
-    },
-    // NOTE: crossSubDomainCookies is intentionally NOT enabled. It only adds a
-    // `domain` attribute for same-registrable-domain subdomains and is a no-op
-    // (and potentially harmful to partitioning) for a fully different origin
-    // like frontend (comp.cosyne.jp.eu.org) talking to backend
-    // (lightwing.urs.deno.net).
+    }
   },
   // The frontend is served from a different origin than this API. better-auth
   // runs a two-layer state check at the OAuth callback: a primary DB-verification
@@ -265,8 +260,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   // cross-origin-fragile signed-cookie check leaves the primary DB verification
   // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
   account: {
-    skipStateCookieCheck: true,
-    storeStateStrategy: "database"
+    skipStateCookieCheck: true
   },
   user: {
     additionalFields: {
