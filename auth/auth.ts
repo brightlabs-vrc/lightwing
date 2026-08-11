@@ -1,11 +1,13 @@
 import { APIError, betterAuth, type Auth } from "better-auth";
 import { createAccessControl, organization } from "better-auth/plugins";
+import { createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { Prisma } from "@prisma/client";
 import { REST, Routes } from "discord.js";
 import type { APIGuildMember, APIRole } from "discord-api-types/v10";
 import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
+import { CounterGroup } from "encore.dev/metrics";
 import log from "encore.dev/log";
 import { prisma } from "./prisma";
 import {
@@ -18,6 +20,35 @@ import {
 //   encore secret set --type dev,local,pr,production AuthSecret
 // Generate a strong value with: openssl rand -base64 32
 const authSecret = secret("BETTER_AUTH_SECRET");
+
+// Observability for the cross-origin session-resolution problem.
+// We track the cross-tab of (session cookie present?) x (session resolved?) on
+// /get-session. A non-zero "has_cookie=true, has_session=false" series means the
+// browser delivered the cookie but better-auth failed to resolve it server-side
+// (the bug we've been chasing across decoupled origins); "has_cookie=false" means
+// the browser dropped the cookie (a different, client-side problem).
+interface GetSessionOutcomeLabels {
+  has_cookie: boolean;
+  has_session: boolean;
+}
+export const getSessionOutcome = new CounterGroup<GetSessionOutcomeLabels>(
+  "auth_get_session_outcome",
+);
+
+// Observability for the OAuth callback state_mismatch family. better-auth collapses
+// the raw StateError codes (state_mismatch = "verification not found" in the DB,
+// state_security_mismatch = "OAuth state param does not match stored state") into a
+// single `state_mismatch` in the HTTP redirect, BUT the `error_description` message is
+// NOT collapsed and still distinguishes them. We capture both on the internal /error
+// route (which the callback redirects to before bouncing to the frontend) so we can
+// tell a missing/orphaned DB verification row apart from a real state mismatch, and
+// see whether failures correlate with a specific origin or user-agent (mobile/Brave).
+interface OAuthCallbackErrorLabels {
+  error: string;
+}
+export const oauthCallbackError = new CounterGroup<OAuthCallbackErrorLabels>(
+  "auth_oauth_callback_error",
+);
 const discordClientId = secret("DISCORD_AUTH_CLIENT_ID");
 const discordClientSecret = secret("DISCORD_AUTH_CLIENT_SECRET");
 const discordBotToken = secret("DISCORD_BOT_TOKEN");
@@ -323,6 +354,53 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
         },
       },
     },
+  },
+  // Instrument /get-session so the dashboard can distinguish "browser dropped the
+  // cookie" (has_cookie=false) from "cookie arrived but server couldn't resolve
+  // the session" (has_cookie=true, has_session=false) across decoupled origins.
+  // Top-level hooks.after is a single middleware-style handler (not a matcher array
+  // like plugin-level hooks), so we guard on the path inside.
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.context.path === "/get-session") {
+        const cookieHeader = ctx.headers?.get("cookie") ?? "";
+        const hasCookie = cookieHeader.includes("better-auth.session_token");
+        const hasSession = ctx.context.session != null;
+        getSessionOutcome.with({ has_cookie: hasCookie, has_session: hasSession }).increment();
+        if (hasCookie && !hasSession) {
+          log.warn("get-session: cookie present but session not resolved", {
+            origin: ctx.headers?.get("origin") ?? null,
+            calledHost: ctx.headers?.get("host") ?? null,
+            baseURL: appMeta().apiBaseUrl,
+            userAgent: ctx.headers?.get("user-agent") ?? null,
+          });
+        }
+        return;
+      }
+      if (ctx.context.path === "/error") {
+        const err = (ctx.query?.error as string | undefined) ?? null;
+        const errDesc = (ctx.query?.error_description as string | undefined) ?? null;
+        if (err) {
+          oauthCallbackError.with({ error: err }).increment();
+          log.warn("oauth callback error captured", {
+            error: err,
+            error_description: errDesc,
+            // "verification not found" => missing/orphaned DB row (subset/TTL/replica);
+            // "OAuth state parameter does not match stored state" => real mismatch.
+            inferredCause:
+              errDesc?.includes("verification not found")
+                ? "db_verification_missing"
+                : errDesc?.includes("does not match stored state")
+                  ? "state_param_mismatch"
+                  : "other",
+            origin: ctx.headers?.get("origin") ?? null,
+            referer: ctx.headers?.get("referer") ?? null,
+            userAgent: ctx.headers?.get("user-agent") ?? null,
+          });
+        }
+        return;
+      }
+    }),
   },
   plugins: [
     organization({
