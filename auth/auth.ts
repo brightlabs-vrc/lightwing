@@ -251,7 +251,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
   account: {
     skipStateCookieCheck: true,
-    storeStateStrategy: "database",
+    storeStateStrategy: "cookie",
   },
   user: {
     additionalFields: {
