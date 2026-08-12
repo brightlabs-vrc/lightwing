@@ -1,3 +1,4 @@
+/// <reference lib="deno.ns" />
 /**
  * Deno Deploy entrypoint for the Lightwing frontend.
  *
@@ -52,7 +53,7 @@ app.get("/assets/*", async (c) => {
   const filepath = `${DIST_DIR}${c.req.path}`;
   try {
     const content = await readFile(filepath);
-    return new Response(content, {
+    return new Response(new Uint8Array(content), {
       headers: {
         "Content-Type": getMimeType(filepath),
         "Cache-Control": "public, max-age=31536000, immutable",
@@ -85,9 +86,11 @@ if (import.meta.main) {
   const port = parseInt(process.env.PORT ?? "8000");
   console.log(`Frontend server running on http://localhost:${port}`);
   createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
+    const host = req.headers.host ?? "localhost";
+    const baseUrl = `http://${host}`;
+    const targetUrl = req.url ? new URL(req.url, baseUrl) : new URL(baseUrl);
     const headers = new Headers(req.headers as Record<string, string>);
-    const response = await handler(new Request(url.toString(), {
+    const response = await handler(new Request(targetUrl.toString(), {
       method: req.method,
       headers,
     }));

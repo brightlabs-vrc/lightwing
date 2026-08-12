@@ -1,3 +1,4 @@
+/// <reference lib="deno.ns" />
 /**
  * Reverse proxy for /api/auth/* → Encore API.
  *
