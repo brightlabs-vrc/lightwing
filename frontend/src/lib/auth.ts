@@ -42,7 +42,17 @@ const defaultMockSession: AuthSession = {
   },
 }
 
+/**
+ * Auth endpoints are same-origin and reverse-proxied to the Encore backend.
+ * This keeps session cookies first-party (required for reliable login on
+ * Safari and under third-party cookie restrictions).
+ */
 function authUrl(path: string) {
+  // Always same-origin in the browser — the frontend host proxies /api/auth
+  // to the Encore API. SSR / tests: fall back to configured API if needed.
+  if (typeof window !== "undefined") {
+    return `/api/auth${path}`
+  }
   return `${API_BASE_URL}/api/auth${path}`
 }
 
