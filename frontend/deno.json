@@ -1,0 +1,17 @@
+{
+  "name": "lightwing-frontend",
+  "version": "1.0.0",
+  "description": "Lightwing frontend — SPA + auth proxy for Deno Deploy",
+  "license": "BSD-3-Clause",
+  "tasks": {
+    "build": "vite build",
+    "preview": "deno run --allow-read --allow-net main.ts"
+  },
+  "imports": {},
+  "deno": {
+    "distDir": "./dist",
+    "run": {
+      "entryPoint": "main.ts"
+    }
+  }
+}
