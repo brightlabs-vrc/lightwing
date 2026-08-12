@@ -1,6 +1,7 @@
 import { appClient } from './api'
-import { MOCK_MODE } from './mock-mode'
+import { MOCK_MODE, isMockModeEnabledServerSide } from './mock-mode'
 import type { auth, eventmanager } from './client'
+import { getMockSessionServerSide } from './auth'
 
 const now = new Date().toISOString()
 
@@ -266,9 +267,28 @@ export function saveMockEvents(events: eventmanager.EventDetail[]) {
 }
 
 // Mock events for public API - excluding DRAFT events
-export let mockPublicEvents: eventmanager.EventDetail[] = loadMockEvents()
+// Module-level variable, initialized lazily when first accessed
+let mockPublicEvents: eventmanager.EventDetail[] = loadMockEvents()
 
-function getCurrentMockUserId(): string | null {
+async function getCurrentMockUserId(): Promise<string | null> {
+  // Check for mock session cookie (server-side)
+  try {
+    const { cookies: cookiesImport } = await import('next/headers')
+    const cookieStore = await cookiesImport()
+    const cookieValue = cookieStore.get('lightwing:mock:session')?.value
+    if (cookieValue) {
+      try {
+        const session = JSON.parse(cookieValue) as { user?: { id: string } }
+        return session.user?.id ?? null
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // cookies() might not be available
+  }
+  
+  // Fall back to localStorage (client-side)
   if (!MOCK_MODE) return null
   const stored = globalThis.localStorage.getItem('lightwing:mock:session')
   if (!stored) return null
@@ -284,7 +304,10 @@ export async function listPublicEvents(
   limit?: number,
   offset?: number,
 ): Promise<{ events: eventmanager.EventListItem[]; total: number }> {
-  if (!MOCK_MODE) {
+  // Check for mock mode (client-side) or server-side mock cookie
+  const isMock = MOCK_MODE || (await isMockModeEnabledServerSide())
+
+  if (!isMock) {
     return appClient.eventmanager.listPublicEvents({
       limit,
       offset,
@@ -352,7 +375,10 @@ function isEligible(
 }
 
 export async function getPublicEvent(eventId: string): Promise<eventmanager.EventDetail> {
-  if (!MOCK_MODE) {
+  // Check for mock mode (client-side) or server-side mock cookie
+  const isMock = MOCK_MODE || (await isMockModeEnabledServerSide())
+  
+  if (!isMock) {
     return appClient.eventmanager.getEvent(eventId)
   }
   mockPublicEvents = loadMockEvents()
@@ -382,7 +408,7 @@ export async function joinEvent(
     throw new Error('Signups are locked for this event')
   }
 
-  const userId = getCurrentMockUserId()
+  const userId = await getCurrentMockUserId()
   if (!userId) throw new Error('Not authenticated')
 
   const user = mockUserProfileMap.get(userId)
@@ -423,7 +449,7 @@ export async function leaveEvent(
     throw new Error('Signups are locked for this event')
   }
 
-  const userId = getCurrentMockUserId()
+  const userId = await getCurrentMockUserId()
   if (!userId) throw new Error('Not authenticated')
 
   mockPublicEvents[eventIndex] = {
@@ -436,7 +462,8 @@ export async function leaveEvent(
 }
 
 export async function getMyProfile(userId: string): Promise<auth.UserProfile> {
-  if (!MOCK_MODE) {
+  const isMock = MOCK_MODE || (await isMockModeEnabledServerSide())
+  if (!isMock) {
     return appClient.auth.getUserProfile(userId)
   }
   const user = mockUserProfileMap.get(userId)
@@ -561,7 +588,7 @@ export async function joinRaceEvent(
   const raceIndex = event.raceEvents.findIndex((r) => r.id === raceId)
   if (raceIndex === -1) throw new Error('Race not found')
 
-  const userId = getCurrentMockUserId()
+  const userId = await getCurrentMockUserId()
   if (!userId) throw new Error('Not authenticated')
 
   const user = mockUserProfileMap.get(userId)
@@ -622,7 +649,7 @@ export async function leaveRaceEvent(
   const raceIndex = event.raceEvents.findIndex((r) => r.id === raceId)
   if (raceIndex === -1) throw new Error('Race not found')
 
-  const userId = getCurrentMockUserId()
+  const userId = await getCurrentMockUserId()
   if (!userId) throw new Error('Not authenticated')
 
   let raceMembers = mockRaceMembersMap.get(raceId) ?? []

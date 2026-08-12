@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth-guard'
 import { OnboardingFormClient } from './OnboardingFormClient'
 
 export default async function OnboardingPage() {
-  const session = await requireAuth()
+  const session = await requireAuth({ pathname: '/onboarding' })
 
   // If user already has VRChat username, redirect to events
   if (session.user.vrchatUsername) {
