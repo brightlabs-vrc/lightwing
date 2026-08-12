@@ -49,4 +49,19 @@ To access the Studio UI for the database, run:
 pnpm prisma studio
 ```
 
-Keep in mind you will need to expose Encore's database connection string to Prisma for Prisma to be able to connect to the database. 
+Keep in mind you will need to expose Encore's database connection string to Prisma for Prisma to be able to connect to the database.
+
+### Reverse proxy for auth endpoints
+
+Auth endpoints (`/api/auth/*`) are reverse-proxied from the frontend host to the
+Encore API. This makes session cookies first-party (SameSite=Lax) so they work
+reliably under Safari ITP and third-party cookie restrictions.
+
+- **Local dev**: Vite proxies `/api/auth` → local Encore (`http://localhost:4000`)
+- **Production**: Deno Deploy runs `frontend/api-proxy.ts` which forwards
+  `/api/auth/*` to the Encore API and passes through `Set-Cookie` unchanged
+
+The proxy is defined in `frontend/api-proxy.ts`. Deploy it alongside the static
+frontend on Deno Deploy. Required env var: `ENCORE_API_BASE_URL`.
+
+### Session invalidation on auth surface changes 
