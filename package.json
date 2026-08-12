@@ -7,15 +7,15 @@
   "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c blue,green \"encore run\" \"pnpm --dir frontend dev\"",
+    "dev": "concurrently -n backend,frontend -c blue,green \"encore run\" \"pnpm --dir frontend-next dev\"",
     "dev:backend": "encore run",
-    "dev:frontend": "pnpm --dir frontend dev",
+    "dev:frontend": "pnpm --dir frontend-next dev",
     "test": "vitest --run",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "encore:gen-client": "encore gen client --output frontend/src/lib/client.ts --lang ts",
-    "frontend:build": "pnpm --dir frontend i -S &&  pnpm --dir frontend build",
+    "encore:gen-client": "encore gen client --output frontend-next/src/lib/client.ts --lang ts",
+    "frontend:build": "pnpm --dir frontend-next i -S &&  pnpm --dir frontend-next build",
     "postinstall": "prisma generate && pnpm frontend:build"
   },
   "devDependencies": {
