@@ -192,8 +192,8 @@ function StandingsTable({
   isRaceNotStarted = false,
 }: StandingsTableProps) {
   const getPreviewPoints = (positionStr: string, resultStatus: string): number => {
-    // DSQ/DNF always resolve to 0 points
-    if (resultStatus === 'DSQ' || resultStatus === 'DNF') {
+    // DSQ/DNF/DNS always resolve to 0 points
+    if (resultStatus === 'DSQ' || resultStatus === 'DNF' || resultStatus === 'DNS') {
       return 0
     }
     const position = parseInt(positionStr, 10);
@@ -371,6 +371,7 @@ function StandingsTable({
                     <option value="">Normal</option>
                     <option value="DSQ">DSQ — Did Not Qualify</option>
                     <option value="DNF">DNF — Did Not Finish</option>
+                    <option value="DNS">DNS — Did Not Start</option>
                   </select>
                 </td>
                 <td>
@@ -388,7 +389,7 @@ function StandingsTable({
                     </span>
                   ) : savedResult ? (
                     <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', background: '#2e7d32', color: '#fff', borderRadius: '4px' }}>
-                      {savedResult.resultStatus === 'DSQ' ? 'DSQ' : savedResult.resultStatus === 'DNF' ? 'DNF' : isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
+                      {savedResult.resultStatus === 'DSQ' ? 'DSQ' : savedResult.resultStatus === 'DNF' ? 'DNF' : savedResult.resultStatus === 'DNS' ? 'DNS' : isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
                     </span>
                   ) : (
                     <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', background: '#e0e0e0', color: '#555', borderRadius: '4px' }}>

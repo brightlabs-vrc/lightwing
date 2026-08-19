@@ -132,9 +132,9 @@ describe("Scorecalc Asynchronous Event-Driven Pipeline", () => {
     expect(checksum1).toBe(checksum2);
   });
 
-  test("DSQ and DNF results still resolve to 0 points on the leaderboard (status stays per-race)", () => {
+  test("DSQ, DNF, and DNS results still resolve to 0 points on the leaderboard (status stays per-race)", () => {
     const projection = calculateEventProjection({
-      eventId: "test-event-dsq-dnf",
+      eventId: "test-event-dsq-dnf-dns",
       members: ["user-a", "user-b", "user-c", "user-d"],
       raceResults: [
         { userId: "user-a", points: 10 },

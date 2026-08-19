@@ -21,7 +21,7 @@ export function calculateEventProjection(input: EventScoreInput): ScoreCalcProje
   }
 
   // Sum points for each user based on race results.
-  // DSQ/DNF is a per-race attribute (stored on race_result) and is NOT
+  // DSQ/DNF/DNS is a per-race attribute (stored on race_result) and is NOT
   // aggregated onto the leaderboard — the standings remain points-only.
   for (const res of input.raceResults) {
     const currentPoints = pointsMap.get(res.userId) ?? 0;
