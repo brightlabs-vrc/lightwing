@@ -33,7 +33,7 @@
     "better-auth": "^1.6.23",
     "discord-api-types": "^0.38.49",
     "discord.js": "^14.26.4",
-    "encore.dev": "^1.57.13"
+    "encore.dev": "^1.58.2"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.13.0"

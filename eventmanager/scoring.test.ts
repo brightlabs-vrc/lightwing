@@ -127,11 +127,13 @@ describe("Points-based Scoring Automation Backend", () => {
       expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: null, position: 1 })).toBe(0);
       expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: "NOT_A_GRADE", position: 1 })).toBe(0);
 
-      // DSQ and DNF always resolve to 0 regardless of position
+      // DSQ, DNF, and DNS always resolve to 0 regardless of position
       expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: "GI", position: 1, resultStatus: "DSQ" })).toBe(0);
       expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: "GI", position: 1, resultStatus: "DNF" })).toBe(0);
+      expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: "GI", position: 1, resultStatus: "DNS" })).toBe(0);
       expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: "GI", position: null, resultStatus: "DSQ" })).toBe(0);
       expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: "GI", position: null, resultStatus: "DNF" })).toBe(0);
+      expect(resolvePoints({ scoringRulesMode: "STANDARD", grade: "GI", position: null, resultStatus: "DNS" })).toBe(0);
     });
   });
 
