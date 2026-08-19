@@ -1195,7 +1195,7 @@ function recomputeMockOverview(eventId: string) {
     const results = mockRaceResultsMap.get(race.id) ?? []
     for (const res of results) {
       pointsTotals[res.userId] = (pointsTotals[res.userId] ?? 0) + res.points
-      if (res.resultStatus === 'DSQ' || res.resultStatus === 'DNF' || res.resultStatus === 'DNS') {
+      if (res.resultStatus === 'DSQ' || res.resultStatus === 'DNF' || res.resultStatus === 'DNS' || res.resultStatus === 'DEFERRED') {
         statusTotals[res.userId] = res.resultStatus
       }
     }

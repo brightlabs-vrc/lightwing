@@ -403,10 +403,11 @@ function RaceStandingsTable({
       header: 'RESULT',
       width: 80,
       render: (r) => {
-        if (r.resultStatus === 'DSQ') return <span className="text-red-600 font-bold">DSQ</span>
-        if (r.resultStatus === 'DNF') return <span className="text-orange-600 font-bold">DNF</span>
-        if (r.resultStatus === 'DNS') return <span className="text-amber-600 font-bold">DNS</span>
-        if (r.resultStatus === 'DEFERRED') return <span className="text-slate-500 font-bold" title="Deferred - Already won an OP">DEFERRED</span>
+        const status = r.resultStatus?.toUpperCase()
+        if (status === 'DSQ') return <span className="text-red-600 font-bold">DSQ</span>
+        if (status === 'DNF') return <span className="text-orange-600 font-bold">DNF</span>
+        if (status === 'DNS') return <span className="text-amber-600 font-bold">DNS</span>
+        if (status === 'DEFERRED') return <span className="text-slate-500 font-bold" title="Deferred - Already won an OP">DEFERRED</span>
         return <span className="text-retro-muted">-</span>
       },
     },
