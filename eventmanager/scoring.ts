@@ -89,7 +89,7 @@ export function resolvePoints(params: {
 }): number {
   const { position, resultStatus } = params;
 
-  // DSQ (Did Not Qualify), DNF (Did Not Finish), and DNS (Did Not Start) always resolve to 0 points
+  // DSQ (Disqualified), DNF (Did Not Finish), and DNS (Did Not Start) always resolve to 0 points
   if (resultStatus === "DSQ" || resultStatus === "DNF" || resultStatus === "DNS") {
     return 0;
   }

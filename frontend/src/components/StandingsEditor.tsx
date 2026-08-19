@@ -369,7 +369,7 @@ function StandingsTable({
                     style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
                   >
                     <option value="">Normal</option>
-                    <option value="DSQ">DSQ — Did Not Qualify</option>
+                    <option value="DSQ">DSQ — Disqualified</option>
                     <option value="DNF">DNF — Did Not Finish</option>
                     <option value="DNS">DNS — Did Not Start</option>
                   </select>
