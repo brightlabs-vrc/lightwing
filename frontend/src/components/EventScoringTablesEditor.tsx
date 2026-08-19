@@ -1,8 +1,8 @@
 import React from 'react';
 
 interface EventScoringTablesEditorProps {
-  value: Record<string, Record<number, number>>;
-  onChange: (value: Record<string, Record<number, number>>) => void;
+  value: Record<string, Record<string | number, any>>;
+  onChange: (value: Record<string, Record<string | number, any>>) => void;
 }
 
 export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> = ({ value, onChange }) => {
@@ -15,6 +15,17 @@ export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> =
       [grade]: {
         ...(value[grade] || {}),
         [pos]: intVal,
+      },
+    };
+    onChange(updated);
+  };
+
+  const handleAutoDeferChange = (grade: string, autoDefer: boolean) => {
+    const updated = {
+      ...value,
+      [grade]: {
+        ...(value[grade] || {}),
+        autoDefer,
       },
     };
     onChange(updated);
@@ -41,17 +52,27 @@ export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> =
               border: '1px solid #dddbda',
             }}
           >
-            <h4
-              className="slds-text-title_caps font-bold text-slate-700"
-              style={{
-                fontSize: '11px',
-                textTransform: 'uppercase',
-                fontWeight: 'bold',
-                marginBottom: '8px',
-              }}
-            >
-              Grade {grade}
-            </h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4
+                className="slds-text-title_caps font-bold text-slate-700"
+                style={{
+                  fontSize: '11px',
+                  textTransform: 'uppercase',
+                  fontWeight: 'bold',
+                  margin: 0,
+                }}
+              >
+                Grade {grade}
+              </h4>
+              <label style={{ fontSize: '11px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={table.autoDefer ?? (grade === 'OP')}
+                  onChange={(e) => handleAutoDeferChange(grade, e.target.checked)}
+                />
+                Auto-defer 1st place if ungraded
+              </label>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
               {Array.from({ length: 10 }).map((_, i) => {
                 const pos = i + 1;
