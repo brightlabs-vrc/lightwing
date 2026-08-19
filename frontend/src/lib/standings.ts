@@ -190,10 +190,10 @@ export function inferFinishTimes(
   rows: DerivedRow[],
   editedResults: Record<string, EditedResult>,
 ): { error: string } | { edits: Record<string, EditedResult>; inferredCount: number } {
-  // DSQ/DNF/DNS rows are excluded — they have no valid position and cannot have
+  // DSQ/DNF/DNS/DEFERRED rows are excluded — they have no valid position and cannot have
   // inferred finish times.
   const activeRows = rows.filter(
-    (d) => d.rowState !== 'pending_delete' && d.edit.resultStatus !== 'DSQ' && d.edit.resultStatus !== 'DNF' && d.edit.resultStatus !== 'DNS'
+    (d) => d.rowState !== 'pending_delete' && d.edit.resultStatus !== 'DSQ' && d.edit.resultStatus !== 'DNF' && d.edit.resultStatus !== 'DNS' && d.edit.resultStatus !== 'DEFERRED'
   )
 
   // 1. Verify all rows have valid numeric positions

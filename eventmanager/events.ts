@@ -13,6 +13,7 @@ import { scorecalc } from "~encore/clients";
 import { StructKeyspace, expireInSeconds } from "encore.dev/storage/cache";
 import { cluster } from "../cache";
 import { invalidateEventCaches } from "./cache-utils";
+import { applyAutoDeferralsForEvent } from "./results";
 import { SCORING_POINTS, SCORING_LADDER } from "../lib/constants";
 
 export const eventDetailCache = new StructKeyspace<{ id: string }, EventDetail>(
@@ -710,6 +711,8 @@ export async function recomputeEventPointsInternal(eventId: string): Promise<voi
   if (event.scoringType !== SCORING_POINTS) {
     return;
   }
+
+  await applyAutoDeferralsForEvent(eventId);
 
   const affectedUserIds = new Set<string>();
 

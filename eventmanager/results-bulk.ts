@@ -10,6 +10,7 @@ import {
   requireRace,
   requireMembershipForResult,
   listResults,
+  applyAutoDeferralsForEvent,
   type RaceResultView,
 } from "./results";
 
@@ -76,6 +77,8 @@ export const replaceRaceResults = api(
       });
     }
 
+    await applyAutoDeferralsForEvent(params.eventId);
+
     const allAffectedUserIds = Array.from(new Set([...payloadUserIds, ...removedUserIds]));
     if (allAffectedUserIds.length > 0) {
       await scorecalc.submitCalc({ eventId: params.eventId, userIds: allAffectedUserIds });
@@ -138,6 +141,8 @@ export const mergeRaceResults = api(
         buildRaceResultUpsert(params.raceId, entry, pointsToPersist)
       );
     }
+
+    await applyAutoDeferralsForEvent(params.eventId);
 
     const affectedUserIds = params.results.map((entry) => entry.userId);
     if (affectedUserIds.length > 0) {

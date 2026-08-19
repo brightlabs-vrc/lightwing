@@ -1,15 +1,15 @@
 import { APIError } from "encore.dev/api";
 
 export type RaceGrade = "OP" | "GIII" | "GII" | "GI";
-export type GradeScoringTable = Record<number, number>;
+export type GradeScoringTable = Record<number, number> & { autoDefer?: boolean };
 export type EventScoringTables = Record<RaceGrade, GradeScoringTable>;
 export type ScoringRulesMode = "STANDARD" | "CUSTOM";
 
 export const DEFAULT_SCORING_TABLES: EventScoringTables = {
-  OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-  GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1 },
-  GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1 },
-  GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1 },
+  OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1, autoDefer: true },
+  GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1, autoDefer: false },
+  GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1, autoDefer: false },
+  GI:   { 1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1, autoDefer: false },
 };
 
 export function getDefaultScoringTables(): EventScoringTables {
@@ -46,6 +46,13 @@ export function validateCustomScoringTables(input: unknown): EventScoringTables 
       }
       gradeTable[pos] = parsed;
     }
+    if (typeof table.autoDefer === "boolean") {
+      gradeTable.autoDefer = table.autoDefer;
+    } else if (table.autoDefer !== undefined && table.autoDefer !== null) {
+      gradeTable.autoDefer = Boolean(table.autoDefer);
+    } else {
+      gradeTable.autoDefer = grade === "OP";
+    }
     validatedTables[grade] = gradeTable;
   }
 
@@ -78,8 +85,34 @@ export function getActiveScoringTable(params: {
   return DEFAULT_SCORING_TABLES[activeGrade] || null;
 }
 
+// Helper to check if a race grade in a given event configuration has auto-deferral enabled.
+export function isAutoDeferGrade(params: {
+  scoringRulesMode?: ScoringRulesMode | string | null;
+  customScoringTables?: any | null;
+  grade?: RaceGrade | string | null;
+}): boolean {
+  const { scoringRulesMode, customScoringTables, grade } = params;
+  if (!grade || !["OP", "GIII", "GII", "GI"].includes(grade)) {
+    return false;
+  }
+
+  if (scoringRulesMode === "CUSTOM" && customScoringTables) {
+    // Check if auto-deferral is disabled globally for custom tables
+    if (customScoringTables.autoDeferEnabled === false) {
+      return false;
+    }
+    const activeGrade = grade as RaceGrade;
+    if (customScoringTables[activeGrade] && typeof customScoringTables[activeGrade].autoDefer === "boolean") {
+      return customScoringTables[activeGrade].autoDefer;
+    }
+  }
+
+  const activeGrade = grade as RaceGrade;
+  return DEFAULT_SCORING_TABLES[activeGrade]?.autoDefer ?? (activeGrade === "OP");
+}
+
 // Resolves position to points based on event rules and race grade.
-// DSQ/DNF/DNS results always resolve to 0 points regardless of position.
+// DSQ/DNF/DNS/DEFERRED results always resolve to 0 points regardless of position.
 export function resolvePoints(params: {
   scoringRulesMode?: ScoringRulesMode | string | null;
   customScoringTables?: any | null;
@@ -89,8 +122,8 @@ export function resolvePoints(params: {
 }): number {
   const { position, resultStatus } = params;
 
-  // DSQ (Disqualified), DNF (Did Not Finish), and DNS (Did Not Start) always resolve to 0 points
-  if (resultStatus === "DSQ" || resultStatus === "DNF" || resultStatus === "DNS") {
+  // DSQ, DNF, DNS, and DEFERRED always resolve to 0 points
+  if (resultStatus === "DSQ" || resultStatus === "DNF" || resultStatus === "DNS" || resultStatus === "DEFERRED") {
     return 0;
   }
 
