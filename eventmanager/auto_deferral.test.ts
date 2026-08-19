@@ -149,10 +149,11 @@ describe("Auto-deferral behavior for OP wins and custom scoring tables", () => {
     expect(user1Race2After?.resultStatus).toBeNull();
   });
 
-  test("custom scoring tables allow configuring auto-deferral on GIII grade", async () => {
+  test("custom scoring tables allow configuring auto-deferral on GIII grade and disabling via master toggle", async () => {
     const user1 = await createTestUser("Ungraded Competitor Custom", null);
 
     const customTables = {
+      autoDeferEnabled: true,
       OP:   { 1: 12, 2: 10, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1, autoDefer: false },
       GIII: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1, autoDefer: true },
       GII:  { 1: 19, 2: 15, 3: 12, 4: 9, 5: 8, 6: 6, 7: 5, 8: 3, 9: 2, 10: 1, autoDefer: false },
@@ -217,5 +218,46 @@ describe("Auto-deferral behavior for OP wins and custom scoring tables", () => {
 
     let r1Res = await listRaceResults({ eventId: event.id, raceId: race1.id });
     expect(r1Res.results.find((r) => r.userId === user1)?.resultStatus).toBe("DEFERRED");
+  });
+
+  test("manually assigning DEFERRED status is supported regardless of 1st place wins", async () => {
+    const user1 = await createTestUser("Manual Defer Competitor", null);
+
+    const event = await createEvent({
+      authorization: authHeader as any,
+      name: "Manual Defer Event",
+      ownerType: "USER",
+      scoringType: SCORING_POINTS,
+      scoringRulesMode: "STANDARD",
+      granularParticipation: false,
+    });
+    createdEventIds.push(event.id);
+
+    await prisma.eventMember.create({
+      data: { id: randomUUID(), eventId: event.id, userId: user1 },
+    });
+
+    const race = await createRaceEvent({
+      eventId: event.id,
+      authorization: authHeader as any,
+      name: "Race GIII",
+      distanceMeters: 1600,
+      trackType: "Turf",
+      location: "Kyoto",
+      grade: "GIII",
+    });
+
+    // Manually assign resultStatus DEFERRED
+    const res = await assignRaceResult({
+      eventId: event.id,
+      raceId: race.id,
+      userId: user1,
+      authorization: authHeader as any,
+      resultStatus: "DEFERRED",
+      position: 5,
+    });
+
+    expect(res.resultStatus).toBe("DEFERRED");
+    expect(res.points).toBe(0);
   });
 });

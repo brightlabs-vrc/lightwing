@@ -1,12 +1,21 @@
 import React from 'react';
 
 interface EventScoringTablesEditorProps {
-  value: Record<string, Record<string | number, any>>;
-  onChange: (value: Record<string, Record<string | number, any>>) => void;
+  value: any;
+  onChange: (value: any) => void;
 }
 
 export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> = ({ value, onChange }) => {
   const grades = ['OP', 'GIII', 'GII', 'GI'];
+  const masterAutoDeferEnabled = value.autoDeferEnabled !== false;
+
+  const handleMasterAutoDeferToggle = (enabled: boolean) => {
+    const updated = {
+      ...value,
+      autoDeferEnabled: enabled,
+    };
+    onChange(updated);
+  };
 
   const handleCellChange = (grade: string, pos: number, valStr: string) => {
     const intVal = valStr === '' ? 0 : (parseInt(valStr, 10) || 0);
@@ -33,6 +42,23 @@ export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> =
 
   return (
     <div style={{ marginTop: '12px' }}>
+      <div
+        className="slds-box slds-m-bottom_medium"
+        style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '12px', borderRadius: '4px' }}
+      >
+        <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={masterAutoDeferEnabled}
+            onChange={(e) => handleMasterAutoDeferToggle(e.target.checked)}
+          />
+          Enable Auto-Deferral Rules for Ungraded Winners
+        </label>
+        <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0 24px' }}>
+          When enabled, ungraded competitors placing 1st in an auto-deferral race will be marked as Deferred in other races for this event.
+        </p>
+      </div>
+
       <p
         className="slds-text-body_small text-slate-500 slds-m-bottom_medium"
         style={{ fontSize: '12px', margin: '4px 0 12px 0' }}
@@ -64,10 +90,11 @@ export const EventScoringTablesEditor: React.FC<EventScoringTablesEditorProps> =
               >
                 Grade {grade}
               </h4>
-              <label style={{ fontSize: '11px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <label style={{ fontSize: '11px', color: masterAutoDeferEnabled ? '#475569' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', cursor: masterAutoDeferEnabled ? 'pointer' : 'not-allowed' }}>
                 <input
                   type="checkbox"
-                  checked={table.autoDefer ?? (grade === 'OP')}
+                  disabled={!masterAutoDeferEnabled}
+                  checked={masterAutoDeferEnabled && (table.autoDefer ?? (grade === 'OP'))}
                   onChange={(e) => handleAutoDeferChange(grade, e.target.checked)}
                 />
                 Auto-defer 1st place if ungraded

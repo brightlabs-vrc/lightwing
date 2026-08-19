@@ -95,18 +95,19 @@ export function isAutoDeferGrade(params: {
   if (!grade || !["OP", "GIII", "GII", "GI"].includes(grade)) {
     return false;
   }
-  const activeGrade = grade as RaceGrade;
+
   if (scoringRulesMode === "CUSTOM" && customScoringTables) {
-    try {
-      const validated = validateCustomScoringTables(customScoringTables);
-      const table = validated[activeGrade];
-      if (table && typeof table.autoDefer === "boolean") {
-        return table.autoDefer;
-      }
-    } catch {
-      // fallback
+    // Check if auto-deferral is disabled globally for custom tables
+    if (customScoringTables.autoDeferEnabled === false) {
+      return false;
+    }
+    const activeGrade = grade as RaceGrade;
+    if (customScoringTables[activeGrade] && typeof customScoringTables[activeGrade].autoDefer === "boolean") {
+      return customScoringTables[activeGrade].autoDefer;
     }
   }
+
+  const activeGrade = grade as RaceGrade;
   return DEFAULT_SCORING_TABLES[activeGrade]?.autoDefer ?? (activeGrade === "OP");
 }
 
