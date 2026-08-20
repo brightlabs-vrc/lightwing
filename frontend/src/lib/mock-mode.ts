@@ -28,16 +28,18 @@ export async function isMockModeEnabledServerSide(): Promise<boolean> {
   }
 
   // Check for mock mode cookie OR mock session cookie (server-side, for Playwright tests)
-  try {
-    const { cookies } = await import('next/headers')
-    const cookieStore = await cookies()
-    const hasMockMode = cookieStore.get('lightwing:mock:mode')?.value === 'true'
-    const hasMockSession = cookieStore.get('lightwing:mock:session')?.value !== undefined
-    if (hasMockMode || hasMockSession) {
-      return true
+  if (typeof window === 'undefined') {
+    try {
+      const { cookies } = await import('next/headers')
+      const cookieStore = await cookies()
+      const hasMockMode = cookieStore.get('lightwing:mock:mode')?.value === 'true'
+      const hasMockSession = cookieStore.get('lightwing:mock:session')?.value !== undefined
+      if (hasMockMode || hasMockSession) {
+        return true
+      }
+    } catch {
+      // cookies() might not be available in all contexts
     }
-  } catch {
-    // cookies() might not be available in all contexts
   }
 
   return false

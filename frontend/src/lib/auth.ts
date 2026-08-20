@@ -91,42 +91,44 @@ function writeMockSession(session: AuthSession | null) {
 
 export async function getAuthSession(): Promise<AuthSession | null> {
   // Check for mock session cookie (server-side, for Playwright tests)
-  try {
-    const { cookies } = await import('next/headers')
-    const cookieStore = await cookies()
-    const mockSessionCookie = cookieStore.get('lightwing:mock:session')?.value
-    const mockModeCookie = cookieStore.get('lightwing:mock:mode')?.value
+  if (typeof window === 'undefined') {
+    try {
+      const { cookies } = await import('next/headers')
+      const cookieStore = await cookies()
+      const mockSessionCookie = cookieStore.get('lightwing:mock:session')?.value
+      const mockModeCookie = cookieStore.get('lightwing:mock:mode')?.value
 
-    console.log('getAuthSession: mockModeCookie =', mockModeCookie, 'mockSessionCookie =', mockSessionCookie ? 'present' : 'none')
+      console.log('getAuthSession: mockModeCookie =', mockModeCookie, 'mockSessionCookie =', mockSessionCookie ? 'present' : 'none')
 
-    if (mockModeCookie === 'true') {
-      console.log('getAuthSession: mock mode enabled via cookie')
+      if (mockModeCookie === 'true') {
+        console.log('getAuthSession: mock mode enabled via cookie')
+        if (mockSessionCookie) {
+          try {
+            const session = JSON.parse(mockSessionCookie) as AuthSession
+            if (session.session?.token) {
+              return session
+            }
+          } catch (e) {
+            console.error('getAuthSession: failed to parse mock session:', e)
+          }
+        }
+        console.log('getAuthSession: returning defaultMockSession')
+        return defaultMockSession
+      }
+
       if (mockSessionCookie) {
         try {
           const session = JSON.parse(mockSessionCookie) as AuthSession
           if (session.session?.token) {
             return session
           }
-        } catch (e) {
-          console.error('getAuthSession: failed to parse mock session:', e)
+        } catch {
+          // ignore
         }
       }
-      console.log('getAuthSession: returning defaultMockSession')
-      return defaultMockSession
+    } catch (err) {
+      console.error('getAuthSession: cookie check error:', err)
     }
-
-    if (mockSessionCookie) {
-      try {
-        const session = JSON.parse(mockSessionCookie) as AuthSession
-        if (session.session?.token) {
-          return session
-        }
-      } catch {
-        // ignore
-      }
-    }
-  } catch (err) {
-    console.error('getAuthSession: cookie check error:', err)
   }
 
   // Check for mock mode (client-side check for client components)

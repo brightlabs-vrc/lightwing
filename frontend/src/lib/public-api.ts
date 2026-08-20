@@ -272,20 +272,22 @@ let mockPublicEvents: eventmanager.EventDetail[] = loadMockEvents()
 
 async function getCurrentMockUserId(): Promise<string | null> {
   // Check for mock session cookie (server-side)
-  try {
-    const { cookies: cookiesImport } = await import('next/headers')
-    const cookieStore = await cookiesImport()
-    const cookieValue = cookieStore.get('lightwing:mock:session')?.value
-    if (cookieValue) {
-      try {
-        const session = JSON.parse(cookieValue) as { user?: { id: string } }
-        return session.user?.id ?? null
-      } catch {
-        // ignore
+  if (typeof window === 'undefined') {
+    try {
+      const { cookies: cookiesImport } = await import('next/headers')
+      const cookieStore = await cookiesImport()
+      const cookieValue = cookieStore.get('lightwing:mock:session')?.value
+      if (cookieValue) {
+        try {
+          const session = JSON.parse(cookieValue) as { user?: { id: string } }
+          return session.user?.id ?? null
+        } catch {
+          // ignore
+        }
       }
+    } catch {
+      // cookies() might not be available
     }
-  } catch {
-    // cookies() might not be available
   }
 
   // Fall back to localStorage (client-side)
