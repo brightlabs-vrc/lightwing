@@ -1,3 +1,7 @@
+packages:
+  - "."
+  - "frontend"
+
 allowBuilds:
   '@prisma/engines': true
   esbuild: true

@@ -42,8 +42,8 @@ export async function handleScoreCalcRequest(event: ScoreCalcRequested): Promise
         return { shouldProceed: false };
       }
 
-      // Only transition pending/failed
-      if (job.status !== "PENDING" && job.status !== "FAILED") {
+      // Only transition pending
+      if (job.status !== "PENDING") {
         log.info(`Job ${jobId} is in status ${job.status}. Skipping.`);
         return { shouldProceed: false };
       }
