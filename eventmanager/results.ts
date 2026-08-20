@@ -79,7 +79,7 @@ export const assignRaceResult = api(
       buildRaceResultUpsert(params.raceId, params, pointsToPersist)
     );
 
-    await applyAutoDeferralsForEvent(params.eventId);
+    await applyAutoDeferralsForEvent(params.eventId, params.raceId);
 
     await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
     await invalidateEventCaches(params.eventId);
@@ -120,7 +120,7 @@ export const deleteRaceResult = api(
       where: { raceEventId_userId: { raceEventId: params.raceId, userId: params.userId } },
     });
 
-    await applyAutoDeferralsForEvent(params.eventId);
+    await applyAutoDeferralsForEvent(params.eventId, params.raceId);
 
     await scorecalc.submitCalc({ eventId: params.eventId, userIds: [params.userId] });
     await invalidateEventCaches(params.eventId);
@@ -216,7 +216,7 @@ export type RaceResultRow = {
 // another explicit outcome or if they were set as DEFERRED.
 // Conversely, if a user no longer places 1st in any auto-deferral race in this event, any DEFERRED results
 // that were auto-assigned should be reverted (set resultStatus to null).
-export async function applyAutoDeferralsForEvent(eventId: string): Promise<void> {
+export async function applyAutoDeferralsForEvent(eventId: string, modifiedRaceId?: string): Promise<void> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     include: {
@@ -326,7 +326,12 @@ export async function applyAutoDeferralsForEvent(eventId: string): Promise<void>
         }
       } else {
         // User is NOT a winner of any auto-deferral race in this event anymore.
-        // If they have a result in this race with resultStatus === 'DEFERRED', revert it.
+        // If they have a result in this race with resultStatus === 'DEFERRED',
+        // revert it ONLY IF this race is NOT the race currently being modified by the admin.
+        if (modifiedRaceId && race.id === modifiedRaceId) {
+          continue;
+        }
+
         if (existingResult && existingResult.resultStatus === "DEFERRED") {
           // Recompute points based on position if position exists
           const restoredPoints = resolvePoints({

@@ -518,7 +518,20 @@ export async function getPublicRaceResults(
   if (!MOCK_MODE) {
     return appClient.eventmanager.listRaceResults(eventId, raceId)
   }
-  const results = mockRaceResults[raceId] ?? []
+  let results = mockRaceResults[raceId] ?? []
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const stored = window.localStorage.getItem('lightwing:mock:race_results')
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (parsed[raceId]) {
+          results = parsed[raceId]
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
   return { results }
 }
 
