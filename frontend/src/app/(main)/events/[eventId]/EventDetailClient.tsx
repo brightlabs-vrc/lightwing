@@ -1,9 +1,16 @@
 'use client'
 
-import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPublicEvent, joinEvent, leaveEvent, getPublicRaceResults, listPublicRaceEvents } from '@/lib/public-api'
+import {
+  getPublicEvent,
+  joinEvent,
+  leaveEvent,
+  getPublicRaceResults,
+  listPublicRaceEvents,
+  joinRaceEvent,
+  leaveRaceEvent,
+} from '@/lib/public-api'
 import { formatLocalDateTime } from '@/lib/datetime'
 import { useNotification } from '@/hooks/useNotification'
 import { Heading, Text, Label, Button, Spinner } from '@primer/react'
@@ -18,11 +25,27 @@ const CLASS_TIER_LABELS: Record<string, string> = {
   G1: 'G1',
 }
 
-interface EventDetailClientProps {
-  event: eventmanager.EventDetail
+const SCORING_LABELS: Record<number, string> = {
+  1: 'POINTS-BASED',
+  2: 'LADDER-ELO',
 }
 
-function RaceStandingsTable({ eventId, raceId, members }: { eventId: string; raceId: string; members: eventmanager.EventMemberView[] }) {
+const STATUS_TONE: Record<string, 'default' | 'accent' | 'success' | 'severe'> = {
+  DRAFT: 'default',
+  UNOFFICIAL: 'accent',
+  OFFICIAL: 'success',
+  CONCLUDED: 'severe',
+}
+
+function RaceStandingsTable({
+  eventId,
+  raceId,
+  members,
+}: {
+  eventId: string
+  raceId: string
+  members: eventmanager.EventMemberView[]
+}) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-race-results', eventId, raceId],
     queryFn: () => getPublicRaceResults(eventId, raceId),
@@ -30,49 +53,134 @@ function RaceStandingsTable({ eventId, raceId, members }: { eventId: string; rac
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem', gap: '0.5rem', color: 'var(--color-fg-muted)' }}>
-        <Spinner size="small" /><span>Loading standings...</span>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '1rem',
+          gap: '0.5rem',
+          color: 'var(--color-fg-muted)',
+        }}
+      >
+        <Spinner size="small" />
+        <span style={{ fontSize: '12px' }}>Loading standings...</span>
       </div>
     )
   }
 
   if (error || !data) {
-    return <span style={{ fontSize: '12px', color: 'var(--color-danger-fg)' }}>ERROR LOADING STANDINGS</span>
+    return (
+      <div style={{ padding: '0.5rem', fontSize: '12px', color: 'var(--color-danger-fg)' }}>
+        ERROR LOADING STANDINGS
+      </div>
+    )
   }
 
   const results = data.results
 
   return (
-    <div style={{ overflowX: 'auto', border: '1px solid var(--color-border-default)', borderRadius: '6px' }}>
+    <div
+      style={{
+        overflowX: 'auto',
+        border: '1px solid var(--color-border-default)',
+        borderRadius: '6px',
+        backgroundColor: 'var(--color-canvas-default)',
+      }}
+    >
       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
         <thead>
-          <tr style={{ background: 'var(--color-canvas-subtle)', borderBottom: '1px solid var(--color-border-default)' }}>
-            <th style={{ padding: '8px', fontWeight: 'bold' }}>POS</th>
-            <th style={{ padding: '8px', fontWeight: 'bold' }}>DRAW</th>
-            <th style={{ padding: '8px', fontWeight: 'bold' }}>PARTICIPANT</th>
-            <th style={{ padding: '8px', fontWeight: 'bold', textAlign: 'right' }}>POINTS</th>
-            <th style={{ padding: '8px', fontWeight: 'bold' }}>FINISH TIME</th>
-            <th style={{ padding: '8px', fontWeight: 'bold' }}>MARGIN</th>
+          <tr
+            style={{
+              backgroundColor: 'var(--color-canvas-subtle)',
+              borderBottom: '1px solid var(--color-border-default)',
+              color: 'var(--color-fg-muted)',
+            }}
+          >
+            <th style={{ padding: '8px 12px', width: '64px' }}>POS</th>
+            <th style={{ padding: '8px 12px', width: '64px' }}>DRAW</th>
+            <th style={{ padding: '8px 12px' }}>PARTICIPANT</th>
+            <th style={{ padding: '8px 12px', textAlign: 'right', width: '96px' }}>POINTS</th>
+            <th style={{ padding: '8px 12px' }}>FINISH TIME</th>
+            <th style={{ padding: '8px 12px' }}>MARGIN</th>
+            <th style={{ padding: '8px 12px' }}>PASSING ORDER</th>
+            <th style={{ padding: '8px 12px' }}>FINAL 3F</th>
+            <th style={{ padding: '8px 12px', width: '96px' }}>RESULT</th>
           </tr>
         </thead>
         <tbody>
           {results.length === 0 ? (
             <tr>
-              <td colSpan={6} style={{ padding: '12px', textAlign: 'center', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
+              <td
+                colSpan={9}
+                style={{
+                  padding: '12px',
+                  textAlign: 'center',
+                  color: 'var(--color-fg-muted)',
+                  fontSize: '12px',
+                }}
+              >
                 NO STANDINGS RECORDED
               </td>
             </tr>
           ) : (
             results.map((r, idx) => {
               const member = members.find((m) => m.userId === r.userId)
+              const status = r.resultStatus?.toUpperCase()
+
               return (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--color-border-default)' }}>
-                  <td style={{ padding: '8px', fontWeight: 'bold' }}>{r.position ?? '-'}</td>
-                  <td style={{ padding: '8px' }}>{r.gateNumber ?? '-'}</td>
-                  <td style={{ padding: '8px', fontWeight: 'bold' }}>{member?.name ?? r.userId}</td>
-                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>{r.points}</td>
-                  <td style={{ padding: '8px' }}>{r.finishTime ? formatLocalDateTime(r.finishTime) : '-'}</td>
-                  <td style={{ padding: '8px' }}>{r.margin ?? '-'}</td>
+                <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--color-border-muted)' }}>
+                  <td style={{ padding: '8px 12px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>
+                    {r.position ?? '-'}
+                  </td>
+                  <td style={{ padding: '8px 12px', color: 'var(--color-fg-default)' }}>
+                    {r.gateNumber ?? '-'}
+                  </td>
+                  <td style={{ padding: '8px 12px', fontWeight: 500, color: 'var(--color-fg-default)' }}>
+                    {member?.name ?? r.userId}
+                  </td>
+                  <td
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'right',
+                      fontWeight: 'bold',
+                      color: 'var(--color-accent-fg)',
+                    }}
+                  >
+                    {r.points}
+                  </td>
+                  <td style={{ padding: '8px 12px', color: 'var(--color-fg-default)' }}>
+                    {r.finishTime ?? '-'}
+                  </td>
+                  <td style={{ padding: '8px 12px', color: 'var(--color-fg-default)' }}>
+                    {r.margin ?? '-'}
+                  </td>
+                  <td style={{ padding: '8px 12px', color: 'var(--color-fg-default)' }}>
+                    {r.passingOrder ?? '-'}
+                  </td>
+                  <td style={{ padding: '8px 12px', color: 'var(--color-fg-default)' }}>
+                    {r.final3F ?? '-'}
+                  </td>
+                  <td style={{ padding: '8px 12px' }}>
+                    {status === 'DSQ' && (
+                      <span style={{ color: 'var(--color-danger-fg)', fontWeight: 'bold' }}>DSQ</span>
+                    )}
+                    {status === 'DNF' && (
+                      <span style={{ color: 'var(--color-attention-fg)', fontWeight: 'bold' }}>DNF</span>
+                    )}
+                    {status === 'DNS' && (
+                      <span style={{ color: 'var(--color-severe-fg)', fontWeight: 'bold' }}>DNS</span>
+                    )}
+                    {status === 'DEFERRED' && (
+                      <span
+                        style={{ color: 'var(--color-fg-muted)', fontWeight: 'bold' }}
+                        title="Deferred - Already won an OP"
+                      >
+                        DEFERRED
+                      </span>
+                    )}
+                    {!status && <span style={{ color: 'var(--color-fg-muted)' }}>-</span>}
+                  </td>
                 </tr>
               )
             })
@@ -83,171 +191,767 @@ function RaceStandingsTable({ eventId, raceId, members }: { eventId: string; rac
   )
 }
 
-export function EventDetailClient({ event }: EventDetailClientProps) {
+function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
   const queryClient = useQueryClient()
   const { session } = useAuth()
   const { addToast } = useNotification()
-  const [activeRaceId, setActiveRaceId] = useState<string | null>(null)
+  const isMember = session && event.members.some((m) => m.userId === session.user.id)
 
-  const isCreator = session?.user.id === event.ownerUserId
-  const canJoin = session?.session && !isCreator && event.status !== 'CONCLUDED' && event.participantLimit === null
-  const isMember = session?.session && event.members?.some((m) => m.userId === session.user.id)
+  const joinRaceMutation = useMutation({
+    mutationFn: ({ raceId }: { raceId: string }) =>
+      joinRaceEvent(event.id, raceId, `Bearer ${session?.session.token ?? ''}`),
+    onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+      addToast({ message: 'Signed up for race successfully', severity: 'success' })
+    },
+    onError: (err: Error) => {
+      addToast({ message: `Could not sign up for this race: ${err.message || 'Unknown error'}`, severity: 'error' })
+    },
+  })
 
-  const { data: racesData, isLoading: racesLoading } = useQuery({
-    queryKey: ['public-race-events', event.id],
+  const leaveRaceMutation = useMutation({
+    mutationFn: ({ raceId }: { raceId: string }) =>
+      leaveRaceEvent(event.id, raceId, `Bearer ${session?.session.token ?? ''}`),
+    onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+      addToast({ message: 'Withdrew from race successfully', severity: 'success' })
+    },
+    onError: (err: Error) => {
+      addToast({ message: `Could not withdraw from this race: ${err.message || 'Unknown error'}`, severity: 'error' })
+    },
+  })
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['public-event-races', event.id],
     queryFn: () => listPublicRaceEvents(event.id),
-    enabled: !!event.id,
+  })
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem', color: 'var(--color-fg-muted)' }}>
+        <Spinner size="medium" />
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div
+        style={{
+          padding: '1.5rem',
+          textAlign: 'center',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '8px',
+          color: 'var(--color-danger-fg)',
+        }}
+      >
+        Error loading races
+      </div>
+    )
+  }
+
+  const races = data.races
+
+  if (races.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '2rem',
+          textAlign: 'center',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '8px',
+          color: 'var(--color-fg-muted)',
+        }}
+      >
+        There are no individual race events configured for this competition.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {races.map((race) => {
+        const raceMembers = race.members ?? []
+        const isRaceMember = !!session?.user.id && raceMembers.some((rm) => rm.userId === session.user.id)
+        const isFull = race.participantLimit !== null && raceMembers.length >= race.participantLimit
+        const canManageSignup = event.granularParticipation || isMember
+
+        return (
+          <div
+            key={race.id}
+            style={{
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '8px',
+              backgroundColor: 'var(--color-canvas-default)',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+            }}
+          >
+            {/* Race Header Info */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <Heading
+                  as="h3"
+                  style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: 'var(--color-fg-default)' }}
+                >
+                  #{race.sequence}. {race.name}
+                </Heading>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '1rem',
+                    fontSize: '12px',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
+                  <span>
+                    TRACK: <strong style={{ color: 'var(--color-fg-default)' }}>{race.trackType}</strong> (
+                    {race.distanceMeters}m)
+                  </span>
+                  {race.location && (
+                    <span>
+                      LOCATION: <strong style={{ color: 'var(--color-fg-default)' }}>{race.location}</strong>
+                    </span>
+                  )}
+                  {race.startsAt && (
+                    <span>
+                      STARTS AT: <strong style={{ color: 'var(--color-fg-default)' }}>{formatLocalDateTime(race.startsAt)}</strong>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <Label variant="default">
+                  CLASS:{' '}
+                  {race.classRestriction && race.classRestriction !== 'PRE_OP' && race.classRestriction !== 'OP'
+                    ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction
+                    : 'OPEN'}
+                </Label>
+                {race.participantLimit !== null && (
+                  <Label variant="default">
+                    CAPACITY: {raceMembers.length} / {race.participantLimit}
+                  </Label>
+                )}
+
+                {canManageSignup && (
+                  <>
+                    {!session?.session ? (
+                      <Link
+                        href={`/auth?redirect=${encodeURIComponent(`/events/${event.id}`)}`}
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <Button size="small" variant="primary">
+                          SIGN IN
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant={isRaceMember ? 'danger' : 'primary'}
+                        disabled={
+                          event.signupsLocked ||
+                          joinRaceMutation.isPending ||
+                          leaveRaceMutation.isPending ||
+                          (!isRaceMember && isFull)
+                        }
+                        onClick={() => {
+                          if (isRaceMember) {
+                            leaveRaceMutation.mutate({ raceId: race.id })
+                          } else {
+                            joinRaceMutation.mutate({ raceId: race.id })
+                          }
+                        }}
+                      >
+                        {isRaceMember ? 'WITHDRAW' : isFull ? 'FULL' : 'SIGN UP'}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Standings Table */}
+            <div>
+              <Heading
+                as="h4"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-fg-muted)',
+                  marginBottom: '0.5rem',
+                }}
+              >
+                RACE STANDINGS
+              </Heading>
+              <RaceStandingsTable eventId={event.id} raceId={race.id} members={event.members} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function EventDetailClient({
+  initialEvent,
+  eventId,
+}: {
+  initialEvent: eventmanager.EventDetail | null
+  eventId: string
+}) {
+  const queryClient = useQueryClient()
+  const { session } = useAuth()
+  const { addToast } = useNotification()
+
+  const { data: event, isLoading, error } = useQuery({
+    queryKey: ['public-event', eventId],
+    queryFn: () => getPublicEvent(eventId),
+    ...(initialEvent ? { initialData: initialEvent } : {}),
   })
 
   const joinMutation = useMutation({
-    mutationFn: () => joinEvent(event.id, session?.session?.token ?? ''),
+    mutationFn: () => joinEvent(eventId, `Bearer ${session?.session?.token ?? ''}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
-      addToast({ message: 'Joined event successfully', severity: 'success' })
+      queryClient.invalidateQueries({ queryKey: ['public-event', eventId] })
+      addToast({ message: 'Signed up for event successfully', severity: 'success' })
     },
-    onError: (error: Error) => {
-      addToast({ message: error.message || 'Failed to join event', severity: 'error' })
+    onError: (err: Error) => {
+      addToast({ message: err.message || 'Failed to sign up for event', severity: 'error' })
     },
   })
 
   const leaveMutation = useMutation({
-    mutationFn: () => leaveEvent(event.id, session?.session?.token ?? ''),
+    mutationFn: () => leaveEvent(eventId, `Bearer ${session?.session?.token ?? ''}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
-      addToast({ message: 'Left event successfully', severity: 'success' })
+      queryClient.invalidateQueries({ queryKey: ['public-event', eventId] })
+      addToast({ message: 'Withdrew from event successfully', severity: 'success' })
     },
-    onError: (error: Error) => {
-      addToast({ message: error.message || 'Failed to leave event', severity: 'error' })
+    onError: (err: Error) => {
+      addToast({ message: err.message || 'Failed to withdraw from event', severity: 'error' })
     },
   })
 
-  const races = racesData?.races ?? []
+  if (isLoading && !event) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem', color: 'var(--color-fg-muted)' }}>
+        <Spinner size="medium" />
+      </div>
+    )
+  }
+
+  if (error || !event) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ padding: '1rem', borderRadius: '6px', backgroundColor: 'var(--color-danger-subtle)', border: '1px solid var(--color-danger-muted)', color: 'var(--color-danger-fg)' }}>
+          Event not found
+        </div>
+        <div>
+          <Link href="/events" style={{ textDecoration: 'none' }}>
+            <Button>Back to Events</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const isCreator = session?.user.id === event.ownerUserId
+  const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
+  const isMember = session?.session && event.members.some((m) => m.userId === session.user.id)
+  const isConcluded = event.status === 'CONCLUDED'
+  const isGranular = event.granularParticipation
+
   const members = event.members ?? []
-  const selectedRace = races.find((r) => r.id === activeRaceId)
+  const schedules = event.schedules ?? []
+  const pointsOverview = event.pointsOverview
+  const ladderOverview = event.ladderOverview
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        {!session?.session ? (
-          <Link href={`/auth?redirect=${encodeURIComponent(`/events/${event.id}`)}`} style={{ textDecoration: 'none' }}>
-            <Button variant="primary">Sign in to Join</Button>
-          </Link>
-        ) : canJoin && !isMember ? (
-          <Button
-            variant="primary"
-            onClick={() => joinMutation.mutate()}
-            disabled={joinMutation.isPending}
-          >
-            {joinMutation.isPending ? 'Joining...' : 'Join Event'}
-          </Button>
-        ) : isMember ? (
-          <Button
-            variant="danger"
-            onClick={() => leaveMutation.mutate()}
-            disabled={leaveMutation.isPending}
-          >
-            {leaveMutation.isPending ? 'Leaving...' : 'Leave Event'}
-          </Button>
-        ) : null}
-        {isCreator && (
-          <Link href={`/admin/events/${event.id}`} style={{ textDecoration: 'none' }}>
-            <Button>Admin</Button>
-          </Link>
-        )}
+      {/* Back link */}
+      <div>
+        <Link
+          href="/events"
+          style={{
+            textDecoration: 'none',
+            color: 'var(--color-fg-muted)',
+            fontSize: '13px',
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          &lt; BACK TO EVENTS
+        </Link>
       </div>
 
-      {/* Race List */}
-      <div style={{ border: '1px solid var(--color-border-default)', borderRadius: '8px', overflow: 'hidden' }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
-          <Heading as="h3" style={{ fontSize: '16px', margin: 0 }}>Races ({races.length})</Heading>
-        </div>
-        {racesLoading ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
-            <Spinner size="medium" />
-          </div>
-        ) : races.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
-            No races created yet.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {races.map((race, idx) => (
-              <button
-                key={race.id}
-                onClick={() => setActiveRaceId(race.id)}
-                style={{
-                  width: '100%',
-                  padding: '1rem',
-                  textAlign: 'left',
-                  border: 'none',
-                  borderBottom: '1px solid var(--color-border-default)',
-                  background: 'none',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s',
-                  fontSize: '14px',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-canvas-subtle)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>
-                    <strong>#{race.sequence}</strong> {race.name}
-                    <span style={{ marginLeft: '0.5rem', color: 'var(--color-fg-muted)', fontSize: '12px' }}>
-                      {race.distanceMeters}m • {race.trackType}
-                    </span>
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
-                    {race.startsAt ? formatLocalDateTime(race.startsAt) : 'Not started'}
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Race Standings */}
-      {selectedRace && (
-        <div style={{ border: '1px solid var(--color-border-default)', borderRadius: '8px', overflow: 'hidden' }}>
-          <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
-            <Heading as="h3" style={{ fontSize: '16px', margin: 0 }}>
-              #{selectedRace.sequence} {selectedRace.name} — Standings
+      {/* Main Info Box */}
+      <div
+        style={{
+          border: '1px solid var(--color-border-default)',
+          borderRadius: '8px',
+          backgroundColor: 'var(--color-canvas-default)',
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Heading
+              as="h1"
+              style={{ fontSize: '26px', fontWeight: 'bold', margin: 0, color: 'var(--color-fg-default)' }}
+            >
+              {event.name}
             </Heading>
+            {event.scheduledAt && (
+              <Text style={{ fontSize: '13px', color: 'var(--color-attention-fg)', fontWeight: 600 }}>
+                SCHEDULED: {formatLocalDateTime(event.scheduledAt)}
+              </Text>
+            )}
           </div>
-          <RaceStandingsTable eventId={event.id} raceId={selectedRace.id} members={members} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Label variant={STATUS_TONE[event.status]}>{event.status.toUpperCase()}</Label>
+            {(isCreator || isSiteAdmin) && (
+              <Link href={`/admin/events/${event.id}`} style={{ textDecoration: 'none' }}>
+                <Button size="small">Admin</Button>
+              </Link>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Members */}
-      <div style={{ border: '1px solid var(--color-border-default)', borderRadius: '8px', overflow: 'hidden' }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-canvas-subtle)' }}>
-          <Heading as="h3" style={{ fontSize: '16px', margin: 0 }}>Participants ({members.length})</Heading>
+        {event.description && (
+          <Text style={{ fontSize: '14px', color: 'var(--color-fg-muted)', lineHeight: '1.6' }}>
+            {event.description}
+          </Text>
+        )}
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Label variant="default">SCORING TYPE: {SCORING_LABELS[event.scoringType] ?? 'UNKNOWN'}</Label>
+          <Label variant="default">
+            CLASS RESTRICTION:{' '}
+            {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP'
+              ? CLASS_TIER_LABELS[event.classRestriction] ?? event.classRestriction
+              : 'OPEN TO ALL'}
+          </Label>
         </div>
-        {members.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-fg-muted)' }}>
-            No participants yet.
-          </div>
-        ) : (
-          <div style={{ padding: '1rem' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {members.map((member) => (
-                <span
-                  key={member.userId}
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--color-canvas-subtle)',
-                    fontSize: '13px',
-                    border: '1px solid var(--color-border-default)',
+
+        {/* Event Sign Up Action (for Non-Granular Events) */}
+        {!isGranular && (
+          <div
+            style={{
+              paddingTop: '1rem',
+              borderTop: '1px solid var(--color-border-default)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            {!session?.session ? (
+              <div>
+                <Link
+                  href={`/auth?redirect=${encodeURIComponent(`/events/${event.id}`)}`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Button variant="primary">SIGN IN TO JOIN</Button>
+                </Link>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
+                <Button
+                  variant={isMember ? 'danger' : 'primary'}
+                  disabled={
+                    isConcluded ||
+                    event.signupsLocked ||
+                    joinMutation.isPending ||
+                    leaveMutation.isPending ||
+                    (!isMember && event.participantLimit !== null && members.length >= event.participantLimit)
+                  }
+                  onClick={() => {
+                    if (isConcluded) return
+                    if (isMember) {
+                      leaveMutation.mutate()
+                    } else {
+                      joinMutation.mutate()
+                    }
                   }}
                 >
-                  {member.name} {member.classTier && member.classTier !== 'PRE_OP' && member.classTier !== 'OP' ? `(${member.classTier})` : ''}
-                </span>
+                  {isMember
+                    ? 'WITHDRAW FROM EVENT'
+                    : event.participantLimit !== null && members.length >= event.participantLimit
+                    ? 'EVENT FULL'
+                    : 'SIGN UP FOR EVENT'}
+                </Button>
+                {event.signupsLocked && (
+                  <Text style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
+                    SIGNUPS ARE LOCKED FOR THIS EVENT
+                  </Text>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Two Column Section: Participants & Schedule */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        {/* Participants Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <Heading
+            as="h3"
+            style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              letterSpacing: '0.05em',
+              color: 'var(--color-fg-muted)',
+              margin: 0,
+            }}
+          >
+            PARTICIPANTS ({members.length}
+            {!isGranular && event.participantLimit !== null && event.participantLimit > 0
+              ? ` / ${event.participantLimit}`
+              : ''}
+            )
+          </Heading>
+          <div
+            style={{
+              overflowX: 'auto',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--color-canvas-default)',
+            }}
+          >
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: 'var(--color-canvas-subtle)',
+                    borderBottom: '1px solid var(--color-border-default)',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
+                  <th style={{ padding: '8px 12px' }}>NAME</th>
+                  <th style={{ padding: '8px 12px', width: '120px' }}>CLASS TIER</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={2}
+                      style={{
+                        padding: '12px',
+                        textAlign: 'center',
+                        color: 'var(--color-fg-muted)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      NO MEMBERS YET
+                    </td>
+                  </tr>
+                ) : (
+                  members.map((m) => (
+                    <tr key={m.userId} style={{ borderBottom: '1px solid var(--color-border-muted)' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 500, color: 'var(--color-fg-default)' }}>
+                        {m.name}
+                      </td>
+                      <td style={{ padding: '8px 12px' }}>
+                        {m.classTier && m.classTier !== 'PRE_OP' && m.classTier !== 'OP' ? (
+                          <Label variant="default">{CLASS_TIER_LABELS[m.classTier] ?? m.classTier}</Label>
+                        ) : (
+                          <span style={{ color: 'var(--color-fg-muted)' }}>-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Schedule Panel */}
+        {schedules.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <Heading
+              as="h3"
+              style={{
+                fontSize: '14px',
+                fontWeight: 'bold',
+                letterSpacing: '0.05em',
+                color: 'var(--color-fg-muted)',
+                margin: 0,
+              }}
+            >
+              SCHEDULE
+            </Heading>
+            <div
+              style={{
+                border: '1px solid var(--color-border-default)',
+                borderRadius: '6px',
+                backgroundColor: 'var(--color-canvas-default)',
+                padding: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+              }}
+            >
+              {schedules.map((schedule, idx) => (
+                <div
+                  key={schedule.id || idx}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem',
+                    borderBottom: idx < schedules.length - 1 ? '1px solid var(--color-border-muted)' : 'none',
+                    paddingBottom: idx < schedules.length - 1 ? '0.75rem' : 0,
+                  }}
+                >
+                  <Text style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--color-accent-fg)' }}>
+                    {schedule.title || 'UNTITLED'}
+                  </Text>
+                  <Text style={{ fontSize: '12px', color: 'var(--color-fg-muted)' }}>
+                    {formatLocalDateTime(schedule.startsAt)}
+                  </Text>
+                  {schedule.location && (
+                    <div style={{ marginTop: '0.25rem' }}>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          color: 'var(--color-fg-default)',
+                          backgroundColor: 'var(--color-canvas-subtle)',
+                          padding: '2px 8px',
+                          border: '1px solid var(--color-border-default)',
+                          borderRadius: '4px',
+                          display: 'inline-block',
+                        }}
+                      >
+                        📍 {schedule.location}
+                      </span>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         )}
+      </div>
+
+      {/* Standings (Points) Overview */}
+      {pointsOverview && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Heading
+              as="h3"
+              style={{
+                fontSize: '14px',
+                fontWeight: 'bold',
+                letterSpacing: '0.05em',
+                color: 'var(--color-fg-muted)',
+                margin: 0,
+              }}
+            >
+              STANDINGS (POINTS)
+            </Heading>
+            <Label variant={event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? 'success' : 'attention'}>
+              {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? 'FINAL' : 'PROVISIONAL'}
+            </Label>
+          </div>
+          <div
+            style={{
+              overflowX: 'auto',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--color-canvas-default)',
+            }}
+          >
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: 'var(--color-canvas-subtle)',
+                    borderBottom: '1px solid var(--color-border-default)',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
+                  <th style={{ padding: '8px 12px', width: '64px' }}>#</th>
+                  <th style={{ padding: '8px 12px' }}>PARTICIPANT</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', width: '128px' }}>TOTAL POINTS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pointsOverview.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{
+                        padding: '12px',
+                        textAlign: 'center',
+                        color: 'var(--color-fg-muted)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      NO RESULTS RECORDED
+                    </td>
+                  </tr>
+                ) : (
+                  pointsOverview.map((e, idx) => (
+                    <tr key={e.userId || idx} style={{ borderBottom: '1px solid var(--color-border-muted)' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>
+                        {idx + 1}
+                      </td>
+                      <td style={{ padding: '8px 12px', fontWeight: 500, color: 'var(--color-fg-default)' }}>
+                        {e.name}
+                      </td>
+                      <td
+                        style={{
+                          padding: '8px 12px',
+                          textAlign: 'right',
+                          fontWeight: 'bold',
+                          color: 'var(--color-accent-fg)',
+                        }}
+                      >
+                        {e.points}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Standings (Ladder) Overview */}
+      {ladderOverview && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Heading
+              as="h3"
+              style={{
+                fontSize: '14px',
+                fontWeight: 'bold',
+                letterSpacing: '0.05em',
+                color: 'var(--color-fg-muted)',
+                margin: 0,
+              }}
+            >
+              STANDINGS (LADDER)
+            </Heading>
+            <Label variant={event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? 'success' : 'attention'}>
+              {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? 'FINAL' : 'PROVISIONAL'}
+            </Label>
+          </div>
+          <div
+            style={{
+              overflowX: 'auto',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--color-canvas-default)',
+            }}
+          >
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: 'var(--color-canvas-subtle)',
+                    borderBottom: '1px solid var(--color-border-default)',
+                    color: 'var(--color-fg-muted)',
+                  }}
+                >
+                  <th style={{ padding: '8px 12px', width: '64px' }}>RANK</th>
+                  <th style={{ padding: '8px 12px' }}>PARTICIPANT</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', width: '96px' }}>ELO</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', width: '96px' }}>W-L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ladderOverview.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      style={{
+                        padding: '12px',
+                        textAlign: 'center',
+                        color: 'var(--color-fg-muted)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      NO LADDER RECORDS
+                    </td>
+                  </tr>
+                ) : (
+                  ladderOverview.map((e, idx) => (
+                    <tr key={e.userId || idx} style={{ borderBottom: '1px solid var(--color-border-muted)' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 'bold', color: 'var(--color-fg-default)' }}>
+                        {e.rank}
+                      </td>
+                      <td style={{ padding: '8px 12px', fontWeight: 500, color: 'var(--color-fg-default)' }}>
+                        {e.name}
+                      </td>
+                      <td
+                        style={{
+                          padding: '8px 12px',
+                          textAlign: 'right',
+                          fontWeight: 'bold',
+                          color: 'var(--color-attention-fg)',
+                        }}
+                      >
+                        {e.elo}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--color-fg-default)' }}>
+                        {e.wins}-{e.losses}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* RACES Section */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <Heading
+          as="h3"
+          style={{
+            fontSize: '14px',
+            fontWeight: 'bold',
+            letterSpacing: '0.05em',
+            color: 'var(--color-fg-muted)',
+            margin: 0,
+          }}
+        >
+          RACES
+        </Heading>
+        <EventRacesList event={event} />
       </div>
     </div>
   )
