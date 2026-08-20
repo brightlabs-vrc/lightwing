@@ -120,8 +120,8 @@ describe("Auth configuration", () => {
     expect(typeof isEnabled).toBe("boolean");
   });
 
-  test("skipStateCookieCheck is configurable via env", () => {
-    // In test env it should be enabled (true) since NODE_ENV=test
+  test("account options specify database state strategy and skip state cookie check", () => {
+    expect(auth.options.account?.storeStateStrategy).toBe("database");
     expect(auth.options.account?.skipStateCookieCheck).toBe(true);
   });
 

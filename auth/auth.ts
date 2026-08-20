@@ -241,20 +241,20 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     },
     cookiePrefix: "lightwing",
   },
-  // The frontend is served from a different origin than this API. better-auth
-  // runs a two-layer state check at the OAuth callback: a primary DB-verification
-  // lookup (the real CSRF protection) plus a secondary signed-cookie comparison.
-  // That secondary cookie is cross-site in a decoupled deployment, so browsers
-  // drop it and the check fails with `state_mismatch` / `state_security_mismatch`
-  // (surfaced to the frontend as error=oauth). Disabling ONLY the fragile
-  // cross-origin-fragile signed-cookie check leaves the primary DB verification
-  // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
+  // Next rewrites (frontend/next.config.ts) make frontend-initiated auth
+  // requests first-party in the browser. However, Discord's top-level OAuth callback
+  // still targets the API host directly (`baseURL` / `appMeta().apiBaseUrl`),
+  // bypassing the proxy. The secondary signed OAuth state cookie set on the frontend
+  // origin can be missing or inaccessible on that top-level hop, causing
+  // `state_mismatch` / `state_security_mismatch` errors.
   //
-  // The reverse proxy (frontend/next.config.ts rewrites) makes auth same-origin in the
-  // browser, so the OAuth state cookie is first-party and this workaround can
-  // be removed. Keep it enabled for now as defense-in-depth; track removal in #92.
+  // Storing OAuth state in the database (`storeStateStrategy: "database"`) and skipping
+  // only the secondary signed-cookie comparison (`skipStateCookieCheck: true`) ensures
+  // primary DB verification continues to provide robust CSRF protection without failing
+  // due to top-level cross-site redirect cookie behavior.
   account: {
-    skipStateCookieCheck: process.env.AUTH_MOCK === "1" || process.env.NODE_ENV === "test",
+    storeStateStrategy: "database",
+    skipStateCookieCheck: true,
   },
   user: {
     additionalFields: {
