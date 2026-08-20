@@ -60,14 +60,19 @@ export default function MainLayout({
           </Link>
         </Header.Item>
         <Header.Item>
-          <Link href="/">Home</Link>
+          <Header.Link as={Link} href="/">
+            Home
+          </Header.Link>
         </Header.Item>
         <Header.Item>
-          <Link href="/events">Events</Link>
+          <Header.Link as={Link} href="/events">
+            Events
+          </Header.Link>
         </Header.Item>
         {isSiteAdmin && (
           <Header.Item>
-            <Link
+            <Header.Link
+              as={Link}
               href="/admin"
               style={{
                 color: 'var(--color-attention-fg)',
@@ -75,7 +80,7 @@ export default function MainLayout({
               }}
             >
               Admin
-            </Link>
+            </Header.Link>
           </Header.Item>
         )}
         <Header.Item full />
