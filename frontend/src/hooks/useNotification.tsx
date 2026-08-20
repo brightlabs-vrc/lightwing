@@ -1,4 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
+'use client'
+
+
+
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Flash, IconButton } from '@primer/react'
 import { XIcon, CheckCircleIcon, AlertIcon, InfoIcon, StopIcon } from '@primer/octicons-react'
@@ -25,6 +29,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const toastsRef = useRef(toasts)
   toastsRef.current = toasts
+  const [mounted, setMounted] = useState(false)
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -50,10 +55,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [removeToast])
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <NotificationContext.Provider value={{ toasts, addToast, removeToast }}>
       {children}
-      {createPortal(
+      {mounted && createPortal(
         <div className="lightwing-toast-container" aria-live="polite" aria-atomic="true">
           {toasts.map((toast) => {
             let scheme: 'default' | 'success' | 'warning' | 'danger' = 'default'

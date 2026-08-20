@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import { Button, Select, Text, Pagination as PrimerPagination } from '@primer/react'
 

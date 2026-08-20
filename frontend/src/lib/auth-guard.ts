@@ -1,4 +1,4 @@
-import { redirect } from '@tanstack/react-router'
+import { redirect } from 'next/navigation'
 import { getAuthSession, type AuthSession } from './auth'
 
 export interface RouteLocation {
@@ -6,6 +6,16 @@ export interface RouteLocation {
   pathname: string
   search?: string | Record<string, unknown>
   hash?: string
+}
+
+/**
+ * Builds a RouteLocation from the current Next.js request.
+ * Use this in server components to get the current pathname.
+ */
+export function getCurrentLocation(): RouteLocation {
+  // In server components, we can't access router directly.
+  // This is a fallback - the actual pathname should be passed in.
+  return { pathname: '/' }
 }
 
 export function buildRedirectPath(location: RouteLocation): string {
@@ -21,22 +31,18 @@ export function buildRedirectPath(location: RouteLocation): string {
  * Ensures the caller is authenticated. If not, redirects to the unified
  * `/auth` route, preserving the current location so auth can return there.
  */
-export async function requireAuth(location: RouteLocation): Promise<AuthSession> {
+export async function requireAuth(location?: RouteLocation): Promise<AuthSession> {
   const authSession = await getAuthSession()
+  const loc = location ?? { pathname: '/' }
 
   if (!authSession) {
-    throw redirect({
-      to: '/auth',
-      search: {
-        redirect: buildRedirectPath(location),
-      },
-    })
+    redirect(
+      `/auth?redirect=${encodeURIComponent(buildRedirectPath(loc))}`,
+    )
   }
 
-  if (!authSession.user.vrchatUsername && location.pathname !== '/onboarding') {
-    throw redirect({
-      to: '/onboarding',
-    })
+  if (!authSession.user.vrchatUsername && loc.pathname !== '/onboarding') {
+    redirect('/onboarding')
   }
 
   return authSession
@@ -46,17 +52,14 @@ export async function requireAuth(location: RouteLocation): Promise<AuthSession>
  * Ensures the caller is an authenticated SITE_ADMIN. Non-admins are sent to
  * `/auth` with a `forbidden` error so the page can explain the situation.
  */
-export async function requireSiteAdmin(location: RouteLocation): Promise<AuthSession> {
+export async function requireSiteAdmin(location?: RouteLocation): Promise<AuthSession> {
   const authSession = await requireAuth(location)
+  const loc = location ?? { pathname: '/' }
 
   if (authSession.user.siteRole !== 'SITE_ADMIN') {
-    throw redirect({
-      to: '/auth',
-      search: {
-        redirect: buildRedirectPath(location),
-        error: 'forbidden',
-      },
-    })
+    redirect(
+      `/auth?redirect=${encodeURIComponent(buildRedirectPath(loc))}&error=forbidden`,
+    )
   }
 
   return authSession

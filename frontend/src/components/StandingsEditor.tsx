@@ -1,3 +1,4 @@
+'use client'
 import type { eventmanager } from '../lib/client'
 import type { ChangeSummary, DerivedRow, EditedResult } from '../lib/standings'
 import { AlertBanner } from './AlertBanner'

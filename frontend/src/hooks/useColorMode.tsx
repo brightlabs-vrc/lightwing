@@ -1,3 +1,7 @@
+'use client'
+
+
+
 import React, { createContext, useContext, useState, useEffect } from 'react'
 
 export type ColorMode = 'light' | 'dark' | 'system'
@@ -11,10 +15,15 @@ interface ColorModeContextType {
 const ColorModeContext = createContext<ColorModeContextType | undefined>(undefined)
 
 export const ColorModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [colorMode, setColorModeState] = useState<ColorMode>(() => {
+  const [colorMode, setColorModeState] = useState<ColorMode>('system')
+
+  // Initialize from localStorage after mount (client-only)
+  useEffect(() => {
     const saved = localStorage.getItem('lightwing_color_mode')
-    return (saved as ColorMode) || 'system'
-  })
+    if (saved) {
+      setColorModeState(saved as ColorMode)
+    }
+  }, [])
 
   const [resolvedColorMode, setResolvedColorMode] = useState<'light' | 'dark'>('light')
 

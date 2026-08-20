@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useEffect, useRef } from 'react'
 import { Autocomplete, ActionList, Spinner, IconButton } from '@primer/react'
 import { SearchIcon, XIcon } from '@primer/octicons-react'

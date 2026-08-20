@@ -4,6 +4,8 @@ import { NotificationProvider } from '@/hooks/useNotification'
 import { QueryClientWrapper } from '@/hooks/QueryClientProvider'
 import '@/styles.css'
 
+export const dynamic = 'force-dynamic'
+
 export default function RootLayout({
   children,
 }: {

@@ -7,15 +7,15 @@
   "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c blue,green \"encore run\" \"pnpm --dir frontend-next dev\"",
+    "dev": "concurrently -n backend,frontend -c blue,green \"encore run\" \"pnpm --dir frontend dev\"",
     "dev:backend": "encore run",
-    "dev:frontend": "pnpm --dir frontend-next dev",
+    "dev:frontend": "pnpm --dir frontend dev",
     "test": "vitest --run",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "encore:gen-client": "encore gen client --output frontend-next/src/lib/client.ts --lang ts",
-    "frontend:build": "pnpm --dir frontend-next i -S &&  pnpm --dir frontend-next build",
+    "encore:gen-client": "encore gen client --output frontend/src/lib/client.ts --lang ts",
+    "frontend:build": "pnpm --dir frontend build",
     "postinstall": "prisma generate"
   },
   "devDependencies": {
@@ -35,7 +35,7 @@
     "better-auth": "^1.6.23",
     "discord-api-types": "^0.38.49",
     "discord.js": "^14.26.4",
-    "encore.dev": "^1.57.13"
+    "encore.dev": "^1.58.2"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.13.0"

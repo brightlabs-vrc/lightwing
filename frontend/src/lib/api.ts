@@ -1,20 +1,21 @@
 import Client, { Local } from './client'
 
 function resolveApiBaseUrl(): string {
-	const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-	if (configuredBaseUrl) {
-		return configuredBaseUrl
-	}
-
-	if (typeof window !== 'undefined') {
-		const { hostname, origin } = window.location
-		if (hostname === 'localhost' || hostname === '127.0.0.1') {
-			return Local
-		}
-		return origin
-	}
-
-	return Local
+  if (typeof window !== 'undefined') {
+    // Browser: use the current origin so auth requests are same-origin
+    // (proxied through Next.js /api/auth/* rewrites to Encore).
+    const { hostname, origin } = window.location
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return Local
+    }
+    return origin
+  }
+  // Server-side (SSR): use configured Encore URL or default to local.
+  const configured = (process.env.ENCORE_API_BASE_URL as string | undefined)?.trim()
+  if (configured) {
+    return configured
+  }
+  return Local
 }
 
 export const API_BASE_URL = resolveApiBaseUrl()

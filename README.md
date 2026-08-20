@@ -59,7 +59,7 @@ cd lightwing
 pnpm dev:backend
 
 # 2. Start the Next.js frontend (in another terminal)
-cd lightwing/frontend-next
+cd lightwing/frontend
 pnpm dev
 ```
 
@@ -76,11 +76,11 @@ The Next.js app can be deployed to any platform that supports Next.js:
 4. Deploy
 
 **Deno Deploy** (alternative):
-1. Build the frontend: `cd frontend-next && pnpm build`
-2. Upload the `.next/` directory and `frontend-next/` to Deno Deploy
+1. Build the frontend: `cd frontend && pnpm build`
+2. Upload the `.next/` directory and `frontend/` to Deno Deploy
 3. Set the environment variable `ENCORE_API_BASE_URL` to the production Encore API origin
-4. Set the entrypoint to `frontend-next/server.js` (or use the Next.js adapter)
+4. Set the entrypoint to `frontend/server.js` (or use the Next.js adapter)
 
-The auth proxy is defined in `frontend-next/next.config.ts`. Required env var: `ENCORE_API_BASE_URL`.
+The auth proxy is defined in `frontend/next.config.ts`. Required env var: `ENCORE_API_BASE_URL`.
 
 ### Session invalidation on auth surface changes 

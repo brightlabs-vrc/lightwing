@@ -1,12 +1,41 @@
-node_modules/
-dist/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Local env overrides (must not be committed — would force mock mode in prod builds)
-.env
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
-# Playwright artifacts
-test-results/
-playwright-report/
-.playwright/
-e2e/visual/primer-candidates/
-e2e/visual/legacy-baselines/
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
