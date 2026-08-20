@@ -12,6 +12,7 @@ function AuthContent() {
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') ?? '/events'
   const error = searchParams.get('error')
+  const errorDescription = searchParams.get('error_description')
 
   const [localLoading, setLocalLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -65,7 +66,22 @@ function AuthContent() {
 
       {error && (
         <AlertBanner variant="error" style={{ marginBottom: '1.5rem' }}>
-          <Text>{error === 'forbidden' ? 'Access denied.' : 'Authentication failed.'}</Text>
+          {error === 'forbidden' ? (
+            <Text>Access denied.</Text>
+          ) : (
+            <div>
+              <Text style={{ fontWeight: 600 }}>Authentication failed.</Text>
+              {(errorDescription || error) && (
+                <Text
+                  as="p"
+                  color="fg.muted"
+                  style={{ marginTop: '0.25rem', fontSize: '13px' }}
+                >
+                  {errorDescription || error}
+                </Text>
+              )}
+            </div>
+          )}
         </AlertBanner>
       )}
 

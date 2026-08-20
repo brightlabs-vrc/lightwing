@@ -48,6 +48,8 @@ Keep in mind you will need to expose Encore's database connection string to Pris
 
 Auth endpoints (`/api/auth/*`) are reverse-proxied from the Next.js frontend to the Encore API. This makes session cookies first-party (SameSite=Lax) so they work reliably under Safari ITP and third-party cookie restrictions.
 
+While Next rewrites make frontend-initiated auth requests first-party, Discord's OAuth callback still targets the API host directly until the provider's registered redirect URI is aligned with the frontend origin. Consequently, database OAuth state (`storeStateStrategy: "database"`) and `skipStateCookieCheck: true` remain active so primary database verification provides CSRF protection without secondary state-cookie mismatch errors.
+
 - **Local dev**: Next.js rewrites `/api/auth/*` → local Encore (`http://localhost:4000`)
 - **Production**: Deploy the Next.js app to your preferred hosting (Vercel, Deno Deploy, etc.). The rewrites are built into the app.
 
