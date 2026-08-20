@@ -236,7 +236,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   ],
   advanced: {
     defaultCookieAttributes: {
-      sameSite: "lax",
+      sameSite: "none",
       secure: true,
     },
     cookiePrefix: "lightwing",
@@ -277,7 +277,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     discord: {
       clientId: discordClientId(),
       clientSecret: discordClientSecret(),
-      scope: ["identify", "guilds", "guilds.members.read"],
+      scope: ["identify"],
       mapProfileToUser: (profile) => {
         log.info("auth.oauth.callback", {
           provider: "discord",
