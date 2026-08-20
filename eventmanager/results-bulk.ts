@@ -77,7 +77,7 @@ export const replaceRaceResults = api(
       });
     }
 
-    await applyAutoDeferralsForEvent(params.eventId);
+    await applyAutoDeferralsForEvent(params.eventId, params.raceId);
 
     const allAffectedUserIds = Array.from(new Set([...payloadUserIds, ...removedUserIds]));
     if (allAffectedUserIds.length > 0) {
@@ -142,7 +142,7 @@ export const mergeRaceResults = api(
       );
     }
 
-    await applyAutoDeferralsForEvent(params.eventId);
+    await applyAutoDeferralsForEvent(params.eventId, params.raceId);
 
     const affectedUserIds = params.results.map((entry) => entry.userId);
     if (affectedUserIds.length > 0) {

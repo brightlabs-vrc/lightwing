@@ -90,6 +90,34 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
   ],
 ])
 
+const RESULTS_LOCAL_STORAGE_KEY = 'lightwing:mock:race_results'
+
+function saveMockResults() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const obj: Record<string, eventmanager.RaceResultView[]> = {}
+    mockRaceResultsMap.forEach((val, key) => {
+      obj[key] = val
+    })
+    window.localStorage.setItem(RESULTS_LOCAL_STORAGE_KEY, JSON.stringify(obj))
+  }
+}
+
+function loadMockResults() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const stored = window.localStorage.getItem(RESULTS_LOCAL_STORAGE_KEY)
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        for (const [key, val] of Object.entries(parsed)) {
+          mockRaceResultsMap.set(key, val as eventmanager.RaceResultView[])
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
 let mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
   [
     'race_mock_102',
@@ -851,6 +879,7 @@ export async function deleteRaceEvent(
   })
 
   mockRaceResultsMap.delete(raceId)
+  saveMockResults()
 
   return { deleted: true }
 }
@@ -867,6 +896,7 @@ export async function listRaceResults(
     return appClient.eventmanager.listRaceResults(eventId, raceId)
   }
 
+  loadMockResults()
   const results = mockRaceResultsMap.get(raceId) ?? []
   return { results }
 }
@@ -901,6 +931,7 @@ export async function assignRaceResult(
     })
   }
 
+  loadMockResults()
   const existing = mockRaceResultsMap.get(raceId) ?? []
   const existingResult = existing.find((r) => r.userId === userId)
 
@@ -926,6 +957,7 @@ export async function assignRaceResult(
 
   mockRaceResultsMap.set(raceId, updatedList)
   recomputeMockOverview(eventId)
+  saveMockResults()
 
   return updatedResult
 }
@@ -943,6 +975,7 @@ export async function replaceRaceResults(
     })
   }
 
+  loadMockResults()
   const updatedList: eventmanager.RaceResultView[] = results.map((r, i) => ({
     id: `res_mock_${Math.floor(Math.random() * 10000)}`,
     raceEventId: raceId,
@@ -961,6 +994,7 @@ export async function replaceRaceResults(
 
   mockRaceResultsMap.set(raceId, updatedList)
   recomputeMockOverview(eventId)
+  saveMockResults()
 
   return { results: updatedList }
 }
@@ -978,6 +1012,7 @@ export async function mergeRaceResults(
     })
   }
 
+  loadMockResults()
   const existing = mockRaceResultsMap.get(raceId) ?? []
   const updatedList = [...existing]
 
@@ -1008,6 +1043,7 @@ export async function mergeRaceResults(
 
   mockRaceResultsMap.set(raceId, updatedList)
   recomputeMockOverview(eventId)
+  saveMockResults()
 
   return { results: updatedList }
 }
@@ -1024,10 +1060,12 @@ export async function deleteRaceResult(
     })
   }
 
+  loadMockResults()
   const existing = mockRaceResultsMap.get(raceId) ?? []
   const filtered = existing.filter((r) => r.userId !== userId)
   mockRaceResultsMap.set(raceId, filtered)
   recomputeMockOverview(eventId)
+  saveMockResults()
 
   return { deleted: true }
 }

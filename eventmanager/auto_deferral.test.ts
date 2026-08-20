@@ -259,5 +259,12 @@ describe("Auto-deferral behavior for OP wins and custom scoring tables", () => {
 
     expect(res.resultStatus).toBe("DEFERRED");
     expect(res.points).toBe(0);
+
+    // Verify DB persistence on refetching results
+    const fetchedResults = await listRaceResults({ eventId: event.id, raceId: race.id });
+    const user1Res = fetchedResults.results.find((r) => r.userId === user1);
+    expect(user1Res).toBeDefined();
+    expect(user1Res?.resultStatus).toBe("DEFERRED");
+    expect(user1Res?.points).toBe(0);
   });
 });
