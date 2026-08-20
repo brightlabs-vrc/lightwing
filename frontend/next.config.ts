@@ -5,10 +5,9 @@ const nextConfig: NextConfig = {
     const encoreBase = process.env.ENCORE_API_BASE_URL || "http://localhost:4000";
     return [
       {
-        // Proxy /api/auth/* to Encore so session cookies are first-party.
-        // The :path* in destination captures the matched path parameter.
-        source: "/api/auth/:path*",
-        destination: `${encoreBase}/api/auth/:path*`,
+        // Proxy all /api/* routes to Encore so frontend calls can stay same-origin.
+        source: "/api/:path*",
+        destination: `${encoreBase}/api/:path*`,
       },
     ];
   },
