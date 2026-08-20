@@ -1,3 +1,4 @@
+'use client'
 import React from 'react'
 import { Heading, Text, TextInput, FormControl } from '@primer/react'
 

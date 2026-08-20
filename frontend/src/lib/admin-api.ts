@@ -123,9 +123,9 @@ let mockEvents: eventmanager.EventDetail[] = [
     members: mockEventMembers,
     schedules: [],
     pointsOverview: [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10, resultStatus: null },
-      { userId: 'mock-user-2', name: 'Shadow Runner', points: 6, resultStatus: null },
-      { userId: 'mock-user-3', name: 'Swift Galloper', points: 0, resultStatus: null },
+      { userId: 'mock-user-1', name: 'Thunder Bolt', points: 10 },
+      { userId: 'mock-user-2', name: 'Shadow Runner', points: 6 },
+      { userId: 'mock-user-3', name: 'Swift Galloper', points: 0 },
     ],
     ladderOverview: null,
     createdAt: now,
@@ -1206,7 +1206,6 @@ function recomputeMockOverview(eventId: string) {
       userId: member.userId,
       name: member.name,
       points: pointsTotals[member.userId] ?? 0,
-      resultStatus: statusTotals[member.userId] ?? null,
     })).sort((a, b) => b.points - a.points)
   }
 }

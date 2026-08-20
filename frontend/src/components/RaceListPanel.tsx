@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import type { eventmanager } from '../lib/client'
 import { SortableRaceItem } from './SortableRaceItem'

@@ -22,18 +22,17 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: frontend-next/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        working-directory: frontend-next
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Frontend Typecheck
-        working-directory: frontend-next
+        working-directory: frontend
         run: pnpm typecheck
 
       - name: Frontend Build
-        working-directory: frontend-next
+        working-directory: frontend
         run: pnpm build
 
   backend-unit:

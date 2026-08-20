@@ -1,6 +1,11 @@
+packages:
+  - "."
+  - "frontend"
+
 allowBuilds:
   '@prisma/engines': true
   esbuild: true
   prisma: true
+  unrs-resolver: true
 minimumReleaseAgeExclude:
   - encore.dev@1.57.12 || 1.57.13

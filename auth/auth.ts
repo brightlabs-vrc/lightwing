@@ -250,7 +250,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   // cross-origin-fragile signed-cookie check leaves the primary DB verification
   // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
   //
-  // The reverse proxy (frontend/api-proxy.ts) makes auth same-origin in the
+  // The reverse proxy (frontend/next.config.ts rewrites) makes auth same-origin in the
   // browser, so the OAuth state cookie is first-party and this workaround can
   // be removed. Keep it enabled for now as defense-in-depth; track removal in #92.
   account: {

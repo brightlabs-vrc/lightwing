@@ -1,4 +1,5 @@
-import { Link } from '@tanstack/react-router'
+'use client'
+import Link from 'next/link'
 import React from 'react'
 
 interface UserLinkProps {
@@ -24,8 +25,7 @@ export const UserLink: React.FC<UserLinkProps> = ({
   if (clickable && userId) {
     return (
       <Link
-        to="/admin/users/$userId"
-        params={{ userId }}
+        href={`/admin/users/${userId}`}
         className={className}
         style={{
           color: 'var(--color-accent-fg)',

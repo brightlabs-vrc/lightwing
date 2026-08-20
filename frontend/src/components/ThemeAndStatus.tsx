@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import { ThemeProvider, BaseStyles, ActionMenu, ActionList } from '@primer/react'
 import { SunIcon, MoonIcon, CpuIcon } from '@primer/octicons-react'

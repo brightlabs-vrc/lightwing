@@ -1,3 +1,4 @@
+'use client'
 import React from 'react'
 import { AsyncCombobox, AsyncComboboxOption } from './AsyncCombobox'
 import { listAdminTeams } from '../lib/admin-api'
