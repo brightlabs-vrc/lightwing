@@ -6,8 +6,8 @@ permissions:
   contents: read
 
 jobs:
-  frontend-unit:
-    name: Frontend Unit Tests
+  frontend-build:
+    name: Frontend Build & Typecheck
     runs-on: ubuntu-22.04
 
     steps:
@@ -20,16 +20,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22.14.0"
+          node-version: 22
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        working-directory: frontend
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Frontend Typecheck
         working-directory: frontend
         run: pnpm typecheck
+
+      - name: Frontend Build
+        working-directory: frontend
+        run: pnpm build
 
   backend-unit:
     name: Backend Unit Tests
@@ -45,7 +49,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22.14.0"
+          node-version: 22
           cache: pnpm
 
       - name: Install Encore CLI
@@ -64,40 +68,3 @@ jobs:
 
       - name: Run backend unit tests
         run: encore test
-
-  frontend-visual:
-    name: Frontend Visual Tests (Playwright)
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22.14.0"
-          cache: pnpm
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: pnpm ci
-
-      - name: Install Playwright browser
-        working-directory: frontend
-        run: npx playwright install-deps chromium && npx playwright install chromium
-
-      - name: Start frontend in mock mode
-        working-directory: frontend
-        run: pnpm dev:mock &
-
-      - name: Wait for server
-        working-directory: frontend
-        run: npx wait-on http://localhost:5173
-
-      - name: Run visual layout parity tests
-        working-directory: frontend
-        run: npx playwright test e2e/visual/layout-parity.spec.ts

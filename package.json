@@ -16,7 +16,7 @@
     "prisma:studio": "prisma studio",
     "encore:gen-client": "encore gen client --output frontend/src/lib/client.ts --lang ts",
     "frontend:build": "pnpm --dir frontend build",
-    "postinstall": "prisma generate && pnpm frontend:build"
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
     "@types/node": "^20.5.7",

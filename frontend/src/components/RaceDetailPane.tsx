@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useEffect, useRef } from 'react'
 import type { eventmanager } from '../lib/client'
 import { AlertBanner } from './AlertBanner'

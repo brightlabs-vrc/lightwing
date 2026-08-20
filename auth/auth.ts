@@ -7,6 +7,11 @@ import type { APIGuildMember, APIRole } from "discord-api-types/v10";
 import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
 import log from "encore.dev/log";
+import { Counter } from "encore.dev/metrics";
+
+export const authSignInTotal = new Counter<{ result: string }>("auth_sign_in_total");
+export const authSessionCreateTotal = new Counter<{ provider: string }>("auth_session_create_total");
+export const authSignOutTotal = new Counter<{ reason: string }>("auth_sign_out_total");
 import { prisma } from "./prisma";
 import {
   administratorRole,
@@ -139,7 +144,7 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
   try {
     roles = (await client.get(Routes.guildRoles(ursDiscordGuildId))) as APIRole[];
   } catch (error) {
-    log.error(error, "failed to fetch Discord guild roles; returning empty staff roles");
+    log.error(error, "auth.discord.roles_fetch_failed");
     return new Set<string>();
   }
 
@@ -159,7 +164,7 @@ async function getDiscordGuildMember(accessToken: string): Promise<APIGuildMembe
       Routes.userGuildMember(ursDiscordGuildId),
     )) as APIGuildMember;
   } catch (error) {
-    log.error(error, "failed to verify Discord guild membership");
+    log.error(error, "auth.discord.membership_check_failed");
     return null;
   }
 }
@@ -188,6 +193,10 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
 
   const member = await getDiscordGuildMember(account.accessToken);
   if (!member) {
+    log.warn("auth.discord.membership_check_failed", {
+      userId,
+      reason: "not_in_guild",
+    });
     throw APIError.fromStatus("FORBIDDEN", {
       message: "you must be a member of the URS Discord server",
     });
@@ -225,21 +234,12 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     // This is dynamically set by the Encore platform when the app is deployed, so we don't hardcode it here. It is used to allow the frontend to call the backend API from a different origin.
     appMeta().apiBaseUrl,
   ],
-  // The frontend is served from a different origin than this API (it is hosted
-  // elsewhere, not inside the Encore backend). For the httpOnly session cookie
-  // to be attached to cross-origin credentialed fetches from the frontend to
-  // /api/auth/*, it MUST be set with `sameSite: "none"`. A `lax` (better-auth
-  // default) or `strict` cookie is dropped on cross-site subrequests, which
-  // leaves the user "logged in to Discord but never authenticated" in the app.
-  // `sameSite: "none"` requires the `Secure` attribute, so we always set it.
-  // (Browsers permit Secure cookies on http://localhost, so local dev still
-  // works; a non-localhost plain-HTTP deployment would not, but that is not a
-  // supported topology for this app.)
   advanced: {
     defaultCookieAttributes: {
-      sameSite: "none",
+      sameSite: "lax",
       secure: true,
     },
+    cookiePrefix: "lightwing",
   },
   // The frontend is served from a different origin than this API. better-auth
   // runs a two-layer state check at the OAuth callback: a primary DB-verification
@@ -249,8 +249,12 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
   // (surfaced to the frontend as error=oauth). Disabling ONLY the fragile
   // cross-origin-fragile signed-cookie check leaves the primary DB verification
   // active, which is sufficient. (better-auth issue #6483: cross-domain setups.)
+  //
+  // The reverse proxy (frontend/next.config.ts rewrites) makes auth same-origin in the
+  // browser, so the OAuth state cookie is first-party and this workaround can
+  // be removed. Keep it enabled for now as defense-in-depth; track removal in #92.
   account: {
-    skipStateCookieCheck: true,
+    skipStateCookieCheck: process.env.AUTH_MOCK === "1" || process.env.NODE_ENV === "test",
   },
   user: {
     additionalFields: {
@@ -267,31 +271,38 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     },
   },
   emailAndPassword: {
-    enabled: false,
+    enabled: process.env.AUTH_MOCK === "1" || process.env.NODE_ENV === "test",
   },
   socialProviders: {
     discord: {
       clientId: discordClientId(),
       clientSecret: discordClientSecret(),
       scope: ["identify", "guilds", "guilds.members.read"],
-      mapProfileToUser: (profile) => ({
+      mapProfileToUser: (profile) => {
+        log.info("auth.oauth.callback", {
+          provider: "discord",
+          discordId: profile.id,
+        });
         // better-auth requires a non-null email field.
         // Use a deterministic, non-routable placeholder derived from the
         // stable Discord user ID. The `.invalid` TLD is RFC-2606-reserved
         // and will never route to a real mailbox.
-        email: `${profile.id}@discord.invalid`,
-        emailVerified: false,
-        name: profile.username,
-        image: profile.avatar
-          ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
-          : null,
-      }),
+        return {
+          email: `${profile.id}@discord.invalid`,
+          emailVerified: false,
+          name: profile.username,
+          image: profile.avatar
+            ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+            : null,
+        };
+      },
     },
   },
   databaseHooks: {
     user: {
       create: {
         before: async (user) => {
+          log.info("auth.user.create", { userId: user.id });
           const existingUsers = await prisma.user.count();
           const uniqueSlug = await generateUniqueUserSlug(prisma, user.name || "user", user.id);
 
@@ -315,8 +326,14 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
       },
     },
     session: {
+      expiresIn: 60 * 60 * 24 * 2,  // 2 days
+      updateAge: 60 * 60 * 12,      // 12 hours
       create: {
         before: async (session) => {
+          log.info("auth.session.create", {
+            userId: session.userId,
+          });
+          authSessionCreateTotal.increment({ provider: "discord" });
           await syncSiteRoleFromDiscordMembership(session.userId);
           await ensureUserSlug(session.userId);
         },

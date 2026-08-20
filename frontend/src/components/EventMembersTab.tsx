@@ -1,3 +1,4 @@
+'use client'
 import type { eventmanager } from '../lib/client'
 import { UserSearchCombobox } from './UserSearchCombobox'
 import { UserLink } from './UserLink'

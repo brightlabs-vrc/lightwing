@@ -1,3 +1,4 @@
+'use client'
 import type { eventmanager } from '../lib/client'
 import { Button } from '@primer/react'
 

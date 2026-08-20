@@ -5,27 +5,19 @@ The URS Competitive Portal is a full-stack application to facilitate the managem
 Lightwing is built with the following technologies:
 
 - Backend: [Encore](https://encore.dev/) (TypeScript + Rust)
-- Frontend: [Vite](https://vitejs.dev/) (TypeScript + React) with [TanStack Query](https://tanstack.com/) for facilitating file-based routing, data fetching, and caching.
-- Database: [PostgreSQL](https://www.postgresql.org/), with [Prisma](https://www.prisma.io/) as the ORM, completely managed by Encore.
+- Frontend: [Next.js 16](https://nextjs.org/) (TypeScript + React) with [TanStack Query](https://tanstack.com/) for data fetching and caching
+- Database: [PostgreSQL](https://www.postgresql.org/), with [Prisma](https://www.prisma.io/) as the ORM, completely managed by Encore
 
 ## Development
 
 Run backend + frontend together:
 
 ```bash
-pnpm dev
+pnpm dev:backend    # Start Encore backend on port 4000
+pnpm dev:frontend   # Start Next.js dev server on port 3000
 ```
 
-This starts:
-- Encore backend (`encore run`)
-- Frontend Vite dev server on port `5173`
-
-You can still run each side independently:
-
-```bash
-pnpm dev:backend
-pnpm dev:frontend
-```
+Or run them separately in different terminals.
 
 ### Setting application secrets
 
@@ -43,10 +35,52 @@ As we use Prisma, you can use the Prisma CLI to manage the database. For example
 ```bash
 pnpm prisma migrate dev
 ```
+
 To access the Studio UI for the database, run:
 
 ```bash
 pnpm prisma studio
 ```
 
-Keep in mind you will need to expose Encore's database connection string to Prisma for Prisma to be able to connect to the database. 
+Keep in mind you will need to expose Encore's database connection string to Prisma for Prisma to be able to connect to the database.
+
+### Reverse proxy for auth endpoints
+
+Auth endpoints (`/api/auth/*`) are reverse-proxied from the Next.js frontend to the Encore API. This makes session cookies first-party (SameSite=Lax) so they work reliably under Safari ITP and third-party cookie restrictions.
+
+- **Local dev**: Next.js rewrites `/api/auth/*` → local Encore (`http://localhost:4000`)
+- **Production**: Deploy the Next.js app to your preferred hosting (Vercel, Deno Deploy, etc.). The rewrites are built into the app.
+
+### Running the Next.js frontend locally
+
+```bash
+# 1. Start the Encore backend (in one terminal)
+cd lightwing
+pnpm dev:backend
+
+# 2. Start the Next.js frontend (in another terminal)
+cd lightwing/frontend
+pnpm dev
+```
+
+The frontend will be available at `http://localhost:3000`.
+
+### Deploying the Next.js frontend
+
+The Next.js app can be deployed to any platform that supports Next.js:
+
+**Vercel** (recommended):
+1. Connect your GitHub repository to Vercel
+2. Set the framework preset to "Next.js"
+3. Set environment variable `ENCORE_API_BASE_URL` to your production Encore API URL
+4. Deploy
+
+**Deno Deploy** (alternative):
+1. Build the frontend: `cd frontend && pnpm build`
+2. Upload the `.next/` directory and `frontend/` to Deno Deploy
+3. Set the environment variable `ENCORE_API_BASE_URL` to the production Encore API origin
+4. Set the entrypoint to `frontend/server.js` (or use the Next.js adapter)
+
+The auth proxy is defined in `frontend/next.config.ts`. Required env var: `ENCORE_API_BASE_URL`.
+
+### Session invalidation on auth surface changes 
