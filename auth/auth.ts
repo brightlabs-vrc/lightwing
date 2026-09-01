@@ -313,7 +313,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     discord: {
       clientId: discordClientId(),
       clientSecret: discordClientSecret(),
-      scope: ["identify", "guilds", "guilds.members.read"],
+      scope: ["identify"],
       mapProfileToUser: (profile) => ({
         // better-auth requires a non-null email field.
         // Use a deterministic, non-routable placeholder derived from the
