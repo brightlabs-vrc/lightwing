@@ -51,6 +51,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install Encore CLI
         run: |
@@ -64,7 +65,7 @@ jobs:
         run: echo "ENCORE_RUNTIME_LIB=$(encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$GITHUB_ENV"
 
       - name: Install dependencies
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run backend unit tests
         run: encore test
