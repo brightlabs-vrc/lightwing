@@ -180,11 +180,22 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
 }
 
 async function getDiscordGuildMember(userId: string): Promise<APIGuildMember | null> {
+  log.info(`Checking Discord guild membership for user ID: ${userId}`);
+
+  const client = getDiscordBotRestClient();
+
+  if (!client) {
+    log.error("Discord bot REST client is not available; cannot check guild membership");
+    return null;
+  }
+
   try {
     // get list of guild members and check if the user is in the list
-    const guildMembers = await discordBotRestClient!.get(
+    const guildMembers = await client.get(
       Routes.guildMembers(ursDiscordGuildId),
     ) as APIGuildMember[];
+
+    log.info(`Fetched ${guildMembers.length} Discord guild members for membership check`);
 
     const member = guildMembers.find((member) => member.user.id === userId);
 
