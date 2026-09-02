@@ -1,11 +1,7 @@
 'use client'
 
-
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Flash, IconButton } from '@primer/react'
-import { XIcon, CheckCircleIcon, AlertIcon, InfoIcon, StopIcon } from '@primer/octicons-react'
 
 export type ToastSeverity = 'success' | 'error' | 'warning' | 'info'
 
@@ -43,7 +39,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return
     }
 
-    const id = Math.random().toString(36).substring(2, 9)
+    const id = crypto.randomUUID()
     const newToast: ToastMessage = { ...msg, id }
 
     setToasts((prev) => [...prev, newToast])
@@ -65,23 +61,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       {mounted && createPortal(
         <div className="lightwing-toast-container" aria-live="polite" aria-atomic="true">
           {toasts.map((toast) => {
-            let scheme: 'default' | 'success' | 'warning' | 'danger' = 'default'
-            let LeadingIcon = InfoIcon
+            let bgColor = '#0969da'
             if (toast.severity === 'success') {
-              scheme = 'success'
-              LeadingIcon = CheckCircleIcon
+              bgColor = '#1a7f37'
             } else if (toast.severity === 'error') {
-              scheme = 'danger'
-              LeadingIcon = StopIcon
+              bgColor = '#cf222e'
             } else if (toast.severity === 'warning') {
-              scheme = 'warning'
-              LeadingIcon = AlertIcon
+              bgColor = '#9a6700'
             }
 
             return (
-              <Flash
+              <div
                 key={toast.id}
-                variant={scheme}
                 className="lightwing-toast-item"
                 style={{
                   display: 'flex',
@@ -91,11 +82,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   borderRadius: '6px',
                   padding: '1rem',
                   pointerEvents: 'auto',
+                  backgroundColor: bgColor,
+                  color: '#ffffff',
+                  marginBottom: '0.5rem',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', marginTop: '2px', flexShrink: 0 }}>
-                  <LeadingIcon size={16} />
-                </div>
                 <div style={{ flexGrow: 1, minWidth: 0 }}>
                   {toast.title && (
                     <span style={{ fontWeight: 'bold', display: 'block', marginBottom: '0.25rem', fontSize: '14px' }}>
@@ -104,15 +95,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   )}
                   <span style={{ fontSize: '14px', wordBreak: 'break-word', display: 'block' }}>{toast.message}</span>
                 </div>
-                <IconButton
-                  icon={XIcon}
+                <button
+                  type="button"
                   aria-label="Dismiss notification"
-                  variant="invisible"
-                  size="small"
                   onClick={() => removeToast(toast.id)}
-                  style={{ marginTop: '-4px', marginRight: '-4px', flexShrink: 0 }}
-                />
-              </Flash>
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    lineHeight: 1,
+                    padding: '2px 6px',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
             )
           })}
         </div>,
