@@ -266,7 +266,7 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
 
   try {
     log.info(`User ID ${userId} has Discord roles: ${member.roles.cache.map((role) => role.id).join(", ")}`);
-    const hasStaffRole = member.roles.cache.some((roleId) => staffRoleIds.has(roleId));
+    const hasStaffRole = member.roles.cache.some((role) => staffRoleIds.has(role.id));
     const nextSiteRole = isBootstrapUser || hasStaffRole ? siteAdminRole : "USER";
 
     if (currentUser && currentUser.siteRole !== nextSiteRole) {
