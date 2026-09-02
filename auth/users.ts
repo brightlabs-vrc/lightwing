@@ -97,7 +97,7 @@ import { isValidUserSlug } from "../lib/slugs";
 // Updates the authenticated user's own profile fields (issue #7). A user may
 // only edit their own record or a site admin may edit other profiles.
 export const updateUserProfile = api(
-  { expose: true, method: "PATCH", path: "/api/users/:id" },
+  { expose: true, auth: true, method: "PATCH", path: "/api/users/:id" },
   async ({
     id,
     authorization,
@@ -160,7 +160,7 @@ interface SetSiteRoleParams {
 // Grants or revokes the global SITE_ADMIN role. Restricted to existing site
 // administrators, the single choke point that bootstraps platform-wide control.
 export const setUserSiteRole = api(
-  { expose: true, method: "PUT", path: "/api/users/:id/site-role" },
+  { expose: true, auth: true, method: "PUT", path: "/api/users/:id/site-role" },
   async ({ id, authorization, siteRole }: SetSiteRoleParams): Promise<UserProfile> => {
     await requireSiteAdmin(prisma, authorization);
 

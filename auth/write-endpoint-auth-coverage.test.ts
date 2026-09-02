@@ -17,12 +17,14 @@ const MUTATING_ENDPOINTS: EndpointRule[] = [
     endpoint: "updateUserProfile",
     method: "PATCH",
     guardPatterns: ["resolveActor("],
+    requireAuthOption: true,
   },
   {
     file: "auth/users.ts",
     endpoint: "setUserSiteRole",
     method: "PUT",
     guardPatterns: ["requireSiteAdmin("],
+    requireAuthOption: true,
   },
   {
     file: "teammanager/team-stats.ts",
