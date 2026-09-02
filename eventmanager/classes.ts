@@ -5,6 +5,7 @@ import {
   type ClassTier,
   CLASS_TIER_LABELS,
   CLASS_TIER_ORDER,
+  getEligibleClassRestrictions,
   isEligible,
 } from "./classtier";
 
@@ -102,21 +103,39 @@ export const listEligibleEvents = api(
       throw APIError.notFound("user not found");
     }
 
+    const { allowedRestrictions, nonNullAllowedRestrictions } =
+      getEligibleClassRestrictions(user.classTier);
+    const allowedSet = new Set(allowedRestrictions);
+
     const events = await prisma.event.findMany({
+      where: {
+        OR: [
+          { classRestriction: { in: allowedRestrictions } },
+          {
+            raceEvents: {
+              some: {
+                classRestriction: { in: nonNullAllowedRestrictions },
+              },
+            },
+          },
+        ],
+      },
       include: {
-        raceEvents: true,
+        raceEvents: {
+          orderBy: { sequence: "asc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
     const eligible: EligibleEvent[] = [];
     for (const event of events) {
-      const isEventEligible = isEligible(user.classTier, event.classRestriction);
+      const isEventEligible = allowedSet.has(event.classRestriction);
 
       const eligibleRaces: EligibleRace[] = [];
       for (const race of event.raceEvents) {
         const effectiveRestriction = race.classRestriction ?? event.classRestriction;
-        if (isEligible(user.classTier, effectiveRestriction)) {
+        if (allowedSet.has(effectiveRestriction)) {
           eligibleRaces.push({
             id: race.id,
             name: race.name,
@@ -125,8 +144,6 @@ export const listEligibleEvents = api(
           });
         }
       }
-
-      eligibleRaces.sort((a, b) => a.sequence - b.sequence);
 
       if (isEventEligible || eligibleRaces.length > 0) {
         eligible.push({

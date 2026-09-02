@@ -58,3 +58,42 @@ export function isEligible(
   // one class lower restriction means rIdx === pIdx - 1.
   return rIdx === pIdx - 1;
 }
+
+// Returns allowed event/race class restrictions for a participant tier, suitable
+// for database filtering and O(1) set membership lookups.
+export function getEligibleClassRestrictions(
+  participantTier: ClassTier | null,
+): { allowedRestrictions: (ClassTier | null)[]; nonNullAllowedRestrictions: ClassTier[] } {
+  const normParticipant =
+    participantTier === "PRE_OP" || participantTier === "OP"
+      ? null
+      : participantTier;
+
+  if (normParticipant === null) {
+    return {
+      allowedRestrictions: [null, "PRE_OP", "OP"],
+      nonNullAllowedRestrictions: ["PRE_OP", "OP"],
+    };
+  }
+
+  const pIdx = CLASS_TIER_ORDER.indexOf(normParticipant);
+  if (pIdx === -1) {
+    return {
+      allowedRestrictions: [null, "PRE_OP", "OP"],
+      nonNullAllowedRestrictions: ["PRE_OP", "OP"],
+    };
+  }
+
+  const allowedNonNull: ClassTier[] = ["PRE_OP", "OP", normParticipant];
+  if (pIdx > 0) {
+    const oneLower = CLASS_TIER_ORDER[pIdx - 1];
+    if (oneLower !== "PRE_OP" && oneLower !== "OP") {
+      allowedNonNull.push(oneLower);
+    }
+  }
+
+  return {
+    allowedRestrictions: [null, ...allowedNonNull],
+    nonNullAllowedRestrictions: allowedNonNull,
+  };
+}
