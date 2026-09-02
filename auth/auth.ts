@@ -324,7 +324,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
         name: profile.username,
         image: profile.avatar
           ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
-          : null,
+          : undefined,
       }),
     },
   },
