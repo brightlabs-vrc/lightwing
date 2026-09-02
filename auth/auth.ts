@@ -104,14 +104,12 @@ function getDiscordBotRestClient(): REST | null {
   try {
     const token = discordBotToken();
     if (!token) {
-      log.warn("Discord bot token is empty");
-      return null;
+      throw new Error("Discord bot token is null! This is required for membership lookup. This will fail without one.");
     }
     discordBotRestClient = new REST({ version: "10" }).setToken(token);
     return discordBotRestClient;
   } catch (error) {
-    log.error(error, "failed to initialize Discord REST client (secret might be missing)");
-    return null;
+    throw new Error(`Failed to initialize Discord bot REST client: ${error}`);
   }
 }
 
@@ -179,19 +177,26 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
   return ids;
 }
 
-async function getDiscordGuildMember(accessToken: string): Promise<APIGuildMember | null> {
+async function getDiscordGuildMember(userId: string): Promise<APIGuildMember | null> {
   const discordUserRestClient = new REST({
     version: "10",
     authPrefix: "Bearer",
-  }).setToken(accessToken);
+  }).setToken(discordBotToken());
 
   try {
-    return (await discordUserRestClient.get(
-      Routes.userGuildMember(ursDiscordGuildId),
-    )) as APIGuildMember;
+    // get list of guild members and check if the user is in the list
+    const guildMembers = await discordUserRestClient.get(
+      Routes.guildMembers(ursDiscordGuildId),
+    ) as APIGuildMember[];
+
+    const member = guildMembers.find((member) => member.user.id === userId);
+
+    if (!member) return null;
+
+    return member;
+
   } catch (error) {
-    log.error(error, "failed to verify Discord guild membership");
-    return null;
+    throw new Error(`Failed to verify Discord guild membership: ${error}`);
   }
 }
 
@@ -208,7 +213,9 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
   const account = await prisma.account.findFirst({
     where: { userId, providerId: "discord" },
     orderBy: { updatedAt: "desc" },
-    select: { accessToken: true },
+    // to avoid breaking some legacy code, we will expose accessToken
+    // but we shouldn't be using it since the bot does all the work for us
+    select: { userId: true, accessToken: true },
   });
 
   if (!account?.accessToken) {
@@ -217,7 +224,7 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
     });
   }
 
-  const member = await getDiscordGuildMember(account.accessToken);
+  const member = await getDiscordGuildMember(account.userId);
   if (!member) {
     throw APIError.fromStatus("FORBIDDEN", {
       message: "you must be a member of the URS Discord server",
@@ -324,7 +331,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
         name: profile.username,
         image: profile.avatar
           ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
-          : null,
+          : undefined,
       }),
     },
   },
