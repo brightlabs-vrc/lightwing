@@ -14,18 +14,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Ensure pnpm v11 bin compatibility
-        run: mkdir -p "$PNPM_HOME/bin" && ln -sf "$PNPM_HOME/pnpm" "$PNPM_HOME/bin/pnpm"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Setup pnpm & Node.js
+        uses: pnpm/setup@v1
         with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          runtime: node@22
+          cache: true
+          install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -46,15 +40,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Setup pnpm & Node.js
+        uses: pnpm/setup@v1
         with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          runtime: node@22
+          cache: true
+          install: false
 
       - name: Install Encore CLI
         run: |
