@@ -206,12 +206,6 @@ async function getDiscordGuildMember(userId: string): Promise<GuildMember | null
     throw new Error(`Failed to login Discord bot client: ${error}`);
   }
 
-
-  if (!client || !client.isReady()) {
-    log.error("Gateway client is not available; cannot check guild membership");
-    return null;
-  }
-
   client.on("ready", async () => {
     log.info(`Discord bot client is ready. Logged in as ${client.user?.tag}`);
 
