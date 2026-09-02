@@ -4,7 +4,7 @@ import { createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { Prisma } from "@prisma/client";
 import { REST, Routes } from "discord.js";
-import type { APIGuildMember, APIRole } from "discord-api-types/v10";
+import type { APIGuild, APIGuildMember, APIRole, APIUser } from "discord-api-types/v10";
 import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
 import { CounterGroup } from "encore.dev/metrics";
@@ -97,7 +97,7 @@ const discordRolesCache = new StructKeyspace<{ key: string }, DiscordStaffRoles>
 
 let discordBotRestClient: REST | null = null;
 
-function getDiscordBotRestClient(): REST | null {
+async function getDiscordBotRestClient(): Promise<REST | null> {
   if (discordBotRestClient) {
     return discordBotRestClient;
   }
@@ -108,6 +108,17 @@ function getDiscordBotRestClient(): REST | null {
       throw new Error("Discord bot token is null! This is required for membership lookup. This will fail without one.");
     }
     discordBotRestClient = new REST({ version: "10" }).setToken(token);
+
+    const userMetadata = await discordBotRestClient.get(Routes.user()) as APIUser;
+    const guildMetadata = await discordBotRestClient.get(Routes.guild(ursDiscordGuildId)) as APIGuild;
+
+    log.info("Initialized Discord Bot REST client", {
+      botUserId: userMetadata.id,
+      botUsername: userMetadata.username,
+      guildId: guildMetadata.id,
+      guildName: guildMetadata.name
+    });
+
     return discordBotRestClient;
   } catch (error) {
     log.error(error, "Failed to initialize Discord bot REST client");
@@ -160,7 +171,7 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
     return new Set(cached.ids);
   }
 
-  const client = getDiscordBotRestClient();
+  const client = await getDiscordBotRestClient();
   if (!client) {
     log.error("Discord bot REST client is not available; returning empty staff roles");
     return new Set<string>();
@@ -182,7 +193,7 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
 async function getDiscordGuildMember(userId: string): Promise<APIGuildMember | null> {
   log.info(`Checking Discord guild membership for user ID: ${userId}`);
 
-  const client = getDiscordBotRestClient();
+  const client = await getDiscordBotRestClient();
 
   if (!client) {
     log.error("Discord bot REST client is not available; cannot check guild membership");
