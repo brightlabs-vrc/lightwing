@@ -3,7 +3,7 @@ import { createAccessControl, organization } from "better-auth/plugins";
 import { createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { Prisma } from "@prisma/client";
-import { Client, GatewayIntentBits, GuildMember, REST, Routes, User } from "discord.js";
+import { GuildMember, REST, Routes } from "discord.js";
 import type { APIGuild, APIRole, APIUser } from "discord-api-types/v10";
 import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
@@ -194,45 +194,30 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
 async function getDiscordGuildMember(userId: string): Promise<GuildMember | null | undefined> {
   log.info(`Checking Discord guild membership for user ID: ${userId}`);
 
-  // unfortunately we can't use the REST client, so we have to use the gateway
-  // TODO: make this reusable? This is SO VERY INEFFICIENT DESUWA
-  const client = new Client({ intents: [ GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers ] });
+  // last attempt failed spectacularly, so let's do a REST instead.
+  // Apparently Encore Cloud doesn't allow gateway connections, so we'll have to eyeball it.
+  const client = await getDiscordBotRestClient();
 
-  try {
-    client.login(discordBotToken());
-    log.info("Gateway client logged in successfully");
-  } catch (error) {
-    log.error("failed to login Discord bot client", { error });
-    throw new Error(`Failed to login Discord bot client: ${error}`);
+  if (!client) {
+    log.error("Discord bot REST client is not available; cannot check membership");
+    return null;
   }
 
-  client.on("ready", async () => {
-    log.info(`Discord bot client is ready. Logged in as ${client.user?.tag}`);
+  try{
+    log.info(`Fetching guild member for user ID: ${userId} from Discord guild ID: ${ursDiscordGuildId}`);
+    const validatedMember = await client.get(Routes.guildMember(ursDiscordGuildId, userId)) as GuildMember;
 
-    // Fetch the guild and its members
-    try {
-      const guild = await client.guilds.fetch(ursDiscordGuildId);
-      log.info(`Fetched guild: ${guild.name} (ID: ${guild.id})`);
-
-      const memberCollection = await guild.members.fetch();
-      log.info(`Fetched ${memberCollection.size} members from the guild, checking for user ID: ${userId}`);
-
-      const member = memberCollection.get(userId);
-
-      if (member) {
-        log.info(`User ID: ${userId} is a member of the guild. Roles: ${member.roles.cache.map(role => role.name).join(", ")}`);
-      } else {
-        log.info(`User ID: ${userId} is NOT a member of the guild.`);
-      }
-
-      return member || null;
-    } catch (error) {
-      log.error("failed to fetch guild or members", { error });
+    if (validatedMember) {
+      log.info(`User ID ${userId} is a member of the Discord guild`);
+      return validatedMember;
+    } else {
+      log.info(`User ID ${userId} is NOT a member of the Discord guild`);
+      return null;
     }
-  });
-
-
-  client.destroy();
+  } catch (error) {
+    log.error("failed to fetch Discord guild member; user is not a member" + { error });
+    return null;
+  }
 }
 
 async function isBootstrapSiteAdminUser(userId: string) {
