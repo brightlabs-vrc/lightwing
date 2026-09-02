@@ -196,6 +196,7 @@ async function getDiscordGuildMember(userId: string): Promise<APIGuildMember | n
     ) as APIGuildMember[];
 
     log.info(`Fetched ${guildMembers.length} Discord guild members for membership check`);
+    log.info (`Data: ${JSON.stringify(guildMembers)}`);
 
     const member = guildMembers.find((member) => member.user.id === userId);
 
