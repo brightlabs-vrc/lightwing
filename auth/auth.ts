@@ -191,7 +191,7 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
   return ids;
 }
 
-async function getDiscordGuildMember(userId: string): Promise<GuildMember | null | undefined> {
+async function getDiscordGuildMember(userId: string): Promise<GuildMember | null> {
   log.info(`Checking Discord guild membership for user ID: ${userId}`);
 
   // last attempt failed spectacularly, so let's do a REST instead.
@@ -230,6 +230,13 @@ async function isBootstrapSiteAdminUser(userId: string) {
 }
 
 async function syncSiteRoleFromDiscordMembership(userId: string) {
+  const client = await getDiscordBotRestClient();
+
+  if (!client) {
+    log.error("Discord bot REST client is not available; cannot sync site role");
+    return;
+  }
+
   const account = await prisma.account.findFirst({
     where: { userId, providerId: "discord" },
     orderBy: { updatedAt: "desc" },
@@ -257,14 +264,22 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
     prisma.user.findUnique({ where: { id: userId }, select: { siteRole: true } }),
   ]);
 
-  const hasStaffRole = member.roles.cache.some((role) => staffRoleIds.has(role.id));
-  const nextSiteRole = isBootstrapUser || hasStaffRole ? siteAdminRole : "USER";
+  try {
+    log.info(`User ID ${userId} has Discord roles: ${member.roles.cache.map((role) => role.id).join(", ")}`);
+    const hasStaffRole = member.roles.cache.some((roleId) => staffRoleIds.has(roleId));
+    const nextSiteRole = isBootstrapUser || hasStaffRole ? siteAdminRole : "USER";
 
-  if (currentUser && currentUser.siteRole !== nextSiteRole) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { siteRole: nextSiteRole },
-    });
+    if (currentUser && currentUser.siteRole !== nextSiteRole) {
+      log.info(`Updating site role for user ID ${userId} from ${currentUser.siteRole} to ${nextSiteRole}`);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { siteRole: nextSiteRole },
+      });
+    } else {
+      log.info(`No site role change needed for user ID ${userId}; current role is ${currentUser?.siteRole}`);
+    }
+  } catch (error) {
+    log.warn("failed to sync site role from Discord membership, this shouldn't affect the user's experience" + { error });
   }
 }
 
