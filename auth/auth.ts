@@ -3,8 +3,8 @@ import { createAccessControl, organization } from "better-auth/plugins";
 import { createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { Prisma } from "@prisma/client";
-import { REST, Routes } from "discord.js";
-import type { APIGuild, APIGuildMember, APIRole, APIUser } from "discord-api-types/v10";
+import { Client, GatewayIntentBits, GuildMember, REST, Routes, User } from "discord.js";
+import type { APIGuild, APIRole, APIUser } from "discord-api-types/v10";
 import { secret } from "encore.dev/config";
 import { appMeta } from "encore.dev";
 import { CounterGroup } from "encore.dev/metrics";
@@ -116,12 +116,13 @@ async function getDiscordBotRestClient(): Promise<REST | null> {
       botUserId: userMetadata.id,
       botUsername: userMetadata.username,
       guildId: guildMetadata.id,
-      guildName: guildMetadata.name
+      guildName: guildMetadata.name,
+      guildMemberCount: guildMetadata.approximate_member_count,
     });
 
     return discordBotRestClient;
   } catch (error) {
-    log.error(error, "Failed to initialize Discord bot REST client");
+    log.error("Failed to initialize Discord bot REST client", { error });
     throw new Error(`Failed to initialize Discord bot REST client: ${error}`);
   }
 }
@@ -190,34 +191,54 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
   return ids;
 }
 
-async function getDiscordGuildMember(userId: string): Promise<APIGuildMember | null> {
+async function getDiscordGuildMember(userId: string): Promise<GuildMember | null | undefined> {
   log.info(`Checking Discord guild membership for user ID: ${userId}`);
 
-  const client = await getDiscordBotRestClient();
+  // unfortunately we can't use the REST client, so we have to use the gateway
+  // TODO: make this reusable? This is SO VERY INEFFICIENT DESUWA
+  const client = new Client({ intents: [ GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers ] });
 
-  if (!client) {
-    log.error("Discord bot REST client is not available; cannot check guild membership");
+  try {
+    client.login(discordBotToken());
+    log.info("Gateway client logged in successfully");
+  } catch (error) {
+    log.error("failed to login Discord bot client", { error });
+    throw new Error(`Failed to login Discord bot client: ${error}`);
+  }
+
+
+  if (!client || !client.isReady()) {
+    log.error("Gateway client is not available; cannot check guild membership");
     return null;
   }
 
-  try {
-    // get list of guild members and check if the user is in the list
-    const guildMembers = await client.get(
-      Routes.guildMembers(ursDiscordGuildId),
-    ) as APIGuildMember[];
+  client.on("ready", async () => {
+    log.info(`Discord bot client is ready. Logged in as ${client.user?.tag}`);
 
-    log.info(`Fetched ${guildMembers.length} Discord guild members for membership check`);
-    log.info (`Data: ${JSON.stringify(guildMembers)}`);
+    // Fetch the guild and its members
+    try {
+      const guild = await client.guilds.fetch(ursDiscordGuildId);
+      log.info(`Fetched guild: ${guild.name} (ID: ${guild.id})`);
 
-    const member = guildMembers.find((member) => member.user.id === userId);
+      const memberCollection = await guild.members.fetch();
+      log.info(`Fetched ${memberCollection.size} members from the guild, checking for user ID: ${userId}`);
 
-    if (!member) return null;
+      const member = memberCollection.get(userId);
 
-    return member;
-  } catch (error) {
-    log.error(error, "failed to fetch Discord guild members");
-    throw new Error(`Failed to verify Discord guild membership: ${error}`);
-  }
+      if (member) {
+        log.info(`User ID: ${userId} is a member of the guild. Roles: ${member.roles.cache.map(role => role.name).join(", ")}`);
+      } else {
+        log.info(`User ID: ${userId} is NOT a member of the guild.`);
+      }
+
+      return member || null;
+    } catch (error) {
+      log.error("failed to fetch guild or members", { error });
+    }
+  });
+
+
+  client.destroy();
 }
 
 async function isBootstrapSiteAdminUser(userId: string) {
@@ -257,7 +278,7 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
     prisma.user.findUnique({ where: { id: userId }, select: { siteRole: true } }),
   ]);
 
-  const hasStaffRole = member.roles.some((roleId: string) => staffRoleIds.has(roleId));
+  const hasStaffRole = member.roles.cache.some((role) => staffRoleIds.has(role.id));
   const nextSiteRole = isBootstrapUser || hasStaffRole ? siteAdminRole : "USER";
 
   if (currentUser && currentUser.siteRole !== nextSiteRole) {
