@@ -8,7 +8,6 @@ import { buildRaceResultUpsert, type RaceResultInput } from "./result-upsert";
 import { SCORING_POINTS } from "../lib/constants";
 import {
   requireRace,
-  requireMembershipForResult,
   listResults,
   type RaceResultView,
 } from "./results";
@@ -157,14 +156,57 @@ export async function validateResultInputs(
   raceId: string,
   results: RaceResultInput[],
 ): Promise<void> {
+  if (results.length === 0) {
+    return;
+  }
+
   const seen = new Set<string>();
+  const userIds: string[] = [];
   for (const entry of results) {
     if (seen.has(entry.userId)) {
       throw APIError.invalidArgument(`duplicate userId in payload: ${entry.userId}`);
     }
     seen.add(entry.userId);
+    userIds.push(entry.userId);
   }
-  for (const entry of results) {
-    await requireMembershipForResult(eventId, raceId, entry.userId);
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { granularParticipation: true },
+  });
+  if (!event) {
+    throw APIError.notFound("event not found");
+  }
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true },
+  });
+  if (users.length !== userIds.length) {
+    throw APIError.notFound("user not found");
+  }
+
+  if (event.granularParticipation) {
+    const raceMembers = await prisma.raceEventMember.findMany({
+      where: {
+        raceEventId: raceId,
+        userId: { in: userIds },
+      },
+      select: { userId: true },
+    });
+    if (raceMembers.length !== userIds.length) {
+      throw APIError.failedPrecondition("user is not registered for this race");
+    }
+  } else {
+    const members = await prisma.eventMember.findMany({
+      where: {
+        eventId,
+        userId: { in: userIds },
+      },
+      select: { userId: true },
+    });
+    if (members.length !== userIds.length) {
+      throw APIError.failedPrecondition("user is not a member of this event");
+    }
   }
 }
