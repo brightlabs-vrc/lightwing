@@ -104,11 +104,13 @@ function getDiscordBotRestClient(): REST | null {
   try {
     const token = discordBotToken();
     if (!token) {
+      log.error("Undefined Discord bot token; membership lookup will fail");
       throw new Error("Discord bot token is null! This is required for membership lookup. This will fail without one.");
     }
     discordBotRestClient = new REST({ version: "10" }).setToken(token);
     return discordBotRestClient;
   } catch (error) {
+    log.error(error, "Failed to initialize Discord bot REST client");
     throw new Error(`Failed to initialize Discord bot REST client: ${error}`);
   }
 }
@@ -178,14 +180,9 @@ async function getDiscordStaffRoleIds(): Promise<Set<string>> {
 }
 
 async function getDiscordGuildMember(userId: string): Promise<APIGuildMember | null> {
-  const discordUserRestClient = new REST({
-    version: "10",
-    authPrefix: "Bearer",
-  }).setToken(discordBotToken());
-
   try {
     // get list of guild members and check if the user is in the list
-    const guildMembers = await discordUserRestClient.get(
+    const guildMembers = await discordBotRestClient!.get(
       Routes.guildMembers(ursDiscordGuildId),
     ) as APIGuildMember[];
 
@@ -194,8 +191,8 @@ async function getDiscordGuildMember(userId: string): Promise<APIGuildMember | n
     if (!member) return null;
 
     return member;
-
   } catch (error) {
+    log.error(error, "failed to fetch Discord guild members");
     throw new Error(`Failed to verify Discord guild membership: ${error}`);
   }
 }
@@ -320,7 +317,7 @@ const authOptions: Parameters<typeof betterAuth>[0] = {
     discord: {
       clientId: discordClientId(),
       clientSecret: discordClientSecret(),
-      scope: ["identify", "guilds", "guilds.members.read"],
+      scope: ["identify"],
       mapProfileToUser: (profile) => ({
         // better-auth requires a non-null email field.
         // Use a deterministic, non-routable placeholder derived from the
