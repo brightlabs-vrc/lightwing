@@ -235,7 +235,7 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
     orderBy: { updatedAt: "desc" },
     // to avoid breaking some legacy code, we will expose accessToken
     // but we shouldn't be using it since the bot does all the work for us
-    select: { userId: true, accessToken: true },
+    select: { accountId: true, accessToken: true },
   });
 
   if (!account?.accessToken) {
@@ -244,7 +244,7 @@ async function syncSiteRoleFromDiscordMembership(userId: string) {
     });
   }
 
-  const member = await getDiscordGuildMember(account.userId);
+  const member = await getDiscordGuildMember(account.accountId);
   if (!member) {
     throw APIError.fromStatus("FORBIDDEN", {
       message: "you must be a member of the URS Discord server",
