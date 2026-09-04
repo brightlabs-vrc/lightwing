@@ -51,13 +51,9 @@ jobs:
       - name: Install Encore CLI
         run: |
           curl -L https://encore.dev/install.sh | bash
-          echo "$HOME/.encore/bin" >> "$GITHUB_PATH"
-
-      - name: Disable Encore telemetry
-        run: encore telemetry disable
 
       - name: Export Encore runtime library
-        run: echo "ENCORE_RUNTIME_LIB=$(encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$GITHUB_ENV"
+        run: echo "ENCORE_RUNTIME_LIB=$(~/.encore/bin/encore daemon env | grep ENCORE_RUNTIME_LIB | cut -d'=' -f2)" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: pnpm ci
