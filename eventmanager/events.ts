@@ -716,6 +716,8 @@ export async function recomputeEventPointsInternal(eventId: string): Promise<voi
 
   const affectedUserIds = new Set<string>();
 
+  const updatesByPoints = new Map<number, string[]>();
+
   for (const race of event.raceEvents) {
     for (const result of race.results) {
       const calculatedPoints = resolvePoints({
@@ -727,13 +729,23 @@ export async function recomputeEventPointsInternal(eventId: string): Promise<voi
       });
 
       if (result.points !== calculatedPoints) {
-        await prisma.raceResult.update({
-          where: { id: result.id },
-          data: { points: calculatedPoints },
-        });
+        const existingIds = updatesByPoints.get(calculatedPoints) ?? [];
+        existingIds.push(result.id);
+        updatesByPoints.set(calculatedPoints, existingIds);
       }
       affectedUserIds.add(result.userId);
     }
+  }
+
+  if (updatesByPoints.size > 0) {
+    await prisma.$transaction(
+      Array.from(updatesByPoints.entries()).map(([points, ids]) =>
+        prisma.raceResult.updateMany({
+          where: { id: { in: ids } },
+          data: { points },
+        })
+      )
+    );
   }
 
   if (affectedUserIds.size > 0) {
