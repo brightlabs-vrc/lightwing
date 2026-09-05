@@ -1,0 +1,35 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "shared/migrations/*.sql"
+    queries:
+      - "teammanager/sqlc/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "teammanager/sqlc"
+        sql_package: "database/sql"
+        emit_pointers_for_null_types: false
+  - engine: "postgresql"
+    schema:
+      - "shared/migrations/*.sql"
+    queries:
+      - "scorecalc/sqlc/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "scorecalc/sqlc"
+        sql_package: "database/sql"
+        emit_pointers_for_null_types: false
+  - engine: "postgresql"
+    schema:
+      - "shared/migrations/*.sql"
+    queries:
+      - "scorecalcworker/sqlc/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "scorecalcworker/sqlc"
+        sql_package: "database/sql"
+        emit_pointers_for_null_types: false

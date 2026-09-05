@@ -30,10 +30,7 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 	if _, _, err := auth.RequirePermission(ctx, authorization, id, "organization", "update"); err != nil {
 		return nil, err
 	}
-	var exists string
-	if err := db.QueryRow(ctx,
-		`SELECT id FROM "organization" WHERE id = $1`, id,
-	).Scan(&exists); errors.Is(err, sql.ErrNoRows) {
+	if _, err := q().OrgIDByID(ctx, id); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	} else if err != nil {
 		return nil, err

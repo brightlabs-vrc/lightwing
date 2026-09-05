@@ -22,6 +22,7 @@ func TestMain(m *testing.M) {
 	testDB, err := et.NewTestDatabase(ctx, "lightwing")
 	if err == nil {
 		shared.SetTestDB(testDB)
+		resetStdPool()
 	}
 	code := m.Run()
 	os.Exit(code)

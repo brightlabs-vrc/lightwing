@@ -17,6 +17,7 @@ import (
 	"encore.dev/storage/cache"
 	"encore.app/auth"
 	"encore.app/shared"
+	"encore.app/teammanager/sqlc"
 )
 
 //encore:service
@@ -85,17 +86,6 @@ func invalidateTeamCache(ctx context.Context, id string) {
 
 // --- Shared loaders ---
 
-type orgRow struct {
-	ID                    string
-	Name                  string
-	Slug                  string
-	Logo                  sql.NullString
-	RankingAverage        sql.NullFloat64
-	PointsAverage         sql.NullFloat64
-	SeasonRank            sql.NullInt64
-	AveragePointsPerEvent sql.NullFloat64
-}
-
 func nullFloatToPtr(n sql.NullFloat64) *float64 {
 	if !n.Valid {
 		return nil
@@ -104,29 +94,12 @@ func nullFloatToPtr(n sql.NullFloat64) *float64 {
 	return &v
 }
 
-func nullInt32ToPtr(n sql.NullInt64) *int32 {
+func nullInt32ToPtr(n sql.NullInt32) *int32 {
 	if !n.Valid {
 		return nil
 	}
-	v := int32(n.Int64)
+	v := n.Int32
 	return &v
-}
-
-func scanOrgRow(row *orgRow, scanner interface {
-	Scan(dest ...any) error
-}) error {
-	return scanner.Scan(&row.ID, &row.Name, &row.Slug, &row.Logo,
-		&row.RankingAverage, &row.PointsAverage, &row.SeasonRank, &row.AveragePointsPerEvent)
-}
-
-const orgColumns = `id, name, slug, logo, "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"`
-
-type memberRow struct {
-	UserID         string
-	Role           string
-	Name           string
-	VrchatUsername sql.NullString
-	Slug           sql.NullString
 }
 
 func displayName(name string, vrc sql.NullString) string {
@@ -136,34 +109,31 @@ func displayName(name string, vrc sql.NullString) string {
 	return name
 }
 
-func loadMemberRows(ctx context.Context, organizationID string) ([]memberRow, error) {
-	rows, err := db.Query(ctx,
-		`SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
-		 FROM "member" m JOIN "user" u ON u.id = m."userId"
-		 WHERE m."organizationId" = $1 ORDER BY m."createdAt" ASC`,
-		organizationID,
-	)
-	if err != nil {
-		return nil, err
+func loadMemberRows(ctx context.Context, organizationID string) ([]sqlc.ListMemberRowsRow, error) {
+	return q().ListMemberRows(ctx, organizationID)
+}
+
+// toOrg converts a GetOrgByID row to the shared Organization shape.
+func toOrg(r sqlc.GetOrgByIDRow) *sqlc.Organization {
+	return &sqlc.Organization{
+		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo,
+		RankingAverage: r.RankingAverage, PointsAverage: r.PointsAverage,
+		SeasonRank: r.SeasonRank, AveragePointsPerEvent: r.AveragePointsPerEvent,
 	}
-	defer rows.Close()
-	members := []memberRow{}
-	for rows.Next() {
-		var m memberRow
-		if err := rows.Scan(&m.UserID, &m.Role, &m.Name, &m.VrchatUsername, &m.Slug); err != nil {
-			return nil, err
-		}
-		members = append(members, m)
+}
+
+// toOrgBySlug converts a GetOrgBySlug row to the shared Organization shape.
+func toOrgBySlug(r sqlc.GetOrgBySlugRow) *sqlc.Organization {
+	return &sqlc.Organization{
+		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo,
+		RankingAverage: r.RankingAverage, PointsAverage: r.PointsAverage,
+		SeasonRank: r.SeasonRank, AveragePointsPerEvent: r.AveragePointsPerEvent,
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return members, nil
 }
 
 // toTeam maps an organization row plus its members to the public Team shape.
 // Mirrors toTeam in ts-legacy/teammanager/teams.ts.
-func toTeam(org *orgRow, members []memberRow) *Team {
+func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 	adminCount := 0
 	summaries := make([]TeamMemberSummary, 0, len(members))
 	for _, m := range members {
@@ -171,7 +141,7 @@ func toTeam(org *orgRow, members []memberRow) *Team {
 			adminCount++
 		}
 		summaries = append(summaries, TeamMemberSummary{
-			UserID: m.UserID,
+			UserID: m.UserId,
 			Name:   displayName(m.Name, m.VrchatUsername),
 			Role:   m.Role,
 		})
@@ -201,9 +171,7 @@ func toTeam(org *orgRow, members []memberRow) *Team {
 }
 
 func loadTeam(ctx context.Context, id string) (*Team, error) {
-	var org orgRow
-	err := scanOrgRow(&org, db.QueryRow(ctx,
-		`SELECT `+orgColumns+` FROM "organization" WHERE id = $1`, id))
+	row, err := q().GetOrgByID(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	}
@@ -214,13 +182,14 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 	if err != nil {
 		return nil, err
 	}
-	return toTeam(&org, members), nil
+	return toTeam(toOrg(row), members), nil
 }
 
 func touchOrg(ctx context.Context, id string) error {
-	_, err := db.Exec(ctx,
-		`UPDATE "organization" SET "updatedAt" = $1 WHERE id = $2`, time.Now().UTC(), id)
-	return err
+	return q().TouchOrg(ctx, sqlc.TouchOrgParams{
+		UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		ID:        id,
+	})
 }
 
 // --- Guard (mirrors team-guards.ts) ---
@@ -228,14 +197,14 @@ func touchOrg(ctx context.Context, id string) error {
 // assertAdminCapNotReached rejects when the organization already has the
 // maximum number of administrators.
 func assertAdminCapNotReached(ctx context.Context, organizationID string) error {
-	var count int
-	if err := db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM "member" WHERE "organizationId" = $1 AND role = $2`,
-		organizationID, auth.AdministratorRole,
-	).Scan(&count); err != nil {
+	count, err := q().CountAdmins(ctx, sqlc.CountAdminsParams{
+		OrganizationId: organizationID,
+		Role:           auth.AdministratorRole,
+	})
+	if err != nil {
 		return err
 	}
-	if count >= auth.AdministratorRoleLimit {
+	if count >= int64(auth.AdministratorRoleLimit) {
 		return &errs.Error{
 			Code:    errs.FailedPrecondition,
 			Message: "At most three administrators can belong to an organization.",

@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
+	"encore.app/teammanager/sqlc"
 )
 
 // --- listTeamMembers (mirrors listTeamMembers; publicly accessible) ---
@@ -18,42 +18,54 @@ type ListTeamMembersResponse struct {
 }
 
 func listTeamMembers(ctx context.Context, id, search string, limit, offset int) (*ListTeamMembersResponse, error) {
-	where := `m."organizationId" = $1`
-	args := []any{id}
-	if search != "" {
-		args = append(args, "%"+search+"%")
-		where += fmt.Sprintf(` AND (u.name ILIKE $%d OR u."vrchatUsername" ILIKE $%d OR u.slug ILIKE $%d)`,
-			len(args), len(args), len(args))
-	}
-	var total int
-	if err := db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM "member" m JOIN "user" u ON u.id = m."userId" WHERE `+where,
-		args...,
-	).Scan(&total); err != nil {
-		return nil, err
-	}
-	query := `SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
-		FROM "member" m JOIN "user" u ON u.id = m."userId"
-		WHERE ` + where + ` ORDER BY m."createdAt" ASC`
-	if limit > 0 {
-		args = append(args, limit)
-		query += fmt.Sprintf(` LIMIT $%d`, len(args))
-	}
-	if offset > 0 {
-		args = append(args, offset)
-		query += fmt.Sprintf(` OFFSET $%d`, len(args))
-	}
-	rows, err := db.Query(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	members := []MemberListItem{}
-	for rows.Next() {
-		var m memberRow
-		if err := rows.Scan(&m.UserID, &m.Role, &m.Name, &m.VrchatUsername, &m.Slug); err != nil {
+	var total int64
+	var stubs []memberStub
+	var err error
+	if search == "" {
+		if total, err = q().CountTeamMembers(ctx, id); err != nil {
 			return nil, err
 		}
+		rows, err := q().ListTeamMemberRows(ctx, sqlc.ListTeamMemberRowsParams{
+			OrganizationId: id,
+			Column2:        int32(limit),
+			Offset:         int32(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+		stubs = make([]memberStub, 0, len(rows))
+		for _, r := range rows {
+			stubs = append(stubs, memberStub{
+				UserID: r.UserId, Role: r.Role, Name: r.Name,
+				VrchatUsername: r.VrchatUsername, Slug: r.Slug,
+			})
+		}
+	} else {
+		if total, err = q().CountTeamMembersBySearch(ctx, sqlc.CountTeamMembersBySearchParams{
+			OrganizationId: id,
+			Column2:        search,
+		}); err != nil {
+			return nil, err
+		}
+		rows, err := q().ListTeamMemberRowsBySearch(ctx, sqlc.ListTeamMemberRowsBySearchParams{
+			OrganizationId: id,
+			Column2:        search,
+			Column3:        int32(limit),
+			Offset:         int32(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+		stubs = make([]memberStub, 0, len(rows))
+		for _, r := range rows {
+			stubs = append(stubs, memberStub{
+				UserID: r.UserId, Role: r.Role, Name: r.Name,
+				VrchatUsername: r.VrchatUsername, Slug: r.Slug,
+			})
+		}
+	}
+	members := []MemberListItem{}
+	for _, m := range stubs {
 		var slug *string
 		if m.Slug.Valid {
 			slug = &m.Slug.String
@@ -65,10 +77,16 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 			Role:   m.Role,
 		})
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return &ListTeamMembersResponse{Members: members, Total: total}, nil
+	return &ListTeamMembersResponse{Members: members, Total: int(total)}, nil
+}
+
+// memberStub is the shared shape of both member-row query variants.
+type memberStub struct {
+	UserID         string
+	Role           string
+	Name           string
+	VrchatUsername sql.NullString
+	Slug           sql.NullString
 }
 
 // --- addTeamMember (mirrors addTeamMember) ---
@@ -81,45 +99,40 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 	if targetRole == "" {
 		targetRole = "member"
 	}
-	var orgExists string
-	if err := db.QueryRow(ctx,
-		`SELECT id FROM "organization" WHERE id = $1`, id,
-	).Scan(&orgExists); errors.Is(err, sql.ErrNoRows) {
+	orgExists, err := q().OrgIDByID(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	} else if err != nil {
 		return nil, err
 	}
-	var userExists string
-	if err := db.QueryRow(ctx,
-		`SELECT id FROM "user" WHERE id = $1`, userID,
-	).Scan(&userExists); errors.Is(err, sql.ErrNoRows) {
+	_ = orgExists
+	userExists, err := q().UserIDByID(ctx, userID)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	} else if err != nil {
 		return nil, err
 	}
+	_ = userExists
 	if targetRole == auth.AdministratorRole {
 		if err := assertAdminCapNotReached(ctx, id); err != nil {
 			return nil, err
 		}
 	}
-	var dup string
-	err := db.QueryRow(ctx,
-		`SELECT id FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
-	).Scan(&dup)
-	if err == nil {
+	if _, err := q().MemberIDByOrgAndUser(ctx, sqlc.MemberIDByOrgAndUserParams{
+		OrganizationId: id,
+		UserId:         userID,
+	}); err == nil {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "user is already a member of this team"}
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	_, err = db.Exec(ctx,
-		`INSERT INTO "member" (id, "organizationId", "userId", role)
-		 VALUES (gen_random_uuid()::text, $1, $2, $3)`,
-		id, userID, targetRole,
-	)
-	if isUniqueViolation(err) {
+	if err := q().InsertMember(ctx, sqlc.InsertMemberParams{
+		OrganizationId: id,
+		UserId:         userID,
+		Role:           targetRole,
+	}); isUniqueViolation(err) {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "user is already a member of this team"}
-	}
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 	if err := touchOrg(ctx, id); err != nil {
@@ -136,10 +149,10 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 	if _, _, err := auth.RequirePermission(ctx, authorization, id, "member", "update"); err != nil {
 		return nil, err
 	}
-	var currentRole string
-	err := db.QueryRow(ctx,
-		`SELECT role FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
-	).Scan(&currentRole)
+	currentRole, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
+		OrganizationId: id,
+		UserId:         userID,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "member not found"}
 	}
@@ -151,10 +164,11 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 			return nil, err
 		}
 	}
-	if _, err := db.Exec(ctx,
-		`UPDATE "member" SET role = $1 WHERE "organizationId" = $2 AND "userId" = $3`,
-		role, id, userID,
-	); err != nil {
+	if err := q().UpdateMemberRole(ctx, sqlc.UpdateMemberRoleParams{
+		Role:           role,
+		OrganizationId: id,
+		UserId:         userID,
+	}); err != nil {
 		return nil, err
 	}
 	if err := touchOrg(ctx, id); err != nil {
@@ -171,19 +185,18 @@ func removeTeamMember(ctx context.Context, authorization, id, userID string) (*T
 	if _, _, err := auth.RequirePermission(ctx, authorization, id, "member", "delete"); err != nil {
 		return nil, err
 	}
-	var exists string
-	err := db.QueryRow(ctx,
-		`SELECT id FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
-	).Scan(&exists)
-	if errors.Is(err, sql.ErrNoRows) {
+	if _, err := q().MemberIDByOrgAndUser(ctx, sqlc.MemberIDByOrgAndUserParams{
+		OrganizationId: id,
+		UserId:         userID,
+	}); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "member not found"}
-	}
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
-	if _, err := db.Exec(ctx,
-		`DELETE FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
-	); err != nil {
+	if err := q().DeleteMember(ctx, sqlc.DeleteMemberParams{
+		OrganizationId: id,
+		UserId:         userID,
+	}); err != nil {
 		return nil, err
 	}
 	if err := touchOrg(ctx, id); err != nil {

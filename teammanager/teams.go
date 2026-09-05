@@ -10,6 +10,7 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
+	"encore.app/teammanager/sqlc"
 )
 
 // --- getTeam (mirrors ts-legacy/teammanager/teams.ts getTeam) ---
@@ -30,20 +31,18 @@ func getTeam(ctx context.Context, id string) (*Team, error) {
 // --- getTeamBySlug (mirrors getTeamBySlug) ---
 
 func getTeamBySlug(ctx context.Context, slug string) (*Team, error) {
-	var org orgRow
-	err := scanOrgRow(&org, db.QueryRow(ctx,
-		`SELECT `+orgColumns+` FROM "organization" WHERE slug = $1`, slug))
+	row, err := q().GetOrgBySlug(ctx, slug)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	}
 	if err != nil {
 		return nil, err
 	}
-	members, err := loadMemberRows(ctx, org.ID)
+	members, err := loadMemberRows(ctx, row.ID)
 	if err != nil {
 		return nil, err
 	}
-	return toTeam(&org, members), nil
+	return toTeam(toOrgBySlug(row), members), nil
 }
 
 // --- listTeams (mirrors listTeams) ---
@@ -54,57 +53,49 @@ type ListTeamsResponse struct {
 }
 
 func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeamsResponse, error) {
-	where := ""
-	args := []any{}
-	if search != "" {
-		args = append(args, "%"+search+"%")
-		where = `WHERE name ILIKE $1 OR slug ILIKE $1`
-	}
-	var total int
-	if err := db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM "organization" `+where, args...,
-	).Scan(&total); err != nil {
-		return nil, err
-	}
-	query := `SELECT id, name, slug, logo FROM "organization" ` + where + ` ORDER BY name ASC`
-	if limit > 0 {
-		args = append(args, limit)
-		query += fmt.Sprintf(` LIMIT $%d`, len(args))
-	}
-	if offset > 0 {
-		args = append(args, offset)
-		query += fmt.Sprintf(` OFFSET $%d`, len(args))
-	}
-	rows, err := db.Query(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	type orgStub struct {
-		ID, Name, Slug string
-		Logo           sql.NullString
-	}
-	stubs := []orgStub{}
-	for rows.Next() {
-		var s orgStub
-		if err := rows.Scan(&s.ID, &s.Name, &s.Slug, &s.Logo); err != nil {
+	var total int64
+	var stubs []sqlc.ListTeamRowsRow
+	var err error
+	if search == "" {
+		if total, err = q().CountTeams(ctx); err != nil {
 			return nil, err
 		}
-		stubs = append(stubs, s)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+		stubs, err = q().ListTeamRows(ctx, sqlc.ListTeamRowsParams{
+			Column1: int32(limit),
+			Offset:  int32(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if total, err = q().CountTeamsBySearch(ctx, search); err != nil {
+			return nil, err
+		}
+		bySearch, err := q().ListTeamRowsBySearch(ctx, sqlc.ListTeamRowsBySearchParams{
+			Column1: search,
+			Column2: int32(limit),
+			Offset:  int32(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+		stubs = make([]sqlc.ListTeamRowsRow, 0, len(bySearch))
+		for _, s := range bySearch {
+			stubs = append(stubs, sqlc.ListTeamRowsRow{
+				ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: s.Logo,
+			})
+		}
 	}
 	teams := make([]TeamListItem, 0, len(stubs))
 	for _, s := range stubs {
-		var memberCount, adminCount int
-		if err := db.QueryRow(ctx,
-			`SELECT COUNT(*), COUNT(*) FILTER (WHERE role = $2) FROM "member" WHERE "organizationId" = $1`,
-			s.ID, auth.AdministratorRole,
-		).Scan(&memberCount, &adminCount); err != nil {
+		counts, err := q().CountMembersAndAdmins(ctx, sqlc.CountMembersAndAdminsParams{
+			OrganizationId: s.ID,
+			Role:           auth.AdministratorRole,
+		})
+		if err != nil {
 			return nil, err
 		}
-		slots := auth.AdministratorRoleLimit - adminCount
+		slots := auth.AdministratorRoleLimit - int(counts.Count_2)
 		if slots < 0 {
 			slots = 0
 		}
@@ -115,10 +106,10 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 		teams = append(teams, TeamListItem{
 			ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: logo,
 			AdministratorSlotsRemaining: slots,
-			MemberCount:                 memberCount,
+			MemberCount:                 int(counts.Count),
 		})
 	}
-	return &ListTeamsResponse{Teams: teams, Total: total}, nil
+	return &ListTeamsResponse{Teams: teams, Total: int(total)}, nil
 }
 
 // --- createTeam (mirrors createTeam; site-admin gated) ---
@@ -128,11 +119,7 @@ func createTeam(ctx context.Context, authorization, name string, logo *string) (
 		return nil, err
 	}
 	slug := slugifyTeamName(name)
-	var existing string
-	err := db.QueryRow(ctx,
-		`SELECT id FROM "organization" WHERE slug = $1`, slug,
-	).Scan(&existing)
-	if err == nil {
+	if _, err := q().OrgIDBySlug(ctx, slug); err == nil {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team with this slug already exists"}
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -141,12 +128,12 @@ func createTeam(ctx context.Context, authorization, name string, logo *string) (
 	if logo != nil {
 		logoVal = sql.NullString{String: *logo, Valid: true}
 	}
-	var id string
-	err = db.QueryRow(ctx,
-		`INSERT INTO "organization" (id, name, slug, logo, "updatedAt")
-		 VALUES (gen_random_uuid()::text, $1, $2, $3, $4) RETURNING id`,
-		name, slug, logoVal, time.Now().UTC(),
-	).Scan(&id)
+	id, err := q().CreateOrg(ctx, sqlc.CreateOrgParams{
+		Name:      name,
+		Slug:      slug,
+		Logo:      logoVal,
+		UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	})
 	if isUniqueViolation(err) {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team with this slug already exists"}
 	}
@@ -177,10 +164,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
 		}
 	}
-	var existingSlug string
-	err = db.QueryRow(ctx,
-		`SELECT slug FROM "organization" WHERE id = $1`, id,
-	).Scan(&existingSlug)
+	existingSlug, err := q().OrgSlugByID(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	}
@@ -192,11 +176,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 		if !auth.IsValidSlug(*p.Slug) {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid slug format or length"}
 		}
-		var collision string
-		err := db.QueryRow(ctx,
-			`SELECT id FROM "organization" WHERE slug = $1`, *p.Slug,
-		).Scan(&collision)
-		if err == nil {
+		if _, err := q().OrgIDBySlug(ctx, *p.Slug); err == nil {
 			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team slug is already in use"}
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err

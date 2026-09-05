@@ -1,9 +1,13 @@
 package teammanager
 
 import (
+	"database/sql"
+	"sync"
+
 	"encore.dev/storage/sqldb"
 
 	"encore.app/shared"
+	"encore.app/teammanager/sqlc"
 )
 
 // db is this service's handle on the shared "lightwing" database.
@@ -17,4 +21,41 @@ var db = sqldb.Named("lightwing")
 
 func init() {
 	shared.RegisterDB(&db)
+}
+
+var (
+	stdMu   sync.Mutex
+	stdPool *sql.DB
+)
+
+// std returns a database/sql pool over the current handle, rebuilding it
+// lazily. Libraries like sqlc need this bridge; raw queries keep using db.
+func std() *sql.DB {
+	stdMu.Lock()
+	defer stdMu.Unlock()
+	if stdPool == nil {
+		connStr := sqldb.RegisterStdlibDriver(db)
+		pool, err := sql.Open("encore", connStr)
+		if err != nil {
+			panic("teammanager: open stdlib db: " + err.Error())
+		}
+		stdPool = pool
+	}
+	return stdPool
+}
+
+// resetStdPool drops the cached pool so the next q() rebuilds it from the
+// current handle. Called from TestMain after shared.SetTestDB.
+func resetStdPool() {
+	stdMu.Lock()
+	defer stdMu.Unlock()
+	if stdPool != nil {
+		_ = stdPool.Close()
+		stdPool = nil
+	}
+}
+
+// q returns the sqlc queries bound to the current database handle.
+func q() *sqlc.Queries {
+	return sqlc.New(std())
 }
