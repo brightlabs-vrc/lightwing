@@ -16,7 +16,6 @@ Lightwing is built with the following technologies:
 - `teammanager/` — teams (organizations), members, stats.
 - `shared/` — shared PostgreSQL database (migrations live here) and cache cluster.
 - `frontend/` — standalone Vite SPA (separate origin; talks to the backend over HTTP).
-- `ts-legacy/` — the original Encore.ts backend + Prisma schema, kept for reference. Ported tests live in the Go services; do not add new code here.
 
 ## Development
 
@@ -107,15 +106,7 @@ encore gen client --lang typescript --output frontend/src/lib/client.ts
 
 ## Deployment
 
-The backend also serves the frontend: `frontendserve` embeds the compiled SPA
-(`frontendserve/dist`) at a root fallback route, so the deployed app is
-same-origin (no CORS needed). Encore Cloud does not run frontend builds, so
-rebuild and commit `dist/` before pushing:
-
-```bash
-cd frontend && pnpm build:encore && cd .. && git add frontendserve/dist
-```
-
-(Built without `VITE_API_BASE_URL`, the SPA calls same-origin APIs.)
-
-See the [self-hosting instructions](https://encore.dev/docs/go/self-host/docker-build) for `encore build docker`, or push to Encore Cloud with `git push encore`.
+Backend and frontend deploy separately: push to Encore Cloud with `git push encore`
+for the backend (see the [self-hosting instructions](https://encore.dev/docs/go/self-host/docker-build)
+for `encore build docker`), and deploy `frontend/` to your static host (Deno Deploy)
+with `VITE_API_BASE_URL` pointed at the backend environment.

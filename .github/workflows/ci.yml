@@ -44,13 +44,9 @@ jobs:
         working-directory: frontend
         run: pnpm vitest run
 
-      # The backend embeds the compiled SPA (frontendserve/dist via go:embed),
-      # so the frontend must be built before the backend compiles. Encore Cloud
-      # does not run frontend builds in the deploy pipeline — dist/ is
-      # committed, and this step keeps the embedded copy fresh in CI.
-      - name: Frontend Build (embedded by backend)
+      - name: Frontend Build
         working-directory: frontend
-        run: pnpm build:encore
+        run: pnpm build
 
       - name: Install Encore CLI
         run: |

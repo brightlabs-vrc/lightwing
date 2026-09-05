@@ -7,7 +7,6 @@
     "dev": "vite --host --port 5173",
     "dev:mock": "VITE_MOCK_MODE=true vite --host --port 5173",
     "build": "vite build",
-    "build:encore": "vite build --outDir ../frontendserve/dist --emptyOutDir",
     "preview": "vite preview --host --port 4173",
     "typecheck": "tsc --noEmit"
   },
