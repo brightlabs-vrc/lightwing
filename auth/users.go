@@ -87,31 +87,47 @@ func loadUserRow(ctx context.Context, userID string) (*userRow, error) {
 }
 
 func loadTeams(ctx context.Context, userID string) ([]TeamAffiliation, error) {
+	teamsByUser, err := loadTeamsForUsers(ctx, []string{userID})
+	if err != nil {
+		return nil, err
+	}
+	teams := teamsByUser[userID]
+	if teams == nil {
+		return []TeamAffiliation{}, nil
+	}
+	return teams, nil
+}
+
+func loadTeamsForUsers(ctx context.Context, userIDs []string) (map[string][]TeamAffiliation, error) {
+	if len(userIDs) == 0 {
+		return map[string][]TeamAffiliation{}, nil
+	}
 	rows, err := db.Query(ctx,
-		`SELECT o.id, o.name, o.slug, m.role
+		`SELECT m."userId", o.id, o.name, o.slug, m.role
 		 FROM "member" m
 		 JOIN "organization" o ON o.id = m."organizationId"
-		 WHERE m."userId" = $1
+		 WHERE m."userId" = ANY($1)
 		 ORDER BY o."createdAt" ASC`,
-		userID,
+		userIDs,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query team affiliations: %w", err)
 	}
 	defer rows.Close()
 
-	teams := []TeamAffiliation{}
+	teamsByUser := make(map[string][]TeamAffiliation)
 	for rows.Next() {
+		var userID string
 		var ta TeamAffiliation
-		if err := rows.Scan(&ta.OrganizationID, &ta.Name, &ta.Slug, &ta.Role); err != nil {
+		if err := rows.Scan(&userID, &ta.OrganizationID, &ta.Name, &ta.Slug, &ta.Role); err != nil {
 			return nil, fmt.Errorf("failed to scan team affiliation: %w", err)
 		}
-		teams = append(teams, ta)
+		teamsByUser[userID] = append(teamsByUser[userID], ta)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate team affiliations: %w", err)
 	}
-	return teams, nil
+	return teamsByUser, nil
 }
 
 // toProfile maps a user row plus affiliations to the public profile.
@@ -352,7 +368,8 @@ func listUsers(ctx context.Context, actor *Actor, q ListUsersQuery) (*ListUsersR
 	}
 	defer rows.Close()
 
-	resp := &ListUsersResponse{Users: []UserProfile{}, Total: total}
+	userRows := []userRow{}
+	userIDs := []string{}
 	for rows.Next() {
 		var r userRow
 		if err := rows.Scan(&r.ID, &r.Name, &r.Email, &r.Image, &r.Slug,
@@ -360,14 +377,25 @@ func listUsers(ctx context.Context, actor *Actor, q ListUsersQuery) (*ListUsersR
 			&r.SiteRole, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
 		}
-		teams, err := loadTeams(ctx, r.ID)
-		if err != nil {
-			return nil, err
-		}
-		resp.Users = append(resp.Users, *r.toProfile(teams))
+		userRows = append(userRows, r)
+		userIDs = append(userIDs, r.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate users: %w", err)
+	}
+
+	teamsByUser, err := loadTeamsForUsers(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &ListUsersResponse{Users: make([]UserProfile, 0, len(userRows)), Total: total}
+	for _, r := range userRows {
+		teams := teamsByUser[r.ID]
+		if teams == nil {
+			teams = []TeamAffiliation{}
+		}
+		resp.Users = append(resp.Users, *r.toProfile(teams))
 	}
 	return resp, nil
 }

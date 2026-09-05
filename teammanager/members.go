@@ -99,20 +99,16 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 	if targetRole == "" {
 		targetRole = "member"
 	}
-	orgExists, err := q().OrgIDByID(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
+	if _, err := q().OrgIDByID(ctx, id); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	} else if err != nil {
 		return nil, err
 	}
-	_ = orgExists
-	userExists, err := q().UserIDByID(ctx, userID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if _, err := q().UserIDByID(ctx, userID); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	} else if err != nil {
 		return nil, err
 	}
-	_ = userExists
 	if targetRole == auth.AdministratorRole {
 		if err := assertAdminCapNotReached(ctx, id); err != nil {
 			return nil, err
