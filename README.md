@@ -4,49 +4,101 @@ The URS Competitive Portal is a full-stack application to facilitate the managem
 
 Lightwing is built with the following technologies:
 
-- Backend: [Encore](https://encore.dev/) (TypeScript + Rust)
-- Frontend: [Vite](https://vitejs.dev/) (TypeScript + React) with [TanStack Query](https://tanstack.com/) for facilitating file-based routing, data fetching, and caching.
-- Database: [PostgreSQL](https://www.postgresql.org/), with [Prisma](https://www.prisma.io/) as the ORM, completely managed by Encore.
+- Backend: [Encore](https://encore.dev/) (Go)
+- Frontend: [Vite](https://vitejs.dev/) (TypeScript + React) with [TanStack Query](https://tanstack.com/) for file-based routing, data fetching, and caching.
+- Database: [PostgreSQL](https://www.postgresql.org/), with raw SQL migrations in `shared/migrations/`, completely managed by Encore.
+
+## Layout
+
+- `auth/` — Discord OAuth sign-in, sessions, users, RBAC (site roles, org roles, event admins).
+- `eventmanager/` — events, race events, members, results, scoring (points/ladder), classes, datasets.
+- `scorecalc/` + `scorecalcworker/` — async points recomputation coordinator and worker (Pub/Sub).
+- `teammanager/` — teams (organizations), members, stats.
+- `shared/` — shared PostgreSQL database (migrations live here) and cache cluster.
+- `frontend/` — standalone Vite SPA (separate origin; talks to the backend over HTTP).
+- `ts-legacy/` — the original Encore.ts backend + Prisma schema, kept for reference. Ported tests live in the Go services; do not add new code here.
 
 ## Development
 
-Run backend + frontend together:
+Run the backend:
 
 ```bash
-pnpm dev
+encore run
 ```
 
-This starts:
-- Encore backend (`encore run`)
-- Frontend Vite dev server on port `5173`
-
-You can still run each side independently:
+Run the frontend (separate terminal):
 
 ```bash
-pnpm dev:backend
-pnpm dev:frontend
+cd frontend && pnpm install && pnpm dev
 ```
+
+This starts the Vite dev server on port `5173`. The frontend targets the local backend by default; point it elsewhere with:
+
+```bash
+VITE_API_BASE_URL=https://<env>-lightwing2-uxgi.encr.app pnpm dev
+```
+
+Frontend-only UI work without a backend:
+
+```bash
+cd frontend && pnpm dev:mock
+```
+
+### Local sign-in without Discord
+
+Discord OAuth does not work on localhost. For local end-to-end testing, set:
+
+```bash
+LIGHTWING_DEBUG_LOGIN=1
+```
+
+With it set, the browser sign-in endpoint provisions a fixed `SITE_ADMIN` debug user, sets the normal session cookie, and returns you to the app — same cookie auth as a real login, no provider round-trip. Never set this in production.
+
+```bash
+LIGHTWING_FRONTEND_URL=http://localhost:5173
+```
+
+overrides the post-login redirect base (defaults to `http://localhost:3000`).
 
 ### Setting application secrets
 
-Because this application works with OIDC, you will need to set secrets for the authentication provider. You will need the following secrets set for the backend to work properly:
+Because this application works with OIDC, you will need the following secrets set for the backend to work properly:
 
-- `BETTER_AUTH_SECRET`: Authentication secret for the BetterAuth OIDC provider. You can generate a random secret using `openssl rand -base64 32`.
-- `DISCORD_AUTH_CLIENT_ID`: The client ID of the OIDC application.
-- `DISCORD_AUTH_CLIENT_SECRET`: The client secret of the OIDC application.
-- `DISCORD_BOT_TOKEN`: The bot token of the Discord bot that will be used by Encore to check for roles automatically. This bot must be added to the server with the `View Channels` and `Read Messages` permissions.
+- `DISCORD_AUTH_CLIENT_ID`: the client ID of the Discord OIDC application.
+- `DISCORD_AUTH_CLIENT_SECRET`: the client secret of the Discord OIDC application.
+- `DISCORD_BOT_TOKEN`: the bot token Encore uses to check server roles automatically. This bot must be added to the server with the `View Channels` and `Read Messages` permissions.
+- `SESSION_COOKIE_SECRET`: signs the session cookie (only the better-auth-compatible cookie routes use it; empty in local dev yields a dev-only key).
+
+Set them via `encore secret set --type development <name>` (or `--type production`), or export the same names as environment variables for local runs. You can generate a secret with `openssl rand -base64 32`.
 
 ### Working with the database
 
-As we use Prisma, you can use the Prisma CLI to manage the database. For example, to apply migrations:
+Migrations are plain SQL in `shared/migrations/` and apply automatically on `encore run` (Docker must be running). To open a shell:
 
 ```bash
-pnpm prisma migrate dev
+encore db shell lightwing
 ```
-To access the Studio UI for the database, run:
+
+## Testing
+
+Backend (all services):
 
 ```bash
-pnpm prisma studio
+encore test ./...
 ```
 
-Keep in mind you will need to expose Encore's database connection string to Prisma for Prisma to be able to connect to the database. 
+Frontend:
+
+```bash
+cd frontend && pnpm vitest run && pnpm typecheck && pnpm build
+```
+
+The generated API client (`frontend/src/lib/client.ts`) is produced from the Go backend — regenerate it after changing endpoints:
+
+```bash
+encore gen client --lang typescript --output frontend/src/lib/client.ts
+```
+
+## Deployment
+
+See the [self-hosting instructions](https://encore.dev/docs/go/self-host/docker-build) for `encore build docker`, or push to Encore Cloud with `git push encore`.

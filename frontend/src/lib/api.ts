@@ -39,12 +39,6 @@ export function writeStoredSessionToken(token: string | null) {
   }
 }
 
-export const appClient = new Client(API_BASE_URL, {
-  auth: () => {
-    const token = getStoredSessionToken()
-    if (token) {
-      return { authorization: `Bearer ${token}` }
-    }
-    return undefined
-  }
-})
+// Note: the Go-generated client has no `auth` ClientOptions hook, so every
+// authenticated wrapper passes `Authorization` explicitly in its params.
+export const appClient = new Client(API_BASE_URL)

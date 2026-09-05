@@ -1,6 +1,7 @@
 import { appClient } from './api'
 import { MOCK_MODE } from './mock-mode'
 import type { auth, eventmanager, teammanager } from './client'
+import type { ClassTier, EventStatus, EventOwnerType, SiteRole } from '../types'
 
 const now = new Date().toISOString()
 
@@ -12,7 +13,7 @@ const mockEventMembers: eventmanager.EventMemberView[] = [
 ]
 
 // Rich initial mock race events
-const mockRaceEventsList: (eventmanager.RaceEventView & { members: eventmanager.RaceEventMemberView[] })[] = [
+const mockRaceEventsList = [
   {
     id: 'race_mock_101',
     name: 'Inaugural Mile Sprint',
@@ -46,13 +47,13 @@ const mockRaceEventsList: (eventmanager.RaceEventView & { members: eventmanager.
       { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
     ],
   },
-]
+] as unknown as (eventmanager.RaceEventView & { members: eventmanager.RaceEventMemberView[] })[]
 
 // Rich initial mock race results.
 // Field mapping: gateNumber=Draw, finishTime=Finish Time,
 // margin=Distance Behind, passingOrder=Passing Order, final3F=Final 3F.
 // Key is raceId
-let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
+let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>(([
   [
     'race_mock_102',
     [
@@ -88,7 +89,9 @@ let mockRaceResultsMap = new Map<string, eventmanager.RaceResultView[]>([
       },
     ],
   ],
-])
+] as unknown as [string, eventmanager.RaceResultView[]][]))
+
+
 
 const RESULTS_LOCAL_STORAGE_KEY = 'lightwing:mock:race_results'
 
@@ -128,7 +131,7 @@ let mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
   ],
 ])
 
-let mockEvents: eventmanager.EventDetail[] = [
+let mockEvents = [
   {
     id: 'evt_mock_001',
     name: 'Summer Sprint Invitational',
@@ -191,9 +194,9 @@ let mockEvents: eventmanager.EventDetail[] = [
     createdAt: now,
     updatedAt: now,
   },
-]
+] as unknown as eventmanager.EventDetail[]
 
-let mockTeamsList: teammanager.Team[] = [
+let mockTeamsList = [
   {
     id: 'org_mock_urs',
     name: 'URS Mock Team',
@@ -211,7 +214,7 @@ let mockTeamsList: teammanager.Team[] = [
       { userId: 'mock-user-1', name: 'Thunder Bolt', role: 'member' },
     ],
   }
-]
+] as unknown as teammanager.Team[]
 
 const mockUserProfiles = new Map<string, auth.UserProfile>([
   [
@@ -293,7 +296,7 @@ const mockUserProfiles = new Map<string, auth.UserProfile>([
       updatedAt: now,
     },
   ],
-])
+] as unknown as [string, auth.UserProfile][])
 
 export function hydrateEventRaceEvents(event: eventmanager.EventDetail): eventmanager.EventDetail {
   const hydratedRaces = event.raceEvents.map((race) => ({
@@ -329,16 +332,16 @@ export function hydrateRaceEvent(eventId: string, race: eventmanager.RaceEventVi
 
 export async function listAdminEvents(
   organizationId?: string,
-  classRestriction?: eventmanager.ClassTier,
+  classRestriction?: ClassTier,
   limit?: number,
   offset?: number,
 ): Promise<{ events: eventmanager.EventListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listEvents({
-      organizationId,
-      classRestriction,
-      limit,
-      offset,
+    return appClient.eventmanager.ListEvents({
+      OrganizationID: organizationId ?? '',
+      ClassRestriction: classRestriction ?? '',
+      Limit: limit ?? 0,
+      Offset: offset ?? 0,
     })
   }
 
@@ -384,7 +387,7 @@ export async function listAdminEvents(
 
 export async function getAdminEvent(eventId: string): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.getEvent(eventId)
+    return appClient.eventmanager.GetEvent(eventId)
   }
 
   const stored = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('lightwing:mock:public_events') : null
@@ -410,12 +413,13 @@ export async function getAdminEvent(eventId: string): Promise<eventmanager.Event
 
 export async function updateAdminEventStatus(
   eventId: string,
-  status: eventmanager.EventStatus,
+  status: EventStatus,
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.setEventStatus(eventId, {
-      authorization,
+    return appClient.eventmanager.SetEventStatus({
+      id: eventId,
+      Authorization: authorization,
       status,
     })
   }
@@ -439,8 +443,9 @@ export async function setEventSignupsLocked(
 ): Promise<eventmanager.EventDetail> {
   console.log("setEventSignupsLocked called", eventId, locked, "MOCK_MODE:", MOCK_MODE);
   if (!MOCK_MODE) {
-    return appClient.eventmanager.setEventSignupsLocked(eventId, {
-      authorization,
+    return appClient.eventmanager.SetEventSignupsLocked({
+      eventId,
+      Authorization: authorization,
       locked,
     })
   }
@@ -487,7 +492,7 @@ export async function updateAdminEvent(
   params: {
     name?: string
     description?: string | null
-    classRestriction?: eventmanager.ClassTier | null
+    classRestriction?: ClassTier | null
     scoringRulesMode?: string | null
     customScoringTables?: any | null
     scheduledAt?: string | null
@@ -497,8 +502,9 @@ export async function updateAdminEvent(
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.updateEvent(eventId, {
-      authorization,
+    return appClient.eventmanager.UpdateEvent({
+      id: eventId,
+      Authorization: authorization,
       name: params.name,
       description: params.description,
       classRestriction: params.classRestriction,
@@ -507,7 +513,7 @@ export async function updateAdminEvent(
       scheduledAt: params.scheduledAt,
       participantLimit: params.participantLimit,
       maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
-    })
+    } as unknown as eventmanager.UpdateEventRequest)
   }
 
   mockEvents = mockEvents.map((evt) => {
@@ -523,7 +529,7 @@ export async function updateAdminEvent(
         participantLimit: params.participantLimit !== undefined ? params.participantLimit : evt.participantLimit,
         maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations !== undefined ? params.maxConcurrentRaceParticipations : evt.maxConcurrentRaceParticipations,
         updatedAt: new Date().toISOString(),
-      }
+      } as unknown as eventmanager.EventDetail
     }
     return evt
   })
@@ -563,11 +569,11 @@ export async function createAdminEvent(
   params: {
     name: string
     description?: string | null
-    ownerType: eventmanager.EventOwnerType
+    ownerType: EventOwnerType
     organizationId?: string | null
     ownerUserId?: string | null
     scoringType: number
-    classRestriction?: eventmanager.ClassTier | null
+    classRestriction?: ClassTier | null
     granularParticipation?: boolean
     scoringRulesMode?: string | null
     customScoringTables?: any | null
@@ -578,26 +584,26 @@ export async function createAdminEvent(
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.createEvent({
-      authorization,
+    return appClient.eventmanager.CreateEvent({
+      Authorization: authorization,
       name: params.name,
-      description: params.description,
+      description: params.description ?? null,
       ownerType: params.ownerType,
-      organizationId: params.organizationId,
-      ownerUserId: params.ownerUserId,
-      scoringType: params.scoringType as any,
-      classRestriction: params.classRestriction,
-      granularParticipation: params.granularParticipation,
-      scoringRulesMode: params.scoringRulesMode,
-      customScoringTables: params.customScoringTables,
-      scheduledAt: params.scheduledAt,
-      participantLimit: params.participantLimit,
-      maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
-    })
+      organizationId: params.organizationId ?? null,
+      ownerUserId: params.ownerUserId ?? null,
+      scoringType: params.scoringType as number,
+      classRestriction: params.classRestriction ?? null,
+      granularParticipation: params.granularParticipation ?? false,
+      scoringRulesMode: params.scoringRulesMode ?? null,
+      customScoringTables: params.customScoringTables ?? null,
+      scheduledAt: params.scheduledAt ?? null,
+      participantLimit: params.participantLimit ?? null,
+      maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations ?? null,
+    } as unknown as eventmanager.CreateEventRequest)
   }
 
   const id = `evt_mock_${Math.floor(Math.random() * 10000)}`
-  const newEvent: eventmanager.EventDetail = {
+  const newEvent = {
     id,
     name: params.name,
     description: params.description ?? null,
@@ -622,7 +628,7 @@ export async function createAdminEvent(
     ladderOverview: params.scoringType === 2 ? [] : null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  }
+  } as unknown as eventmanager.EventDetail
 
   mockEvents.unshift(newEvent)
   return newEvent
@@ -634,7 +640,7 @@ export async function createAdminEvent(
 
 export async function listRaceEvents(eventId: string): Promise<{ races: eventmanager.RaceEventDetail[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listRaceEvents(eventId)
+    return appClient.eventmanager.ListRaceEvents({ EventID: eventId })
   }
 
   const event = mockEvents.find((evt) => evt.id === eventId)
@@ -648,7 +654,7 @@ export async function listRaceEvents(eventId: string): Promise<{ races: eventman
 
 export async function getRaceEvent(eventId: string, raceId: string): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.getRaceEvent(eventId, raceId)
+    return appClient.eventmanager.GetRaceEvent({ EventID: eventId, RaceID: raceId })
   }
 
   const event = mockEvents.find((evt) => evt.id === eventId)
@@ -674,7 +680,7 @@ export async function createRaceEvent(
     location: string
     startsAt?: string | null
     endsAt?: string | null
-    classRestriction?: eventmanager.ClassTier | null
+    classRestriction?: ClassTier | null
     scoringType?: number | null
     grade?: string | null
     participantLimit?: number | null
@@ -682,20 +688,21 @@ export async function createRaceEvent(
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.createRaceEvent(eventId, {
-      authorization,
+    return appClient.eventmanager.CreateRaceEvent({
+      eventId,
+      Authorization: authorization,
       name: params.name,
-      sequence: params.sequence,
+      sequence: params.sequence ?? null,
       distanceMeters: params.distanceMeters,
       trackType: params.trackType,
       location: params.location,
-      startsAt: params.startsAt,
-      endsAt: params.endsAt,
-      classRestriction: params.classRestriction,
-      scoringType: params.scoringType,
-      grade: params.grade,
-      participantLimit: params.participantLimit,
-    })
+      startsAt: params.startsAt ?? null,
+      endsAt: params.endsAt ?? null,
+      classRestriction: params.classRestriction ?? null,
+      scoringType: params.scoringType ?? null,
+      grade: params.grade ?? null,
+      participantLimit: params.participantLimit ?? null,
+    } as unknown as eventmanager.CreateRaceEventRequest)
   }
 
   const event = mockEvents.find((evt) => evt.id === eventId)
@@ -706,7 +713,7 @@ export async function createRaceEvent(
   }
 
   const id = `race_mock_${Math.floor(Math.random() * 10000)}`
-  const newRace: eventmanager.RaceEventView = {
+  const newRace = {
     id,
     name: params.name,
     sequence: params.sequence !== undefined ? params.sequence : nextSeq,
@@ -720,7 +727,7 @@ export async function createRaceEvent(
     endsAt: params.endsAt ?? null,
     participantLimit: params.participantLimit ?? null,
     members: [],
-  }
+  } as unknown as eventmanager.RaceEventView
 
   mockEvents = mockEvents.map((evt) => {
     if (evt.id === eventId) {
@@ -741,8 +748,9 @@ export async function reorderRaceEvents(
   authorization: string,
 ): Promise<{ races: eventmanager.RaceEventDetail[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.reorderRaceEvents(eventId, {
-      authorization,
+    return appClient.eventmanager.ReorderRaceEvents({
+      eventId,
+      Authorization: authorization,
       orderedRaceIds,
     })
   }
@@ -785,7 +793,7 @@ export async function updateRaceEvent(
     location?: string
     startsAt?: string | null
     endsAt?: string | null
-    classRestriction?: eventmanager.ClassTier | null
+    classRestriction?: ClassTier | null
     scoringType?: number | null
     grade?: string | null
     participantLimit?: number | null
@@ -793,10 +801,12 @@ export async function updateRaceEvent(
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.updateRaceEvent(eventId, raceId, {
-      authorization,
+    return appClient.eventmanager.UpdateRaceEvent({
+      eventId,
+      raceId,
+      Authorization: authorization,
       ...params,
-    })
+    } as unknown as eventmanager.UpdateRaceEventRequest)
   }
 
   let updatedRace: eventmanager.RaceEventView | null = null
@@ -818,7 +828,7 @@ export async function updateRaceEvent(
             scoringType: params.scoringType === undefined ? race.scoringType : params.scoringType,
             grade: params.grade === undefined ? race.grade : params.grade,
             participantLimit: params.participantLimit === undefined ? race.participantLimit : params.participantLimit,
-          }
+          } as unknown as eventmanager.RaceEventView
           return updatedRace!
         }
         return race
@@ -863,8 +873,10 @@ export async function deleteRaceEvent(
   authorization: string,
 ): Promise<{ deleted: boolean }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.deleteRaceEvent(eventId, raceId, {
-      authorization,
+    return appClient.eventmanager.DeleteRaceEvent({
+      eventId,
+      raceId,
+      Authorization: authorization,
     })
   }
 
@@ -893,7 +905,7 @@ export async function listRaceResults(
   raceId: string,
 ): Promise<{ results: eventmanager.RaceResultView[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listRaceResults(eventId, raceId)
+    return appClient.eventmanager.ListRaceResults({ EventID: eventId, RaceID: raceId })
   }
 
   loadMockResults()
@@ -918,8 +930,11 @@ export async function assignRaceResult(
   authorization: string,
 ): Promise<eventmanager.RaceResultView> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.assignRaceResult(eventId, raceId, userId, {
-      authorization,
+    return appClient.eventmanager.AssignRaceResult({
+      eventId,
+      raceId,
+      userId,
+      Authorization: authorization,
       position: params.position,
       points: params.points,
       gateNumber: params.gateNumber,
@@ -928,14 +943,14 @@ export async function assignRaceResult(
       passingOrder: params.passingOrder,
       final3F: params.final3F,
       resultStatus: params.resultStatus ?? null,
-    })
+    } as unknown as eventmanager.AssignRaceResultRequest)
   }
 
   loadMockResults()
   const existing = mockRaceResultsMap.get(raceId) ?? []
   const existingResult = existing.find((r) => r.userId === userId)
 
-  const updatedResult: eventmanager.RaceResultView = {
+  const updatedResult = {
     id: existingResult?.id ?? `res_mock_${Math.floor(Math.random() * 10000)}`,
     raceEventId: raceId,
     userId,
@@ -949,7 +964,7 @@ export async function assignRaceResult(
     resultStatus: params.resultStatus ?? null,
     createdAt: existingResult?.createdAt ?? now,
     updatedAt: now,
-  }
+  } as unknown as eventmanager.RaceResultView
 
   const updatedList = existingResult
     ? existing.map((r) => (r.userId === userId ? updatedResult : r))
@@ -969,8 +984,10 @@ export async function replaceRaceResults(
   authorization: string,
 ): Promise<{ results: eventmanager.RaceResultView[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.replaceRaceResults(eventId, raceId, {
-      authorization,
+    return appClient.eventmanager.ReplaceRaceResults({
+      eventId,
+      raceId,
+      Authorization: authorization,
       results,
     })
   }
@@ -1006,8 +1023,10 @@ export async function mergeRaceResults(
   authorization: string,
 ): Promise<{ results: eventmanager.RaceResultView[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.mergeRaceResults(eventId, raceId, {
-      authorization,
+    return appClient.eventmanager.MergeRaceResults({
+      eventId,
+      raceId,
+      Authorization: authorization,
       results,
     })
   }
@@ -1055,8 +1074,11 @@ export async function deleteRaceResult(
   authorization: string,
 ): Promise<{ deleted: boolean }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.deleteRaceResult(eventId, raceId, userId, {
-      authorization,
+    return appClient.eventmanager.DeleteRaceResult({
+      eventId,
+      raceId,
+      userId,
+      Authorization: authorization,
     })
   }
 
@@ -1080,9 +1102,10 @@ export async function addEventMember(
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.addEventMember(eventId, {
-      authorization,
+    return appClient.eventmanager.AddEventMember({
+      eventId,
       userId,
+      Authorization: authorization,
     })
   }
 
@@ -1119,8 +1142,10 @@ export async function removeEventMember(
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.removeEventMember(eventId, userId, {
-      authorization,
+    return appClient.eventmanager.RemoveEventMember({
+      EventID: eventId,
+      UserID: userId,
+      Authorization: authorization,
     })
   }
 
@@ -1149,9 +1174,11 @@ export async function addRaceEventMember(
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.addRaceEventMember(eventId, raceId, {
-      authorization,
+    return appClient.eventmanager.AddRaceEventMember({
+      eventId,
+      raceId,
       userId,
+      Authorization: authorization,
     })
   }
 
@@ -1188,8 +1215,11 @@ export async function removeRaceEventMember(
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.removeRaceEventMember(eventId, raceId, userId, {
-      authorization,
+    return appClient.eventmanager.RemoveRaceEventMember({
+      eventId,
+      raceId,
+      userId,
+      Authorization: authorization,
     })
   }
 
@@ -1214,7 +1244,7 @@ export async function listRaceEventMembers(
   raceId: string,
 ): Promise<{ members: eventmanager.RaceEventMemberView[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listRaceEventMembers(eventId, raceId)
+    return appClient.eventmanager.ListRaceEventMembers({ EventID: eventId, RaceID: raceId })
   }
 
   const members = mockRaceMembersMap.get(raceId) ?? []
@@ -1260,11 +1290,11 @@ export async function listAdminUsers(
   offset?: number,
 ): Promise<{ users: auth.UserProfile[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.auth.listUsers({
-      authorization,
-      search,
-      limit,
-      offset,
+    return appClient.auth.ListUsers({
+      Authorization: authorization,
+      Search: search ?? '',
+      Limit: limit ?? 0,
+      Offset: offset ?? 0,
     })
   }
 
@@ -1289,7 +1319,7 @@ export async function listAdminUsers(
 
 export async function getAdminUserProfile(userId: string): Promise<auth.UserProfile> {
   if (!MOCK_MODE) {
-    return appClient.auth.getUserProfile(userId)
+    return appClient.auth.GetUser(userId)
   }
 
   const existing = mockUserProfiles.get(userId)
@@ -1302,12 +1332,13 @@ export async function getAdminUserProfile(userId: string): Promise<auth.UserProf
 
 export async function updateAdminUserSiteRole(
   userId: string,
-  siteRole: auth.SiteRoleName,
+  siteRole: SiteRole,
   authorization: string,
 ): Promise<auth.UserProfile> {
   if (!MOCK_MODE) {
-    return appClient.auth.setUserSiteRole(userId, {
-      authorization,
+    return appClient.auth.SetUserSiteRole({
+      id: userId,
+      Authorization: authorization,
       siteRole,
     })
   }
@@ -1317,7 +1348,7 @@ export async function updateAdminUserSiteRole(
     throw new Error(`User ${userId} was not found in mock records`)
   }
 
-  const nextRole: auth.SiteRoleName = siteRole === 'SITE_ADMIN' ? 'SITE_ADMIN' : 'USER'
+  const nextRole: SiteRole = siteRole === 'SITE_ADMIN' ? 'SITE_ADMIN' : 'USER'
   const updated: auth.UserProfile = {
     ...existing,
     siteRole: nextRole,
@@ -1341,10 +1372,11 @@ export async function updateAdminUserProfile(
   authorization: string,
 ): Promise<auth.UserProfile> {
   if (!MOCK_MODE) {
-    return appClient.auth.updateUserProfile(userId, {
-      authorization,
+    return appClient.auth.UpdateUser({
+      id: userId,
+      Authorization: authorization,
       ...params,
-    })
+    } as unknown as auth.UpdateUserRequest)
   }
 
   const existing = mockUserProfiles.get(userId)
@@ -1354,12 +1386,12 @@ export async function updateAdminUserProfile(
 
   const updated: auth.UserProfile = {
     ...existing,
-    name: params.name !== undefined ? params.name : existing.name,
-    slug: params.slug !== undefined ? params.slug : existing.slug,
-    image: params.image !== undefined ? params.image : existing.image,
-    biography: params.biography !== undefined ? params.biography : existing.biography,
-    careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
-    vrchatUsername: params.vrchatUsername !== undefined ? params.vrchatUsername : existing.vrchatUsername,
+    name: params.name ?? existing.name,
+    slug: params.slug ?? existing.slug,
+    image: params.image ?? existing.image,
+    biography: params.biography ?? existing.biography,
+    careerOverview: params.careerOverview ?? existing.careerOverview,
+    vrchatUsername: params.vrchatUsername ?? existing.vrchatUsername,
     updatedAt: new Date().toISOString(),
   }
 
@@ -1369,14 +1401,17 @@ export async function updateAdminUserProfile(
 
 export async function updateAdminUserClass(
   userId: string,
-  classTier: eventmanager.ClassTier | null,
+  classTier: ClassTier | null,
   authorization: string,
-): Promise<{ userId: string; classTier: eventmanager.ClassTier | null }> {
+): Promise<{ userId: string; classTier: ClassTier | null }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.setUserClass(userId, {
-      authorization,
+    const res = await appClient.eventmanager.SetUserClass({
+      userId,
+      Authorization: authorization,
+      organizationId: null,
       classTier,
-    })
+    } as unknown as eventmanager.SetUserClassRequest)
+    return { userId: res.userId, classTier: res.classTier as ClassTier | null }
   }
 
   const existing = mockUserProfiles.get(userId)
@@ -1386,7 +1421,7 @@ export async function updateAdminUserClass(
 
   const updated: auth.UserProfile = {
     ...existing,
-    classTier: classTier,
+    classTier: classTier ?? existing.classTier,
     updatedAt: new Date().toISOString(),
   }
 
@@ -1404,10 +1439,10 @@ export async function listAdminTeams(
   offset?: number,
 ): Promise<{ teams: teammanager.TeamListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.listTeams({
-      search,
-      limit,
-      offset,
+    return appClient.teammanager.ListTeams({
+      Search: search ?? '',
+      Limit: limit ?? 0,
+      Offset: offset ?? 0,
     })
   }
 
@@ -1438,7 +1473,7 @@ export async function listAdminTeams(
 
 export async function getAdminTeam(id: string): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.getTeam(id)
+    return appClient.teammanager.GetTeam(id)
   }
 
   const team = mockTeamsList.find((t) => t.id === id)
@@ -1459,10 +1494,11 @@ export async function updateAdminTeamStats(
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.updateTeamStats(id, {
-      authorization,
+    return appClient.teammanager.UpdateTeamStats({
+      id,
+      Authorization: authorization,
       ...params,
-    })
+    } as unknown as teammanager.UpdateTeamStatsRequest)
   }
 
   const teamIndex = mockTeamsList.findIndex((t) => t.id === id)
@@ -1470,10 +1506,10 @@ export async function updateAdminTeamStats(
   const team = mockTeamsList[teamIndex]
 
   team.stats = {
-    rankingAverage: params.rankingAverage !== undefined ? params.rankingAverage : team.stats.rankingAverage,
-    pointsAverage: params.pointsAverage !== undefined ? params.pointsAverage : team.stats.pointsAverage,
-    seasonRank: params.seasonRank !== undefined ? params.seasonRank : team.stats.seasonRank,
-    averagePointsPerEvent: params.averagePointsPerEvent !== undefined ? params.averagePointsPerEvent : team.stats.averagePointsPerEvent,
+    rankingAverage: params.rankingAverage ?? team.stats.rankingAverage,
+    pointsAverage: params.pointsAverage ?? team.stats.pointsAverage,
+    seasonRank: params.seasonRank ?? team.stats.seasonRank,
+    averagePointsPerEvent: params.averagePointsPerEvent ?? team.stats.averagePointsPerEvent,
   }
 
   return team
@@ -1489,19 +1525,20 @@ export async function updateAdminTeam(
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.updateTeam(id, {
-      authorization,
+    return appClient.teammanager.UpdateTeam({
+      id,
+      Authorization: authorization,
       ...params,
-    })
+    } as unknown as teammanager.UpdateTeamRequest)
   }
 
   const teamIndex = mockTeamsList.findIndex((t) => t.id === id)
   if (teamIndex === -1) throw new Error('Mock team not found')
   const team = mockTeamsList[teamIndex]
 
-  team.name = params.name !== undefined ? params.name : team.name
-  team.slug = params.slug !== undefined ? params.slug : team.slug
-  team.logo = params.logo !== undefined ? params.logo : team.logo
+  team.name = params.name ?? team.name
+  team.slug = params.slug ?? team.slug
+  team.logo = params.logo ?? team.logo
 
   return team
 }
@@ -1513,10 +1550,11 @@ export async function listAdminTeamMembers(
   offset?: number,
 ): Promise<{ members: Array<{ userId: string; name: string; slug: string | null; role: string }>; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.listTeamMembers(teamId, {
-      search,
-      limit,
-      offset,
+    return appClient.teammanager.ListTeamMembers({
+      ID: teamId,
+      Search: search ?? '',
+      Limit: limit ?? 0,
+      Offset: offset ?? 0,
     })
   }
 
@@ -1560,7 +1598,7 @@ export async function recomputeEventPoints(
   authorization: string,
 ): Promise<{ success: boolean }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.recomputeEventPoints(eventId, { authorization })
+    return appClient.eventmanager.RecomputeEventPoints({ id: eventId, Authorization: authorization })
   }
   recomputeMockOverview(eventId)
   return { success: true }
@@ -1571,11 +1609,11 @@ export async function createAdminTeam(
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.createTeam({
-      authorization,
+    return appClient.teammanager.CreateTeam({
+      Authorization: authorization,
       name: params.name,
-      logo: params.logo,
-    })
+      logo: params.logo ?? null,
+    } as unknown as teammanager.CreateTeamRequest)
   }
 
   const slug = params.name
@@ -1588,7 +1626,7 @@ export async function createAdminTeam(
   }
 
   const id = `org_mock_${Math.floor(Math.random() * 10000)}`
-  const newTeam: teammanager.Team = {
+  const newTeam = {
     id,
     name: params.name,
     slug,
@@ -1601,7 +1639,7 @@ export async function createAdminTeam(
     },
     administratorSlotsRemaining: 3,
     members: [],
-  }
+  } as unknown as teammanager.Team
 
   mockTeamsList.unshift(newTeam)
   return newTeam
@@ -1613,10 +1651,11 @@ export async function addAdminTeamMember(
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.addTeamMember(teamId, {
-      authorization,
+    return appClient.teammanager.AddTeamMember({
+      id: teamId,
+      Authorization: authorization,
       userId: params.userId,
-      role: params.role,
+      role: params.role ?? 'member',
     })
   }
 
@@ -1659,8 +1698,10 @@ export async function updateAdminTeamMemberRole(
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.updateTeamMemberRole(teamId, userId, {
-      authorization,
+    return appClient.teammanager.UpdateTeamMemberRole({
+      id: teamId,
+      userId,
+      Authorization: authorization,
       role,
     })
   }
@@ -1702,8 +1743,10 @@ export async function removeAdminTeamMember(
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.removeTeamMember(teamId, userId, {
-      authorization,
+    return appClient.teammanager.RemoveTeamMember({
+      ID: teamId,
+      UserID: userId,
+      Authorization: authorization,
     })
   }
 

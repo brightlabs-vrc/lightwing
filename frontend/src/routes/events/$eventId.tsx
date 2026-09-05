@@ -17,6 +17,7 @@ import {
   useToast,
 } from '@pxlkit/ui-kit'
 import type { eventmanager } from '../../lib/client'
+import type { EventStatus } from '../../types'
 import { PixelSkeletonDetail } from '../../components/LoadingSkeleton'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
@@ -32,7 +33,7 @@ const SCORING_LABELS: Record<number, string> = {
   2: 'LADDER-ELO',
 }
 
-const STATUS_TONE: Record<eventmanager.EventStatus, 'neutral' | 'cyan' | 'green' | 'pink'> = {
+const STATUS_TONE: Record<EventStatus, 'neutral' | 'cyan' | 'green' | 'pink'> = {
   DRAFT: 'neutral',
   UNOFFICIAL: 'cyan',
   OFFICIAL: 'green',
@@ -155,7 +156,7 @@ function EventDetailPage() {
                 </div>
               )}
             </PixelStack>
-            <PixelBadge tone={STATUS_TONE[event.status]}>{event.status.toUpperCase()}</PixelBadge>
+            <PixelBadge tone={STATUS_TONE[event.status as EventStatus]}>{event.status.toUpperCase()}</PixelBadge>
           </PixelStack>
 
           {event.description && (

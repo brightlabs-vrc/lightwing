@@ -4,6 +4,7 @@ import {
   setEventSignupsLocked,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
+import type { EventStatus } from '../types'
 
 interface UseEventStatusProps {
   eventId: string;
@@ -25,7 +26,7 @@ export function useEventStatus({
 
   // Update parent event lifecycle status
   const handleUpdateEventStatus = useCallback(
-    async (status: eventmanager.EventStatus) => {
+    async (status: EventStatus) => {
       if (!authHeader) {
         setGlobalError('Authentication token is required.')
         return

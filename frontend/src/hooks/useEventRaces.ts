@@ -6,13 +6,14 @@ import {
   reorderRaceEvents,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
+import type { ClassTier } from '../types'
 
 export interface NewRaceForm {
   name: string
   distanceMeters: number
   trackType: string
   location: string
-  classRestriction: eventmanager.ClassTier | null
+  classRestriction: ClassTier | null
   grade?: string
   participantLimit?: number | null
 }
@@ -132,7 +133,7 @@ export function useEventRaces({
         distanceMeters?: number
         trackType?: string
         location?: string
-        classRestriction?: eventmanager.ClassTier | null
+        classRestriction?: ClassTier | null
         grade?: string | null
         participantLimit?: number | null
       }

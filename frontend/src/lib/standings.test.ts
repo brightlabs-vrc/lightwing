@@ -12,7 +12,7 @@ function makeMockRow(
     member: {
       userId,
       name: "User_" + userId,
-      classTier: null,
+      classTier: null as unknown as string,
     },
     savedResult: undefined,
     edit: {

@@ -16,6 +16,7 @@ import {
 } from '@pxlkit/ui-kit'
 import type { eventmanager } from '../../lib/client'
 import { PixelSkeletonList } from '../../components/LoadingSkeleton'
+import type { EventStatus } from '../../types'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
   PRE_OP: 'PRE-OP',
@@ -30,14 +31,14 @@ const SCORING_LABELS: Record<number, string> = {
   2: 'ladder-elo',
 }
 
-const STATUS_LABELS: Record<eventmanager.EventStatus, string> = {
+const STATUS_LABELS: Record<EventStatus, string> = {
   DRAFT: 'Draft',
   UNOFFICIAL: 'Unofficial',
   OFFICIAL: 'Official',
   CONCLUDED: 'Concluded',
 }
 
-const STATUS_TONE: Record<eventmanager.EventStatus, 'neutral' | 'cyan' | 'green' | 'pink'> = {
+const STATUS_TONE: Record<EventStatus, 'neutral' | 'cyan' | 'green' | 'pink'> = {
   DRAFT: 'neutral',
   UNOFFICIAL: 'cyan',
   OFFICIAL: 'green',
@@ -132,8 +133,8 @@ function EventsPage() {
                             </p>
                           )}
                         </PixelStack>
-                        <PixelBadge tone={STATUS_TONE[event.status]}>
-                          {STATUS_LABELS[event.status].toUpperCase()}
+                        <PixelBadge tone={STATUS_TONE[event.status as EventStatus]}>
+                          {STATUS_LABELS[event.status as EventStatus].toUpperCase()}
                         </PixelBadge>
                       </PixelStack>
 

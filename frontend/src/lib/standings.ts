@@ -285,7 +285,9 @@ export function editedToRaceResultInput(userId: string, edit: EditedResult): eve
     passingOrder: edit.passingOrder.trim() !== '' ? edit.passingOrder.trim() : null,
     final3F: edit.final3F.trim() !== '' ? edit.final3F.trim() : null,
     resultStatus: edit.resultStatus.trim() !== '' ? edit.resultStatus.trim() : null,
-  }
+    clearPosition: false,
+    clearStatus: false,
+  } as unknown as eventmanager.RaceResultInput
 }
 
 // Convert a saved result row into the API payload shape (used for full replace).
@@ -300,5 +302,7 @@ export function savedToRaceResultInput(saved: eventmanager.RaceResultView): even
     passingOrder: saved.passingOrder,
     final3F: saved.final3F,
     resultStatus: saved.resultStatus,
+    clearPosition: false,
+    clearStatus: false,
   }
 }

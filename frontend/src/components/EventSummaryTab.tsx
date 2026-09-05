@@ -76,7 +76,7 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {['OP', 'GIII', 'GII', 'GI'].map((grade) => {
               const table = (selectedEvent.scoringRulesMode === 'CUSTOM' && selectedEvent.customScoringTables)
-                ? (selectedEvent.customScoringTables[grade] || DEFAULT_SCORING_TABLES[grade])
+                ? ((selectedEvent.customScoringTables as Record<string, Record<number, number>>)[grade] || DEFAULT_SCORING_TABLES[grade])
                 : DEFAULT_SCORING_TABLES[grade];
               return <GradePointsPreview key={grade} grade={grade} table={table} />;
             })}

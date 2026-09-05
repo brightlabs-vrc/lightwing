@@ -18,6 +18,7 @@ import { EventMembersTab } from '../../../components/EventMembersTab'
 import { EventRacesTab } from '../../../components/EventRacesTab'
 import { DEFAULT_SCORING_TABLES } from '../../../lib/scoringDefaults'
 import { toLocalISOString } from '../../../lib/datetime'
+import type { ClassTier, EventStatus } from '../../../types'
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   beforeLoad: async ({ location }) => {
@@ -92,7 +93,7 @@ function AdminEventDetailPage() {
   const [raceEditLocation, setRaceEditLocation] = useState('')
   const [raceEditDistance, setRaceEditDistance] = useState(1200)
   const [raceEditTrackType, setRaceEditTrackType] = useState('Turf')
-  const [raceEditClassRestriction, setRaceEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
+  const [raceEditClassRestriction, setRaceEditClassRestriction] = useState<ClassTier | null>(null)
   const [raceEditGrade, setRaceEditGrade] = useState<string | null>(null)
   const [raceEditParticipantLimit, setRaceEditParticipantLimit] = useState<string>('')
   const [showRaceGradeConfirm, setShowRaceGradeConfirm] = useState(false)
@@ -100,7 +101,7 @@ function AdminEventDetailPage() {
 
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
-  const [editClassRestriction, setEditClassRestriction] = useState<eventmanager.ClassTier | null>(null)
+  const [editClassRestriction, setEditClassRestriction] = useState<ClassTier | null>(null)
   const [editGranularParticipation, setEditGranularParticipation] = useState(false)
   const [editSignupsLocked, setEditSignupsLocked] = useState(false)
   const [editScheduledAt, setEditScheduledAt] = useState<string>('')
@@ -117,7 +118,7 @@ function AdminEventDetailPage() {
       setRaceEditLocation(selectedRace.location)
       setRaceEditDistance(selectedRace.distanceMeters)
       setRaceEditTrackType(selectedRace.trackType)
-      setRaceEditClassRestriction(selectedRace.classRestriction)
+      setRaceEditClassRestriction(selectedRace.classRestriction as ClassTier | null)
       setRaceEditGrade(selectedRace.grade)
       setRaceEditParticipantLimit(selectedRace.participantLimit !== null ? String(selectedRace.participantLimit) : '')
       setRaceEditError(null)
@@ -129,7 +130,7 @@ function AdminEventDetailPage() {
     if (selectedEvent) {
       setEditName(selectedEvent.name)
       setEditDescription(selectedEvent.description ?? '')
-      setEditClassRestriction(selectedEvent.classRestriction)
+      setEditClassRestriction(selectedEvent.classRestriction as ClassTier | null)
       setEditGranularParticipation(selectedEvent.granularParticipation)
       setEditSignupsLocked(selectedEvent.signupsLocked)
       setEditScheduledAt(selectedEvent.scheduledAt ? toLocalISOString(selectedEvent.scheduledAt) : '')
@@ -137,7 +138,7 @@ function AdminEventDetailPage() {
       setEditMaxConcurrentRaceParticipations(selectedEvent.maxConcurrentRaceParticipations !== null ? String(selectedEvent.maxConcurrentRaceParticipations) : '')
       setEditScoringRulesMode((selectedEvent.scoringRulesMode as 'STANDARD' | 'CUSTOM') || 'STANDARD')
       if (selectedEvent.customScoringTables) {
-        setEditCustomScoringTables(selectedEvent.customScoringTables)
+        setEditCustomScoringTables(selectedEvent.customScoringTables as Record<string, Record<number, number>>)
       } else {
         setEditCustomScoringTables(DEFAULT_SCORING_TABLES)
       }
@@ -404,7 +405,7 @@ function AdminEventDetailPage() {
                   <select
                     disabled={eventStatusSaving}
                     value={selectedEvent.status}
-                    onChange={(e) => void handleUpdateEventStatus(e.target.value as eventmanager.EventStatus)}
+                    onChange={(e) => void handleUpdateEventStatus(e.target.value as EventStatus)}
                     className="slds-select"
                     style={{ minWidth: '130px', padding: '4px 28px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
                   >
@@ -684,7 +685,7 @@ function AdminEventDetailPage() {
                             <select
                               id="race-restriction"
                               value={newRaceForm.classRestriction || ''}
-                              onChange={(e) => setNewRaceForm((c) => ({ ...c, classRestriction: e.target.value ? e.target.value as eventmanager.ClassTier : null }))}
+                              onChange={(e) => setNewRaceForm((c) => ({ ...c, classRestriction: e.target.value ? e.target.value as ClassTier : null }))}
                               className="slds-select"
                               style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                             >
@@ -897,7 +898,7 @@ function AdminEventDetailPage() {
                             <select
                               id="edit-class-tier"
                               value={editClassRestriction || ''}
-                              onChange={(e) => setEditClassRestriction(e.target.value ? e.target.value as eventmanager.ClassTier : null)}
+                              onChange={(e) => setEditClassRestriction(e.target.value ? e.target.value as ClassTier : null)}
                               className="slds-select"
                               style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                             >
@@ -1202,7 +1203,7 @@ function AdminEventDetailPage() {
                             <select
                               id="edit-race-restriction"
                               value={raceEditClassRestriction || ''}
-                              onChange={(e) => setRaceEditClassRestriction(e.target.value ? e.target.value as eventmanager.ClassTier : null)}
+                              onChange={(e) => setRaceEditClassRestriction(e.target.value ? e.target.value as ClassTier : null)}
                               className="slds-select"
                               style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                             >

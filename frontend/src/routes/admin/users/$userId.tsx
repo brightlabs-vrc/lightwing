@@ -6,6 +6,7 @@ import { getAdminUserProfile, updateAdminUserSiteRole, updateAdminUserProfile, u
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import type { auth, eventmanager } from '../../../lib/client'
+import type { ClassTier, SiteRole } from '../../../types'
 
 export const Route = createFileRoute('/admin/users/$userId')({
   beforeLoad: async ({ location }) => {
@@ -49,7 +50,7 @@ function AdminUserDetailPage() {
       const loaded = await getAdminUserProfile(userId)
       const normalizedProfile = {
         ...loaded,
-        classTier: (loaded.classTier === 'PRE_OP' || loaded.classTier === 'OP') ? null : loaded.classTier
+        classTier: ((loaded.classTier === 'PRE_OP' || loaded.classTier === 'OP') ? null : loaded.classTier) as string,
       }
       setProfile(normalizedProfile)
       setName(loaded.name || '')
@@ -133,7 +134,7 @@ function AdminUserDetailPage() {
       }
 
       // 2. Update Class Tier if changed
-      const nextTier = classTier === '' ? null : (classTier as eventmanager.ClassTier)
+      const nextTier = classTier === '' ? null : (classTier as ClassTier)
       const classTierChanged = nextTier !== profile.classTier
 
       if (classTierChanged) {
@@ -141,7 +142,7 @@ function AdminUserDetailPage() {
         // Refresh profile state with the new class tier
         currentProfile = {
           ...currentProfile,
-          classTier: nextTier,
+          classTier: nextTier as string,
         }
       }
 
@@ -155,7 +156,7 @@ function AdminUserDetailPage() {
     }
   }
 
-  async function adjustSiteRole(siteRole: auth.SiteRoleName) {
+  async function adjustSiteRole(siteRole: SiteRole) {
     if (!profile || !authHeader) {
       setError('System authentication is required.')
       return

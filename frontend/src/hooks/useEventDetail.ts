@@ -7,6 +7,7 @@ import {
   listRaceResults,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
+import type { ClassTier, EventStatus } from '../types'
 import {
   isRaceOngoing,
   isRaceConcluded,
@@ -19,7 +20,7 @@ import { useEventMembers } from './useEventMembers'
 import { useEventResults } from './useEventResults'
 import { useEventStatus } from './useEventStatus'
 
-const STATUS_OPTIONS: eventmanager.EventStatus[] = ['DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'CONCLUDED']
+const STATUS_OPTIONS: EventStatus[] = ['DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'CONCLUDED']
 const CLASS_TIER_OPTIONS = ['G3', 'G2', 'G1']
 
 export type ActiveTab = 'details' | 'members' | 'races' | 'datasets'
@@ -139,7 +140,7 @@ export function useEventDetail(eventId: string) {
     async (params: {
       name: string
       description: string | null
-      classRestriction: eventmanager.ClassTier | null
+      classRestriction: ClassTier | null
       scoringRulesMode?: string | null
       customScoringTables?: any | null
       scheduledAt?: string | null

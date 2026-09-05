@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { eventmanager } from '../lib/client'
+import type { ClassTier } from '../types'
 import { AlertBanner } from './AlertBanner'
 
 function formatClassTier(tier: string | null | undefined): string {
@@ -310,7 +311,7 @@ export function RaceDetailPane({
                 <select
                   id="race-class-restriction-select"
                   value={(!selectedRace.classRestriction || selectedRace.classRestriction === 'PRE_OP' || selectedRace.classRestriction === 'OP') ? '' : selectedRace.classRestriction}
-                  onChange={(e) => void handleUpdateRace(selectedRace.id, { classRestriction: e.target.value ? e.target.value as eventmanager.ClassTier : null })}
+                  onChange={(e) => void handleUpdateRace(selectedRace.id, { classRestriction: e.target.value ? e.target.value as ClassTier : null })}
                   className="slds-select"
                   style={{ minWidth: '130px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
                 >

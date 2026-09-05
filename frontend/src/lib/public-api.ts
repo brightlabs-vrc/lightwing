@@ -51,7 +51,7 @@ const mockUserProfileMap = new Map<string, auth.UserProfile>([
     createdAt: now,
     updatedAt: now,
   }],
-])
+] as unknown as [string, auth.UserProfile][])
 
 const mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
   [
@@ -71,7 +71,7 @@ const mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
 ])
 
 // Mock results for the mock races
-const mockRaceResults: Record<string, eventmanager.RaceResultView[]> = {
+const mockRaceResults = {
   'race_mock_001': [
     {
       id: 'res_mock_001',
@@ -136,7 +136,7 @@ const mockRaceResults: Record<string, eventmanager.RaceResultView[]> = {
       updatedAt: now,
     },
   ],
-}
+} as unknown as Record<string, eventmanager.RaceResultView[]>
 
 const LOCAL_STORAGE_KEY = 'lightwing:mock:public_events'
 
@@ -252,7 +252,7 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       createdAt: now,
       updatedAt: now,
     },
-  ]
+  ] as unknown as eventmanager.EventDetail[]
 }
 
 export function saveMockEvents(events: eventmanager.EventDetail[]) {
@@ -285,9 +285,9 @@ export async function listPublicEvents(
   offset?: number,
 ): Promise<{ events: eventmanager.EventListItem[]; total: number }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listPublicEvents({
-      limit,
-      offset,
+    return appClient.eventmanager.ListPublicEvents({
+      Limit: limit ?? 0,
+      Offset: offset ?? 0,
     })
   }
   mockPublicEvents = loadMockEvents()
@@ -353,7 +353,7 @@ function isEligible(
 
 export async function getPublicEvent(eventId: string): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.getEvent(eventId)
+    return appClient.eventmanager.GetEvent(eventId)
   }
   mockPublicEvents = loadMockEvents()
   const event = mockPublicEvents.find((e) => e.id === eventId)
@@ -366,7 +366,7 @@ export async function joinEvent(
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.with({ auth: { authorization } }).eventmanager.joinEvent(eventId, { authorization })
+    return appClient.eventmanager.JoinEvent({ eventId, Authorization: authorization })
   }
 
   mockPublicEvents = loadMockEvents()
@@ -411,7 +411,7 @@ export async function leaveEvent(
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.with({ auth: { authorization } }).eventmanager.leaveEvent(eventId, { authorization })
+    return appClient.eventmanager.LeaveEvent({ EventID: eventId, Authorization: authorization })
   }
 
   mockPublicEvents = loadMockEvents()
@@ -437,7 +437,7 @@ export async function leaveEvent(
 
 export async function getMyProfile(userId: string): Promise<auth.UserProfile> {
   if (!MOCK_MODE) {
-    return appClient.auth.getUserProfile(userId)
+    return appClient.auth.GetUser(userId)
   }
   const user = mockUserProfileMap.get(userId)
   if (!user) throw new Error('User not found')
@@ -456,14 +456,15 @@ export async function updateMyProfile(
   authorization: string,
 ): Promise<auth.UserProfile> {
   if (!MOCK_MODE) {
-    return appClient.with({ auth: { authorization } }).auth.updateUserProfile(userId, {
-      authorization,
+    return appClient.auth.UpdateUser({
+      id: userId,
+      Authorization: authorization,
       name: params.name,
       slug: params.slug,
       biography: params.biography,
       careerOverview: params.careerOverview,
       vrchatUsername: params.vrchatUsername,
-    })
+    } as unknown as auth.UpdateUserRequest)
   }
 
   const existing = mockUserProfileMap.get(userId)
@@ -472,10 +473,10 @@ export async function updateMyProfile(
   const updated: auth.UserProfile = {
     ...existing,
     name: params.name ?? (existing.vrchatUsername ?? existing.name),
-    slug: params.slug !== undefined ? params.slug : existing.slug,
-    biography: params.biography !== undefined ? params.biography : existing.biography,
-    careerOverview: params.careerOverview !== undefined ? params.careerOverview : existing.careerOverview,
-    vrchatUsername: params.vrchatUsername !== undefined ? params.vrchatUsername : existing.vrchatUsername,
+    slug: params.slug ?? existing.slug,
+    biography: params.biography ?? existing.biography,
+    careerOverview: params.careerOverview ?? existing.careerOverview,
+    vrchatUsername: params.vrchatUsername ?? existing.vrchatUsername,
     updatedAt: new Date().toISOString(),
   }
 
@@ -499,7 +500,7 @@ export async function listPublicRaceEvents(
   eventId: string,
 ): Promise<{ races: eventmanager.RaceEventDetail[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listRaceEvents(eventId)
+    return appClient.eventmanager.ListRaceEvents({ EventID: eventId })
   }
   mockPublicEvents = loadMockEvents()
   const event = mockPublicEvents.find((e) => e.id === eventId)
@@ -516,7 +517,7 @@ export async function getPublicRaceResults(
   raceId: string,
 ): Promise<{ results: eventmanager.RaceResultView[] }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.listRaceResults(eventId, raceId)
+    return appClient.eventmanager.ListRaceResults({ EventID: eventId, RaceID: raceId })
   }
   let results = mockRaceResults[raceId] ?? []
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -540,7 +541,7 @@ export async function getPublicRaceEvent(
   raceId: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.getRaceEvent(eventId, raceId)
+    return appClient.eventmanager.GetRaceEvent({ EventID: eventId, RaceID: raceId })
   }
   mockPublicEvents = loadMockEvents()
   const event = mockPublicEvents.find((e) => e.id === eventId)
@@ -559,7 +560,7 @@ export async function joinRaceEvent(
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.with({ auth: { authorization } }).eventmanager.joinRaceEvent(eventId, raceId, { authorization })
+    return appClient.eventmanager.JoinRaceEvent({ eventId, raceId, Authorization: authorization })
   }
 
   mockPublicEvents = loadMockEvents()
@@ -620,7 +621,7 @@ export async function leaveRaceEvent(
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.with({ auth: { authorization } }).eventmanager.leaveRaceEvent(eventId, raceId, { authorization })
+    return appClient.eventmanager.LeaveRaceEvent({ eventId, raceId, Authorization: authorization })
   }
 
   mockPublicEvents = loadMockEvents()

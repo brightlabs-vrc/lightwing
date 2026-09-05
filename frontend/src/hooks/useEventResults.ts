@@ -9,6 +9,8 @@ import type { eventmanager } from '../lib/client'
 import {
   deriveRows,
   editsFromResults,
+  editedToRaceResultInput,
+  savedToRaceResultInput,
   EMPTY_EDIT,
   inferFinishTimes,
   summarizeChanges,
@@ -147,17 +149,7 @@ export function useEventResults({
 
       const activeStagedChanges = derivedStates
         .filter((d) => d.rowState === 'new' || d.rowState === 'modified')
-        .map((d) => ({
-          userId: d.member.userId,
-          position: d.edit.position.trim() !== '' ? Number(d.edit.position) : null,
-          points: Number(d.edit.points) || 0,
-          gateNumber: d.edit.gateNumber.trim() !== '' ? Number(d.edit.gateNumber) : null,
-          finishTime: d.edit.finishTime.trim() !== '' ? d.edit.finishTime.trim() : null,
-          margin: d.edit.margin.trim() !== '' ? d.edit.margin.trim() : null,
-          passingOrder: d.edit.passingOrder.trim() !== '' ? d.edit.passingOrder.trim() : null,
-          final3F: d.edit.final3F.trim() !== '' ? d.edit.final3F.trim() : null,
-          resultStatus: d.edit.resultStatus.trim() !== '' ? d.edit.resultStatus.trim() : null,
-        }))
+        .map((d) => editedToRaceResultInput(d.member.userId, d.edit))
 
       let nextResults = [...results]
 
@@ -199,31 +191,11 @@ export function useEventResults({
       } else if (deletedCount > 0) {
         const fullReplacePayload = derivedStates
           .filter((d) => d.rowState === 'unchanged' && d.savedResult)
-          .map((d) => ({
-            userId: d.member.userId,
-            position: d.savedResult!.position,
-            points: d.savedResult!.points,
-            gateNumber: d.savedResult!.gateNumber,
-            finishTime: d.savedResult!.finishTime,
-            margin: d.savedResult!.margin,
-            passingOrder: d.savedResult!.passingOrder,
-            final3F: d.savedResult!.final3F,
-            resultStatus: d.savedResult!.resultStatus,
-          }))
+          .map((d) => savedToRaceResultInput(d.savedResult!))
           .concat(
             derivedStates
               .filter((d) => d.rowState === 'new' || d.rowState === 'modified')
-              .map((d) => ({
-                userId: d.member.userId,
-                position: d.edit.position.trim() !== '' ? Number(d.edit.position) : null,
-                points: d.edit.points.trim() !== '' ? Number(d.edit.points) : 0,
-                gateNumber: d.edit.gateNumber.trim() !== '' ? Number(d.edit.gateNumber) : null,
-                finishTime: d.edit.finishTime.trim() !== '' ? d.edit.finishTime.trim() : null,
-                margin: d.edit.margin.trim() !== '' ? d.edit.margin.trim() : null,
-                passingOrder: d.edit.passingOrder.trim() !== '' ? d.edit.passingOrder.trim() : null,
-                final3F: d.edit.final3F.trim() !== '' ? d.edit.final3F.trim() : null,
-                resultStatus: d.edit.resultStatus.trim() !== '' ? d.edit.resultStatus.trim() : null,
-              })),
+              .map((d) => editedToRaceResultInput(d.member.userId, d.edit)),
           )
 
         const response = await replaceRaceResults(eventId, selectedRaceId, fullReplacePayload, authHeader)

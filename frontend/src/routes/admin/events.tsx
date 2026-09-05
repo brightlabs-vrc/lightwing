@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { requireSiteAdmin } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
+import type { ClassTier, EventOwnerType } from '../../types'
 import { AlertBanner } from '../../components/AlertBanner'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
 import { TeamSearchCombobox } from '../../components/TeamSearchCombobox'
@@ -38,7 +39,7 @@ function AdminEventsListPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [formName, setFormName] = useState('')
   const [formDescription, setFormDescription] = useState('')
-  const [formOwnerType, setFormOwnerType] = useState<eventmanager.EventOwnerType>('USER')
+  const [formOwnerType, setFormOwnerType] = useState<EventOwnerType>('USER')
   const [formOwnerUserId, setFormOwnerUserId] = useState('')
   const [formOrganizationId, setFormOrganizationId] = useState('')
   const [formScoringType, setFormScoringType] = useState<number>(1)
@@ -156,7 +157,7 @@ function AdminEventsListPage() {
           organizationId: formOwnerType === 'ORGANIZATION' ? (formOrganizationId.trim() || null) : null,
           ownerUserId: formOwnerType === 'USER' ? (formOwnerUserId.trim() || null) : null,
           scoringType: Number(formScoringType),
-          classRestriction: formClassRestriction ? (formClassRestriction as eventmanager.ClassTier) : null,
+          classRestriction: formClassRestriction ? (formClassRestriction as ClassTier) : null,
           granularParticipation: formGranularParticipation,
           scoringRulesMode: formScoringType === 1 ? formScoringRulesMode : null,
           customScoringTables: (formScoringType === 1 && formScoringRulesMode === 'CUSTOM') ? formCustomScoringTables : null,
@@ -549,7 +550,7 @@ function AdminEventsListPage() {
                             <select
                               id="owner-type"
                               value={formOwnerType}
-                              onChange={(e) => setFormOwnerType(e.target.value as eventmanager.EventOwnerType)}
+                              onChange={(e) => setFormOwnerType(e.target.value as EventOwnerType)}
                               className="slds-select"
                               style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                             >

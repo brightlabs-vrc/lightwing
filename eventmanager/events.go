@@ -1,0 +1,1000 @@
+package eventmanager
+
+import (
+	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"encore.dev/beta/errs"
+	"encore.dev/storage/sqldb"
+	"encore.app/auth"
+	"encore.app/shared"
+)
+
+// Scoring types, mirroring ts-legacy/lib/constants.ts.
+const (
+	ScoringPoints = 1
+	ScoringLadder = 2
+)
+
+var scoringLabels = map[int]string{
+	ScoringPoints: "points-based",
+	ScoringLadder: "ladder-elo",
+}
+
+// scoringLabel mirrors the TS SCORING_LABELS lookup with "unknown" fallback.
+func scoringLabel(scoringType int) string {
+	if label, ok := scoringLabels[scoringType]; ok {
+		return label
+	}
+	return "unknown"
+}
+
+// truncate clamps s to max bytes (TS slice(0, n) clamps; Go panics).
+func truncate(s string, max int) string {
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
+}
+
+// newID generates a random UUIDv4 string for row ids.
+func newID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// isoTime formats a timestamp as an ISO-8601 UTC string (mirrors TS toISOString).
+func isoTime(t time.Time) string {
+	return t.UTC().Format(time.RFC3339Nano)
+}
+
+// --- API-facing views (mirror ts-legacy/eventmanager/events.ts) ---
+
+// EventListItem is the summary row returned by list endpoints.
+type EventListItem struct {
+	ID                              string  `json:"id"`
+	Name                            string  `json:"name"`
+	Description                     *string `json:"description"`
+	OwnerType                       string  `json:"ownerType"`
+	OrganizationID                  *string `json:"organizationId"`
+	OwnerUserID                     *string `json:"ownerUserId"`
+	Status                          string  `json:"status"`
+	ScoringType                     int     `json:"scoringType"`
+	ScoringTypeLabel                string  `json:"scoringTypeLabel"`
+	ClassRestriction                *string `json:"classRestriction"`
+	GranularParticipation           bool    `json:"granularParticipation"`
+	SignupsLocked                   bool    `json:"signupsLocked"`
+	ScheduledAt                     *string `json:"scheduledAt"`
+	ParticipantLimit                *int    `json:"participantLimit"`
+	MaxConcurrentRaceParticipations *int    `json:"maxConcurrentRaceParticipations"`
+	RaceCount                       int     `json:"raceCount"`
+	MemberCount                     int     `json:"memberCount"`
+	CreatedAt                       string  `json:"createdAt"`
+	UpdatedAt                       string  `json:"updatedAt"`
+}
+
+// EventMemberView is a single event participant.
+type EventMemberView struct {
+	UserID    string  `json:"userId"`
+	Name      string  `json:"name"`
+	ClassTier *string `json:"classTier"`
+}
+
+// EventScheduleView is a single schedule slot.
+type EventScheduleView struct {
+	ID       string  `json:"id"`
+	Title    *string `json:"title"`
+	StartsAt string  `json:"startsAt"`
+	EndsAt   *string `json:"endsAt"`
+	Location *string `json:"location"`
+}
+
+// PointsEntryView is one row of the points overview.
+type PointsEntryView struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	Points int    `json:"points"`
+}
+
+// LadderEntryView is one row of the ladder overview.
+type LadderEntryView struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	Elo    int    `json:"elo"`
+	Wins   int    `json:"wins"`
+	Losses int    `json:"losses"`
+	Rank   int    `json:"rank"`
+}
+
+// RaceEventMemberView is a single race participant.
+type RaceEventMemberView struct {
+	UserID    string  `json:"userId"`
+	Name      string  `json:"name"`
+	ClassTier *string `json:"classTier"`
+}
+
+// RaceEventView is a race belonging to an event.
+type RaceEventView struct {
+	ID               string                `json:"id"`
+	Name             string                `json:"name"`
+	Sequence         int                   `json:"sequence"`
+	DistanceMeters   int                   `json:"distanceMeters"`
+	TrackType        string                `json:"trackType"`
+	Location         string                `json:"location"`
+	ScoringType      *int                  `json:"scoringType"`
+	Grade            *string               `json:"grade"`
+	ClassRestriction *string               `json:"classRestriction"`
+	StartsAt         *string               `json:"startsAt"`
+	EndsAt           *string               `json:"endsAt"`
+	ParticipantLimit *int                  `json:"participantLimit"`
+	Members          []RaceEventMemberView `json:"members"`
+}
+
+// EventDetail is the full event payload.
+//
+// Mirrors ts-legacy/eventmanager/events.ts EventDetail.
+type EventDetail struct {
+	ID                              string             `json:"id"`
+	Name                            string             `json:"name"`
+	Description                     *string            `json:"description"`
+	OwnerType                       string             `json:"ownerType"`
+	OrganizationID                  *string            `json:"organizationId"`
+	OwnerUserID                     *string            `json:"ownerUserId"`
+	Status                          string             `json:"status"`
+	ScoringType                     int                `json:"scoringType"`
+	ScoringTypeLabel                string             `json:"scoringTypeLabel"`
+	ScoringRulesMode                *string            `json:"scoringRulesMode"`
+	CustomScoringTables             json.RawMessage    `json:"customScoringTables"`
+	ClassRestriction                *string            `json:"classRestriction"`
+	GranularParticipation           bool               `json:"granularParticipation"`
+	SignupsLocked                   bool               `json:"signupsLocked"`
+	ScheduledAt                     *string            `json:"scheduledAt"`
+	ParticipantLimit                *int               `json:"participantLimit"`
+	MaxConcurrentRaceParticipations *int               `json:"maxConcurrentRaceParticipations"`
+	RaceEvents                      []RaceEventView    `json:"raceEvents"`
+	Members                         []EventMemberView  `json:"members"`
+	Schedules                       []EventScheduleView `json:"schedules"`
+	PointsOverview                  []PointsEntryView  `json:"pointsOverview"`
+	LadderOverview                  []LadderEntryView  `json:"ladderOverview"`
+	CreatedAt                       string             `json:"createdAt"`
+	UpdatedAt                       string             `json:"updatedAt"`
+}
+
+// nullString converts sql.NullString to *string.
+func nullString(ns sql.NullString) *string {
+	if !ns.Valid {
+		return nil
+	}
+	s := ns.String
+	return &s
+}
+
+// nullInt converts sql.NullInt64 to *int.
+func nullInt(ni sql.NullInt64) *int {
+	if !ni.Valid {
+		return nil
+	}
+	n := int(ni.Int64)
+	return &n
+}
+
+// nullTime converts *time.Time to an ISO *string.
+func nullTime(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := isoTime(*t)
+	return &s
+}
+
+// classTierPtr converts a nullable class-tier column to the *string form used
+// in API views (empty treated as unset).
+func classTierPtr(ns sql.NullString) *string {
+	if !ns.Valid || ns.String == "" {
+		return nil
+	}
+	s := ns.String
+	return &s
+}
+
+// toClassTier converts a *string view value to the classtier type for eligibility checks.
+func toClassTier(s *string) *ClassTier {
+	if s == nil || *s == "" {
+		return nil
+	}
+	t := ClassTier(*s)
+	return &t
+}
+
+// eventRow holds the raw event columns for loadEvent.
+type eventRow struct {
+	ID                              string
+	Name                            string
+	Description                     sql.NullString
+	OwnerType                       string
+	OrganizationID                  sql.NullString
+	OwnerUserID                     sql.NullString
+	Status                          string
+	ScoringType                     int
+	ScoringRulesMode                sql.NullString
+	CustomScoringTables             []byte
+	ClassRestriction                sql.NullString
+	GranularParticipation           bool
+	SignupsLocked                   bool
+	ScheduledAt                     *time.Time
+	ParticipantLimit                sql.NullInt64
+	MaxConcurrentRaceParticipations sql.NullInt64
+	CreatedAt                       time.Time
+	UpdatedAt                       time.Time
+}
+
+const eventColumns = `id, name, description, "ownerType", "organizationId", "ownerUserId", status, "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction", "granularParticipation", "signupsLocked", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations", "createdAt", "updatedAt"`
+
+func scanEventRow(row *sqldb.Row) (*eventRow, error) {
+	var e eventRow
+	err := row.Scan(
+		&e.ID, &e.Name, &e.Description, &e.OwnerType, &e.OrganizationID, &e.OwnerUserID,
+		&e.Status, &e.ScoringType, &e.ScoringRulesMode, &e.CustomScoringTables,
+		&e.ClassRestriction, &e.GranularParticipation, &e.SignupsLocked, &e.ScheduledAt,
+		&e.ParticipantLimit, &e.MaxConcurrentRaceParticipations, &e.CreatedAt, &e.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+// LoadEvent returns a single event with members, schedules and the scoring
+// overview matching its scoring type.
+//
+// Mirrors ts-legacy/eventmanager/events.ts loadEvent.
+func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
+	e, err := scanEventRow(shared.DB.QueryRow(ctx,
+		`SELECT `+eventColumns+` FROM "event" WHERE id = $1`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Races.
+	type raceRow struct {
+		ID               string
+		Name             string
+		Sequence         int
+		DistanceMeters   int
+		TrackType        string
+		Location         string
+		ScoringType      sql.NullInt64
+		Grade            sql.NullString
+		ClassRestriction sql.NullString
+		StartsAt         *time.Time
+		EndsAt           *time.Time
+		ParticipantLimit sql.NullInt64
+	}
+	var races []raceRow
+	rows, err := shared.DB.Query(ctx,
+		`SELECT id, name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit"
+		 FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r raceRow
+		if err := rows.Scan(&r.ID, &r.Name, &r.Sequence, &r.DistanceMeters, &r.TrackType,
+			&r.Location, &r.ScoringType, &r.Grade, &r.ClassRestriction, &r.StartsAt, &r.EndsAt,
+			&r.ParticipantLimit); err != nil {
+			return nil, err
+		}
+		races = append(races, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Race members with display names, grouped by race.
+	raceMembers := map[string][]RaceEventMemberView{}
+	activeUserIDs := map[string]bool{}
+	if len(races) > 0 {
+		mrows, err := shared.DB.Query(ctx,
+			`SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
+			 FROM "race_event_member" m
+			 JOIN "race_event" r ON r.id = m."raceEventId"
+			 JOIN "user" u ON u.id = m."userId"
+			 WHERE r."eventId" = $1`, id)
+		if err != nil {
+			return nil, err
+		}
+		defer mrows.Close()
+		for mrows.Next() {
+			var raceID, userID, name string
+			var tier sql.NullString
+			if err := mrows.Scan(&raceID, &userID, &name, &tier); err != nil {
+				return nil, err
+			}
+			raceMembers[raceID] = append(raceMembers[raceID], RaceEventMemberView{
+				UserID: userID, Name: name, ClassTier: classTierPtr(tier),
+			})
+			activeUserIDs[userID] = true
+		}
+		if err := mrows.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Event members; granular events only surface members active in a race.
+	type memberRow struct {
+		UserID string
+		Name   string
+		Tier   sql.NullString
+	}
+	var members []memberRow
+	erows, err := shared.DB.Query(ctx,
+		`SELECT m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
+		 FROM "event_member" m JOIN "user" u ON u.id = m."userId"
+		 WHERE m."eventId" = $1`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer erows.Close()
+	for erows.Next() {
+		var m memberRow
+		if err := erows.Scan(&m.UserID, &m.Name, &m.Tier); err != nil {
+			return nil, err
+		}
+		if e.GranularParticipation && !activeUserIDs[m.UserID] {
+			continue
+		}
+		members = append(members, m)
+	}
+	if err := erows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Schedules.
+	var schedules []EventScheduleView
+	srows, err := shared.DB.Query(ctx,
+		`SELECT id, title, "startsAt", "endsAt", location FROM "event_schedule"
+		 WHERE "eventId" = $1 ORDER BY "startsAt" ASC`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer srows.Close()
+	for srows.Next() {
+		var s EventScheduleView
+		var title sql.NullString
+		var startsAt time.Time
+		var endsAt *time.Time
+		var location sql.NullString
+		if err := srows.Scan(&s.ID, &title, &startsAt, &endsAt, &location); err != nil {
+			return nil, err
+		}
+		s.Title = nullString(title)
+		s.StartsAt = isoTime(startsAt)
+		s.EndsAt = nullTime(endsAt)
+		s.Location = nullString(location)
+		schedules = append(schedules, s)
+	}
+	if err := srows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Scoring overviews matching the event's scoring type (the other stays null).
+	var pointsOverview []PointsEntryView
+	var ladderOverview []LadderEntryView
+	if e.ScoringType == ScoringPoints {
+		pointsOverview = []PointsEntryView{}
+		prows, err := shared.DB.Query(ctx,
+			`SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.points
+			 FROM "event_points_entry" e JOIN "user" u ON u.id = e."userId"
+			 WHERE e."eventId" = $1 ORDER BY e.points DESC`, id)
+		if err != nil {
+			return nil, err
+		}
+		defer prows.Close()
+		for prows.Next() {
+			var p PointsEntryView
+			if err := prows.Scan(&p.UserID, &p.Name, &p.Points); err != nil {
+				return nil, err
+			}
+			pointsOverview = append(pointsOverview, p)
+		}
+		if err := prows.Err(); err != nil {
+			return nil, err
+		}
+	} else if e.ScoringType == ScoringLadder {
+		ladderOverview = []LadderEntryView{}
+		lrows, err := shared.DB.Query(ctx,
+			`SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.elo, e.wins, e.losses
+			 FROM "event_ladder_entry" e JOIN "user" u ON u.id = e."userId"
+			 WHERE e."eventId" = $1 ORDER BY e.elo DESC`, id)
+		if err != nil {
+			return nil, err
+		}
+		defer lrows.Close()
+		rank := 0
+		for lrows.Next() {
+			var l LadderEntryView
+			if err := lrows.Scan(&l.UserID, &l.Name, &l.Elo, &l.Wins, &l.Losses); err != nil {
+				return nil, err
+			}
+			rank++
+			l.Rank = rank
+			ladderOverview = append(ladderOverview, l)
+		}
+		if err := lrows.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	var customTables json.RawMessage
+	if len(e.CustomScoringTables) > 0 {
+		if json.Valid(e.CustomScoringTables) {
+			customTables = e.CustomScoringTables
+		}
+	}
+
+	raceViews := make([]RaceEventView, 0, len(races))
+	for _, r := range races {
+		mems := raceMembers[r.ID]
+		if mems == nil {
+			mems = []RaceEventMemberView{}
+		}
+		raceViews = append(raceViews, RaceEventView{
+			ID: r.ID, Name: r.Name, Sequence: r.Sequence,
+			DistanceMeters: r.DistanceMeters, TrackType: r.TrackType, Location: r.Location,
+			ScoringType: nullInt(r.ScoringType), Grade: nullString(r.Grade),
+			ClassRestriction: classTierPtr(r.ClassRestriction),
+			StartsAt:         nullTime(r.StartsAt), EndsAt: nullTime(r.EndsAt),
+			ParticipantLimit: nullInt(r.ParticipantLimit), Members: mems,
+		})
+	}
+	memberViews := make([]EventMemberView, 0, len(members))
+	for _, m := range members {
+		memberViews = append(memberViews, EventMemberView{
+			UserID: m.UserID, Name: m.Name, ClassTier: classTierPtr(m.Tier),
+		})
+	}
+	if schedules == nil {
+		schedules = []EventScheduleView{}
+	}
+
+	return &EventDetail{
+		ID: e.ID, Name: e.Name, Description: nullString(e.Description),
+		OwnerType: e.OwnerType, OrganizationID: nullString(e.OrganizationID),
+		OwnerUserID: nullString(e.OwnerUserID), Status: e.Status,
+		ScoringType: e.ScoringType, ScoringTypeLabel: scoringLabel(e.ScoringType),
+		ScoringRulesMode: nullString(e.ScoringRulesMode), CustomScoringTables: customTables,
+		ClassRestriction: classTierPtr(e.ClassRestriction),
+		GranularParticipation: e.GranularParticipation, SignupsLocked: e.SignupsLocked,
+		ScheduledAt: nullTime(e.ScheduledAt),
+		ParticipantLimit: nullInt(e.ParticipantLimit),
+		MaxConcurrentRaceParticipations: nullInt(e.MaxConcurrentRaceParticipations),
+		RaceEvents: raceViews, Members: memberViews, Schedules: schedules,
+		PointsOverview: pointsOverview, LadderOverview: ladderOverview,
+		CreatedAt: isoTime(e.CreatedAt), UpdatedAt: isoTime(e.UpdatedAt),
+	}, nil
+}
+
+// EnsureEventStandingsRow seeds the scoring record for a member, idempotently.
+//
+// Mirrors ts-legacy/eventmanager/events.ts ensureEventStandingsRow.
+func EnsureEventStandingsRow(ctx context.Context, eventID, userID string, scoringType int) error {
+	if scoringType == ScoringPoints {
+		_, err := shared.DB.Exec(ctx,
+			`INSERT INTO "event_points_entry" (id, "eventId", "userId", points, "createdAt", "updatedAt")
+			 VALUES ($1, $2, $3, 0, $4, $4) ON CONFLICT ("eventId", "userId") DO NOTHING`,
+			newID(), eventID, userID, time.Now().UTC())
+		return err
+	}
+	_, err := shared.DB.Exec(ctx,
+		`INSERT INTO "event_ladder_entry" (id, "eventId", "userId", elo, "createdAt", "updatedAt")
+		 VALUES ($1, $2, $3, $4, $5, $5) ON CONFLICT ("eventId", "userId") DO NOTHING`,
+		newID(), eventID, userID, LadderStartingElo, time.Now().UTC())
+	return err
+}
+
+// --- Create ---
+
+// CreateEventRequest carries the create payload plus the auth header.
+//
+// Mirrors ts-legacy/eventmanager/events.ts CreateEventParams (POST /api/events).
+type CreateEventRequest struct {
+	Authorization                     string          `header:"Authorization"`
+	Name                              string          `json:"name"`
+	Description                       *string         `json:"description,omitempty"`
+	OwnerType                         string          `json:"ownerType"`
+	OrganizationID                    *string         `json:"organizationId,omitempty"`
+	OwnerUserID                       *string         `json:"ownerUserId,omitempty"`
+	ScoringType                       int             `json:"scoringType"`
+	ScoringRulesMode                  *string         `json:"scoringRulesMode,omitempty"`
+	CustomScoringTables               json.RawMessage `json:"customScoringTables,omitempty"`
+	ClassRestriction                  *string         `json:"classRestriction,omitempty"`
+	GranularParticipation             bool            `json:"granularParticipation,omitempty"`
+	ScheduledAt                       *string         `json:"scheduledAt,omitempty"`
+	ParticipantLimit                  OptInt          `json:"participantLimit,omitempty"`
+	MaxConcurrentRaceParticipations   OptInt          `json:"maxConcurrentRaceParticipations,omitempty"`
+}
+
+// CreateEventCore creates an event and returns its detail.
+func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, error) {
+	if p.Name == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "name is required"}
+	}
+	if p.OwnerType != "ORGANIZATION" && p.OwnerType != "USER" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "ownerType must be ORGANIZATION or USER"}
+	}
+
+	var organizationID, ownerUserID *string
+	if p.OwnerType == "ORGANIZATION" {
+		if p.OrganizationID == nil || *p.OrganizationID == "" {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "organizationId is required for organization-owned events"}
+		}
+		if _, _, err := auth.RequirePermission(ctx, p.Authorization, *p.OrganizationID, auth.ResourceEvent, auth.ActionCreate); err != nil {
+			return nil, err
+		}
+		var exists bool
+		if err := shared.DB.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM "organization" WHERE id = $1)`, *p.OrganizationID,
+		).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "organization not found"}
+		}
+		organizationID = p.OrganizationID
+	} else {
+		actor, err := auth.ResolveActor(ctx, p.Authorization)
+		if err != nil {
+			return nil, err
+		}
+		owner := actor.UserID
+		if p.OwnerUserID != nil && *p.OwnerUserID != "" {
+			owner = *p.OwnerUserID
+		}
+		if owner != actor.UserID && !auth.IsSiteAdmin(actor.SiteRole) {
+			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "only a site administrator can create an event on behalf of another user"}
+		}
+		var exists bool
+		if err := shared.DB.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM "user" WHERE id = $1)`, owner,
+		).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "owner user not found"}
+		}
+		ownerUserID = &owner
+	}
+
+	var scoringRulesMode *string
+	var customTables any
+	if p.ScoringType == ScoringPoints {
+		mode := "STANDARD"
+		if p.ScoringRulesMode != nil && *p.ScoringRulesMode != "" {
+			mode = *p.ScoringRulesMode
+		}
+		if mode == "CUSTOM" {
+			if len(p.CustomScoringTables) == 0 || string(p.CustomScoringTables) == "null" {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables is required when scoringRulesMode is CUSTOM"}
+			}
+			var v any
+			if err := json.Unmarshal(p.CustomScoringTables, &v); err != nil {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables must be an object"}
+			}
+			if _, err := ValidateCustomScoringTables(v); err != nil {
+				return nil, err
+			}
+			customTables = v
+		} else {
+			mode = "STANDARD"
+		}
+		scoringRulesMode = &mode
+	}
+
+	isGranular := p.GranularParticipation
+	var participantLimit, maxConcurrent *int
+	if p.ParticipantLimit.Set {
+		participantLimit = p.ParticipantLimit.Value
+	}
+	if p.MaxConcurrentRaceParticipations.Set {
+		maxConcurrent = p.MaxConcurrentRaceParticipations.Value
+	}
+	if isGranular {
+		if participantLimit != nil {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Granular events cannot have an event-level participant limit"}
+		}
+	} else {
+		if maxConcurrent != nil {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Regular events cannot have a maxConcurrentRaceParticipations limit"}
+		}
+	}
+
+	var scheduledAt *time.Time
+	if p.ScheduledAt != nil && *p.ScheduledAt != "" {
+		t, err := time.Parse(time.RFC3339Nano, *p.ScheduledAt)
+		if err != nil {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "scheduledAt must be an ISO-8601 timestamp"}
+		}
+		utc := t.UTC()
+		scheduledAt = &utc
+	}
+
+	var classRestriction *string
+	if p.ClassRestriction != nil && *p.ClassRestriction != "" {
+		classRestriction = p.ClassRestriction
+	}
+
+	var description *string
+	if p.Description != nil {
+		description = p.Description
+	}
+
+	var customTablesJSON any
+	if customTables != nil {
+		raw, err := json.Marshal(customTables)
+		if err != nil {
+			return nil, err
+		}
+		customTablesJSON = string(raw)
+	}
+
+	now := time.Now().UTC()
+	id := newID()
+	_, err := shared.DB.Exec(ctx,
+		`INSERT INTO "event" (id, name, description, "ownerType", "organizationId", "ownerUserId",
+		  "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction",
+		  "granularParticipation", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations",
+		  "createdAt", "updatedAt")
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)`,
+		id, truncate(p.Name, 255), description, p.OwnerType, organizationID, ownerUserID,
+		p.ScoringType, scoringRulesMode, customTablesJSON, classRestriction,
+		isGranular, scheduledAt, participantLimit, maxConcurrent,
+		now)
+	if err != nil {
+		return nil, err
+	}
+	return LoadEvent(ctx, id)
+}
+
+//encore:api public method=POST path=/api/events
+func CreateEvent(ctx context.Context, p *CreateEventRequest) (*EventDetail, error) {
+	return CreateEventCore(ctx, p)
+}
+
+// --- List ---
+
+// ListEventsQuery carries optional filters plus pagination.
+//
+// Mirrors ts-legacy/eventmanager/events.ts ListEventsParams (GET /api/events).
+type ListEventsQuery struct {
+	OrganizationID   string `query:"organizationId"`
+	ClassRestriction string `query:"classRestriction"`
+	Limit            int    `query:"limit"`
+	Offset           int    `query:"offset"`
+}
+
+// ListEventsResponse carries the page plus the total count.
+type ListEventsResponse struct {
+	Events []EventListItem `json:"events"`
+	Total  int             `json:"total"`
+}
+
+func scanListItem(scan func(...any) error) (EventListItem, error) {
+	var item EventListItem
+	var description, orgID, ownerUID, classRestriction sql.NullString
+	var schedTime *time.Time
+	var participantLimit, maxConcurrent sql.NullInt64
+	var createdAt, updatedAt time.Time
+	var raceCount, memberCount int64
+	// scheduledAt scanned as *time.Time via a separate var to preserve NULL.
+	err := scan(&item.ID, &item.Name, &description, &item.OwnerType, &orgID, &ownerUID,
+		&item.Status, &item.ScoringType, &classRestriction, &item.GranularParticipation,
+		&item.SignupsLocked, &schedTime, &participantLimit, &maxConcurrent,
+		&createdAt, &updatedAt, &raceCount, &memberCount)
+	if err != nil {
+		return item, err
+	}
+	item.Description = nullString(description)
+	item.OrganizationID = nullString(orgID)
+	item.OwnerUserID = nullString(ownerUID)
+	item.ScoringTypeLabel = scoringLabel(item.ScoringType)
+	item.ClassRestriction = classTierPtr(classRestriction)
+	item.ScheduledAt = nullTime(schedTime)
+	item.ParticipantLimit = nullInt(participantLimit)
+	item.MaxConcurrentRaceParticipations = nullInt(maxConcurrent)
+	item.RaceCount = int(raceCount)
+	item.MemberCount = int(memberCount)
+	item.CreatedAt = isoTime(createdAt)
+	item.UpdatedAt = isoTime(updatedAt)
+	return item, nil
+}
+
+const listItemSelect = `e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId",
+	e.status, e."scoringType", e."classRestriction", e."granularParticipation",
+	e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
+	e."createdAt", e."updatedAt",
+	(SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
+	(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id)`
+
+// ListEventsCore lists events with optional filters.
+func ListEventsCore(ctx context.Context, q *ListEventsQuery) (*ListEventsResponse, error) {
+	where := ""
+	args := []any{}
+	if q.OrganizationID != "" {
+		args = append(args, q.OrganizationID)
+		where += fmt.Sprintf(" AND e.\"organizationId\" = $%d", len(args))
+	}
+	if q.ClassRestriction != "" {
+		args = append(args, q.ClassRestriction)
+		where += fmt.Sprintf(" AND e.\"classRestriction\" = $%d", len(args))
+	}
+
+	var total int64
+	if err := shared.DB.QueryRow(ctx,
+		`SELECT COUNT(*) FROM "event" e WHERE TRUE`+where, args...,
+	).Scan(&total); err != nil {
+		return nil, err
+	}
+
+	query := `SELECT ` + listItemSelect + ` FROM "event" e WHERE TRUE` + where + ` ORDER BY e."createdAt" DESC`
+	if q.Limit > 0 {
+		args = append(args, q.Limit)
+		query += fmt.Sprintf(" LIMIT $%d", len(args))
+	}
+	if q.Offset > 0 {
+		args = append(args, q.Offset)
+		query += fmt.Sprintf(" OFFSET $%d", len(args))
+	}
+	rows, err := shared.DB.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []EventListItem{}
+	for rows.Next() {
+		item, err := scanListItem(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &ListEventsResponse{Events: items, Total: int(total)}, nil
+}
+
+//encore:api public method=GET path=/api/events
+func ListEvents(ctx context.Context, q *ListEventsQuery) (*ListEventsResponse, error) {
+	return ListEventsCore(ctx, q)
+}
+
+// --- Public list ---
+
+// ListPublicEventsQuery carries pagination for the public listing.
+type ListPublicEventsQuery struct {
+	Limit  int `query:"limit"`
+	Offset int `query:"offset"`
+}
+
+// ListPublicEventsCore lists non-draft events (UNOFFICIAL, OFFICIAL, CONCLUDED).
+//
+// Mirrors ts-legacy/eventmanager/events.ts listPublicEvents.
+// It lives at /api/events-public (rather than /api/events/public) because a
+// static sub-path would route-conflict with /api/events/:id.
+func ListPublicEventsCore(ctx context.Context, q *ListPublicEventsQuery) (*ListEventsResponse, error) {
+	limit := q.Limit
+	if limit == 0 {
+		limit = 10
+	}
+	var total int64
+	if err := shared.DB.QueryRow(ctx,
+		`SELECT COUNT(*) FROM "event" e WHERE e.status IN ('UNOFFICIAL','OFFICIAL','CONCLUDED')`,
+	).Scan(&total); err != nil {
+		return nil, err
+	}
+	rows, err := shared.DB.Query(ctx,
+		`SELECT `+listItemSelect+` FROM "event" e
+		 WHERE e.status IN ('UNOFFICIAL','OFFICIAL','CONCLUDED')
+		 ORDER BY e."createdAt" DESC LIMIT $1 OFFSET $2`, limit, q.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []EventListItem{}
+	for rows.Next() {
+		item, err := scanListItem(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &ListEventsResponse{Events: items, Total: int(total)}, nil
+}
+
+//encore:api public method=GET path=/api/events-public
+func ListPublicEvents(ctx context.Context, q *ListPublicEventsQuery) (*ListEventsResponse, error) {
+	return ListPublicEventsCore(ctx, q)
+}
+
+// --- Get ---
+
+//encore:api public method=GET path=/api/events/:id
+func GetEvent(ctx context.Context, id string) (*EventDetail, error) {
+	return LoadEvent(ctx, id)
+}
+
+// --- Admins ---
+
+// EventAdminView is one event administrator.
+type EventAdminView struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+}
+
+// ListEventAdminsResponse carries the admin list.
+type ListEventAdminsResponse struct {
+	Admins []EventAdminView `json:"admins"`
+}
+
+// ListEventAdminsCore lists event administrators.
+//
+// Mirrors ts-legacy/eventmanager/events.ts listEventAdmins.
+func ListEventAdminsCore(ctx context.Context, eventID string) (*ListEventAdminsResponse, error) {
+	rows, err := shared.DB.Query(ctx,
+		`SELECT a."userId", COALESCE(u."vrchatUsername", u.name)
+		 FROM "event_admin" a JOIN "user" u ON u.id = a."userId"
+		 WHERE a."eventId" = $1`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	admins := []EventAdminView{}
+	for rows.Next() {
+		var a EventAdminView
+		if err := rows.Scan(&a.UserID, &a.Name); err != nil {
+			return nil, err
+		}
+		admins = append(admins, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &ListEventAdminsResponse{Admins: admins}, nil
+}
+
+//encore:api public method=GET path=/api/event-admins/:eventID
+func ListEventAdmins(ctx context.Context, eventID string) (*ListEventAdminsResponse, error) {
+	return ListEventAdminsCore(ctx, eventID)
+}
+
+// AddEventAdminRequest carries the event/user ids plus the auth header.
+// The ids travel in the body (rather than :id path params) because this
+// Encore version only accepts scalar params alongside path params.
+//
+// Mirrors ts-legacy/eventmanager/events.ts addEventAdmin (POST /api/events/:id/admins).
+type AddEventAdminRequest struct {
+	EventID       string `json:"eventId"`
+	UserID        string `json:"userId"`
+	Authorization string `header:"Authorization"`
+}
+
+// AddEventAdminResponse reports success.
+type AddEventAdminResponse struct {
+	Success bool `json:"success"`
+}
+
+// AddEventAdminCore adds an administrator to an event (idempotent).
+func AddEventAdminCore(ctx context.Context, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+		return nil, err
+	}
+	var exists bool
+	if err := shared.DB.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM "user" WHERE id = $1)`, p.UserID,
+	).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+	}
+	// Idempotent: ignore duplicate admin rows.
+	_, err := shared.DB.Exec(ctx,
+		`INSERT INTO "event_admin" (id, "eventId", "userId", "createdAt")
+		 VALUES ($1, $2, $3, $4) ON CONFLICT ("eventId", "userId") DO NOTHING`,
+		newID(), p.EventID, p.UserID, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	return &AddEventAdminResponse{Success: true}, nil
+}
+
+//encore:api public method=POST path=/api/event-admins
+func AddEventAdmin(ctx context.Context, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
+	return AddEventAdminCore(ctx, p)
+}
+
+// RemoveEventAdminRequest carries the event/user ids plus the auth header
+// (DELETE decodes the struct from query params).
+//
+// Mirrors ts-legacy/eventmanager/events.ts removeEventAdmin.
+type RemoveEventAdminRequest struct {
+	EventID       string `query:"eventId"`
+	UserID        string `query:"userId"`
+	Authorization string `header:"Authorization"`
+}
+
+// RemoveEventAdminCore removes an administrator from an event.
+func RemoveEventAdminCore(ctx context.Context, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+		return nil, err
+	}
+	if _, err := shared.DB.Exec(ctx,
+		`DELETE FROM "event_admin" WHERE "eventId" = $1 AND "userId" = $2`,
+		p.EventID, p.UserID); err != nil {
+		return nil, err
+	}
+	return &AddEventAdminResponse{Success: true}, nil
+}
+
+//encore:api public method=DELETE path=/api/event-admins
+func RemoveEventAdmin(ctx context.Context, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
+	return RemoveEventAdminCore(ctx, p)
+}
+
+// --- Delete ---
+
+// DeleteEventRequest carries the event id plus the auth header (DELETE
+// decodes the struct from query params). The id travels in the query string
+// (rather than a :id path param) because this Encore version only accepts
+// scalar params alongside path params.
+//
+// Mirrors ts-legacy/eventmanager/events.ts deleteEvent (DELETE /api/events/:id).
+type DeleteEventRequest struct {
+	ID            string `query:"id"`
+	Authorization string `header:"Authorization"`
+}
+
+// DeleteEventResponse reports deletion.
+type DeleteEventResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+// DeleteEventCore deletes an event and its related records (via FK cascades).
+func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventResponse, error) {
+	var exists bool
+	if err := shared.DB.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1)`, p.ID,
+	).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
+	}
+	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionDelete); err != nil {
+		return nil, err
+	}
+	if _, err := shared.DB.Exec(ctx, `DELETE FROM "event" WHERE id = $1`, p.ID); err != nil {
+		return nil, err
+	}
+	return &DeleteEventResponse{Deleted: true}, nil
+}
+
+//encore:api public method=DELETE path=/api/events
+func DeleteEvent(ctx context.Context, p *DeleteEventRequest) (*DeleteEventResponse, error) {
+	return DeleteEventCore(ctx, p)
+}
