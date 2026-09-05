@@ -69,7 +69,13 @@ Because this application works with OIDC, you will need the following secrets se
 - `DISCORD_BOT_TOKEN`: the bot token Encore uses to check server roles automatically. This bot must be added to the server with the `View Channels` and `Read Messages` permissions.
 - `SESSION_COOKIE_SECRET`: signs the session cookie (only the better-auth-compatible cookie routes use it; empty in local dev yields a dev-only key).
 
-Set them via `encore secret set --type development <name>` (or `--type production`), or export the same names as environment variables for local runs. You can generate a secret with `openssl rand -base64 32`.
+Set them in the dashboard (Settings → Secrets) or via `encore secret set --env <env> <name>` —
+the Go backend reads them through Encore's secrets facility (`var secrets` in
+`auth/service.go`; field names must match secret names exactly). Plain
+environment variables with the same names also work as a fallback (self-hosted
+Docker runs outside Encore's secret injection). For local runs, set
+`--type local` values once (synced automatically) or export the same names as
+environment variables. You can generate a secret with `openssl rand -base64 32`.
 
 ### Working with the database
 

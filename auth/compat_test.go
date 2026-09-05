@@ -13,7 +13,7 @@ import (
 )
 
 func testCompatService() *Service {
-	return &Service{secrets: &secrets{
+	return &Service{secrets: &serviceSecrets{
 		SessionCookieSecret:     "test-cookie-secret-at-least-32-bytes!",
 		DiscordAuthClientID:     "test-client-id",
 		DiscordAuthClientSecret: "test-client-secret",

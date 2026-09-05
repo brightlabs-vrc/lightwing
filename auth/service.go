@@ -86,25 +86,44 @@ var discordRolesCache = cache.NewStructKeyspace[discordStaffRolesKey, discordSta
 	DefaultExpiry: cache.ExpireIn(300 * time.Second),
 })
 
-// secrets holds the OAuth and Discord credentials.
-type secrets struct {
+// secrets is populated by Encore's runtime from the app's secret store
+// (dashboard Secrets page or `encore secret set`). Field names must match the
+// secret names exactly.
+var secrets struct {
+	DISCORD_AUTH_CLIENT_ID     string
+	DISCORD_AUTH_CLIENT_SECRET string
+	DISCORD_BOT_TOKEN          string
+	SESSION_COOKIE_SECRET      string
+}
+
+// serviceSecrets is the auth service's resolved credentials: framework secret
+// values first, plain environment variables as a fallback (self-hosted Docker
+// runs outside Encore's secret injection).
+type serviceSecrets struct {
 	DiscordAuthClientID     string
 	DiscordAuthClientSecret string
 	DiscordBotToken         string
 	AuthBaseURL             string
 	// SessionCookieSecret signs the session cookie. Empty in local dev yields
 	// an ephemeral key (sessions reset on restart) with a startup warning.
-	SessionCookieSecret   string
-	ephemeralCookieKey    bool
+	SessionCookieSecret string
+	ephemeralCookieKey  bool
 }
 
-func loadSecrets() *secrets {
-	s := &secrets{
-		DiscordAuthClientID:     os.Getenv("DISCORD_AUTH_CLIENT_ID"),
-		DiscordAuthClientSecret: os.Getenv("DISCORD_AUTH_CLIENT_SECRET"),
-		DiscordBotToken:         os.Getenv("DISCORD_BOT_TOKEN"),
+func secretOrEnv(frameworkValue, envName string) string {
+	if frameworkValue != "" {
+		return frameworkValue
+	}
+	return os.Getenv(envName)
+}
+
+func loadSecrets() *serviceSecrets {
+	s := &serviceSecrets{
+		DiscordAuthClientID:     secretOrEnv(secrets.DISCORD_AUTH_CLIENT_ID, "DISCORD_AUTH_CLIENT_ID"),
+		DiscordAuthClientSecret: secretOrEnv(secrets.DISCORD_AUTH_CLIENT_SECRET, "DISCORD_AUTH_CLIENT_SECRET"),
+		DiscordBotToken:         secretOrEnv(secrets.DISCORD_BOT_TOKEN, "DISCORD_BOT_TOKEN"),
 		AuthBaseURL:             os.Getenv("ENCORERUNTIME_API_BASE_URL"),
-		SessionCookieSecret:     os.Getenv("SESSION_COOKIE_SECRET"),
+		SessionCookieSecret:     secretOrEnv(secrets.SESSION_COOKIE_SECRET, "SESSION_COOKIE_SECRET"),
 	}
 	if s.SessionCookieSecret == "" {
 		var b [32]byte
@@ -139,7 +158,7 @@ var (
 // Service is the auth service.
 //encore:service
 type Service struct {
-	secrets *secrets
+	secrets *serviceSecrets
 }
 
 // initService is called by Encore's runtime.
