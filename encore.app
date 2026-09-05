@@ -1,7 +1,7 @@
 {
     // The app is not currently linked to the encore.dev platform.
     // Use "encore app link" to link it.
-    "id":   "lightwing2-uxgi",
+    "id":   "",
     "lang": "go",
 
     "global_cors": {
