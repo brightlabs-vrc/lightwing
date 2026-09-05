@@ -10,6 +10,7 @@
             "http://localhost:5173",
             "https://lightwing.urs.deno.net",
             "https://lightwing-canary.urs.deno.net",
+            "https://*.urs.deno.net",
             "https://comp.cosyne.jp.eu.org",
         ],
         "allow_origins_without_credentials": [
@@ -17,6 +18,7 @@
             "http://localhost:5173",
             "https://lightwing.urs.deno.net",
             "https://lightwing-canary.urs.deno.net",
+            "https://*.urs.deno.net",
             "https://comp.cosyne.jp.eu.org",
         ],
         "debug": true,
