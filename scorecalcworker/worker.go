@@ -10,7 +10,6 @@ import (
 	"encore.dev/rlog"
 	"encore.dev/pubsub"
 	"encore.app/scorecalc"
-	"encore.app/shared"
 )
 
 // db is the shared Lightwing database (direct reference: Encore tracks
@@ -27,7 +26,7 @@ func HandleScoreCalcRequest(ctx context.Context, event scorecalc.ScoreCalcReques
 	jobID, eventID, generation := event.JobID, event.EventID, event.Generation
 	rlog.Info(fmt.Sprintf("Received ScoreCalcRequested message: jobId=%s, eventId=%s, gen=%d", jobID, eventID, generation))
 
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -82,12 +81,12 @@ func HandleScoreCalcRequest(ctx context.Context, event scorecalc.ScoreCalcReques
 	}
 
 	var scoringType int
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT "scoringType" FROM "event" WHERE id = $1`, jobEventID,
 	).Scan(&scoringType)
 	if errors.Is(err, sql.ErrNoRows) {
 		rlog.Error(fmt.Sprintf("Event %s not found for Job %s. Marking failed.", jobEventID, jobID))
-		if _, err := shared.DB.Exec(ctx,
+		if _, err := db.Exec(ctx,
 			`UPDATE "score_calc_task" SET status = 'FAILED', "lastError" = $1, "completedAt" = $2 WHERE id = $3`,
 			fmt.Sprintf("Event %s not found.", jobEventID), time.Now().UTC(), jobID,
 		); err != nil {
@@ -108,14 +107,14 @@ func HandleScoreCalcRequest(ctx context.Context, event scorecalc.ScoreCalcReques
 
 	if scoringType != 1 {
 		rlog.Info(fmt.Sprintf("Event %s is not points-based (scoringType=%d). Rejecting job %s.", jobEventID, scoringType, jobID))
-		_, err = shared.DB.Exec(ctx,
+		_, err = db.Exec(ctx,
 			`UPDATE "score_calc_task" SET status = 'SUPERSEDED', "lastError" = $1, "completedAt" = $2 WHERE id = $3`,
 			fmt.Sprintf("Rejected: event is not points-based (scoringType=%d)", scoringType), time.Now().UTC(), jobID,
 		)
 		return err
 	}
 
-	rows, err := shared.DB.Query(ctx, `SELECT "userId" FROM "event_member" WHERE "eventId" = $1`, jobEventID)
+	rows, err := db.Query(ctx, `SELECT "userId" FROM "event_member" WHERE "eventId" = $1`, jobEventID)
 	if err != nil {
 		return err
 	}
@@ -133,7 +132,7 @@ func HandleScoreCalcRequest(ctx context.Context, event scorecalc.ScoreCalcReques
 		return err
 	}
 
-	rows, err = shared.DB.Query(ctx,
+	rows, err = db.Query(ctx,
 		`SELECT r."userId", r.points FROM "race_result" r
 		 JOIN "race_event" re ON re.id = r."raceEventId"
 		 WHERE re."eventId" = $1`, jobEventID)

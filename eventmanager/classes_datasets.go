@@ -8,7 +8,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // Class tiers and datasets endpoints.
@@ -66,14 +65,14 @@ func SetUserClassCore(ctx context.Context, p *SetUserClassRequest) (*SetUserClas
 		return nil, err
 	}
 	var exists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "user" WHERE id=$1)`, p.UserID).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	}
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`UPDATE "user" SET "classTier"=$1 WHERE id=$2`, p.ClassTier, p.UserID); err != nil {
 		return nil, err
 	}
@@ -116,7 +115,7 @@ type EligibleEventsResponse struct {
 // class tier and each event's class restriction.
 func ListEligibleEventsCore(ctx context.Context, q *EligibleEventsQuery) (*EligibleEventsResponse, error) {
 	var userTier sql.NullString
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT "classTier" FROM "user" WHERE id=$1`, q.UserID).Scan(&userTier); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
@@ -128,7 +127,7 @@ func ListEligibleEventsCore(ctx context.Context, q *EligibleEventsQuery) (*Eligi
 		t := ClassTier(userTier.String)
 		tier = &t
 	}
-	erows, err := shared.DB.Query(ctx,
+	erows, err := db.Query(ctx,
 		`SELECT id, name, "organizationId", "classRestriction" FROM "event" ORDER BY "createdAt" DESC`)
 	if err != nil {
 		return nil, err
@@ -160,7 +159,7 @@ func ListEligibleEventsCore(ctx context.Context, q *EligibleEventsQuery) (*Eligi
 			eventRestr = &t
 		}
 		eventEligible := IsEligible(tier, eventRestr)
-		rrows, err := shared.DB.Query(ctx,
+		rrows, err := db.Query(ctx,
 			`SELECT id, name, sequence, "classRestriction" FROM "race_event" WHERE "eventId"=$1 ORDER BY sequence ASC`, e.id)
 		if err != nil {
 			return nil, err
@@ -265,7 +264,7 @@ func ListDatasetsCore(ctx context.Context, q *DatasetsQuery) (*DatasetsResponse,
 	if _, err := requireEventRow(ctx, q.EventID); err != nil {
 		return nil, err
 	}
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT id, "eventId", source, rows, status, "importedAt", "createdAt", "updatedAt"
 		 FROM "dataset" WHERE "eventId"=$1 ORDER BY "createdAt" DESC`, q.EventID)
 	if err != nil {
@@ -318,7 +317,7 @@ func CreateDatasetCore(ctx context.Context, p *CreateDatasetRequest) (*DatasetVi
 	id := "dataset-" + newID()[:8]
 	now := time.Now().UTC()
 	var d datasetRow
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`INSERT INTO "dataset" (id, "eventId", source, rows, status, "importedAt", "createdAt", "updatedAt")
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$7)
 		 RETURNING id, "eventId", source, rows, status, "importedAt", "createdAt", "updatedAt"`,
@@ -353,7 +352,7 @@ func UpdateDatasetStatusCore(ctx context.Context, p *UpdateDatasetStatusRequest)
 		return nil, err
 	}
 	var d datasetRow
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT id, "eventId", source, rows, status, "importedAt", "createdAt", "updatedAt"
 		 FROM "dataset" WHERE id=$1 AND "eventId"=$2`, p.DatasetID, p.EventID,
 	).Scan(&d.ID, &d.EventID, &d.Source, &d.Rows, &d.Status,
@@ -370,7 +369,7 @@ func UpdateDatasetStatusCore(ctx context.Context, p *UpdateDatasetStatusRequest)
 		importedAt = &now
 	}
 	var updated datasetRow
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`UPDATE "dataset" SET status=$1, "importedAt"=$2 WHERE id=$3
 		 RETURNING id, "eventId", source, rows, status, "importedAt", "createdAt", "updatedAt"`,
 		p.Status, importedAt, p.DatasetID,

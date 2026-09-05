@@ -8,6 +8,7 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.dev/et"
+
 	"encore.app/shared"
 )
 
@@ -27,7 +28,7 @@ func insertTestUser(t *testing.T, ctx context.Context, id, name, siteRole, slug 
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	// Mirror TS tests: deterministic placeholder email derived from the user id.
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", "vrchatUsername", slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		id, name, id+"@discord.invalid", "", siteRole, "", slug, now, now,
@@ -41,7 +42,7 @@ func insertTestUser(t *testing.T, ctx context.Context, id, name, siteRole, slug 
 func insertTestSession(t *testing.T, ctx context.Context, userId, token string, expiresAt time.Time) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "session" (id, "userId", token, "activeOrganizationId", "expiresAt", "createdAt", "updatedAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, NULL, $3, $4, $4)`,
 	// Store UTC wall clock: the column is TIMESTAMP (no TZ), so a local
@@ -165,7 +166,7 @@ func Test_requirePermission(t *testing.T) {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
 	// Create organization
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "organization" (id, name, slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, $4, $5)`,
 		"org-1", "Test Org", "test-org", now, now,
@@ -189,7 +190,7 @@ func Test_requirePermission(t *testing.T) {
 	t.Run("org admin can perform actions", func(t *testing.T) {
 		insertTestUser(t, ctx, "org-admin", "OrgAdmin", string(SiteRoleUser), "orgadmin")
 		insertTestSession(t, ctx, "org-admin", "org-admin-token", time.Now().Add(1*time.Hour))
-		_, err := shared.DB.Exec(ctx,
+		_, err := db.Exec(ctx,
 			`INSERT INTO "member" ("id", "userId", "organizationId", "role", "createdAt")
 			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4)`,
 			"org-admin", "org-1", administratorRole, now,
@@ -213,7 +214,7 @@ func Test_requirePermission(t *testing.T) {
 	t.Run("org member can only read", func(t *testing.T) {
 		insertTestUser(t, ctx, "org-member", "OrgMember", string(SiteRoleUser), "orgmember")
 		insertTestSession(t, ctx, "org-member", "member-token", time.Now().Add(1*time.Hour))
-		_, err := shared.DB.Exec(ctx,
+		_, err := db.Exec(ctx,
 			`INSERT INTO "member" ("id", "userId", "organizationId", "role", "createdAt")
 			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4)`,
 			"org-member", "org-1", memberRole, now,
@@ -261,7 +262,7 @@ func Test_requireEventPermission(t *testing.T) {
 
 	// Create user-owned event (owner user must exist: event_ownerUserId_fkey).
 	insertTestUser(t, ctx, "event-owner", "Owner", string(SiteRoleUser), "owner")
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "event" (id, name, "organizationId", "ownerUserId", "ownerType", "scoringType", "createdAt", "updatedAt")
 		 VALUES ($1, $2, NULL, $3, $4, 0, $5, $5)`,
 		"event-user-owned", "Test Event", "event-owner", string(EventOwnerTypeUser), now,
@@ -271,7 +272,7 @@ func Test_requireEventPermission(t *testing.T) {
 	}
 
 	// Create org-owned event
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "event" (id, name, "organizationId", "ownerUserId", "ownerType", "scoringType", "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, NULL, $4, 0, $5, $5)`,
 		"event-org-owned", "Org Event", "org-1", string(EventOwnerTypeOrganization), now,
@@ -326,7 +327,7 @@ func Test_getMemberRole(t *testing.T) {
 
 	insertTestUser(t, ctx, "role-user", "Role User", string(SiteRoleUser), "roleuser")
 
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "member" ("id", "userId", "organizationId", "role", "createdAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, $3, $4)`,
 		"role-user", "org-1", administratorRole, now,

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"encore.app/shared"
 )
 
 // Debug bypass end-to-end through the browser sign-in endpoint: provision the
@@ -138,7 +137,7 @@ func Test_EnsureDebugUserSession(t *testing.T) {
 	// still serve the old token from the actor cache until its TTL lapses —
 	// same staleness as the Discord rotation path.
 	var remaining int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM "session" WHERE "userId" = $1`, debugUserID,
 	).Scan(&remaining); err != nil {
 		t.Fatalf("count sessions: %v", err)

@@ -7,7 +7,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // Bulk standings endpoints: full-replace (PUT) and additive merge (POST).
@@ -79,7 +78,7 @@ func ReplaceRaceResultsCore(ctx context.Context, p *BulkResultsRequest) (*RaceRe
 		return nil, err
 	}
 	if len(removed) > 0 {
-		if _, err := shared.DB.Exec(ctx,
+		if _, err := db.Exec(ctx,
 			`DELETE FROM "race_result" WHERE "raceEventId"=$1 AND "userId"=ANY($2)`, p.RaceID, removed); err != nil {
 			return nil, err
 		}
@@ -169,7 +168,7 @@ func scoringRulesOf(e *eventRow) (string, any) {
 
 // removedResultUsers returns existing result holders absent from the payload.
 func removedResultUsers(ctx context.Context, raceID string, payloadIDs map[string]bool) ([]string, error) {
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT "userId" FROM "race_result" WHERE "raceEventId"=$1`, raceID)
 	if err != nil {
 		return nil, err

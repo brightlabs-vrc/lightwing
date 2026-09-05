@@ -9,7 +9,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.dev/storage/cache"
-	"encore.app/shared"
 )
 
 // Actor represents the authenticated caller resolved from a session token.
@@ -48,7 +47,7 @@ func resolveActor(ctx context.Context, authorization string) (*Actor, error) {
 	var activeOrgID sql.NullString
 	var expiresAt time.Time
 
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT s."userId", s."activeOrganizationId", u."siteRole", s."expiresAt"
 		 FROM "session" s
 		 JOIN "user" u ON u.id = s."userId"
@@ -102,7 +101,7 @@ func getMemberRole(ctx context.Context, organizationId, userId string) (string, 
 	}
 
 	var role string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT role FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`,
 		organizationId, userId,
 	).Scan(&role)
@@ -185,7 +184,7 @@ func requireEventPermission(ctx context.Context, authorization string, eventId s
 	// NULL (user-owned events have no organizationId and vice versa).
 	var ownerType string
 	var ownerUserID, organizationID sql.NullString
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT "ownerType", "ownerUserId", "organizationId" FROM "event" WHERE id = $1`,
 		eventId,
 	).Scan(&ownerType, &ownerUserID, &organizationID)
@@ -212,7 +211,7 @@ func requireEventPermission(ctx context.Context, authorization string, eventId s
 
 	// Check explicit EventAdmin row
 	var eventAdminExists bool
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "event_admin" WHERE "eventId" = $1 AND "userId" = $2)`,
 		eventId, actor.UserID,
 	).Scan(&eventAdminExists)

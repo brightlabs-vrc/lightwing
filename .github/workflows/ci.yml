@@ -6,8 +6,8 @@ permissions:
   contents: read
 
 jobs:
-  frontend-unit:
-    name: Frontend Unit Tests
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-22.04
 
     steps:
@@ -24,7 +24,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install
 
@@ -36,23 +42,13 @@ jobs:
         working-directory: frontend
         run: pnpm vitest run
 
-      - name: Frontend Build
+      # The backend embeds the compiled SPA (frontendserve/dist via go:embed),
+      # so the frontend must be built before the backend compiles. Encore Cloud
+      # does not run frontend builds in the deploy pipeline — dist/ is
+      # committed, and this step keeps the embedded copy fresh in CI.
+      - name: Frontend Build (embedded by backend)
         working-directory: frontend
-        run: pnpm build
-
-  backend-unit:
-    name: Backend Unit Tests
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
+        run: pnpm build:encore
 
       - name: Install Encore CLI
         run: |

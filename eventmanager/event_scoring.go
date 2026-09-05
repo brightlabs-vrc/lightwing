@@ -8,7 +8,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // Event scoring endpoints: points overview, ladder matches, status changes,
@@ -37,7 +36,7 @@ func SetEventPointsCore(ctx context.Context, p *SetEventPointsRequest) (*EventDe
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "event is not points-based"}
 	}
 	var memberExists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "event_member" WHERE "eventId"=$1 AND "userId"=$2)`,
 		p.ID, p.UserID).Scan(&memberExists); err != nil {
 		return nil, err
@@ -46,7 +45,7 @@ func SetEventPointsCore(ctx context.Context, p *SetEventPointsRequest) (*EventDe
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
 	now := time.Now().UTC()
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`INSERT INTO "event_points_entry" (id, "eventId", "userId", points, "createdAt", "updatedAt")
 		 VALUES ($1,$2,$3,$4,$5,$5)
 		 ON CONFLICT ("eventId", "userId") DO UPDATE SET points=$4, "updatedAt"=$5`,
@@ -93,7 +92,7 @@ func RecordLadderMatchCore(ctx context.Context, p *LadderMatchRequest) (*EventDe
 		{p.LoserID, "loser"},
 	} {
 		var memberExists bool
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT EXISTS(SELECT 1 FROM "event_member" WHERE "eventId"=$1 AND "userId"=$2)`,
 			p.ID, m.userID).Scan(&memberExists); err != nil {
 			return nil, err
@@ -111,12 +110,12 @@ func RecordLadderMatchCore(ctx context.Context, p *LadderMatchRequest) (*EventDe
 		return nil, err
 	}
 	updated := ComputeElo(winnerElo, loserElo)
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`UPDATE "event_ladder_entry" SET elo=$1, wins=wins+1 WHERE "eventId"=$2 AND "userId"=$3`,
 		updated.WinnerElo, p.ID, p.WinnerID); err != nil {
 		return nil, err
 	}
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`UPDATE "event_ladder_entry" SET elo=$1, losses=losses+1 WHERE "eventId"=$2 AND "userId"=$3`,
 		updated.LoserElo, p.ID, p.LoserID); err != nil {
 		return nil, err
@@ -128,19 +127,19 @@ func RecordLadderMatchCore(ctx context.Context, p *LadderMatchRequest) (*EventDe
 // entry when absent.
 func getOrCreateLadderElo(ctx context.Context, eventID, userID string) (int, error) {
 	var elo int
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT elo FROM "event_ladder_entry" WHERE "eventId"=$1 AND "userId"=$2`,
 		eventID, userID).Scan(&elo)
 	if errors.Is(err, sql.ErrNoRows) {
 		now := time.Now().UTC()
-		if _, err := shared.DB.Exec(ctx,
+		if _, err := db.Exec(ctx,
 			`INSERT INTO "event_ladder_entry" (id, "eventId", "userId", elo, "createdAt")
 			 VALUES ($1,$2,$3,1200,$4)
 			 ON CONFLICT ("eventId", "userId") DO NOTHING`,
 			"ladder-"+newID()[:8], eventID, userID, now); err != nil {
 			return 0, err
 		}
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT elo FROM "event_ladder_entry" WHERE "eventId"=$1 AND "userId"=$2`,
 			eventID, userID).Scan(&elo); err != nil {
 			return 0, err
@@ -175,7 +174,7 @@ func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDe
 	} else if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
-	if _, err := shared.DB.Exec(ctx, `UPDATE "event" SET status=$1 WHERE id=$2`, p.Status, p.ID); err != nil {
+	if _, err := db.Exec(ctx, `UPDATE "event" SET status=$1 WHERE id=$2`, p.Status, p.ID); err != nil {
 		return nil, err
 	}
 	return LoadEvent(ctx, p.ID)

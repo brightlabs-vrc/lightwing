@@ -11,7 +11,6 @@ import (
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/scorecalc"
-	"encore.app/shared"
 )
 
 // Per-race results. Event admins assign points to participants on a specific
@@ -81,7 +80,7 @@ func RequireRace(ctx context.Context, eventID, raceID string) (*raceEventRow, er
 // on the event's granularParticipation setting.
 func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID string) error {
 	var exists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "user" WHERE id=$1)`, userID).Scan(&exists); err != nil {
 		return err
 	}
@@ -89,7 +88,7 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 		return &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	}
 	var granular sql.NullBool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT "granularParticipation" FROM "event" WHERE id=$1`, eventID).Scan(&granular); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &errs.Error{Code: errs.NotFound, Message: "event not found"}
@@ -97,7 +96,7 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 		return err
 	}
 	if granular.Valid && granular.Bool {
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT EXISTS(SELECT 1 FROM "race_event_member" WHERE "raceEventId"=$1 AND "userId"=$2)`,
 			raceID, userID).Scan(&exists); err != nil {
 			return err
@@ -106,7 +105,7 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 			return &errs.Error{Code: errs.FailedPrecondition, Message: "user is not registered for this race"}
 		}
 	} else {
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT EXISTS(SELECT 1 FROM "event_member" WHERE "eventId"=$1 AND "userId"=$2)`,
 			eventID, userID).Scan(&exists); err != nil {
 			return err
@@ -120,7 +119,7 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 
 // ListResultsCore loads the full ordered result list for a race.
 func ListResultsCore(ctx context.Context, raceID string) ([]*RaceResultView, error) {
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT `+raceResultColumns+` FROM "race_result" WHERE "raceEventId"=$1
 		 ORDER BY position ASC NULLS LAST, points DESC`, raceID)
 	if err != nil {
@@ -161,7 +160,7 @@ type RaceResultInput struct {
 func eventScoringRules(ctx context.Context, eventID string) (scoringType int, mode string, custom any, err error) {
 	var modeNS sql.NullString
 	var customBytes []byte
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT "scoringType", "scoringRulesMode", "customScoringTables" FROM "event" WHERE id=$1`,
 		eventID).Scan(&scoringType, &modeNS, &customBytes)
 	if err != nil {
@@ -211,7 +210,7 @@ func upsertRaceResult(ctx context.Context, raceID string, entry *RaceResultInput
 		gateNumber = int64(*entry.GateNumber)
 	}
 	var r raceResultRow
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`INSERT INTO "race_result" (id, "raceEventId", "userId", position, points,
 		  "gateNumber", "finishTime", margin, "passingOrder", "final3F", "resultStatus",
 		  "createdAt", "updatedAt")
@@ -247,7 +246,7 @@ func upsertRaceResult(ctx context.Context, raceID string, entry *RaceResultInput
 			setClause = append(setClause, `"resultStatus" = NULL`)
 		}
 		_ = args
-		if _, err := shared.DB.Exec(ctx,
+		if _, err := db.Exec(ctx,
 			`UPDATE "race_result" SET `+strings.Join(setClause, ", ")+` WHERE id=$1`, r.ID); err != nil {
 			return nil, err
 		}
@@ -386,7 +385,7 @@ func DeleteRaceResultCore(ctx context.Context, p *DeleteRaceResultRequest) (*Del
 	if _, err := RequireRace(ctx, p.EventID, p.RaceID); err != nil {
 		return nil, err
 	}
-	res, err := shared.DB.Exec(ctx,
+	res, err := db.Exec(ctx,
 		`DELETE FROM "race_result" WHERE "raceEventId"=$1 AND "userId"=$2`, p.RaceID, p.UserID)
 	if err != nil {
 		return nil, err
@@ -468,7 +467,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 		resultStatus sql.NullString
 		classTier    sql.NullString
 	}
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT res.id, res."raceEventId", r.grade, res."userId", res.position,
 		        res.points, res."resultStatus", u."classTier"
 		 FROM "race_result" res
@@ -520,7 +519,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 	// All registered users per race: event members (non-granular) + result
 	// holders + explicit race members.
 	var granular bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT "granularParticipation" FROM "event" WHERE id=$1`, eventID).Scan(&granular); err != nil {
 		return err
 	}
@@ -532,7 +531,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 		raceUsers[raceID][userID] = true
 	}
 	if !granular {
-		mrows, err := shared.DB.Query(ctx, `SELECT "userId" FROM "event_member" WHERE "eventId"=$1`, eventID)
+		mrows, err := db.Query(ctx, `SELECT "userId" FROM "event_member" WHERE "eventId"=$1`, eventID)
 		if err != nil {
 			return err
 		}
@@ -563,7 +562,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 	for _, res := range results {
 		addUser(res.raceID, res.userID)
 	}
-	rmrows, err := shared.DB.Query(ctx,
+	rmrows, err := db.Query(ctx,
 		`SELECT m."raceEventId", m."userId" FROM "race_event_member" m
 		 JOIN "race_event" r ON r.id = m."raceEventId" WHERE r."eventId"=$1`, eventID)
 	if err != nil {
@@ -590,7 +589,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 		lookup[ri.raceID][ri.userID] = ri
 	}
 	raceGrades := map[string]string{}
-	grows, err := shared.DB.Query(ctx, `SELECT id, grade FROM "race_event" WHERE "eventId"=$1`, eventID)
+	grows, err := db.Query(ctx, `SELECT id, grade FROM "race_event" WHERE "eventId"=$1`, eventID)
 	if err != nil {
 		return err
 	}
@@ -619,7 +618,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 					continue
 				}
 				if existing == nil {
-					if _, err := shared.DB.Exec(ctx,
+					if _, err := db.Exec(ctx,
 						`INSERT INTO "race_result" (id, "raceEventId", "userId", points, "resultStatus", "createdAt", "updatedAt")
 						 VALUES ($1,$2,$3,0,'DEFERRED',$4,$4)`,
 						"raceresult-"+newID()[:8], raceID, userID, time.Now().UTC()); err != nil {
@@ -627,7 +626,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 					}
 				} else if !existing.resultStatus.Valid || existing.resultStatus.String == "DEFERRED" {
 					if !existing.resultStatus.Valid || existing.points != 0 {
-						if _, err := shared.DB.Exec(ctx,
+						if _, err := db.Exec(ctx,
 							`UPDATE "race_result" SET "resultStatus"='DEFERRED', points=0 WHERE id=$1`, existing.id); err != nil {
 							return err
 						}
@@ -644,7 +643,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 						pos = &n
 					}
 					restored := ResolvePoints(mode, custom, raceGrades[raceID], pos, "")
-					if _, err := shared.DB.Exec(ctx,
+					if _, err := db.Exec(ctx,
 						`UPDATE "race_result" SET "resultStatus"=NULL, points=$1 WHERE id=$2`, restored, existing.id); err != nil {
 						return err
 					}
@@ -657,7 +656,7 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 
 // raceIDsForEvent returns all race ids of an event.
 func raceIDsForEvent(ctx context.Context, eventID string) ([]string, error) {
-	rows, err := shared.DB.Query(ctx, `SELECT id FROM "race_event" WHERE "eventId"=$1`, eventID)
+	rows, err := db.Query(ctx, `SELECT id FROM "race_event" WHERE "eventId"=$1`, eventID)
 	if err != nil {
 		return nil, err
 	}

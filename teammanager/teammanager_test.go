@@ -12,11 +12,11 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.dev/et"
+
 	"encore.app/shared"
 )
 
 // TestMain sets up a single shared test database for all tests in this package.
-// Mirrors the auth package's TestMain via shared.SetTestDB.
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 	testDB, err := et.NewTestDatabase(ctx, "lightwing")
@@ -42,7 +42,7 @@ func bearer(token string) string { return "Bearer " + token }
 func insertTestUser(t *testing.T, ctx context.Context, id, name, siteRole string) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", biography, "vrchatUsername", slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, '', $4, '', '', $5, $6, $6)`,
 		id, name, id+"@example.com", siteRole, id, now,
@@ -61,7 +61,7 @@ func insertTestSession(t *testing.T, ctx context.Context, userID string) string 
 	token := hex.EncodeToString(b[:])
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	exp := time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano)
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "session" (id, "userId", token, "expiresAt", "createdAt", "updatedAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $4)`,
 		userID, token, exp, now,
@@ -83,7 +83,7 @@ type memberSpec struct {
 func createOrgWithMembers(t *testing.T, ctx context.Context, id, name, slug string, members []memberSpec) string {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`INSERT INTO "organization" (id, name, slug, "updatedAt") VALUES ($1, $2, $3, $4)`,
 		id, name, slug, now,
 	); err != nil {
@@ -93,7 +93,7 @@ func createOrgWithMembers(t *testing.T, ctx context.Context, id, name, slug stri
 	for i, m := range members {
 		insertTestUser(t, ctx, m.userID, m.name, "USER")
 		createdAt := base.Add(time.Duration(i) * time.Microsecond).Format(time.RFC3339Nano)
-		if _, err := shared.DB.Exec(ctx,
+		if _, err := db.Exec(ctx,
 			`INSERT INTO "member" (id, "organizationId", "userId", role, "createdAt")
 			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4)`,
 			id, m.userID, m.role, createdAt,
@@ -114,7 +114,7 @@ func TestGetTeam(t *testing.T) {
 		{userID: nextTeamID("user-blake"), role: "administrator", name: "Blake"},
 		{userID: nextTeamID("user-casey"), role: "member", name: "Casey"},
 	})
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`UPDATE "organization" SET "rankingAverage" = $1, "pointsAverage" = $2,
 		 "seasonRank" = $3, "averagePointsPerEvent" = $4 WHERE id = $5`,
 		4.2, 91.5, 7, 14.3, orgID,

@@ -11,6 +11,7 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.dev/et"
+
 	"encore.app/shared"
 )
 
@@ -42,7 +43,7 @@ func setupTestEvent(t *testing.T, ctx context.Context, scoringType int) (userID,
 	raceID2 = "sc-race2-" + tag
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, "siteRole", "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, 'USER', $4, $4)`,
 		userID, "Test User", userID+"@example.com", now,
@@ -50,7 +51,7 @@ func setupTestEvent(t *testing.T, ctx context.Context, scoringType int) (userID,
 	if err != nil {
 		t.Fatalf("failed to insert user: %v", err)
 	}
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "event" (id, name, "ownerType", "ownerUserId", "scoringType", status, "createdAt", "updatedAt")
 		 VALUES ($1, 'Test Points Event', 'USER', $2, $3, 'UNOFFICIAL', $4, $4)`,
 		eventID, userID, scoringType, now,
@@ -58,7 +59,7 @@ func setupTestEvent(t *testing.T, ctx context.Context, scoringType int) (userID,
 	if err != nil {
 		t.Fatalf("failed to insert event: %v", err)
 	}
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "event_member" (id, "eventId", "userId", "createdAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, $3)`,
 		eventID, userID, now,
@@ -73,7 +74,7 @@ func setupTestEvent(t *testing.T, ctx context.Context, scoringType int) (userID,
 		{raceID1, "Race 1", "Asphalt", "Track A", 1000},
 		{raceID2, "Race 2", "Dirt", "Track B", 1200},
 	} {
-		_, err = shared.DB.Exec(ctx,
+		_, err = db.Exec(ctx,
 			`INSERT INTO "race_event" (id, "eventId", name, "distanceMeters", "trackType", location, "createdAt", "updatedAt")
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
 			race.id, eventID, race.name, race.dist, race.track, race.loc, now,
@@ -88,7 +89,7 @@ func setupTestEvent(t *testing.T, ctx context.Context, scoringType int) (userID,
 func readJob(t *testing.T, ctx context.Context, jobID string) scoreCalcJobRow {
 	t.Helper()
 	var j scoreCalcJobRow
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT id, "eventId", generation, "requestedUserIds", status, attempts
 		 FROM "score_calc_task" WHERE id = $1`, jobID,
 	).Scan(&j.ID, &j.EventID, &j.Generation, &j.RequestedUserIDs, &j.Status, &j.Attempts)
@@ -132,7 +133,7 @@ func Test_submitCalc(t *testing.T) {
 		}
 
 		var latest, accepted int
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT "latestGeneration", "acceptedGeneration" FROM "score_calc_state" WHERE "eventId" = $1`, eventID,
 		).Scan(&latest, &accepted); err != nil {
 			t.Fatalf("failed to read state: %v", err)
@@ -173,7 +174,7 @@ func Test_submitCalc(t *testing.T) {
 			t.Errorf("got %+v, want no-op/0", resp)
 		}
 		var count int
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT COUNT(*) FROM "score_calc_task" WHERE "eventId" = $1`, eventID,
 		).Scan(&count); err != nil {
 			t.Fatalf("failed to count jobs: %v", err)
@@ -191,7 +192,7 @@ func Test_submitCalc(t *testing.T) {
 func claimJob(t *testing.T, ctx context.Context, jobID string) {
 	t.Helper()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`UPDATE "score_calc_task" SET status = 'PROCESSING', attempts = 1, "startedAt" = $1 WHERE id = $2`,
 		now, jobID,
 	)
@@ -228,7 +229,7 @@ func Test_completed(t *testing.T) {
 	}
 	var checksum string
 	var completedAt time.Time
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT "resultChecksum", "completedAt" FROM "score_calc_task" WHERE id = $1`, sub.JobID,
 	).Scan(&checksum, &completedAt); err != nil {
 		t.Fatalf("failed to read job completion: %v", err)
@@ -241,7 +242,7 @@ func Test_completed(t *testing.T) {
 	}
 
 	var points int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT points FROM "event_points_entry" WHERE "eventId" = $1 AND "userId" = $2`,
 		eventID, userID,
 	).Scan(&points); err != nil {
@@ -252,7 +253,7 @@ func Test_completed(t *testing.T) {
 	}
 
 	var accepted int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT "acceptedGeneration" FROM "score_calc_state" WHERE "eventId" = $1`, eventID,
 	).Scan(&accepted); err != nil {
 		t.Fatalf("failed to read state: %v", err)
@@ -281,7 +282,7 @@ func Test_handleFailed(t *testing.T) {
 	}
 
 	var status, lastError string
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT status, "lastError" FROM "score_calc_task" WHERE id = $1`, sub.JobID,
 	).Scan(&status, &lastError); err != nil {
 		t.Fatalf("failed to read job: %v", err)

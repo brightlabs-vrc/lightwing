@@ -281,7 +281,7 @@ func (s *Service) getDiscordGuildMember(ctx context.Context, userID string) (*di
 // Mirrors ts-legacy/auth/auth.ts isBootstrapSiteAdminUser
 func (s *Service) isBootstrapSiteAdminUser(ctx context.Context, userId string) (bool, error) {
 	var firstUserId string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT id FROM "user" ORDER BY "createdAt" ASC LIMIT 1`,
 	).Scan(&firstUserId)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -305,7 +305,7 @@ func (s *Service) syncSiteRoleFromDiscordMembership(ctx context.Context, userId 
 
 	// Look up the Discord account ID for this user.
 	var accountId string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT "accountId" FROM "account" WHERE "userId" = $1 AND "providerId" = 'discord' ORDER BY "updatedAt" DESC LIMIT 1`,
 		userId,
 	).Scan(&accountId)
@@ -355,7 +355,7 @@ func (s *Service) syncSiteRoleFromDiscordMembership(ctx context.Context, userId 
 
 	// Get current site role
 	var currentSiteRole string
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT "siteRole" FROM "user" WHERE id = $1`, userId,
 	).Scan(&currentSiteRole)
 	if err != nil {
@@ -364,7 +364,7 @@ func (s *Service) syncSiteRoleFromDiscordMembership(ctx context.Context, userId 
 
 	if currentSiteRole != nextSiteRole {
 		rlog.Info(fmt.Sprintf("Updating site role for user ID %s from %s to %s", userId, currentSiteRole, nextSiteRole))
-		_, err = shared.DB.Exec(ctx,
+		_, err = db.Exec(ctx,
 			`UPDATE "user" SET "siteRole" = $1 WHERE id = $2`,
 			nextSiteRole, userId,
 		)
@@ -418,7 +418,7 @@ func (s *Service) storeOAuthState(ctx context.Context, state, redirect, errorRed
 		return fmt.Errorf("failed to encode OAuth state: %w", err)
 	}
 	now := time.Now().UTC()
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "verification" ("id", "identifier", "value", "expiresAt", "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, $4, $5, $6)`,
 		"oauth_state:"+state, "oauth_state:"+state, string(value),
@@ -431,7 +431,7 @@ func (s *Service) storeOAuthState(ctx context.Context, state, redirect, errorRed
 // the redirect targets.
 func (s *Service) consumeOAuthState(ctx context.Context, state string) (oauthRedirect, error) {
 	var raw string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT "value" FROM "verification" WHERE "identifier" = $1 AND "expiresAt" > $2`,
 		"oauth_state:"+state, time.Now().UTC(),
 	).Scan(&raw)
@@ -439,7 +439,7 @@ func (s *Service) consumeOAuthState(ctx context.Context, state string) (oauthRed
 		return oauthRedirect{}, err
 	}
 	// Delete the state (single use)
-	_, _ = shared.DB.Exec(ctx, `DELETE FROM "verification" WHERE "identifier" = $1`, "oauth_state:"+state)
+	_, _ = db.Exec(ctx, `DELETE FROM "verification" WHERE "identifier" = $1`, "oauth_state:"+state)
 	var redir oauthRedirect
 	if err := json.Unmarshal([]byte(raw), &redir); err != nil {
 		// Plain-string rows predate the JSON envelope; treat as redirect only.

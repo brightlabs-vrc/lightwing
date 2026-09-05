@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"encore.dev/beta/errs"
-	"encore.app/shared"
 )
 
 // Ports of the race/results/datasets DB-backed legacy tests:
@@ -228,7 +227,7 @@ func Test_AutoDeferralCustomTables(t *testing.T) {
 		`"GIII":{"1":15,"2":12,"3":10,"4":8,"5":6,"6":5,"7":4,"8":3,"9":2,"10":1,"autoDefer":true},` +
 		`"GII":{"1":19,"2":15,"3":12,"4":9,"5":8,"6":6,"7":5,"8":3,"9":2,"10":1,"autoDefer":false},` +
 		`"GI":{"1":25,"2":18,"3":15,"4":12,"5":10,"6":8,"7":6,"8":4,"9":2,"10":1,"autoDefer":false}}`
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`UPDATE "event" SET "scoringRulesMode"='CUSTOM', "customScoringTables"=$1 WHERE id=$2`,
 		[]byte(customTables), eventID); err != nil {
 		t.Fatalf("set custom tables: %v", err)
@@ -390,7 +389,7 @@ func Test_DatasetCreateRejectsMissingEvent(t *testing.T) {
 // addEventMemberDirect inserts an event membership row without the API.
 func (f *fixtures) addEventMemberDirect(eventID, userID string) {
 	f.t.Helper()
-	if _, err := shared.DB.Exec(f.ctx,
+	if _, err := db.Exec(f.ctx,
 		`INSERT INTO "event_member" (id, "eventId", "userId") VALUES ($1,$2,$3)`,
 		"eventmember-"+newID()[:8], eventID, userID); err != nil {
 		f.t.Fatalf("insert event member: %v", err)

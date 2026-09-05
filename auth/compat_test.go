@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"encore.app/shared"
 )
 
 func testCompatService() *Service {
@@ -233,7 +232,7 @@ func Test_compatSignOut(t *testing.T) {
 
 	// Session row must be gone.
 	var count int
-	if err := shared.DB.QueryRow(ctx, `SELECT COUNT(*) FROM "session" WHERE "token" = $1`, token).Scan(&count); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM "session" WHERE "token" = $1`, token).Scan(&count); err != nil {
 		t.Fatalf("failed to check session: %v", err)
 	}
 	if count != 0 {

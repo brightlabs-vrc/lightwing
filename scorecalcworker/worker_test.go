@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"encore.dev/et"
-	"encore.app/scorecalc"
+
 	"encore.app/shared"
+	"encore.app/scorecalc"
 )
 
 func TestMain(m *testing.M) {
@@ -36,7 +37,7 @@ func setupWorkerEvent(t *testing.T, ctx context.Context) (userID, eventID, raceI
 	raceID2 = "w-race2-" + tag
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, "siteRole", "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, 'USER', $4, $4)`,
 		userID, "Test User", userID+"@example.com", now,
@@ -44,7 +45,7 @@ func setupWorkerEvent(t *testing.T, ctx context.Context) (userID, eventID, raceI
 	if err != nil {
 		t.Fatalf("failed to insert user: %v", err)
 	}
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "event" (id, name, "ownerType", "ownerUserId", "scoringType", status, "createdAt", "updatedAt")
 		 VALUES ($1, 'Test Points Event', 'USER', $2, 1, 'UNOFFICIAL', $3, $3)`,
 		eventID, userID, now,
@@ -52,7 +53,7 @@ func setupWorkerEvent(t *testing.T, ctx context.Context) (userID, eventID, raceI
 	if err != nil {
 		t.Fatalf("failed to insert event: %v", err)
 	}
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "event_member" (id, "eventId", "userId", "createdAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, $3)`,
 		eventID, userID, now,
@@ -68,7 +69,7 @@ func setupWorkerEvent(t *testing.T, ctx context.Context) (userID, eventID, raceI
 		{raceID2, "Race 2", "Dirt", "Track B", 1200, 15, 2},
 	}
 	for _, race := range races {
-		_, err = shared.DB.Exec(ctx,
+		_, err = db.Exec(ctx,
 			`INSERT INTO "race_event" (id, "eventId", name, "distanceMeters", "trackType", location, "createdAt", "updatedAt")
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
 			race.id, eventID, race.name, race.dist, race.track, race.loc, now,
@@ -76,7 +77,7 @@ func setupWorkerEvent(t *testing.T, ctx context.Context) (userID, eventID, raceI
 		if err != nil {
 			t.Fatalf("failed to insert race: %v", err)
 		}
-		_, err = shared.DB.Exec(ctx,
+		_, err = db.Exec(ctx,
 			`INSERT INTO "race_result" (id, "raceEventId", "userId", points, position, "createdAt", "updatedAt")
 			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $5)`,
 			race.id, userID, race.points, race.pos, now,
@@ -90,7 +91,7 @@ func setupWorkerEvent(t *testing.T, ctx context.Context) (userID, eventID, raceI
 
 func readWorkerJob(t *testing.T, ctx context.Context, jobID string) (status string, attempts int) {
 	t.Helper()
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT status, attempts FROM "score_calc_task" WHERE id = $1`, jobID,
 	).Scan(&status, &attempts); err != nil {
 		t.Fatalf("failed to read job: %v", err)
@@ -212,7 +213,7 @@ func Test_generationFencing(t *testing.T) {
 		t.Fatalf("gen1 status = %q, want SUPERSEDED", status)
 	}
 	var count int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM "event_points_entry" WHERE "eventId" = $1`, eventID,
 	).Scan(&count); err != nil {
 		t.Fatalf("failed to count points: %v", err)
@@ -226,7 +227,7 @@ func Test_generationFencing(t *testing.T) {
 		t.Fatalf("gen2 status = %q, want COMPLETED", status)
 	}
 	var points int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT points FROM "event_points_entry" WHERE "eventId" = $1 AND "userId" = $2`,
 		eventID, userID,
 	).Scan(&points); err != nil {

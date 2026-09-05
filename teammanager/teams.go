@@ -10,7 +10,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // --- getTeam (mirrors ts-legacy/teammanager/teams.ts getTeam) ---
@@ -32,7 +31,7 @@ func getTeam(ctx context.Context, id string) (*Team, error) {
 
 func getTeamBySlug(ctx context.Context, slug string) (*Team, error) {
 	var org orgRow
-	err := scanOrgRow(&org, shared.DB.QueryRow(ctx,
+	err := scanOrgRow(&org, db.QueryRow(ctx,
 		`SELECT `+orgColumns+` FROM "organization" WHERE slug = $1`, slug))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
@@ -62,7 +61,7 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 		where = `WHERE name ILIKE $1 OR slug ILIKE $1`
 	}
 	var total int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM "organization" `+where, args...,
 	).Scan(&total); err != nil {
 		return nil, err
@@ -76,7 +75,7 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 		args = append(args, offset)
 		query += fmt.Sprintf(` OFFSET $%d`, len(args))
 	}
-	rows, err := shared.DB.Query(ctx, query, args...)
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +98,7 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 	teams := make([]TeamListItem, 0, len(stubs))
 	for _, s := range stubs {
 		var memberCount, adminCount int
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT COUNT(*), COUNT(*) FILTER (WHERE role = $2) FROM "member" WHERE "organizationId" = $1`,
 			s.ID, auth.AdministratorRole,
 		).Scan(&memberCount, &adminCount); err != nil {
@@ -130,7 +129,7 @@ func createTeam(ctx context.Context, authorization, name string, logo *string) (
 	}
 	slug := slugifyTeamName(name)
 	var existing string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT id FROM "organization" WHERE slug = $1`, slug,
 	).Scan(&existing)
 	if err == nil {
@@ -143,7 +142,7 @@ func createTeam(ctx context.Context, authorization, name string, logo *string) (
 		logoVal = sql.NullString{String: *logo, Valid: true}
 	}
 	var id string
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`INSERT INTO "organization" (id, name, slug, logo, "updatedAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, $3, $4) RETURNING id`,
 		name, slug, logoVal, time.Now().UTC(),
@@ -179,7 +178,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 		}
 	}
 	var existingSlug string
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT slug FROM "organization" WHERE id = $1`, id,
 	).Scan(&existingSlug)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -194,7 +193,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid slug format or length"}
 		}
 		var collision string
-		err := shared.DB.QueryRow(ctx,
+		err := db.QueryRow(ctx,
 			`SELECT id FROM "organization" WHERE slug = $1`, *p.Slug,
 		).Scan(&collision)
 		if err == nil {
@@ -217,7 +216,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 		set = append(set, fmt.Sprintf(`"logo" = $%d`, len(args)))
 	}
 	args = append(args, id)
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`UPDATE "organization" SET `+strings.Join(set, ", ")+fmt.Sprintf(` WHERE id = $%d`, len(args)),
 		args...,
 	)

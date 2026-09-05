@@ -14,7 +14,6 @@ import (
 	"encore.dev"
 	"encore.dev/beta/errs"
 	"encore.dev/rlog"
-	"encore.app/shared"
 	"golang.org/x/oauth2"
 )
 
@@ -227,7 +226,7 @@ func upsertUserAndSession(ctx context.Context, svc *Service, token *oauth2.Token
 	// Returning users keep their existing id via the account link, so rows
 	// created by better-auth (cuid ids) stay stable across the migration.
 	userID := ""
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT "userId" FROM "account" WHERE "providerId" = 'discord' AND "accountId" = $1`,
 		discordUser.ID,
 	).Scan(&userID)
@@ -236,7 +235,7 @@ func upsertUserAndSession(ctx context.Context, svc *Service, token *oauth2.Token
 	}
 
 	// Use a transaction to keep user/account/session consistent
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -262,7 +261,7 @@ func upsertUserAndSession(ctx context.Context, svc *Service, token *oauth2.Token
 		if userID == "" {
 			userID = generateID()
 		}
-		slug, err := GenerateUniqueUserSlug(shared.DB.Stdlib(), displayName, userID)
+		slug, err := GenerateUniqueUserSlug(db.Stdlib(), displayName, userID)
 		if err != nil {
 			return "", fmt.Errorf("failed to generate user slug: %w", err)
 		}
@@ -412,7 +411,7 @@ func getSessionData(ctx context.Context, token string, hasCookie bool) (*GetSess
 
 	// Fetch session expiry
 	var expiresAt time.Time
-	err = shared.DB.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT "expiresAt" FROM "session" WHERE "token" = $1`, token,
 	).Scan(&expiresAt)
 	if err != nil {
@@ -421,7 +420,7 @@ func getSessionData(ctx context.Context, token string, hasCookie bool) (*GetSess
 
 	// Ensure the user has a slug (lazy assignment for pre-slug rows)
 	if profile.Slug == nil {
-		if slug, err := ensureUserSlug(ctx, shared.DB, actor.UserID); err != nil {
+		if slug, err := ensureUserSlug(ctx, db, actor.UserID); err != nil {
 			rlog.Error("failed to ensure user slug", "err", err)
 		} else {
 			profile.Slug = &slug

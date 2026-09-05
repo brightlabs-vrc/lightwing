@@ -15,7 +15,6 @@ import (
 	"encore.dev"
 	"encore.dev/beta/errs"
 	"encore.dev/rlog"
-	"encore.app/shared"
 	"golang.org/x/oauth2"
 )
 
@@ -132,7 +131,7 @@ func signOutSession(ctx context.Context, token string) error {
 	if actorCache != nil {
 		_, _ = actorCache.Delete(ctx, actorCacheKey{Token: token})
 	}
-	_, err := shared.DB.Exec(ctx, `DELETE FROM "session" WHERE "token" = $1`, token)
+	_, err := db.Exec(ctx, `DELETE FROM "session" WHERE "token" = $1`, token)
 	return err
 }
 

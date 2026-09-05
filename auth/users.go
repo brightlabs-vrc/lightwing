@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"encore.dev/beta/errs"
-	"encore.app/shared"
 )
 
 // TeamAffiliation represents a user's membership in an organization.
@@ -70,7 +69,7 @@ func nullToPtr(ns sql.NullString) *string {
 
 func loadUserRow(ctx context.Context, userID string) (*userRow, error) {
 	var r userRow
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT id, name, email, image, slug, biography, "careerOverview",
 		        "vrchatUsername", "classTier", "siteRole", "createdAt", "updatedAt"
 		 FROM "user" WHERE id = $1`,
@@ -88,7 +87,7 @@ func loadUserRow(ctx context.Context, userID string) (*userRow, error) {
 }
 
 func loadTeams(ctx context.Context, userID string) ([]TeamAffiliation, error) {
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT o.id, o.name, o.slug, m.role
 		 FROM "member" m
 		 JOIN "organization" o ON o.id = m."organizationId"
@@ -163,7 +162,7 @@ func getUserProfile(ctx context.Context, userID string) (*UserProfile, error) {
 // Mirrors ts-legacy/auth/users.ts getUserProfileBySlug
 func getUserProfileBySlug(ctx context.Context, slug string) (*UserProfile, error) {
 	var userID string
-	err := shared.DB.QueryRow(ctx, `SELECT id FROM "user" WHERE slug = $1`, slug).Scan(&userID)
+	err := db.QueryRow(ctx, `SELECT id FROM "user" WHERE slug = $1`, slug).Scan(&userID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	}
@@ -214,7 +213,7 @@ func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, p
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid slug format or length"}
 		}
 		var collisionID string
-		err := shared.DB.QueryRow(ctx, `SELECT id FROM "user" WHERE slug = $1`, *params.Slug).Scan(&collisionID)
+		err := db.QueryRow(ctx, `SELECT id FROM "user" WHERE slug = $1`, *params.Slug).Scan(&collisionID)
 		if err == nil {
 			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "user slug is already in use"}
 		}
@@ -238,7 +237,7 @@ func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, p
 	add("\"updatedAt\"", time.Now().UTC())
 
 	args = append(args, targetUserID)
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		fmt.Sprintf(`UPDATE "user" SET %s WHERE id = $%d`, strings.Join(sets, ", "), len(args)),
 		args...,
 	)
@@ -280,7 +279,7 @@ func setUserSiteRole(ctx context.Context, actor *Actor, params *SetUserSiteRoleP
 	if _, err := loadUserRow(ctx, params.UserID); err != nil {
 		return nil, err
 	}
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`UPDATE "user" SET "siteRole" = $1, "updatedAt" = $2 WHERE id = $3`,
 		params.SiteRole, time.Now().UTC(), params.UserID,
 	)
@@ -328,7 +327,7 @@ func listUsers(ctx context.Context, actor *Actor, q ListUsersQuery) (*ListUsersR
 	}
 
 	var total int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		fmt.Sprintf(`SELECT COUNT(*) FROM "user" %s`, filter), args...,
 	).Scan(&total); err != nil {
 		return nil, fmt.Errorf("failed to count users: %w", err)
@@ -347,7 +346,7 @@ func listUsers(ctx context.Context, actor *Actor, q ListUsersQuery) (*ListUsersR
 		query += fmt.Sprintf(" OFFSET $%d", len(args))
 	}
 
-	rows, err := shared.DB.Query(ctx, query, args...)
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query users: %w", err)
 	}

@@ -101,4 +101,15 @@ encore gen client --lang typescript --output frontend/src/lib/client.ts
 
 ## Deployment
 
+The backend also serves the frontend: `frontendserve` embeds the compiled SPA
+(`frontendserve/dist`) at a root fallback route, so the deployed app is
+same-origin (no CORS needed). Encore Cloud does not run frontend builds, so
+rebuild and commit `dist/` before pushing:
+
+```bash
+cd frontend && pnpm build:encore && cd .. && git add frontendserve/dist
+```
+
+(Built without `VITE_API_BASE_URL`, the SPA calls same-origin APIs.)
+
 See the [self-hosting instructions](https://encore.dev/docs/go/self-host/docker-build) for `encore build docker`, or push to Encore Cloud with `git push encore`.

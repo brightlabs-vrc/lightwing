@@ -1,6 +1,8 @@
 package shared
 
 import (
+	"sync"
+
 	"encore.dev/storage/cache"
 	"encore.dev/storage/sqldb"
 )
@@ -19,8 +21,29 @@ var Cache = cache.NewCluster("lightwing-cache", cache.ClusterConfig{
 	EvictionPolicy: cache.VolatileTTL,
 })
 
-// SetTestDB repoints the shared database at an isolated test database.
-// Called once from TestMain; production code never calls it.
+// dbHandles tracks every service-local database handle (see db.go in each
+// service) so tests can repoint them all at once.
+var (
+	dbMu      sync.Mutex
+	dbHandles []*sqldb.Database
+)
+
+// RegisterDB records a service-local handle created via sqldb.Named.
+// Called from init in each service's db.go.
+func RegisterDB(db **sqldb.Database) {
+	dbMu.Lock()
+	defer dbMu.Unlock()
+	dbHandles = append(dbHandles, *db)
+}
+
+// SetTestDB repoints the shared database and every registered service-local
+// handle at an isolated test database. Called once from TestMain; production
+// code never calls it.
 func SetTestDB(testDB *sqldb.Database) {
+	dbMu.Lock()
+	defer dbMu.Unlock()
 	DB = testDB
+	for _, h := range dbHandles {
+		*h = *testDB
+	}
 }

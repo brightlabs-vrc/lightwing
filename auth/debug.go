@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"encore.app/shared"
 )
 
 // Local debug login bypass.
@@ -39,7 +38,7 @@ func ensureDebugUserSession(ctx context.Context) (string, error) {
 	expiresAt := now.Add(sessionLifetime)
 	sessionToken := generateSessionToken()
 
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -49,7 +48,7 @@ func ensureDebugUserSession(ctx context.Context) (string, error) {
 	err = tx.QueryRow(ctx, `SELECT id FROM "user" WHERE id = $1`, debugUserID).Scan(&existingID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		slug, serr := GenerateUniqueUserSlug(shared.DB.Stdlib(), "Debug User", debugUserID)
+		slug, serr := GenerateUniqueUserSlug(db.Stdlib(), "Debug User", debugUserID)
 		if serr != nil {
 			return "", fmt.Errorf("failed to generate debug user slug: %w", serr)
 		}

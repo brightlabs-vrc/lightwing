@@ -6,7 +6,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // AddEventScheduleRequest carries the schedule payload plus the auth header.
@@ -25,7 +24,7 @@ type AddEventScheduleRequest struct {
 // AddEventScheduleCore adds a schedule slot to an event.
 func AddEventScheduleCore(ctx context.Context, p *AddEventScheduleRequest) (*EventDetail, error) {
 	var exists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1)`, p.EventID,
 	).Scan(&exists); err != nil {
 		return nil, err
@@ -51,7 +50,7 @@ func AddEventScheduleCore(ctx context.Context, p *AddEventScheduleRequest) (*Eve
 		endsAt = &utc
 	}
 
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`INSERT INTO "event_schedule" (id, "eventId", title, "startsAt", "endsAt", location, "createdAt")
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		newID(), p.EventID, p.Title, startsAt.UTC(), endsAt, p.Location, time.Now().UTC()); err != nil {

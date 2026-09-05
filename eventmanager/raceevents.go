@@ -9,7 +9,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // Race events: single races contained within an event. The parent event acts
@@ -67,7 +66,7 @@ const raceEventColumns = `id, "eventId", name, sequence, "distanceMeters", "trac
 // loadRaceMembers returns the registered participants of a race with display
 // names (vrchatUsername preferred) and class tiers.
 func loadRaceMembers(ctx context.Context, raceID string) ([]RaceEventMemberView, error) {
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
 		 FROM "race_event_member" m JOIN "user" u ON u.id = m."userId"
 		 WHERE m."raceEventId" = $1`, raceID)
@@ -115,7 +114,7 @@ func toRaceEventDetail(r *raceEventRow, members []RaceEventMemberView) *RaceEven
 // requireRaceEvent loads a race and asserts it belongs to the given event.
 func requireRaceEvent(ctx context.Context, eventID, raceID string) (*raceEventRow, error) {
 	var r raceEventRow
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT `+raceEventColumns+` FROM "race_event" WHERE id = $1`, raceID,
 	).Scan(&r.ID, &r.EventID, &r.Name, &r.Sequence, &r.DistanceMeters,
 		&r.TrackType, &r.Location, &r.ScoringType, &r.Grade, &r.ClassRestriction,
@@ -141,7 +140,7 @@ func loadRaceDetail(ctx context.Context, r *raceEventRow) (*RaceEventDetail, err
 // requireEventRow loads the parent event row or returns NotFound.
 func requireEventRow(ctx context.Context, eventID string) (*eventRow, error) {
 	var e eventRow
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT `+eventColumns+` FROM "event" WHERE id = $1`, eventID,
 	).Scan(&e.ID, &e.Name, &e.Description, &e.OwnerType, &e.OrganizationID,
 		&e.OwnerUserID, &e.Status, &e.ScoringType, &e.ScoringRulesMode,
@@ -203,7 +202,7 @@ func CreateRaceEventCore(ctx context.Context, p *CreateRaceEventRequest) (*RaceE
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Race participant limit can only be configured for granular events"}
 	}
 	var maxSeq sql.NullInt64
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT MAX(sequence) FROM "race_event" WHERE "eventId" = $1`, p.EventID,
 	).Scan(&maxSeq); err != nil {
 		return nil, err
@@ -229,7 +228,7 @@ func CreateRaceEventCore(ctx context.Context, p *CreateRaceEventRequest) (*RaceE
 	}
 	id := "race-" + newID()[:8]
 	now := time.Now().UTC()
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "race_event" (id, "eventId", name, sequence, "distanceMeters", "trackType",
 		  location, "scoringType", grade, "classRestriction", "startsAt", "endsAt",
 		  "participantLimit", "createdAt", "updatedAt")
@@ -270,7 +269,7 @@ func ReorderRaceEventsCore(ctx context.Context, p *ReorderRaceEventsRequest) (*R
 	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT id, sequence FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC`, p.EventID)
 	if err != nil {
 		return nil, err
@@ -320,7 +319,7 @@ func ReorderRaceEventsCore(ctx context.Context, p *ReorderRaceEventsRequest) (*R
 		}
 	}
 	if needsUpdate {
-		tx, err := shared.DB.Begin(ctx)
+		tx, err := db.Begin(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -351,7 +350,7 @@ type ListRaceEventsQuery struct {
 
 // ListRaceEventsCore returns all races of an event with members.
 func ListRaceEventsCore(ctx context.Context, q *ListRaceEventsQuery) (*ReorderRaceEventsResponse, error) {
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT `+raceEventColumns+` FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC`, q.EventID)
 	if err != nil {
 		return nil, err
@@ -450,7 +449,7 @@ func UpdateRaceEventCore(ctx context.Context, p *UpdateRaceEventRequest) (*RaceE
 		}
 		if limitVal != nil {
 			var currentCount int
-			if err := shared.DB.QueryRow(ctx,
+			if err := db.QueryRow(ctx,
 				`SELECT COUNT(*) FROM "race_event_member" WHERE "raceEventId" = $1`, p.RaceID,
 			).Scan(&currentCount); err != nil {
 				return nil, err
@@ -542,7 +541,7 @@ func UpdateRaceEventCore(ctx context.Context, p *UpdateRaceEventRequest) (*RaceE
 		classRestr = *p.ClassRestriction
 	}
 	now := time.Now().UTC()
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`UPDATE "race_event" SET name=$1, sequence=$2, "distanceMeters"=$3, "trackType"=$4,
 		  location=$5, "scoringType"=$6, grade=$7, "classRestriction"=$8, "startsAt"=$9,
 		  "endsAt"=$10, "participantLimit"=$11, "updatedAt"=$12 WHERE id=$13`,
@@ -590,7 +589,7 @@ func DeleteRaceEventCore(ctx context.Context, p *DeleteRaceEventRequest) (*Delet
 	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionDelete); err != nil {
 		return nil, err
 	}
-	if _, err := shared.DB.Exec(ctx, `DELETE FROM "race_event" WHERE id = $1`, p.RaceID); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM "race_event" WHERE id = $1`, p.RaceID); err != nil {
 		return nil, err
 	}
 	return &DeleteRaceEventResponse{Deleted: true}, nil
@@ -615,13 +614,13 @@ type RaceMemberRequest struct {
 // an event member first; class restriction and capacity limits are enforced.
 func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEventDetail, error) {
 	var userTier sql.NullString
-	if err := shared.DB.QueryRow(ctx, `SELECT "classTier" FROM "user" WHERE id = $1`, p.UserID).Scan(&userTier); err != nil {
+	if err := db.QueryRow(ctx, `SELECT "classTier" FROM "user" WHERE id = $1`, p.UserID).Scan(&userTier); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 		}
 		return nil, err
 	}
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -735,7 +734,7 @@ func RemoveRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*Race
 		return nil, err
 	}
 	var memberExists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "event_member" WHERE "eventId"=$1 AND "userId"=$2)`,
 		p.EventID, p.UserID).Scan(&memberExists); err != nil {
 		return nil, err
@@ -743,13 +742,13 @@ func RemoveRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*Race
 	if !memberExists {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`DELETE FROM "race_event_member" WHERE "raceEventId"=$1 AND "userId"=$2`, p.RaceID, p.UserID); err != nil {
 		return nil, err
 	}
 	if e.GranularParticipation {
 		var activeCount int
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT COUNT(*) FROM "race_event_member" m JOIN "race_event" r ON r.id = m."raceEventId"
 			 WHERE m."userId"=$1 AND r."eventId"=$2`, p.UserID, p.EventID,
 		).Scan(&activeCount); err != nil {
@@ -819,13 +818,13 @@ func JoinRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDetai
 	}
 	userID := actor.UserID
 	var userTier sql.NullString
-	if err := shared.DB.QueryRow(ctx, `SELECT "classTier" FROM "user" WHERE id = $1`, userID).Scan(&userTier); err != nil {
+	if err := db.QueryRow(ctx, `SELECT "classTier" FROM "user" WHERE id = $1`, userID).Scan(&userTier); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 		}
 		return nil, err
 	}
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -951,7 +950,7 @@ func LeaveRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDeta
 	}
 	userID := actor.UserID
 	var memberExists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "event_member" WHERE "eventId"=$1 AND "userId"=$2)`,
 		p.EventID, userID).Scan(&memberExists); err != nil {
 		return nil, err
@@ -959,13 +958,13 @@ func LeaveRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDeta
 	if !memberExists {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`DELETE FROM "race_event_member" WHERE "raceEventId"=$1 AND "userId"=$2`, p.RaceID, userID); err != nil {
 		return nil, err
 	}
 	if e.GranularParticipation {
 		var activeCount int
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT COUNT(*) FROM "race_event_member" m JOIN "race_event" r ON r.id = m."raceEventId"
 			 WHERE m."userId"=$1 AND r."eventId"=$2`, userID, p.EventID,
 		).Scan(&activeCount); err != nil {

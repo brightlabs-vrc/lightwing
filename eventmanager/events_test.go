@@ -9,6 +9,7 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.dev/et"
+
 	"encore.app/shared"
 )
 
@@ -42,23 +43,23 @@ func newFixtures(t *testing.T) *fixtures {
 func (f *fixtures) cleanup() {
 	ctx := context.Background()
 	if len(f.events) > 0 {
-		_, _ = shared.DB.Exec(ctx,
+		_, _ = db.Exec(ctx,
 			`DELETE FROM "race_result" WHERE "raceEventId" IN (SELECT id FROM "race_event" WHERE "eventId" = ANY($1))`, f.events)
-		_, _ = shared.DB.Exec(ctx,
+		_, _ = db.Exec(ctx,
 			`DELETE FROM "race_event_member" WHERE "raceEventId" IN (SELECT id FROM "race_event" WHERE "eventId" = ANY($1))`, f.events)
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "race_event" WHERE "eventId" = ANY($1)`, f.events)
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "event_points_entry" WHERE "eventId" = ANY($1)`, f.events)
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "event_ladder_entry" WHERE "eventId" = ANY($1)`, f.events)
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "event_member" WHERE "eventId" = ANY($1)`, f.events)
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "event_admin" WHERE "eventId" = ANY($1)`, f.events)
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "event_schedule" WHERE "eventId" = ANY($1)`, f.events)
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "event" WHERE id = ANY($1)`, f.events)
+		_, _ = db.Exec(ctx, `DELETE FROM "race_event" WHERE "eventId" = ANY($1)`, f.events)
+		_, _ = db.Exec(ctx, `DELETE FROM "event_points_entry" WHERE "eventId" = ANY($1)`, f.events)
+		_, _ = db.Exec(ctx, `DELETE FROM "event_ladder_entry" WHERE "eventId" = ANY($1)`, f.events)
+		_, _ = db.Exec(ctx, `DELETE FROM "event_member" WHERE "eventId" = ANY($1)`, f.events)
+		_, _ = db.Exec(ctx, `DELETE FROM "event_admin" WHERE "eventId" = ANY($1)`, f.events)
+		_, _ = db.Exec(ctx, `DELETE FROM "event_schedule" WHERE "eventId" = ANY($1)`, f.events)
+		_, _ = db.Exec(ctx, `DELETE FROM "event" WHERE id = ANY($1)`, f.events)
 	}
 	if len(f.tokens) > 0 {
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "session" WHERE token = ANY($1)`, f.tokens)
+		_, _ = db.Exec(ctx, `DELETE FROM "session" WHERE token = ANY($1)`, f.tokens)
 	}
 	if len(f.users) > 0 {
-		_, _ = shared.DB.Exec(ctx, `DELETE FROM "user" WHERE id = ANY($1)`, f.users)
+		_, _ = db.Exec(ctx, `DELETE FROM "user" WHERE id = ANY($1)`, f.users)
 	}
 }
 
@@ -71,7 +72,7 @@ func (f *fixtures) createUser(prefix, name string, classTier *string, siteRole s
 	if classTier != nil {
 		tier = *classTier
 	}
-	_, err := shared.DB.Exec(f.ctx,
+	_, err := db.Exec(f.ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", "vrchatUsername", slug, "classTier", "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, '', $4, NULL, $5, $6, $7, $7)`,
 		id, name, id+"@example.com", siteRole, "slug-"+id, tier, now)
@@ -87,7 +88,7 @@ func (f *fixtures) createSession(userID string) string {
 	f.t.Helper()
 	token := "token-" + newID()
 	now := time.Now().UTC()
-	_, err := shared.DB.Exec(f.ctx,
+	_, err := db.Exec(f.ctx,
 		`INSERT INTO "session" (id, "userId", token, "activeOrganizationId", "expiresAt", "createdAt", "updatedAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, NULL, $3, $4, $4)`,
 		userID, token, now.Add(time.Hour), now)
@@ -109,7 +110,7 @@ func (f *fixtures) createEventDirect(ownerID, name, status string, restriction *
 	if restriction != nil {
 		r = *restriction
 	}
-	_, err := shared.DB.Exec(f.ctx,
+	_, err := db.Exec(f.ctx,
 		`INSERT INTO "event" (id, name, "ownerType", "ownerUserId", status, "scoringType",
 		  "classRestriction", "granularParticipation", "createdAt", "updatedAt")
 		 VALUES ($1, $2, 'USER', $3, $4, 1, $5, $6, $7, $7)`,
@@ -126,7 +127,7 @@ func (f *fixtures) createEventDirectWithLimit(ownerID, name string, limit int) s
 	f.t.Helper()
 	id := "event-" + newID()[:8]
 	now := time.Now().UTC()
-	_, err := shared.DB.Exec(f.ctx,
+	_, err := db.Exec(f.ctx,
 		`INSERT INTO "event" (id, name, "ownerType", "ownerUserId", status, "scoringType",
 		  "participantLimit", "createdAt", "updatedAt")
 		 VALUES ($1, $2, 'USER', $3, 'UNOFFICIAL', 1, $4, $5, $5)`,
@@ -143,7 +144,7 @@ func (f *fixtures) createRace(eventID, name string) string {
 	f.t.Helper()
 	id := "race-" + newID()[:8]
 	now := time.Now().UTC()
-	_, err := shared.DB.Exec(f.ctx,
+	_, err := db.Exec(f.ctx,
 		`INSERT INTO "race_event" (id, "eventId", name, sequence, "distanceMeters", "trackType", location, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, 1, 1200, 'Turf', 'Kyoto', $4, $4)`,
 		id, eventID, name, now)
@@ -315,12 +316,12 @@ func Test_LeaveRemovesStandingsAndRaceRows(t *testing.T) {
 		t.Fatalf("add member: %v", err)
 	}
 	now := time.Now().UTC()
-	if _, err := shared.DB.Exec(f.ctx,
+	if _, err := db.Exec(f.ctx,
 		`INSERT INTO "race_event_member" (id, "raceEventId", "userId", "createdAt") VALUES ($1,$2,$3,$4)`,
 		"rem-"+newID()[:8], raceID, userID, now); err != nil {
 		t.Fatalf("insert race member: %v", err)
 	}
-	if _, err := shared.DB.Exec(f.ctx,
+	if _, err := db.Exec(f.ctx,
 		`INSERT INTO "race_result" (id, "raceEventId", "userId", position, points, "createdAt", "updatedAt")
 		 VALUES ($1,$2,$3,1,10,$4,$4)`,
 		"res-"+newID()[:8], raceID, userID, now); err != nil {
@@ -329,7 +330,7 @@ func Test_LeaveRemovesStandingsAndRaceRows(t *testing.T) {
 
 	count := func(q string, args ...any) int {
 		var n int
-		if err := shared.DB.QueryRow(f.ctx, q, args...).Scan(&n); err != nil {
+		if err := db.QueryRow(f.ctx, q, args...).Scan(&n); err != nil {
 			t.Fatalf("count: %v", err)
 		}
 		return n

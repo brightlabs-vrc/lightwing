@@ -11,7 +11,6 @@ import (
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/scorecalc"
-	"encore.app/shared"
 )
 
 // UpdateEventRequest carries the editable fields plus the auth header. The
@@ -58,7 +57,7 @@ func jsonEqual(a, b []byte) bool {
 
 // UpdateEventCore updates an event's editable fields and returns its detail.
 func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, error) {
-	existing, err := scanEventRow(shared.DB.QueryRow(ctx,
+	existing, err := scanEventRow(db.QueryRow(ctx,
 		`SELECT `+eventColumns+` FROM "event" WHERE id = $1`, p.ID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
@@ -101,7 +100,7 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 	// Capacity checks before reducing a limit.
 	if !isGranular && participantLimit != nil {
 		var currentCount int
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT COUNT(*) FROM "event_member" WHERE "eventId" = $1`, p.ID,
 		).Scan(&currentCount); err != nil {
 			return nil, err
@@ -114,7 +113,7 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 	}
 	if isGranular && maxConcurrent != nil {
 		var maxJoined int
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT COALESCE(MAX(c), 0) FROM (
 			   SELECT COUNT(*) AS c FROM "race_event_member" m
 			   JOIN "race_event" r ON r.id = m."raceEventId"
@@ -262,7 +261,7 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 		}
 		args = append(args, p.ID)
 		query += " WHERE id = $" + strconv.Itoa(len(args))
-		if _, err := shared.DB.Exec(ctx, query, args...); err != nil {
+		if _, err := db.Exec(ctx, query, args...); err != nil {
 			return nil, err
 		}
 	}
@@ -313,7 +312,7 @@ func recomputeEventPoints(ctx context.Context, eventID string) error {
 	var scoringType int
 	var scoringRulesMode sql.NullString
 	var customTables []byte
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT "scoringType", "scoringRulesMode", "customScoringTables" FROM "event" WHERE id = $1`,
 		eventID,
 	).Scan(&scoringType, &scoringRulesMode, &customTables)
@@ -338,7 +337,7 @@ func recomputeEventPoints(ctx context.Context, eventID string) error {
 		}
 	}
 
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT res.id, res."userId", res.position, res.points, res."resultStatus", r.grade
 		 FROM "race_result" res JOIN "race_event" r ON r.id = res."raceEventId"
 		 WHERE r."eventId" = $1`, eventID)
@@ -364,7 +363,7 @@ func recomputeEventPoints(ctx context.Context, eventID string) error {
 	}
 	for _, r := range stale {
 		calculated := resolveResultPoints(mode, custom, &r)
-		if _, err := shared.DB.Exec(ctx,
+		if _, err := db.Exec(ctx,
 			`UPDATE "race_result" SET points = $1 WHERE id = $2`, calculated, r.ID); err != nil {
 			return err
 		}

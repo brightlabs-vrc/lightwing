@@ -3,7 +3,7 @@
 //
 // Mirrors ts-legacy/teammanager/teams.ts, team-members.ts, team-stats.ts,
 // and team-guards.ts. A team is modelled as a better-auth organization row;
-// all state lives in the shared lightwing database (shared.DB).
+// all state lives in the shared lightwing database (db).
 package teammanager
 
 import (
@@ -137,7 +137,7 @@ func displayName(name string, vrc sql.NullString) string {
 }
 
 func loadMemberRows(ctx context.Context, organizationID string) ([]memberRow, error) {
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
 		 FROM "member" m JOIN "user" u ON u.id = m."userId"
 		 WHERE m."organizationId" = $1 ORDER BY m."createdAt" ASC`,
@@ -202,7 +202,7 @@ func toTeam(org *orgRow, members []memberRow) *Team {
 
 func loadTeam(ctx context.Context, id string) (*Team, error) {
 	var org orgRow
-	err := scanOrgRow(&org, shared.DB.QueryRow(ctx,
+	err := scanOrgRow(&org, db.QueryRow(ctx,
 		`SELECT `+orgColumns+` FROM "organization" WHERE id = $1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
@@ -218,7 +218,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 }
 
 func touchOrg(ctx context.Context, id string) error {
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`UPDATE "organization" SET "updatedAt" = $1 WHERE id = $2`, time.Now().UTC(), id)
 	return err
 }
@@ -229,7 +229,7 @@ func touchOrg(ctx context.Context, id string) error {
 // maximum number of administrators.
 func assertAdminCapNotReached(ctx context.Context, organizationID string) error {
 	var count int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM "member" WHERE "organizationId" = $1 AND role = $2`,
 		organizationID, auth.AdministratorRole,
 	).Scan(&count); err != nil {

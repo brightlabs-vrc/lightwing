@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"encore.dev/beta/errs"
-	"encore.app/shared"
 )
 
 var usersTestSeq int
@@ -24,7 +23,7 @@ func createUsersTestUser(t *testing.T, ctx context.Context, name, siteRole, bio,
 	usersTestSeq++
 	id := fmt.Sprintf("userstest-%d", usersTestSeq)
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", biography, "vrchatUsername", slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, '', $4, $5, $6, $7, $8, $8)`,
 		id, name, id+"@discord.invalid", siteRole,
@@ -46,7 +45,7 @@ func createUsersTestSession(t *testing.T, ctx context.Context, userID string) st
 	token := hex.EncodeToString(b[:])
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	exp := time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano)
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "session" (id, "userId", token, "expiresAt", "createdAt", "updatedAt")
 		 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $4)`,
 		userID, token, exp, now,
@@ -140,7 +139,7 @@ func Test_updateUserProfile(t *testing.T) {
 		admin := mustResolveActor(t, ctx, createUsersTestSession(t, ctx, adminID))
 
 		var firstSlug = "takenuser1"
-		if _, err := shared.DB.Exec(ctx, `UPDATE "user" SET slug = $1 WHERE id = $2`, firstSlug, firstID); err != nil {
+		if _, err := db.Exec(ctx, `UPDATE "user" SET slug = $1 WHERE id = $2`, firstSlug, firstID); err != nil {
 			t.Fatalf("failed to set slug: %v", err)
 		}
 		_ = secondID

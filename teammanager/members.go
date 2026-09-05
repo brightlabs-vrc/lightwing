@@ -8,7 +8,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // --- listTeamMembers (mirrors listTeamMembers; publicly accessible) ---
@@ -27,7 +26,7 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 			len(args), len(args), len(args))
 	}
 	var total int
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM "member" m JOIN "user" u ON u.id = m."userId" WHERE `+where,
 		args...,
 	).Scan(&total); err != nil {
@@ -44,7 +43,7 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 		args = append(args, offset)
 		query += fmt.Sprintf(` OFFSET $%d`, len(args))
 	}
-	rows, err := shared.DB.Query(ctx, query, args...)
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +82,7 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 		targetRole = "member"
 	}
 	var orgExists string
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT id FROM "organization" WHERE id = $1`, id,
 	).Scan(&orgExists); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
@@ -91,7 +90,7 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 		return nil, err
 	}
 	var userExists string
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT id FROM "user" WHERE id = $1`, userID,
 	).Scan(&userExists); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
@@ -104,7 +103,7 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 		}
 	}
 	var dup string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT id FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
 	).Scan(&dup)
 	if err == nil {
@@ -112,7 +111,7 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "member" (id, "organizationId", "userId", role)
 		 VALUES (gen_random_uuid()::text, $1, $2, $3)`,
 		id, userID, targetRole,
@@ -138,7 +137,7 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 		return nil, err
 	}
 	var currentRole string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT role FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
 	).Scan(&currentRole)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -152,7 +151,7 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 			return nil, err
 		}
 	}
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`UPDATE "member" SET role = $1 WHERE "organizationId" = $2 AND "userId" = $3`,
 		role, id, userID,
 	); err != nil {
@@ -173,7 +172,7 @@ func removeTeamMember(ctx context.Context, authorization, id, userID string) (*T
 		return nil, err
 	}
 	var exists string
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT id FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
 	).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -182,7 +181,7 @@ func removeTeamMember(ctx context.Context, authorization, id, userID string) (*T
 	if err != nil {
 		return nil, err
 	}
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`DELETE FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`, id, userID,
 	); err != nil {
 		return nil, err

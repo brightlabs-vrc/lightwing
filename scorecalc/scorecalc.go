@@ -77,7 +77,7 @@ func SubmitCalc(ctx context.Context, params *SubmitCalcParams) (*SubmitCalcRespo
 	}
 
 	var scoringType int
-	err := shared.DB.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT "scoringType" FROM "event" WHERE id = $1`, params.EventID,
 	).Scan(&scoringType)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -97,7 +97,7 @@ func SubmitCalc(ctx context.Context, params *SubmitCalcParams) (*SubmitCalcRespo
 		return nil, fmt.Errorf("failed to encode user ids: %w", err)
 	}
 
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -163,7 +163,7 @@ type scoreCalcJobRow struct {
 func HandleScoreCalcCompleted(ctx context.Context, event ScoreCalcCompleted) error {
 	rlog.Info(fmt.Sprintf("Received ScoreCalcCompleted message: jobId=%s, eventId=%s, gen=%d", event.JobID, event.EventID, event.Generation))
 
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -261,7 +261,7 @@ func HandleScoreCalcCompleted(ctx context.Context, event ScoreCalcCompleted) err
 func HandleScoreCalcFailed(ctx context.Context, event ScoreCalcFailed) error {
 	rlog.Info(fmt.Sprintf("Received ScoreCalcFailed message: jobId=%s, eventId=%s, gen=%d", event.JobID, event.EventID, event.Generation))
 
-	tx, err := shared.DB.Begin(ctx)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

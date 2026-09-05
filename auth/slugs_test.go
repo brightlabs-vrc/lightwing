@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"encore.app/shared"
 )
 
 // Test_slugify validates the slugify utility.
@@ -119,11 +118,11 @@ func Test_isValidUserSlug(t *testing.T) {
 func Test_generateUniqueUserSlug(t *testing.T) {
 	ctx := context.Background()
 
-	stdlibDB := shared.DB.Stdlib()
+	stdlibDB := db.Stdlib()
 
 	// Insert a user holding slug "collisionuser".
 	// Mirrors ts-legacy/auth/slugs.test.ts → "user slug collision resolution".
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", "vrchatUsername", slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		"discord-user-1", "CollisionUser", "discord-user-1@discord.invalid", "",
@@ -146,7 +145,7 @@ func Test_generateUniqueUserSlug(t *testing.T) {
 	}
 
 	// Multiple collisions keep incrementing the suffix.
-	_, err = shared.DB.Exec(ctx,
+	_, err = db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", "vrchatUsername", slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		"discord-user-2", "CollisionUser", "discord-user-2@discord.invalid", "",
@@ -173,10 +172,10 @@ func Test_generateUniqueUserSlug(t *testing.T) {
 func Test_generateUniqueOrgSlug(t *testing.T) {
 	ctx := context.Background()
 
-	stdlibDB := shared.DB.Stdlib()
+	stdlibDB := db.Stdlib()
 
 	// Insert an organization (unique ids: the test database is shared).
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "organization" (id, name, slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, $4, $5)`,
 		"sg-org-1", "Sg Team", "sg-team", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z",

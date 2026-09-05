@@ -12,7 +12,6 @@ import (
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // Scoring types, mirroring ts-legacy/lib/constants.ts.
@@ -257,7 +256,7 @@ func scanEventRow(row *sqldb.Row) (*eventRow, error) {
 //
 // Mirrors ts-legacy/eventmanager/events.ts loadEvent.
 func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
-	e, err := scanEventRow(shared.DB.QueryRow(ctx,
+	e, err := scanEventRow(db.QueryRow(ctx,
 		`SELECT `+eventColumns+` FROM "event" WHERE id = $1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
@@ -282,7 +281,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		ParticipantLimit sql.NullInt64
 	}
 	var races []raceRow
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT id, name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit"
 		 FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC`, id)
 	if err != nil {
@@ -306,7 +305,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 	raceMembers := map[string][]RaceEventMemberView{}
 	activeUserIDs := map[string]bool{}
 	if len(races) > 0 {
-		mrows, err := shared.DB.Query(ctx,
+		mrows, err := db.Query(ctx,
 			`SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
 			 FROM "race_event_member" m
 			 JOIN "race_event" r ON r.id = m."raceEventId"
@@ -339,7 +338,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		Tier   sql.NullString
 	}
 	var members []memberRow
-	erows, err := shared.DB.Query(ctx,
+	erows, err := db.Query(ctx,
 		`SELECT m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
 		 FROM "event_member" m JOIN "user" u ON u.id = m."userId"
 		 WHERE m."eventId" = $1`, id)
@@ -363,7 +362,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 
 	// Schedules.
 	var schedules []EventScheduleView
-	srows, err := shared.DB.Query(ctx,
+	srows, err := db.Query(ctx,
 		`SELECT id, title, "startsAt", "endsAt", location FROM "event_schedule"
 		 WHERE "eventId" = $1 ORDER BY "startsAt" ASC`, id)
 	if err != nil {
@@ -394,7 +393,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 	var ladderOverview []LadderEntryView
 	if e.ScoringType == ScoringPoints {
 		pointsOverview = []PointsEntryView{}
-		prows, err := shared.DB.Query(ctx,
+		prows, err := db.Query(ctx,
 			`SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.points
 			 FROM "event_points_entry" e JOIN "user" u ON u.id = e."userId"
 			 WHERE e."eventId" = $1 ORDER BY e.points DESC`, id)
@@ -414,7 +413,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		}
 	} else if e.ScoringType == ScoringLadder {
 		ladderOverview = []LadderEntryView{}
-		lrows, err := shared.DB.Query(ctx,
+		lrows, err := db.Query(ctx,
 			`SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.elo, e.wins, e.losses
 			 FROM "event_ladder_entry" e JOIN "user" u ON u.id = e."userId"
 			 WHERE e."eventId" = $1 ORDER BY e.elo DESC`, id)
@@ -491,13 +490,13 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 // Mirrors ts-legacy/eventmanager/events.ts ensureEventStandingsRow.
 func EnsureEventStandingsRow(ctx context.Context, eventID, userID string, scoringType int) error {
 	if scoringType == ScoringPoints {
-		_, err := shared.DB.Exec(ctx,
+		_, err := db.Exec(ctx,
 			`INSERT INTO "event_points_entry" (id, "eventId", "userId", points, "createdAt", "updatedAt")
 			 VALUES ($1, $2, $3, 0, $4, $4) ON CONFLICT ("eventId", "userId") DO NOTHING`,
 			newID(), eventID, userID, time.Now().UTC())
 		return err
 	}
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "event_ladder_entry" (id, "eventId", "userId", elo, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, $4, $5, $5) ON CONFLICT ("eventId", "userId") DO NOTHING`,
 		newID(), eventID, userID, LadderStartingElo, time.Now().UTC())
@@ -544,7 +543,7 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 			return nil, err
 		}
 		var exists bool
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT EXISTS(SELECT 1 FROM "organization" WHERE id = $1)`, *p.OrganizationID,
 		).Scan(&exists); err != nil {
 			return nil, err
@@ -566,7 +565,7 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "only a site administrator can create an event on behalf of another user"}
 		}
 		var exists bool
-		if err := shared.DB.QueryRow(ctx,
+		if err := db.QueryRow(ctx,
 			`SELECT EXISTS(SELECT 1 FROM "user" WHERE id = $1)`, owner,
 		).Scan(&exists); err != nil {
 			return nil, err
@@ -651,7 +650,7 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 
 	now := time.Now().UTC()
 	id := newID()
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "event" (id, name, description, "ownerType", "organizationId", "ownerUserId",
 		  "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction",
 		  "granularParticipation", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations",
@@ -741,7 +740,7 @@ func ListEventsCore(ctx context.Context, q *ListEventsQuery) (*ListEventsRespons
 	}
 
 	var total int64
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM "event" e WHERE TRUE`+where, args...,
 	).Scan(&total); err != nil {
 		return nil, err
@@ -756,7 +755,7 @@ func ListEventsCore(ctx context.Context, q *ListEventsQuery) (*ListEventsRespons
 		args = append(args, q.Offset)
 		query += fmt.Sprintf(" OFFSET $%d", len(args))
 	}
-	rows, err := shared.DB.Query(ctx, query, args...)
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -799,12 +798,12 @@ func ListPublicEventsCore(ctx context.Context, q *ListPublicEventsQuery) (*ListE
 		limit = 10
 	}
 	var total int64
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM "event" e WHERE e.status IN ('UNOFFICIAL','OFFICIAL','CONCLUDED')`,
 	).Scan(&total); err != nil {
 		return nil, err
 	}
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT `+listItemSelect+` FROM "event" e
 		 WHERE e.status IN ('UNOFFICIAL','OFFICIAL','CONCLUDED')
 		 ORDER BY e."createdAt" DESC LIMIT $1 OFFSET $2`, limit, q.Offset)
@@ -855,7 +854,7 @@ type ListEventAdminsResponse struct {
 //
 // Mirrors ts-legacy/eventmanager/events.ts listEventAdmins.
 func ListEventAdminsCore(ctx context.Context, eventID string) (*ListEventAdminsResponse, error) {
-	rows, err := shared.DB.Query(ctx,
+	rows, err := db.Query(ctx,
 		`SELECT a."userId", COALESCE(u."vrchatUsername", u.name)
 		 FROM "event_admin" a JOIN "user" u ON u.id = a."userId"
 		 WHERE a."eventId" = $1`, eventID)
@@ -904,7 +903,7 @@ func AddEventAdminCore(ctx context.Context, p *AddEventAdminRequest) (*AddEventA
 		return nil, err
 	}
 	var exists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "user" WHERE id = $1)`, p.UserID,
 	).Scan(&exists); err != nil {
 		return nil, err
@@ -913,7 +912,7 @@ func AddEventAdminCore(ctx context.Context, p *AddEventAdminRequest) (*AddEventA
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	}
 	// Idempotent: ignore duplicate admin rows.
-	_, err := shared.DB.Exec(ctx,
+	_, err := db.Exec(ctx,
 		`INSERT INTO "event_admin" (id, "eventId", "userId", "createdAt")
 		 VALUES ($1, $2, $3, $4) ON CONFLICT ("eventId", "userId") DO NOTHING`,
 		newID(), p.EventID, p.UserID, time.Now().UTC())
@@ -943,7 +942,7 @@ func RemoveEventAdminCore(ctx context.Context, p *RemoveEventAdminRequest) (*Add
 	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
-	if _, err := shared.DB.Exec(ctx,
+	if _, err := db.Exec(ctx,
 		`DELETE FROM "event_admin" WHERE "eventId" = $1 AND "userId" = $2`,
 		p.EventID, p.UserID); err != nil {
 		return nil, err
@@ -977,7 +976,7 @@ type DeleteEventResponse struct {
 // DeleteEventCore deletes an event and its related records (via FK cascades).
 func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventResponse, error) {
 	var exists bool
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1)`, p.ID,
 	).Scan(&exists); err != nil {
 		return nil, err
@@ -988,7 +987,7 @@ func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventRe
 	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionDelete); err != nil {
 		return nil, err
 	}
-	if _, err := shared.DB.Exec(ctx, `DELETE FROM "event" WHERE id = $1`, p.ID); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM "event" WHERE id = $1`, p.ID); err != nil {
 		return nil, err
 	}
 	return &DeleteEventResponse{Deleted: true}, nil

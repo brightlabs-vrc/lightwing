@@ -9,7 +9,6 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
-	"encore.app/shared"
 )
 
 // --- updateTeamStats (mirrors ts-legacy/teammanager/team-stats.ts) ---
@@ -32,7 +31,7 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 		return nil, err
 	}
 	var exists string
-	if err := shared.DB.QueryRow(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT id FROM "organization" WHERE id = $1`, id,
 	).Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
@@ -59,7 +58,7 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 	}
 	if len(set) > 0 {
 		args = append(args, id)
-		_, err := shared.DB.Exec(ctx,
+		_, err := db.Exec(ctx,
 			`UPDATE "organization" SET `+strings.Join(set, ", ")+fmt.Sprintf(` WHERE id = $%d`, len(args)),
 			args...,
 		)
