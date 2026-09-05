@@ -52,6 +52,45 @@ type ListTeamsResponse struct {
 	Total int            `json:"total"`
 }
 
+type teamCounts struct {
+	memberCount int
+	adminCount  int
+}
+
+func batchCountMembersAndAdmins(ctx context.Context, orgIDs []string) (map[string]teamCounts, error) {
+	if len(orgIDs) == 0 {
+		return map[string]teamCounts{}, nil
+	}
+	rows, err := db.Query(ctx,
+		`SELECT "organizationId", COUNT(*), COUNT(*) FILTER (WHERE role = $1)
+		 FROM "member"
+		 WHERE "organizationId" = ANY($2)
+		 GROUP BY "organizationId"`,
+		auth.AdministratorRole, orgIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to batch count members and admins: %w", err)
+	}
+	defer rows.Close()
+
+	res := make(map[string]teamCounts)
+	for rows.Next() {
+		var orgID string
+		var memberCount, adminCount int64
+		if err := rows.Scan(&orgID, &memberCount, &adminCount); err != nil {
+			return nil, fmt.Errorf("failed to scan team member counts: %w", err)
+		}
+		res[orgID] = teamCounts{
+			memberCount: int(memberCount),
+			adminCount:  int(adminCount),
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate team member counts: %w", err)
+	}
+	return res, nil
+}
+
 func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeamsResponse, error) {
 	var total int64
 	var stubs []sqlc.ListTeamRowsRow
@@ -86,16 +125,21 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 			})
 		}
 	}
+
+	orgIDs := make([]string, 0, len(stubs))
+	for _, s := range stubs {
+		orgIDs = append(orgIDs, s.ID)
+	}
+
+	countsByOrg, err := batchCountMembersAndAdmins(ctx, orgIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	teams := make([]TeamListItem, 0, len(stubs))
 	for _, s := range stubs {
-		counts, err := q().CountMembersAndAdmins(ctx, sqlc.CountMembersAndAdminsParams{
-			OrganizationId: s.ID,
-			Role:           auth.AdministratorRole,
-		})
-		if err != nil {
-			return nil, err
-		}
-		slots := auth.AdministratorRoleLimit - int(counts.Count_2)
+		c := countsByOrg[s.ID]
+		slots := auth.AdministratorRoleLimit - c.adminCount
 		if slots < 0 {
 			slots = 0
 		}
@@ -106,7 +150,7 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 		teams = append(teams, TeamListItem{
 			ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: logo,
 			AdministratorSlotsRemaining: slots,
-			MemberCount:                 int(counts.Count),
+			MemberCount:                 c.memberCount,
 		})
 	}
 	return &ListTeamsResponse{Teams: teams, Total: int(total)}, nil

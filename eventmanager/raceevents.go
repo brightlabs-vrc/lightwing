@@ -87,6 +87,35 @@ func loadRaceMembers(ctx context.Context, raceID string) ([]RaceEventMemberView,
 	return members, rows.Err()
 }
 
+func loadRaceMembersForEvent(ctx context.Context, eventID string) (map[string][]RaceEventMemberView, error) {
+	rows, err := db.Query(ctx,
+		`SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
+		 FROM "race_event_member" m
+		 JOIN "race_event" r ON r.id = m."raceEventId"
+		 JOIN "user" u ON u.id = m."userId"
+		 WHERE r."eventId" = $1`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load race members for event: %w", err)
+	}
+	defer rows.Close()
+
+	membersByRace := make(map[string][]RaceEventMemberView)
+	for rows.Next() {
+		var raceID string
+		var m RaceEventMemberView
+		var tier sql.NullString
+		if err := rows.Scan(&raceID, &m.UserID, &m.Name, &tier); err != nil {
+			return nil, fmt.Errorf("failed to scan race member: %w", err)
+		}
+		m.ClassTier = classTierPtr(tier)
+		membersByRace[raceID] = append(membersByRace[raceID], m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate race members: %w", err)
+	}
+	return membersByRace, nil
+}
+
 func toRaceEventDetail(r *raceEventRow, members []RaceEventMemberView) *RaceEventDetail {
 	if members == nil {
 		members = []RaceEventMemberView{}
@@ -356,7 +385,7 @@ func ListRaceEventsCore(ctx context.Context, q *ListRaceEventsQuery) (*ReorderRa
 		return nil, err
 	}
 	defer rows.Close()
-	resp := &ReorderRaceEventsResponse{Races: []*RaceEventDetail{}}
+	var raceRows []raceEventRow
 	for rows.Next() {
 		var r raceEventRow
 		if err := rows.Scan(&r.ID, &r.EventID, &r.Name, &r.Sequence, &r.DistanceMeters,
@@ -364,13 +393,23 @@ func ListRaceEventsCore(ctx context.Context, q *ListRaceEventsQuery) (*ReorderRa
 			&r.StartsAt, &r.EndsAt, &r.ParticipantLimit, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
-		d, err := loadRaceDetail(ctx, &r)
-		if err != nil {
-			return nil, err
-		}
-		resp.Races = append(resp.Races, d)
+		raceRows = append(raceRows, r)
 	}
-	return resp, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	membersByRace, err := loadRaceMembersForEvent(ctx, q.EventID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &ReorderRaceEventsResponse{Races: make([]*RaceEventDetail, 0, len(raceRows))}
+	for _, r := range raceRows {
+		mems := membersByRace[r.ID]
+		resp.Races = append(resp.Races, toRaceEventDetail(&r, mems))
+	}
+	return resp, nil
 }
 
 //encore:api public method=GET path=/api/race-events-list

@@ -2,7 +2,6 @@ package eventmanager
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,6 +11,7 @@ import (
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 	"encore.app/auth"
+	"encore.app/shared"
 )
 
 // Scoring types, mirroring ts-legacy/lib/constants.ts.
@@ -43,11 +43,7 @@ func truncate(s string, max int) string {
 
 // newID generates a random UUIDv4 string for row ids.
 func newID() string {
-	var b [16]byte
-	_, _ = rand.Read(b[:])
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	return shared.NewID()
 }
 
 // isoTime formats a timestamp as an ISO-8601 UTC string (mirrors TS toISOString).
