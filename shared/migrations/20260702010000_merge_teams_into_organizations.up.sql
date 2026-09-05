@@ -1,29 +1,29 @@
 -- DropForeignKey
-ALTER TABLE "invitation" DROP CONSTRAINT "invitation_teamId_fkey";
+ALTER TABLE "invitation" DROP CONSTRAINT IF EXISTS "invitation_teamId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "teamMember" DROP CONSTRAINT "teamMember_teamId_fkey";
+ALTER TABLE "teamMember" DROP CONSTRAINT IF EXISTS "teamMember_teamId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "teamMember" DROP CONSTRAINT "teamMember_userId_fkey";
+ALTER TABLE "teamMember" DROP CONSTRAINT IF EXISTS "teamMember_userId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "team" DROP CONSTRAINT "team_organizationId_fkey";
+ALTER TABLE "team" DROP CONSTRAINT IF EXISTS "team_organizationId_fkey";
 
 -- DropIndex
-DROP INDEX "invitation_teamId_idx";
+DROP INDEX IF EXISTS "invitation_teamId_idx";
 
 -- DropIndex
-DROP INDEX "session_activeTeamId_idx";
+DROP INDEX IF EXISTS "session_activeTeamId_idx";
 
 -- AlterTable
-ALTER TABLE "invitation" DROP COLUMN "teamId";
+ALTER TABLE "invitation" DROP COLUMN IF EXISTS "teamId";
 
 -- AlterTable
-ALTER TABLE "session" DROP COLUMN "activeTeamId";
+ALTER TABLE "session" DROP COLUMN IF EXISTS "activeTeamId";
 
 -- DropTable
-DROP TABLE "teamMember";
+DROP TABLE IF EXISTS "teamMember";
 
 -- DropTable
-DROP TABLE "team";
+DROP TABLE IF EXISTS "team";

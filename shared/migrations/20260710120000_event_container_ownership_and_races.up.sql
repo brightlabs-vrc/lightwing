@@ -1,19 +1,28 @@
--- CreateEnum
-CREATE TYPE "EventOwnerType" AS ENUM ('ORGANIZATION', 'USER');
+-- CreateEnum (idempotent, see 20260709120000).
+DO $$ BEGIN
+  CREATE TYPE "EventOwnerType" AS ENUM ('ORGANIZATION', 'USER');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- CreateEnum
-CREATE TYPE "EventStatus" AS ENUM ('DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'ARCHIVED');
+-- CreateEnum (idempotent, see 20260709120000).
+DO $$ BEGIN
+  CREATE TYPE "EventStatus" AS ENUM ('DRAFT', 'UNOFFICIAL', 'OFFICIAL', 'ARCHIVED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
--- CreateEnum
-CREATE TYPE "SiteRole" AS ENUM ('USER', 'SITE_ADMIN');
+-- CreateEnum (idempotent, see 20260709120000).
+DO $$ BEGIN
+  CREATE TYPE "SiteRole" AS ENUM ('USER', 'SITE_ADMIN');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AlterTable
-ALTER TABLE "user" ADD COLUMN "siteRole" "SiteRole" NOT NULL DEFAULT 'USER';
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "siteRole" "SiteRole" NOT NULL DEFAULT 'USER';
 
 -- AlterTable
-ALTER TABLE "event" ADD COLUMN "ownerType" "EventOwnerType",
-ADD COLUMN "ownerUserId" TEXT,
-ADD COLUMN "status" "EventStatus" NOT NULL DEFAULT 'UNOFFICIAL';
+ALTER TABLE "event" ADD COLUMN IF NOT EXISTS "ownerType" "EventOwnerType",
+ADD COLUMN IF NOT EXISTS "ownerUserId" TEXT,
+ADD COLUMN IF NOT EXISTS "status" "EventStatus" NOT NULL DEFAULT 'UNOFFICIAL';
 
 -- Backfill: every existing event is organization-owned.
 UPDATE "event" SET "ownerType" = 'ORGANIZATION' WHERE "ownerType" IS NULL;
@@ -23,14 +32,18 @@ ALTER TABLE "event" ALTER COLUMN "ownerType" SET NOT NULL;
 ALTER TABLE "event" ALTER COLUMN "organizationId" DROP NOT NULL;
 
 -- AddCheck: exactly one owner (organization XOR user), consistent with ownerType.
-ALTER TABLE "event" ADD CONSTRAINT "event_owner_xor" CHECK (
-    ("organizationId" IS NOT NULL AND "ownerUserId" IS NULL AND "ownerType" = 'ORGANIZATION')
-    OR
-    ("organizationId" IS NULL AND "ownerUserId" IS NOT NULL AND "ownerType" = 'USER')
-);
+-- Wrapped so replaying over a database where the check already exists is a no-op.
+DO $$ BEGIN
+  ALTER TABLE "event" ADD CONSTRAINT "event_owner_xor" CHECK (
+      ("organizationId" IS NOT NULL AND "ownerUserId" IS NULL AND "ownerType" = 'ORGANIZATION')
+      OR
+      ("organizationId" IS NULL AND "ownerUserId" IS NOT NULL AND "ownerType" = 'USER')
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateTable
-CREATE TABLE "race_event" (
+CREATE TABLE IF NOT EXISTS "race_event" (
     "id" TEXT NOT NULL,
     "eventId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -49,7 +62,7 @@ CREATE TABLE "race_event" (
 );
 
 -- CreateTable
-CREATE TABLE "race_result" (
+CREATE TABLE IF NOT EXISTS "race_result" (
     "id" TEXT NOT NULL,
     "raceEventId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -62,7 +75,7 @@ CREATE TABLE "race_result" (
 );
 
 -- CreateTable
-CREATE TABLE "event_admin" (
+CREATE TABLE IF NOT EXISTS "event_admin" (
     "id" TEXT NOT NULL,
     "eventId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -72,43 +85,61 @@ CREATE TABLE "event_admin" (
 );
 
 -- CreateIndex
-CREATE INDEX "event_ownerUserId_idx" ON "event"("ownerUserId");
+CREATE INDEX IF NOT EXISTS "event_ownerUserId_idx" ON "event"("ownerUserId");
 
 -- CreateIndex
-CREATE INDEX "race_event_eventId_idx" ON "race_event"("eventId");
+CREATE INDEX IF NOT EXISTS "race_event_eventId_idx" ON "race_event"("eventId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "race_result_raceEventId_userId_key" ON "race_result"("raceEventId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "race_result_raceEventId_userId_key" ON "race_result"("raceEventId", "userId");
 
 -- CreateIndex
-CREATE INDEX "race_result_raceEventId_idx" ON "race_result"("raceEventId");
+CREATE INDEX IF NOT EXISTS "race_result_raceEventId_idx" ON "race_result"("raceEventId");
 
 -- CreateIndex
-CREATE INDEX "race_result_userId_idx" ON "race_result"("userId");
+CREATE INDEX IF NOT EXISTS "race_result_userId_idx" ON "race_result"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "event_admin_eventId_userId_key" ON "event_admin"("eventId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "event_admin_eventId_userId_key" ON "event_admin"("eventId", "userId");
 
 -- CreateIndex
-CREATE INDEX "event_admin_eventId_idx" ON "event_admin"("eventId");
+CREATE INDEX IF NOT EXISTS "event_admin_eventId_idx" ON "event_admin"("eventId");
 
 -- CreateIndex
-CREATE INDEX "event_admin_userId_idx" ON "event_admin"("userId");
+CREATE INDEX IF NOT EXISTS "event_admin_userId_idx" ON "event_admin"("userId");
 
 -- AddForeignKey
-ALTER TABLE "event" ADD CONSTRAINT "event_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event" ADD CONSTRAINT "event_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "race_event" ADD CONSTRAINT "race_event_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "race_event" ADD CONSTRAINT "race_event_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "race_result" ADD CONSTRAINT "race_result_raceEventId_fkey" FOREIGN KEY ("raceEventId") REFERENCES "race_event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "race_result" ADD CONSTRAINT "race_result_raceEventId_fkey" FOREIGN KEY ("raceEventId") REFERENCES "race_event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "race_result" ADD CONSTRAINT "race_result_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "race_result" ADD CONSTRAINT "race_result_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_admin" ADD CONSTRAINT "event_admin_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_admin" ADD CONSTRAINT "event_admin_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_admin" ADD CONSTRAINT "event_admin_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_admin" ADD CONSTRAINT "event_admin_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

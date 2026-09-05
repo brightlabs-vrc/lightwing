@@ -1,5 +1,5 @@
 -- Add user slug column as nullable
-ALTER TABLE "user" ADD COLUMN "slug" TEXT;
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "slug" TEXT;
 
 -- Convert legacy eventAdministrator roles to explicit EventAdmin rows
 INSERT INTO "event_admin" ("id", "eventId", "userId", "createdAt")
@@ -15,4 +15,4 @@ SET "role" = 'member'
 WHERE "role" IN ('eventAdministrator', 'organizationAdministrator');
 
 -- Create unique index on user slug
-CREATE UNIQUE INDEX "user_slug_key" ON "user"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "user_slug_key" ON "user"("slug");

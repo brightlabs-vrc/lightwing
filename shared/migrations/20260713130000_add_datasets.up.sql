@@ -1,8 +1,11 @@
--- CreateEnum
-CREATE TYPE "DatasetStatus" AS ENUM ('PENDING', 'RUNNING', 'DONE', 'FAILED');
+-- CreateEnum (idempotent, see 20260709120000).
+DO $$ BEGIN
+  CREATE TYPE "DatasetStatus" AS ENUM ('PENDING', 'RUNNING', 'DONE', 'FAILED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateTable
-CREATE TABLE "dataset" (
+CREATE TABLE IF NOT EXISTS "dataset" (
     "id" TEXT NOT NULL,
     "eventId" TEXT NOT NULL,
     "source" TEXT NOT NULL,
@@ -16,7 +19,10 @@ CREATE TABLE "dataset" (
 );
 
 -- CreateIndex
-CREATE INDEX "dataset_eventId_idx" ON "dataset"("eventId");
+CREATE INDEX IF NOT EXISTS "dataset_eventId_idx" ON "dataset"("eventId");
 
 -- AddForeignKey
-ALTER TABLE "dataset" ADD CONSTRAINT "dataset_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "dataset" ADD CONSTRAINT "dataset_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

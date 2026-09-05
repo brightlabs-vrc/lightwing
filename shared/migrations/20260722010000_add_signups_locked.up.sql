@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "event" ADD COLUMN "signupsLocked" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "event" ADD COLUMN IF NOT EXISTS "signupsLocked" BOOLEAN NOT NULL DEFAULT false;

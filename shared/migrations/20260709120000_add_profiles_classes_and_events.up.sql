@@ -1,19 +1,23 @@
--- CreateEnum
-CREATE TYPE "ClassTier" AS ENUM ('PRE_OP', 'OP', 'G3', 'G2', 'G1');
+-- CreateEnum (idempotent: skips if the type already exists, e.g. on a
+-- database originally created by Prisma, which this migration history replays).
+DO $$ BEGIN
+  CREATE TYPE "ClassTier" AS ENUM ('PRE_OP', 'OP', 'G3', 'G2', 'G1');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AlterTable
-ALTER TABLE "user" ADD COLUMN "biography" TEXT,
-ADD COLUMN "careerOverview" TEXT,
-ADD COLUMN "classTier" "ClassTier";
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "biography" TEXT,
+ADD COLUMN IF NOT EXISTS "careerOverview" TEXT,
+ADD COLUMN IF NOT EXISTS "classTier" "ClassTier";
 
 -- AlterTable
-ALTER TABLE "organization" ADD COLUMN "rankingAverage" DOUBLE PRECISION,
-ADD COLUMN "pointsAverage" DOUBLE PRECISION,
-ADD COLUMN "seasonRank" INTEGER,
-ADD COLUMN "averagePointsPerEvent" DOUBLE PRECISION;
+ALTER TABLE "organization" ADD COLUMN IF NOT EXISTS "rankingAverage" DOUBLE PRECISION,
+ADD COLUMN IF NOT EXISTS "pointsAverage" DOUBLE PRECISION,
+ADD COLUMN IF NOT EXISTS "seasonRank" INTEGER,
+ADD COLUMN IF NOT EXISTS "averagePointsPerEvent" DOUBLE PRECISION;
 
 -- CreateTable
-CREATE TABLE "event" (
+CREATE TABLE IF NOT EXISTS "event" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -27,7 +31,7 @@ CREATE TABLE "event" (
 );
 
 -- CreateTable
-CREATE TABLE "event_member" (
+CREATE TABLE IF NOT EXISTS "event_member" (
     "id" TEXT NOT NULL,
     "eventId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -37,7 +41,7 @@ CREATE TABLE "event_member" (
 );
 
 -- CreateTable
-CREATE TABLE "event_schedule" (
+CREATE TABLE IF NOT EXISTS "event_schedule" (
     "id" TEXT NOT NULL,
     "eventId" TEXT NOT NULL,
     "title" TEXT,
@@ -50,7 +54,7 @@ CREATE TABLE "event_schedule" (
 );
 
 -- CreateTable
-CREATE TABLE "event_points_entry" (
+CREATE TABLE IF NOT EXISTS "event_points_entry" (
     "id" TEXT NOT NULL,
     "eventId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -62,7 +66,7 @@ CREATE TABLE "event_points_entry" (
 );
 
 -- CreateTable
-CREATE TABLE "event_ladder_entry" (
+CREATE TABLE IF NOT EXISTS "event_ladder_entry" (
     "id" TEXT NOT NULL,
     "eventId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -76,58 +80,82 @@ CREATE TABLE "event_ladder_entry" (
 );
 
 -- CreateIndex
-CREATE INDEX "event_organizationId_idx" ON "event"("organizationId");
+CREATE INDEX IF NOT EXISTS "event_organizationId_idx" ON "event"("organizationId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "event_member_eventId_userId_key" ON "event_member"("eventId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "event_member_eventId_userId_key" ON "event_member"("eventId", "userId");
 
 -- CreateIndex
-CREATE INDEX "event_member_eventId_idx" ON "event_member"("eventId");
+CREATE INDEX IF NOT EXISTS "event_member_eventId_idx" ON "event_member"("eventId");
 
 -- CreateIndex
-CREATE INDEX "event_member_userId_idx" ON "event_member"("userId");
+CREATE INDEX IF NOT EXISTS "event_member_userId_idx" ON "event_member"("userId");
 
 -- CreateIndex
-CREATE INDEX "event_schedule_eventId_idx" ON "event_schedule"("eventId");
+CREATE INDEX IF NOT EXISTS "event_schedule_eventId_idx" ON "event_schedule"("eventId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "event_points_entry_eventId_userId_key" ON "event_points_entry"("eventId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "event_points_entry_eventId_userId_key" ON "event_points_entry"("eventId", "userId");
 
 -- CreateIndex
-CREATE INDEX "event_points_entry_eventId_idx" ON "event_points_entry"("eventId");
+CREATE INDEX IF NOT EXISTS "event_points_entry_eventId_idx" ON "event_points_entry"("eventId");
 
 -- CreateIndex
-CREATE INDEX "event_points_entry_userId_idx" ON "event_points_entry"("userId");
+CREATE INDEX IF NOT EXISTS "event_points_entry_userId_idx" ON "event_points_entry"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "event_ladder_entry_eventId_userId_key" ON "event_ladder_entry"("eventId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "event_ladder_entry_eventId_userId_key" ON "event_ladder_entry"("eventId", "userId");
 
 -- CreateIndex
-CREATE INDEX "event_ladder_entry_eventId_idx" ON "event_ladder_entry"("eventId");
+CREATE INDEX IF NOT EXISTS "event_ladder_entry_eventId_idx" ON "event_ladder_entry"("eventId");
 
 -- CreateIndex
-CREATE INDEX "event_ladder_entry_userId_idx" ON "event_ladder_entry"("userId");
+CREATE INDEX IF NOT EXISTS "event_ladder_entry_userId_idx" ON "event_ladder_entry"("userId");
 
 -- AddForeignKey
-ALTER TABLE "event" ADD CONSTRAINT "event_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event" ADD CONSTRAINT "event_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_member" ADD CONSTRAINT "event_member_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_member" ADD CONSTRAINT "event_member_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_member" ADD CONSTRAINT "event_member_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_member" ADD CONSTRAINT "event_member_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_schedule" ADD CONSTRAINT "event_schedule_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_schedule" ADD CONSTRAINT "event_schedule_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_points_entry" ADD CONSTRAINT "event_points_entry_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_points_entry" ADD CONSTRAINT "event_points_entry_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_points_entry" ADD CONSTRAINT "event_points_entry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_points_entry" ADD CONSTRAINT "event_points_entry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_ladder_entry" ADD CONSTRAINT "event_ladder_entry_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_ladder_entry" ADD CONSTRAINT "event_ladder_entry_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "event_ladder_entry" ADD CONSTRAINT "event_ladder_entry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "event_ladder_entry" ADD CONSTRAINT "event_ladder_entry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
