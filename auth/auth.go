@@ -413,14 +413,6 @@ func upsertUserAndSession(ctx context.Context, svc *Service, token *oauth2.Token
 		return "", fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	go func() {
-		backgroundCtx := context.Background()
-		err := svc.syncSiteRoleFromDiscordMembership(backgroundCtx, userID)
-		if err != nil {
-			rlog.Error("failed to sync site role from Discord", "err", err)
-		}
-	}()
-
 	return sessionToken, nil
 }
 

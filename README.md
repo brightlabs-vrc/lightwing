@@ -65,7 +65,6 @@ Because this application works with OIDC, you will need the following secrets se
 
 - `DISCORD_AUTH_CLIENT_ID`: the client ID of the Discord OIDC application.
 - `DISCORD_AUTH_CLIENT_SECRET`: the client secret of the Discord OIDC application.
-- `DISCORD_BOT_TOKEN`: the bot token Encore uses to check server roles automatically. This bot must be added to the server with the `View Channels` and `Read Messages` permissions.
 - `SESSION_COOKIE_SECRET`: signs the session cookie (only the better-auth-compatible cookie routes use it; empty in local dev yields a dev-only key).
 
 Set them in the dashboard (Settings → Secrets) or via `encore secret set --env <env> <name>` —
