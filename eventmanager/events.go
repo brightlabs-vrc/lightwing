@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"encore.dev/beta/errs"
+	"encore.dev/cron"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/shared"
@@ -645,10 +646,18 @@ func CreateEvent(ctx context.Context, p *CreateEventRequest) (*EventDetail, erro
 
 // PurgeExpiredDeletedEvents permanently deletes events in PENDING_DELETION state
 // that were deleted more than 7 days ago.
+//
+//encore:api private
 func PurgeExpiredDeletedEvents(ctx context.Context) error {
 	threshold := time.Now().UTC().AddDate(0, 0, -7)
 	return q().PurgeExpiredDeletedEvents(ctx, sql.NullTime{Time: threshold, Valid: true})
 }
+
+var _ = cron.NewJob("purge-deleted-events", cron.JobConfig{
+	Title:    "Purge expired soft-deleted events",
+	Every:    1 * cron.Hour,
+	Endpoint: PurgeExpiredDeletedEvents,
+})
 
 // ListEventsQuery carries optional filters plus pagination.
 //
@@ -706,8 +715,6 @@ func toPublicListItem(r sqlc.ListPublicEventsRow) sqlc.ListEventsRow {
 
 // ListEventsCore lists events with optional filters.
 func ListEventsCore(ctx context.Context, q *ListEventsQuery) (*ListEventsResponse, error) {
-	_ = PurgeExpiredDeletedEvents(ctx)
-
 	qq := sqlc.New(std())
 	total, err := qq.CountEvents(ctx, sqlc.CountEventsParams{
 		Column1: q.OrganizationID,
@@ -753,7 +760,6 @@ type ListPublicEventsQuery struct {
 
 // ListPublicEventsCore lists non-draft, active events (PENDING, ONGOING, CONCLUDED).
 func ListPublicEventsCore(ctx context.Context, q *ListPublicEventsQuery) (*ListEventsResponse, error) {
-	_ = PurgeExpiredDeletedEvents(ctx)
 	limit := q.Limit
 	if limit == 0 {
 		limit = 10
