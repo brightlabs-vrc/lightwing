@@ -697,6 +697,36 @@ func (q *Queries) InsertDeferredResult(ctx context.Context, arg InsertDeferredRe
 	return err
 }
 
+const insertDeferredResultsBatch = `-- name: InsertDeferredResultsBatch :exec
+INSERT INTO "race_result" (id, "raceEventId", "userId", points, "resultStatus", "createdAt", "updatedAt")
+SELECT
+    unnest($1::text[]),
+    unnest($2::text[]),
+    unnest($3::text[]),
+    0,
+    'DEFERRED',
+    $4,
+    $4
+`
+
+type InsertDeferredResultsBatchParams struct {
+	Column1   []string
+	Column2   []string
+	Column3   []string
+	CreatedAt time.Time
+}
+
+// Batch insert deferred results.
+func (q *Queries) InsertDeferredResultsBatch(ctx context.Context, arg InsertDeferredResultsBatchParams) error {
+	_, err := q.db.ExecContext(ctx, insertDeferredResultsBatch,
+		pq.Array(arg.Column1),
+		pq.Array(arg.Column2),
+		pq.Array(arg.Column3),
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const insertEventAdmin = `-- name: InsertEventAdmin :exec
 INSERT INTO "event_admin" (id, "eventId", "userId", "createdAt")
 VALUES ($1, $2, $3, $4) ON CONFLICT ("eventId", "userId") DO NOTHING
