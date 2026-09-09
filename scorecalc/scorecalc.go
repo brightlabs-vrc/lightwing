@@ -190,15 +190,23 @@ func HandleScoreCalcCompleted(ctx context.Context, event ScoreCalcCompleted) err
 	}
 
 	now := time.Now().UTC()
-	for _, entry := range event.Result.Entries {
-		if err := qq.UpsertPointsEntry(ctx, sqlc.UpsertPointsEntryParams{
-			ID:        newID(),
-			EventId:   event.EventID,
-			UserId:    entry.UserID,
-			Points:    int32(entry.Points),
+	if len(event.Result.Entries) > 0 {
+		ids := make([]string, len(event.Result.Entries))
+		userIDs := make([]string, len(event.Result.Entries))
+		points := make([]int32, len(event.Result.Entries))
+		for i, entry := range event.Result.Entries {
+			ids[i] = newID()
+			userIDs[i] = entry.UserID
+			points[i] = int32(entry.Points)
+		}
+		if err := qq.BatchUpsertPointsEntries(ctx, sqlc.BatchUpsertPointsEntriesParams{
+			Ids:       ids,
+			EventID:   event.EventID,
+			UserIds:   userIDs,
+			Points:    points,
 			CreatedAt: now,
 		}); err != nil {
-			return fmt.Errorf("failed to upsert points entry: %w", err)
+			return fmt.Errorf("failed to batch upsert points entries: %w", err)
 		}
 	}
 	if err := qq.AcceptGeneration(ctx, sqlc.AcceptGenerationParams{

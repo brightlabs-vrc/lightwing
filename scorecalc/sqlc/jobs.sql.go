@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/sqlc-dev/pqtype"
 )
 
@@ -24,6 +25,31 @@ type AcceptGenerationParams struct {
 
 func (q *Queries) AcceptGeneration(ctx context.Context, arg AcceptGenerationParams) error {
 	_, err := q.db.ExecContext(ctx, acceptGeneration, arg.AcceptedGeneration, arg.EventId)
+	return err
+}
+
+const batchUpsertPointsEntries = `-- name: BatchUpsertPointsEntries :exec
+INSERT INTO "event_points_entry" (id, "eventId", "userId", points, "createdAt", "updatedAt")
+SELECT unnest($1::text[]), $2::text, unnest($3::text[]), unnest($4::int[]), $5::timestamp, $5::timestamp
+ON CONFLICT ("eventId", "userId") DO UPDATE SET points = EXCLUDED.points
+`
+
+type BatchUpsertPointsEntriesParams struct {
+	Ids       []string
+	EventID   string
+	UserIds   []string
+	Points    []int32
+	CreatedAt time.Time
+}
+
+func (q *Queries) BatchUpsertPointsEntries(ctx context.Context, arg BatchUpsertPointsEntriesParams) error {
+	_, err := q.db.ExecContext(ctx, batchUpsertPointsEntries,
+		pq.Array(arg.Ids),
+		arg.EventID,
+		pq.Array(arg.UserIds),
+		pq.Array(arg.Points),
+		arg.CreatedAt,
+	)
 	return err
 }
 
