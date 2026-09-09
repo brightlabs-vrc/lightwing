@@ -3,6 +3,7 @@ package eventmanager
 import (
 	"context"
 	"testing"
+	"time"
 
 	"encore.dev/beta/errs"
 )
@@ -482,4 +483,64 @@ func findResult(results []*RaceResultView, userID string) *RaceResultView {
 		}
 	}
 	return nil
+}
+
+func Test_BenchmarkApplyAutoDeferralsForEvent(t *testing.T) {
+	f := newFixtures(t)
+	ctx := context.Background()
+
+	admin := f.createUser("bmadmin", "Benchmark Admin", nil, "SITE_ADMIN")
+
+	numUsers := 50
+	numRaces := 10
+
+	users := make([]string, numUsers)
+	for i := 0; i < numUsers; i++ {
+		users[i] = f.createUser("bmuser", "Benchmark User", nil, "USER")
+	}
+
+	eventID := f.createEventDirect(admin, "Benchmark Event", "UNOFFICIAL", nil, false)
+	for _, u := range users {
+		f.addEventMemberDirect(eventID, u)
+	}
+
+	raceIDs := make([]string, numRaces)
+	now := time.Now().UTC()
+	for i := 0; i < numRaces; i++ {
+		rid := "race-" + newID()[:8]
+		if _, err := db.Exec(ctx,
+			`INSERT INTO "race_event" (id, "eventId", name, sequence, "distanceMeters", "trackType", location, grade, "createdAt", "updatedAt")
+			 VALUES ($1, $2, $3, $4, 1200, 'Turf', 'Kyoto', 'OP', $5, $5)`,
+			rid, eventID, "Race OP", i+1, now); err != nil {
+			t.Fatalf("insert race %d: %v", i, err)
+		}
+		raceIDs[i] = rid
+	}
+
+	// Make each user win race 1 (sequence 1)
+	for _, u := range users {
+		resID := "raceresult-" + newID()[:8]
+		if _, err := db.Exec(ctx,
+			`INSERT INTO "race_result" (id, "raceEventId", "userId", position, points, "createdAt", "updatedAt")
+			 VALUES ($1, $2, $3, 1, 12, $4, $4)`,
+			resID, raceIDs[0], u, now); err != nil {
+			t.Fatalf("assign win: %v", err)
+		}
+	}
+
+	iterations := 20
+	var totalDuration time.Duration
+
+	for i := 0; i < iterations; i++ {
+		_, _ = db.Exec(ctx, `DELETE FROM "race_result" WHERE "resultStatus" = 'DEFERRED' AND "raceEventId" IN (SELECT id FROM "race_event" WHERE "eventId" = $1)`, eventID)
+
+		start := time.Now()
+		if err := ApplyAutoDeferralsForEvent(ctx, eventID, nil); err != nil {
+			t.Fatalf("ApplyAutoDeferralsForEvent: %v", err)
+		}
+		totalDuration += time.Since(start)
+	}
+
+	avgMs := float64(totalDuration.Milliseconds()) / float64(iterations)
+	t.Logf("BENCHMARK_RESULT: %d iterations, total time: %v, average per call: %.2f ms", iterations, totalDuration, avgMs)
 }

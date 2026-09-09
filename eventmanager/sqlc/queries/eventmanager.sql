@@ -335,6 +335,18 @@ JOIN "race_event" r ON r.id = m."raceEventId" WHERE r."eventId" = $1;
 INSERT INTO "race_result" (id, "raceEventId", "userId", points, "resultStatus", "createdAt", "updatedAt")
 VALUES ($1, $2, $3, 0, 'DEFERRED', $4, $4);
 
+-- Batch insert deferred results.
+-- name: InsertDeferredResultsBatch :exec
+INSERT INTO "race_result" (id, "raceEventId", "userId", points, "resultStatus", "createdAt", "updatedAt")
+SELECT
+    unnest($1::text[]),
+    unnest($2::text[]),
+    unnest($3::text[]),
+    0,
+    'DEFERRED',
+    $4,
+    $4;
+
 -- Deferred result mark.
 -- name: MarkResultDeferred :exec
 UPDATE "race_result" SET "resultStatus" = 'DEFERRED', points = 0 WHERE id = $1;

@@ -564,6 +564,11 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 		}
 		lookup[ri.raceID][ri.userID] = ri
 	}
+	var batchIDs []string
+	var batchRaceIDs []string
+	var batchUserIDs []string
+	now := time.Now().UTC()
+
 	for raceID, users := range raceUsers {
 		seq := raceSeqs[raceID]
 		for userID := range users {
@@ -573,12 +578,9 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 
 			if shouldDefer {
 				if existing == nil {
-					if err := q().InsertDeferredResult(ctx, sqlc.InsertDeferredResultParams{
-						ID: "raceresult-" + newID()[:8], RaceEventId: raceID, UserId: userID,
-						CreatedAt: time.Now().UTC(),
-					}); err != nil {
-						return err
-					}
+					batchIDs = append(batchIDs, "raceresult-"+newID()[:8])
+					batchRaceIDs = append(batchRaceIDs, raceID)
+					batchUserIDs = append(batchUserIDs, userID)
 				} else if !existing.resultStatus.Valid || existing.resultStatus.String == "DEFERRED" {
 					if !existing.resultStatus.Valid || existing.points != 0 {
 						if err := q().MarkResultDeferred(ctx, existing.id); err != nil {
@@ -604,6 +606,17 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 					}
 				}
 			}
+		}
+	}
+
+	if len(batchIDs) > 0 {
+		if err := q().InsertDeferredResultsBatch(ctx, sqlc.InsertDeferredResultsBatchParams{
+			Column1:   batchIDs,
+			Column2:   batchRaceIDs,
+			Column3:   batchUserIDs,
+			CreatedAt: now,
+		}); err != nil {
+			return err
 		}
 	}
 	return nil
