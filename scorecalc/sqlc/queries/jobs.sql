@@ -33,6 +33,11 @@ INSERT INTO "event_points_entry" (id, "eventId", "userId", points, "createdAt", 
 VALUES ($1, $2, $3, $4, $5, $5)
 ON CONFLICT ("eventId", "userId") DO UPDATE SET points = EXCLUDED.points;
 
+-- name: BatchUpsertPointsEntries :exec
+INSERT INTO "event_points_entry" (id, "eventId", "userId", points, "createdAt", "updatedAt")
+SELECT unnest(@ids::text[]), @event_id::text, unnest(@user_ids::text[]), unnest(@points::int[]), @created_at::timestamp, @created_at::timestamp
+ON CONFLICT ("eventId", "userId") DO UPDATE SET points = EXCLUDED.points;
+
 -- name: AcceptGeneration :exec
 UPDATE "score_calc_state" SET "acceptedGeneration" = $1 WHERE "eventId" = $2;
 
