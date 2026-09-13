@@ -256,6 +256,52 @@ export function parseMarginToSeconds(value: string): number {
   return lengthsToSeconds(lengths)
 }
 
+export type PenaltyType = 'NONE' | 'DSQ' | 'DNF' | 'DNS' | 'DEFERRED' | 'POS' | 'PTS'
+
+export interface PenaltyInfo {
+  type: PenaltyType
+  amount?: number
+}
+
+export function parsePenaltyStatus(statusStr: string): PenaltyInfo {
+  const upper = (statusStr || '').trim().toUpperCase()
+  if (!upper) return { type: 'NONE' }
+  if (upper === 'DSQ') return { type: 'DSQ' }
+  if (upper === 'DNF') return { type: 'DNF' }
+  if (upper === 'DNS') return { type: 'DNS' }
+  if (upper === 'DEFERRED') return { type: 'DEFERRED' }
+
+  if (upper.startsWith('PEN (POS-') && upper.endsWith(')')) {
+    const amtStr = upper.slice('PEN (POS-'.length, -1).trim()
+    const amount = parseInt(amtStr, 10)
+    return { type: 'POS', amount: !isNaN(amount) && amount > 0 ? amount : 1 }
+  }
+
+  if (upper.startsWith('PEN (PTS-') && upper.endsWith(')')) {
+    const amtStr = upper.slice('PEN (PTS-'.length, -1).trim()
+    const amount = parseInt(amtStr, 10)
+    return { type: 'PTS', amount: !isNaN(amount) && amount > 0 ? amount : 1 }
+  }
+
+  return { type: 'NONE' }
+}
+
+export function formatPenaltyStatus(type: PenaltyType, amount?: number): string {
+  if (type === 'DSQ') return 'DSQ'
+  if (type === 'DNF') return 'DNF'
+  if (type === 'DNS') return 'DNS'
+  if (type === 'DEFERRED') return 'DEFERRED'
+  if (type === 'POS') {
+    const amt = amount && amount > 0 ? amount : 1
+    return `PEN (POS-${amt})`
+  }
+  if (type === 'PTS') {
+    const amt = amount && amount > 0 ? amount : 1
+    return `PEN (PTS-${amt})`
+  }
+  return ''
+}
+
 // Infer missing finish times from the leader's time and ordered per-position margins.
 // Pure: returns either an error message or the next edits map + inferred count.
 export function inferFinishTimes(
@@ -264,9 +310,11 @@ export function inferFinishTimes(
 ): { error: string } | { edits: Record<string, EditedResult>; inferredCount: number } {
   // DSQ/DNF/DNS/DEFERRED rows are excluded — they have no valid position and cannot have
   // inferred finish times.
-  const activeRows = rows.filter(
-    (d) => d.rowState !== 'pending_delete' && d.edit.resultStatus !== 'DSQ' && d.edit.resultStatus !== 'DNF' && d.edit.resultStatus !== 'DNS' && d.edit.resultStatus !== 'DEFERRED'
-  )
+  const activeRows = rows.filter((d) => {
+    if (d.rowState === 'pending_delete') return false
+    const penalty = parsePenaltyStatus(d.edit.resultStatus)
+    return penalty.type !== 'DSQ' && penalty.type !== 'DNF' && penalty.type !== 'DNS' && penalty.type !== 'DEFERRED'
+  })
 
   // 1. Verify all rows have valid numeric positions
   for (const d of activeRows) {
