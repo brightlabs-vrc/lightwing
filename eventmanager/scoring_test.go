@@ -103,6 +103,10 @@ func Test_scoringResolvers(t *testing.T) {
 			{"DNS nil position", "GI", nil, "DNS", 0},
 			{"standard GI first", "GI", intptr(1), "", 25},
 			{"standard GII first", "GII", intptr(1), "", 19},
+			{"penalty POS-3 on GI 1st (eff 4th)", "GI", intptr(1), "PEN (POS-3)", 12},
+			{"penalty POS-10 on GI 1st (eff 11th out of bounds)", "GI", intptr(1), "PEN (POS-10)", 0},
+			{"penalty PTS-3 on GI 1st (25 - 3)", "GI", intptr(1), "PEN (PTS-3)", 22},
+			{"penalty PTS-30 on GI 1st (25 - 30 floored at 0)", "GI", intptr(1), "PEN (PTS-30)", 0},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
