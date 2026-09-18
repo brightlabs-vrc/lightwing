@@ -12,7 +12,7 @@
             "https://lightwing-canary.urs.deno.net",
             "https://*.urs.deno.net",
             "https://comp.cosyne.jp.eu.org",
-            "comp-canary.cosyne.jp.eu.org"
+            "https://comp-canary.cosyne.jp.eu.org"
         ],
         "allow_origins_without_credentials": [
             "http://localhost:3000",
@@ -21,7 +21,7 @@
             "https://lightwing-canary.urs.deno.net",
             "https://*.urs.deno.net",
             "https://comp.cosyne.jp.eu.org",
-            "comp-canary.cosyne.jp.eu.org"
+            "https://comp-canary.cosyne.jp.eu.org"
         ],
         "debug": true,
     },
