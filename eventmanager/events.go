@@ -319,7 +319,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		}
 	}
 
-	// Event members; granular events only surface members active in a race.
+	// Event members.
 	type memberRow struct {
 		UserID string
 		Name   string
@@ -332,9 +332,6 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 	}
 	for _, em := range emrows {
 		m := memberRow{UserID: em.UserId, Name: em.VrchatUsername, Tier: nullStringFromAny(em.ClassTier)}
-		if e.GranularParticipation && !activeUserIDs[m.UserID] {
-			continue
-		}
 		members = append(members, m)
 	}
 

@@ -91,6 +91,65 @@ func Test_GranularResultsGating(t *testing.T) {
 	}
 }
 
+func Test_GranularEventMembersSurfacedAndSelectableForRace(t *testing.T) {
+	f := newFixtures(t)
+	ctx := context.Background()
+
+	admin := f.createUser("gradmin2", "Granular Admin 2", nil, "SITE_ADMIN")
+	authHeader := f.createSession(admin)
+	p1 := f.createUser("grpart3", "Participant Three", nil, "USER")
+
+	eventID := f.createEventDirect(admin, "Granular Event 2", "UNOFFICIAL", nil, true)
+
+	// Add p1 as event member
+	addedEvent, err := AddEventMemberCore(ctx, &AddEventMemberRequest{
+		EventID: eventID, UserID: p1, Authorization: authHeader,
+	})
+	if err != nil {
+		t.Fatalf("AddEventMemberCore: %v", err)
+	}
+
+	// Verify p1 is in EventDetail.Members immediately
+	found := false
+	for _, m := range addedEvent.Members {
+		if m.UserID == p1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected %q to be in EventDetail.Members after AddEventMemberCore on granular event", p1)
+	}
+
+	// Create a race
+	race, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
+		EventID: eventID, Authorization: authHeader, Name: "Race 1",
+		DistanceMeters: 1000, TrackType: "Dirt", Location: "Tokyo",
+	})
+	if err != nil {
+		t.Fatalf("CreateRaceEventCore: %v", err)
+	}
+
+	// Add p1 to race
+	addedRace, err := AddRaceEventMemberCore(ctx, &RaceMemberRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p1, Authorization: authHeader,
+	})
+	if err != nil {
+		t.Fatalf("AddRaceEventMemberCore: %v", err)
+	}
+
+	foundInRace := false
+	for _, rm := range addedRace.Members {
+		if rm.UserID == p1 {
+			foundInRace = true
+			break
+		}
+	}
+	if !foundInRace {
+		t.Errorf("expected %q to be in RaceEventDetail.Members after AddRaceEventMemberCore", p1)
+	}
+}
+
 func Test_NonGranularFallsBackToEventMembership(t *testing.T) {
 	f := newFixtures(t)
 	ctx := context.Background()

@@ -674,7 +674,7 @@ func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEve
 	if err != nil {
 		return nil, err
 	}
-	if !memberExists {
+	if !memberExists && !e.GranularParticipation {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
 	if !isEligibleTier(userTier, raceRestriction(r, e)) {
@@ -707,6 +707,13 @@ func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEve
 			if joinedCount >= e.MaxConcurrentRaceParticipations.Int64 {
 				return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "User maximum race enrollment count reached",
 					Details: detailsMap{"code": CodeGranularUserRaceLimitReached, "limit": int(e.MaxConcurrentRaceParticipations.Int64), "currentCount": int(joinedCount)}}
+			}
+		}
+		if !memberExists && e.GranularParticipation {
+			if err := qq.InsertEventMemberSimple(ctx, sqlc.InsertEventMemberSimpleParams{
+				ID: "eventmember-" + newID()[:8], EventId: p.EventID, UserId: p.UserID,
+			}); err != nil {
+				return nil, err
 			}
 		}
 		if err := qq.InsertRaceEventMember(ctx, sqlc.InsertRaceEventMemberParams{
