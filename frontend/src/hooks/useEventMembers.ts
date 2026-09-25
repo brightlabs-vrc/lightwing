@@ -14,6 +14,7 @@ interface UseEventMembersProps {
   setRaces: React.Dispatch<React.SetStateAction<eventmanager.RaceEventDetail[]>>;
   setGlobalError: (err: string | null) => void;
   setGlobalSuccess: (success: string | null) => void;
+  reloadCurrentEvent?: () => Promise<void>;
 }
 
 export function useEventMembers({
@@ -23,6 +24,7 @@ export function useEventMembers({
   setRaces,
   setGlobalError,
   setGlobalSuccess,
+  reloadCurrentEvent,
 }: UseEventMembersProps) {
   const [newMemberUserId, setNewMemberUserId] = useState('')
   const [newRaceMemberUserId, setNewRaceMemberUserId] = useState('')
@@ -77,11 +79,14 @@ export function useEventMembers({
         setRaces((current) => current.map((r) => (r.id === raceId ? updatedRace : r)))
         setNewRaceMemberUserId('')
         setGlobalSuccess(`Successfully registered competitor "${userId}" for the race.`)
+        if (reloadCurrentEvent) {
+          await reloadCurrentEvent()
+        }
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to register race member')
       }
     },
-    [authHeader, eventId, setRaces, setGlobalError, setGlobalSuccess],
+    [authHeader, eventId, setRaces, setGlobalError, setGlobalSuccess, reloadCurrentEvent],
   )
 
   // Remove Race Member
@@ -95,11 +100,14 @@ export function useEventMembers({
         const updatedRace = await removeRaceEventMember(eventId, raceId, userId, authHeader)
         setRaces((current) => current.map((r) => (r.id === raceId ? updatedRace : r)))
         setGlobalSuccess('Successfully unregistered competitor from the race.')
+        if (reloadCurrentEvent) {
+          await reloadCurrentEvent()
+        }
       } catch (cause) {
         setGlobalError(cause instanceof Error ? cause.message : 'Unable to unregister race member')
       }
     },
-    [authHeader, eventId, setRaces, setGlobalError, setGlobalSuccess],
+    [authHeader, eventId, setRaces, setGlobalError, setGlobalSuccess, reloadCurrentEvent],
   )
 
   return {
