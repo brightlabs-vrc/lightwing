@@ -124,6 +124,31 @@ function EventDetailPage() {
           <span className="text-retro-muted">-</span>
         ),
     },
+    ...(isGranular
+      ? [
+          {
+            key: 'registeredRaces',
+            header: 'REGISTERED RACES',
+            render: (m: eventmanager.EventMemberView) => {
+              const userRaces = (event.raceEvents ?? []).filter((r) =>
+                (r.members ?? []).some((rm) => rm.userId === m.userId)
+              )
+              if (userRaces.length === 0) {
+                return <span className="text-retro-muted text-xs">NONE</span>
+              }
+              return (
+                <div className="flex gap-1 flex-wrap">
+                  {userRaces.map((r) => (
+                    <PixelBadge key={r.id} tone="neutral">
+                      #{r.sequence} {r.name}
+                    </PixelBadge>
+                  ))}
+                </div>
+              )
+            },
+          },
+        ]
+      : []),
   ]
 
   const pointsColumns: PixelTableColumn<eventmanager.PointsEntryView>[] = [
