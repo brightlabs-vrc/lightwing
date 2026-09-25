@@ -64,66 +64,86 @@ export function EventMembersTab({
       {selectedEvent.members.length === 0 ? (
         <p className="slds-text-body_small text-slate-500">No participants are currently registered for this competition.</p>
       ) : (
-        <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.membersTable}`}>
-          <thead>
-            <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-              <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Competitor Name</div></th>
-              <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-              <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Skill Tier</div></th>
-              {isGranular && (
-                <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Registered Races</div></th>
-              )}
-              <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate">Actions</div></th>
-            </tr>
-          </thead>
-          <tbody>
-            {selectedEvent.members.map((member) => {
-              const registeredRaces = isGranular
-                ? (selectedEvent.raceEvents ?? []).filter((r) =>
-                    (r.members ?? []).some((rm) => rm.userId === member.userId)
-                  )
-                : []
+        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+          <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.membersTable}`} style={{ width: '100%', tableLayout: 'fixed' }}>
+            <thead>
+              <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
+                <th scope="col" style={{ fontWeight: 'bold', width: '22%', minWidth: '160px' }}>
+                  <div className="slds-truncate" title="Competitor Name">Competitor Name</div>
+                </th>
+                <th scope="col" style={{ fontWeight: 'bold', width: '20%', minWidth: '140px' }}>
+                  <div className="slds-truncate" title="User ID">User ID</div>
+                </th>
+                <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}>
+                  <div className="slds-truncate" title="Skill Tier">Skill Tier</div>
+                </th>
+                {isGranular && (
+                  <th scope="col" style={{ fontWeight: 'bold', minWidth: '240px' }}>
+                    <div className="slds-truncate" title="Registered Races">Registered Races</div>
+                  </th>
+                )}
+                <th scope="col" style={{ fontWeight: 'bold', width: '90px', textAlign: 'right' }}>
+                  <div className="slds-truncate" title="Actions">Actions</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedEvent.members.map((member) => {
+                const registeredRaces = isGranular
+                  ? (selectedEvent.raceEvents ?? []).filter((r) =>
+                      (r.members ?? []).some((rm) => rm.userId === member.userId)
+                    )
+                  : []
 
-              return (
-                <tr key={member.userId} className="slds-hint-parent">
-                  <td><UserLink userId={member.userId} name={member.name} /></td>
-                  <td><code className="text-xs">{member.userId}</code></td>
-                  <td>
-                    <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px' }}>
-                      {!member.classTier || member.classTier === 'PRE_OP' || member.classTier === 'OP' ? 'None' : member.classTier}
-                    </span>
-                  </td>
-                  {isGranular && (
+                return (
+                  <tr key={member.userId} className="slds-hint-parent">
                     <td>
-                      {registeredRaces.length === 0 ? (
-                        <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px', color: '#64748b' }}>
-                          None
-                        </span>
-                      ) : (
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {registeredRaces.map((r) => (
-                            <span key={r.id} className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
-                              #{r.sequence} {r.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <div className="slds-truncate" title={member.name}>
+                        <UserLink userId={member.userId} name={member.name} />
+                      </div>
                     </td>
-                  )}
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveMember(member.userId)}
-                      className={styles.btnDestructive}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                    <td>
+                      <div className="slds-truncate" title={member.userId}>
+                        <code className="text-xs">{member.userId}</code>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px' }}>
+                        {!member.classTier || member.classTier === 'PRE_OP' || member.classTier === 'OP' ? 'None' : member.classTier}
+                      </span>
+                    </td>
+                    {isGranular && (
+                      <td>
+                        {registeredRaces.length === 0 ? (
+                          <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px', color: '#64748b' }}>
+                            None
+                          </span>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '80px', overflowY: 'auto' }}>
+                            {registeredRaces.map((r) => (
+                              <span key={r.id} className="slds-badge slds-theme_light" title={`#${r.sequence} ${r.name}`} style={{ padding: '1px 6px', fontSize: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '220px' }}>
+                                #{r.sequence} {r.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveMember(member.userId)}
+                        className={styles.btnDestructive}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

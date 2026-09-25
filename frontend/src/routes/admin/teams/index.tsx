@@ -156,22 +156,22 @@ function AdminTeamsPage() {
               ) : teams.length > 0 ? (
                 <>
                   <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Teams Directory Table" style={{ width: '100%' }}>
+                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Teams Directory Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '700px' }}>
                       <thead>
                         <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '250px' }}>
+                          <th scope="col" style={{ width: '30%', minWidth: '180px' }}>
                             <div className="slds-truncate font-bold" title="Team Name" style={{ fontWeight: 'bold' }}>Team Name</div>
                           </th>
-                          <th scope="col" style={{ width: '250px' }}>
+                          <th scope="col" style={{ width: '25%', minWidth: '150px' }}>
                             <div className="slds-truncate font-bold" title="Unique Slug" style={{ fontWeight: 'bold' }}>Unique Slug</div>
                           </th>
-                          <th scope="col" style={{ width: '120px' }}>
+                          <th scope="col" style={{ width: '110px' }}>
                             <div className="slds-truncate font-bold" title="Members Count" style={{ fontWeight: 'bold' }}>Members</div>
                           </th>
-                          <th scope="col" style={{ width: '220px' }}>
+                          <th scope="col" style={{ minWidth: '180px' }}>
                             <div className="slds-truncate font-bold" title="Admin Slots" style={{ fontWeight: 'bold' }}>Admin Slots Remaining</div>
                           </th>
-                          <th scope="col" style={{ width: '120px' }}>
+                          <th scope="col" style={{ width: '100px' }}>
                             <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
                           </th>
                         </tr>

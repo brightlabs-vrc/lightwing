@@ -113,10 +113,20 @@ function EventDetailPage() {
   const isGranular = event.granularParticipation
 
   const participantColumns: PixelTableColumn<eventmanager.EventMemberView>[] = [
-    { key: 'name', header: 'NAME', render: (m) => <span className="font-medium">{m.name}</span> },
+    {
+      key: 'name',
+      header: 'NAME',
+      width: '35%',
+      render: (m) => (
+        <div className="truncate font-medium max-w-[200px]" title={m.name}>
+          {m.name}
+        </div>
+      ),
+    },
     {
       key: 'classTier',
       header: 'CLASS TIER',
+      width: 120,
       render: (m) =>
         m.classTier ? (
           <PixelBadge tone="neutral">{CLASS_TIER_LABELS[m.classTier as any]}</PixelBadge>
@@ -137,9 +147,9 @@ function EventDetailPage() {
                 return <span className="text-retro-muted text-xs">NONE</span>
               }
               return (
-                <div className="flex gap-1 flex-wrap">
+                <div className="flex gap-1 flex-wrap max-h-20 overflow-y-auto">
                   {userRaces.map((r) => (
-                    <PixelBadge key={r.id} tone="neutral">
+                    <PixelBadge key={r.id} tone="neutral" title={`#${r.sequence} ${r.name}`}>
                       #{r.sequence} {r.name}
                     </PixelBadge>
                   ))}
@@ -153,7 +163,15 @@ function EventDetailPage() {
 
   const pointsColumns: PixelTableColumn<eventmanager.PointsEntryView>[] = [
     { key: 'rank', header: '#', width: 64, render: (_e, idx) => idx + 1 },
-    { key: 'name', header: 'PARTICIPANT', render: (e) => <span className="font-medium">{e.name}</span> },
+    {
+      key: 'name',
+      header: 'PARTICIPANT',
+      render: (e) => (
+        <div className="truncate font-medium max-w-[240px]" title={e.name}>
+          {e.name}
+        </div>
+      ),
+    },
     {
       key: 'points',
       header: 'TOTAL POINTS',
@@ -165,7 +183,15 @@ function EventDetailPage() {
 
   const ladderColumns: PixelTableColumn<eventmanager.LadderEntryView>[] = [
     { key: 'rank', header: 'RANK', width: 64, render: (e) => e.rank },
-    { key: 'name', header: 'PARTICIPANT', render: (e) => <span className="font-medium">{e.name}</span> },
+    {
+      key: 'name',
+      header: 'PARTICIPANT',
+      render: (e) => (
+        <div className="truncate font-medium max-w-[240px]" title={e.name}>
+          {e.name}
+        </div>
+      ),
+    },
     {
       key: 'elo',
       header: 'ELO',
@@ -406,48 +432,58 @@ function RaceStandingsTable({
     {
       key: 'position',
       header: 'POS',
-      width: 64,
+      width: 60,
       render: (r) => <span className="font-pixel">{r.position ?? '-'}</span>,
     },
     {
       key: 'gateNumber',
       header: 'DRAW',
-      width: 64,
+      width: 60,
       render: (r) => <span>{r.gateNumber ?? '-'}</span>,
     },
     {
       key: 'participant',
       header: 'PARTICIPANT',
+      width: 180,
       render: (r) => {
         const member = members.find((m) => m.userId === r.userId)
-        return <span className="font-medium">{member?.name ?? r.userId}</span>
+        const name = member?.name ?? r.userId
+        return (
+          <div className="truncate font-medium max-w-[170px]" title={name}>
+            {name}
+          </div>
+        )
       },
     },
     {
       key: 'points',
       header: 'POINTS',
       align: 'right',
-      width: 96,
+      width: 80,
       render: (r) => <span className="text-retro-primary">{r.points}</span>,
     },
     {
       key: 'finishTime',
       header: 'FINISH TIME',
+      width: 100,
       render: (r) => <span>{r.finishTime ?? '-'}</span>,
     },
     {
       key: 'margin',
       header: 'MARGIN',
+      width: 90,
       render: (r) => <span>{r.margin ?? '-'}</span>,
     },
     {
       key: 'passingOrder',
       header: 'PASSING ORDER',
+      width: 120,
       render: (r) => <span>{r.passingOrder ?? '-'}</span>,
     },
     {
       key: 'final3F',
       header: 'FINAL 3F',
+      width: 90,
       render: (r) => <span>{r.final3F ?? '-'}</span>,
     },
     {

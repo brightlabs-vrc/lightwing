@@ -251,22 +251,22 @@ function StandingsTable({
         />
       )}
 
-      <div style={{ overflowX: 'auto', width: '100%' }}>
-        <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ border: '1px solid #dddbda', minWidth: '100%' }}>
+      <div style={{ overflowX: 'auto', width: '100%', border: '1px solid #dddbda', borderRadius: '4px' }}>
+        <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ minWidth: '1100px', width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-              <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Competitor Name</div></th>
-              <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Draw</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Position</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Points</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}><div className="slds-truncate">Finish Time</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '90px' }}><div className="slds-truncate">Behind</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Passing Order</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate">Final 3F</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate">Outcome / Penalty</div></th>
-              <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Status</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate">Staged Actions</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate" title="Competitor Name">Competitor Name</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="User ID">User ID</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate" title="Draw">Draw</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate" title="Position">Position</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate" title="Points">Points</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate" title="Finish Time">Finish Time</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '85px' }}><div className="slds-truncate" title="Behind">Behind</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate" title="Passing Order">Passing Order</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '85px' }}><div className="slds-truncate" title="Final 3F">Final 3F</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Outcome / Penalty">Outcome / Penalty</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '140px' }}><div className="slds-truncate" title="Status">Status</div></th>
+              <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Staged Actions">Staged Actions</div></th>
             </tr>
           </thead>
           <tbody>
@@ -288,15 +288,18 @@ function StandingsTable({
                 >
                   <td>
                     <div
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                      className="slds-truncate"
+                      style={{ cursor: 'pointer' }}
                       onClick={() => !isDeleted && setPenaltyTarget({ userId: member.userId, name: member.name, currentStatus: edit.resultStatus })}
-                      title="Click participant to issue penalty"
+                      title={`Click ${member.name} to issue penalty`}
                     >
                       <UserLink userId={member.userId} name={member.name} />
                     </div>
                   </td>
                   <td>
-                    <code className="text-xs">{member.userId}</code>
+                    <div className="slds-truncate" title={member.userId}>
+                      <code className="text-xs">{member.userId}</code>
+                    </div>
                   </td>
                   <td>
                     <div className="slds-form-element">
