@@ -398,19 +398,19 @@ function AdminTeamDetailPage() {
                   {members.length > 0 ? (
                     <>
                       <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                        <table className="slds-table slds-table_cell-buffer slds-table_bordered" aria-label="Team Roster Table" style={{ width: '100%' }}>
+                        <table className="slds-table slds-table_cell-buffer slds-table_bordered" aria-label="Team Roster Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '600px' }}>
                           <thead>
                             <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                              <th scope="col" style={{ width: '250px' }}>
+                              <th scope="col" style={{ width: '35%', minWidth: '160px' }}>
                                 <div className="slds-truncate font-bold" title="Competitor Name" style={{ fontWeight: 'bold' }}>Competitor Name</div>
                               </th>
-                              <th scope="col" style={{ width: '250px' }}>
+                              <th scope="col" style={{ width: '140px' }}>
                                 <div className="slds-truncate font-bold" title="Roster Role" style={{ fontWeight: 'bold' }}>Roster Role</div>
                               </th>
-                              <th scope="col" style={{ width: '150px' }}>
+                              <th scope="col" style={{ width: '160px' }}>
                                 <div className="slds-truncate font-bold" title="Role Action" style={{ fontWeight: 'bold' }}>Change Role</div>
                               </th>
-                              <th scope="col" style={{ width: '120px' }}>
+                              <th scope="col" style={{ width: '100px' }}>
                                 <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
                               </th>
                             </tr>
@@ -419,10 +419,10 @@ function AdminTeamDetailPage() {
                             {members.map((member) => (
                               <tr key={member.userId} className="slds-hint-parent hover:bg-slate-50">
                                 <th scope="row">
-                                  <div className="slds-truncate font-bold" title={member.name}>
+                                  <div className="slds-truncate font-bold" title={`${member.name}${member.slug ? ` (@${member.slug})` : ''}`}>
                                     <UserLink userId={member.userId} name={member.name} />
                                     {member.slug && (
-                                      <span style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
+                                      <span className="slds-truncate" style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
                                         @{member.slug}
                                       </span>
                                     )}
@@ -438,7 +438,7 @@ function AdminTeamDetailPage() {
                                     value={member.role}
                                     onChange={(e) => handleChangeRole(member.userId, e.target.value)}
                                     className="slds-select"
-                                    style={{ padding: '2px 8px', height: '28px', fontSize: '12px', minWidth: '150px' }}
+                                    style={{ padding: '2px 8px', height: '28px', fontSize: '12px', width: '100%' }}
                                   >
                                     {roleOptions.map((opt) => (
                                       <option key={opt.value} value={opt.value}>

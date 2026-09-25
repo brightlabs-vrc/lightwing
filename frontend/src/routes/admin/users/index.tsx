@@ -103,25 +103,25 @@ function AdminUsersPage() {
               ) : users.length > 0 ? (
                 <>
                   <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Competitors Directory Table" style={{ width: '100%' }}>
+                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Competitors Directory Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '800px' }}>
                       <thead>
                         <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '200px' }}>
+                          <th scope="col" style={{ width: '22%', minWidth: '160px' }}>
                             <div className="slds-truncate font-bold" title="VRChat Username" style={{ fontWeight: 'bold' }}>VRChat Username</div>
                           </th>
-                          <th scope="col" style={{ width: '200px' }}>
+                          <th scope="col" style={{ width: '20%', minWidth: '150px' }}>
                             <div className="slds-truncate font-bold" title="Discord Name" style={{ fontWeight: 'bold' }}>Discord Name</div>
                           </th>
-                          <th scope="col" style={{ width: '150px' }}>
+                          <th scope="col" style={{ width: '120px' }}>
                             <div className="slds-truncate font-bold" title="Site Role" style={{ fontWeight: 'bold' }}>Site Role</div>
                           </th>
-                          <th scope="col" style={{ width: '150px' }}>
+                          <th scope="col" style={{ width: '110px' }}>
                             <div className="slds-truncate font-bold" title="Class Tier" style={{ fontWeight: 'bold' }}>Class Tier</div>
                           </th>
-                          <th scope="col">
+                          <th scope="col" style={{ minWidth: '200px' }}>
                             <div className="slds-truncate font-bold" title="Team Affiliations" style={{ fontWeight: 'bold' }}>Team Affiliations</div>
                           </th>
-                          <th scope="col" style={{ width: '120px' }}>
+                          <th scope="col" style={{ width: '100px' }}>
                             <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
                           </th>
                         </tr>
@@ -155,19 +155,17 @@ function AdminUsersPage() {
                               </div>
                             </td>
                             <td>
-                              <div className="slds-truncate" title={user.teams.map((t) => `${t.name} (${t.role})`).join(', ')}>
-                                {user.teams.length > 0 ? (
-                                  <div className="slds-grid slds-wrap" style={{ gap: '4px' }}>
-                                    {user.teams.map((t) => (
-                                      <span key={t.organizationId} className="slds-badge slds-theme_light" style={{ fontSize: '11px', padding: '1px 6px' }}>
-                                        {t.name} ({t.role})
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400">None</span>
-                                )}
-                              </div>
+                              {user.teams.length > 0 ? (
+                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '60px', overflowY: 'auto' }}>
+                                  {user.teams.map((t) => (
+                                    <span key={t.organizationId} className="slds-badge slds-theme_light" title={`${t.name} (${t.role})`} style={{ fontSize: '11px', padding: '1px 6px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '180px' }}>
+                                      {t.name} ({t.role})
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">None</span>
+                              )}
                             </td>
                             <td>
                               <button
