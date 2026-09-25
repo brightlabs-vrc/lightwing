@@ -11,6 +11,7 @@ function formatClassTier(tier: string | null | undefined): string {
 }
 import { StandingsEditor } from './StandingsEditor'
 import { UserLink } from './UserLink'
+import { UserSearchCombobox } from './UserSearchCombobox'
 import {
   isRaceOngoing,
   isRaceNotStarted,
@@ -444,13 +445,20 @@ export function RaceDetailPane({
               style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               <div style={{ flexGrow: 1, minWidth: '180px' }}>
-                <RaceMemberCombobox
-                  value={newRaceMemberUserId}
-                  onChange={(val) => setNewRaceMemberUserId(val)}
-                  members={selectedEvent.members.filter(
-                    (em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId)
-                  )}
-                />
+                {selectedEvent.granularParticipation ? (
+                  <UserSearchCombobox
+                    value={newRaceMemberUserId}
+                    onChange={(val) => setNewRaceMemberUserId(val)}
+                  />
+                ) : (
+                  <RaceMemberCombobox
+                    value={newRaceMemberUserId}
+                    onChange={(val) => setNewRaceMemberUserId(val)}
+                    members={selectedEvent.members.filter(
+                      (em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId)
+                    )}
+                  />
+                )}
               </div>
               <button
                 type="submit"

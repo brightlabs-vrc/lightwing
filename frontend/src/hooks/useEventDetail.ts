@@ -92,6 +92,7 @@ export function useEventDetail(eventId: string) {
     setRaces,
     setGlobalError,
     setGlobalSuccess,
+    reloadCurrentEvent: async () => { await reloadCurrentEvent() },
   })
 
   // Sub-hook: Event Status
