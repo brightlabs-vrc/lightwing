@@ -32,7 +32,6 @@ function AdminUserDetailPage() {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [biography, setBiography] = useState('')
-  const [careerOverview, setCareerOverview] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
   const [image, setImage] = useState('')
   const [classTier, setClassTier] = useState<string>('')
@@ -56,7 +55,6 @@ function AdminUserDetailPage() {
       setName(loaded.name || '')
       setSlug(loaded.slug || '')
       setBiography(loaded.biography || '')
-      setCareerOverview(loaded.careerOverview || '')
       setVrchatUsername(loaded.vrchatUsername || '')
       setImage(loaded.image || '')
       setClassTier(normalizedProfile.classTier || '')
@@ -76,7 +74,6 @@ function AdminUserDetailPage() {
       setName(profile.name || '')
       setSlug(profile.slug || '')
       setBiography(profile.biography || '')
-      setCareerOverview(profile.careerOverview || '')
       setVrchatUsername(profile.vrchatUsername || '')
       setImage(profile.image || '')
       setClassTier(profile.classTier || '')
@@ -114,7 +111,6 @@ function AdminUserDetailPage() {
         name !== (profile.name || '') ||
         trimmedSlug !== (profile.slug || '') ||
         biography !== (profile.biography || '') ||
-        careerOverview !== (profile.careerOverview || '') ||
         vrchatUsername !== (profile.vrchatUsername || '') ||
         image !== (profile.image || '')
 
@@ -125,7 +121,6 @@ function AdminUserDetailPage() {
             name,
             slug: trimmedSlug || undefined,
             biography: biography.trim() || null,
-            careerOverview: careerOverview.trim() || null,
             vrchatUsername: vrchatUsername.trim() || null,
             image: image.trim() || null,
           },
@@ -321,20 +316,6 @@ function AdminUserDetailPage() {
                         </div>
                       </div>
 
-                      {/* Career Overview Input Field */}
-                      <div className="slds-m-bottom_large">
-                        <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="career-overview">Career Overview</label>
-                        <div className="slds-form-element__control slds-m-top_xx-small">
-                          <textarea
-                            id="career-overview"
-                            value={careerOverview}
-                            onChange={(e) => setCareerOverview(e.target.value)}
-                            className="slds-textarea"
-                            style={{ padding: '10px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '80px', width: '100%' }}
-                            placeholder="Detail your competitive history and highlights..."
-                          />
-                        </div>
-                      </div>
 
                       {/* Form Actions */}
                       <div className="slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -369,6 +350,9 @@ function AdminUserDetailPage() {
                               <img
                                 src={profile.image}
                                 alt={`${profile.name}'s Avatar`}
+                                onError={(e) => {
+                                  e.currentTarget.src = '/fallback_avatar.jpg'
+                                }}
                                 style={{
                                   width: '110px',
                                   height: '110px',
@@ -455,13 +439,6 @@ function AdminUserDetailPage() {
                         </div>
                       </div>
 
-                      {/* Career Overview */}
-                      <div className="slds-m-bottom_large">
-                        <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Career Overview</p>
-                        <div className="slds-m-top_xx-small" style={{ whiteSpace: 'pre-wrap', background: '#f8fafc', padding: '12px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '60px', color: '#334155' }}>
-                          {profile.careerOverview ? profile.careerOverview : <span className="text-slate-400 italic">No career overview highlights registered.</span>}
-                        </div>
-                      </div>
 
                       {/* Trigger Edit Button */}
                       <div className="slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'flex-end' }}>

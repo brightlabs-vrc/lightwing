@@ -258,16 +258,6 @@ function AdminTeamDetailPage() {
       <button
         type="button"
         onClick={() => {
-          setStatsError(null)
-          setIsStatsModalOpen(true)
-        }}
-        className="slds-button slds-button_neutral"
-      >
-        Edit Statistics
-      </button>
-      <button
-        type="button"
-        onClick={() => {
           setMemberError(null)
           setIsMemberModalOpen(true)
         }}

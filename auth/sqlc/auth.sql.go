@@ -445,7 +445,7 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
 }
 
 const listTeamAffiliations = `-- name: ListTeamAffiliations :many
-SELECT m."userId", o.id, o.name, o.slug, m.role
+SELECT m."userId", o.id, o.name, o.slug, o.logo, m.role
 FROM "member" m
 JOIN "organization" o ON o.id = m."organizationId"
 WHERE m."userId" = ANY($1::text[])
@@ -457,10 +457,11 @@ type ListTeamAffiliationsRow struct {
 	ID     string
 	Name   string
 	Slug   string
+	Logo   sql.NullString
 	Role   string
 }
 
-// Team affiliations for a batch of users.
+// Team affiliations for a batch of users (includes organization logo).
 func (q *Queries) ListTeamAffiliations(ctx context.Context, dollar_1 []string) ([]ListTeamAffiliationsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTeamAffiliations, pq.Array(dollar_1))
 	if err != nil {
@@ -475,6 +476,7 @@ func (q *Queries) ListTeamAffiliations(ctx context.Context, dollar_1 []string) (
 			&i.ID,
 			&i.Name,
 			&i.Slug,
+			&i.Logo,
 			&i.Role,
 		); err != nil {
 			return nil, err
