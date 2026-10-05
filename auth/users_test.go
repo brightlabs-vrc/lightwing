@@ -122,7 +122,7 @@ func Test_updateUserProfile(t *testing.T) {
 		actor := mustResolveActor(t, ctx, createUsersTestSession(t, ctx, userID))
 
 		_, err := updateUserProfile(ctx, actor, userID, &UpdateUserProfileParams{
-			Slug: strptr("has-hyphen"),
+			Slug: strptr("invalid slug!"),
 		})
 		if err == nil {
 			t.Fatal("expected invalid slug error")
