@@ -45,21 +45,15 @@ describe('isValidSlug', () => {
       expect(isValidSlug('Team-Name')).toBe(false);
     });
 
-    it('rejects leading or trailing hyphens', () => {
-      expect(isValidSlug('-abc')).toBe(false);
-      expect(isValidSlug('abc-')).toBe(false);
-      expect(isValidSlug('-abc-')).toBe(false);
-    });
-
-    it('rejects consecutive hyphens', () => {
-      expect(isValidSlug('abc--def')).toBe(false);
+    it('accepts underscores, periods, and hyphens', () => {
+      expect(isValidSlug('team_name')).toBe(true);
+      expect(isValidSlug('hello.world')).toBe(true);
+      expect(isValidSlug('abc-123_def.456')).toBe(true);
     });
 
     it('rejects special characters and spaces', () => {
       expect(isValidSlug('hello!')).toBe(false);
-      expect(isValidSlug('team_name')).toBe(false);
       expect(isValidSlug('team name')).toBe(false);
-      expect(isValidSlug('hello.world')).toBe(false);
       expect(isValidSlug('slug@domain')).toBe(false);
     });
   });
@@ -111,9 +105,12 @@ describe('isReservedSlug', () => {
 });
 
 describe('isValidUserSlug', () => {
-  it('accepts valid 4-24 character alphanumeric user slugs', () => {
+  it('accepts valid 4-24 character user slugs with periods, hyphens, and underscores', () => {
     expect(isValidUserSlug('abcd')).toBe(true);
     expect(isValidUserSlug('user123')).toBe(true);
+    expect(isValidUserSlug('user-slug')).toBe(true);
+    expect(isValidUserSlug('user_123')).toBe(true);
+    expect(isValidUserSlug('user.123')).toBe(true);
     expect(isValidUserSlug('a'.repeat(24))).toBe(true);
   });
 
@@ -122,10 +119,9 @@ describe('isValidUserSlug', () => {
     expect(isValidUserSlug('a'.repeat(25))).toBe(false);
   });
 
-  it('rejects hyphens, uppercase, and special chars for user slugs', () => {
-    expect(isValidUserSlug('user-slug')).toBe(false);
+  it('rejects uppercase and special chars for user slugs', () => {
     expect(isValidUserSlug('User123')).toBe(false);
-    expect(isValidUserSlug('user_123')).toBe(false);
+    expect(isValidUserSlug('user!')).toBe(false);
   });
 
   it('rejects reserved slugs for users', () => {
@@ -140,7 +136,7 @@ describe('slugify', () => {
     expect(slugify('  Hello   World  ')).toBe('hello-world');
     expect(slugify('Héllô Wörld 123')).toBe('hello-world-123');
     expect(slugify('---Hello---')).toBe('hello');
-    expect(slugify('foo__bar')).toBe('foo-bar');
+    expect(slugify('foo__bar')).toBe('foo__bar');
     expect(slugify('')).toBe('');
   });
 });

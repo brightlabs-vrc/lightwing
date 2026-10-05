@@ -15,6 +15,7 @@ import (
 
 // LeaderboardEntry represents one row on the overall leaderboard.
 type LeaderboardEntry struct {
+	Rank                   int      `json:"rank"`
 	UserID                 string   `json:"userId"`
 	Name                   string   `json:"name"`
 	Slug                   *string  `json:"slug"`
@@ -170,12 +171,59 @@ func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardR
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to calculate leaderboard"}
 	}
 
+	// Make a copy of entries to sort and assign global ranks before filtering
+	allEntries := make([]LeaderboardEntry, len(entries))
+	copy(allEntries, entries)
+
+	// Sort all entries according to sortBy criteria
+	sortBy := strings.TrimSpace(p.SortBy)
+	switch sortBy {
+	case "avgPosition":
+		// Best average position first (1.0 is better than 2.0). 0 means unplaced.
+		sort.SliceStable(allEntries, func(i, j int) bool {
+			pi := allEntries[i].AveragePosition
+			pj := allEntries[j].AveragePosition
+			if pi == 0 && pj == 0 {
+				return allEntries[i].TotalPoints > allEntries[j].TotalPoints
+			}
+			if pi == 0 {
+				return false
+			}
+			if pj == 0 {
+				return true
+			}
+			if pi == pj {
+				return allEntries[i].TotalPoints > allEntries[j].TotalPoints
+			}
+			return pi < pj
+		})
+	case "avgPointsPerSeason":
+		sort.SliceStable(allEntries, func(i, j int) bool {
+			if allEntries[i].AveragePointsPerSeason == allEntries[j].AveragePointsPerSeason {
+				return allEntries[i].TotalPoints > allEntries[j].TotalPoints
+			}
+			return allEntries[i].AveragePointsPerSeason > allEntries[j].AveragePointsPerSeason
+		})
+	default: // "points" or default
+		sort.SliceStable(allEntries, func(i, j int) bool {
+			if allEntries[i].TotalPoints == allEntries[j].TotalPoints {
+				return allEntries[i].AveragePosition < allEntries[j].AveragePosition
+			}
+			return allEntries[i].TotalPoints > allEntries[j].TotalPoints
+		})
+	}
+
+	// Assign global rank based on sorted overall standings
+	for i := range allEntries {
+		allEntries[i].Rank = i + 1
+	}
+
 	// Filter
-	filtered := make([]LeaderboardEntry, 0, len(entries))
+	filtered := make([]LeaderboardEntry, 0, len(allEntries))
 	searchLower := strings.ToLower(strings.TrimSpace(p.Search))
 	classTierUpper := strings.ToUpper(strings.TrimSpace(p.ClassTier))
 
-	for _, e := range entries {
+	for _, e := range allEntries {
 		if searchLower != "" {
 			nameMatch := strings.Contains(strings.ToLower(e.Name), searchLower)
 			slugMatch := e.Slug != nil && strings.Contains(strings.ToLower(*e.Slug), searchLower)
@@ -191,44 +239,6 @@ func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardR
 		}
 
 		filtered = append(filtered, e)
-	}
-
-	// Sort
-	sortBy := strings.TrimSpace(p.SortBy)
-	switch sortBy {
-	case "avgPosition":
-		// Best average position first (1.0 is better than 2.0). 0 means unplaced.
-		sort.SliceStable(filtered, func(i, j int) bool {
-			pi := filtered[i].AveragePosition
-			pj := filtered[j].AveragePosition
-			if pi == 0 && pj == 0 {
-				return filtered[i].TotalPoints > filtered[j].TotalPoints
-			}
-			if pi == 0 {
-				return false
-			}
-			if pj == 0 {
-				return true
-			}
-			if pi == pj {
-				return filtered[i].TotalPoints > filtered[j].TotalPoints
-			}
-			return pi < pj
-		})
-	case "avgPointsPerSeason":
-		sort.SliceStable(filtered, func(i, j int) bool {
-			if filtered[i].AveragePointsPerSeason == filtered[j].AveragePointsPerSeason {
-				return filtered[i].TotalPoints > filtered[j].TotalPoints
-			}
-			return filtered[i].AveragePointsPerSeason > filtered[j].AveragePointsPerSeason
-		})
-	default: // "points" or default
-		sort.SliceStable(filtered, func(i, j int) bool {
-			if filtered[i].TotalPoints == filtered[j].TotalPoints {
-				return filtered[i].AveragePosition < filtered[j].AveragePosition
-			}
-			return filtered[i].TotalPoints > filtered[j].TotalPoints
-		})
 	}
 
 	total := len(filtered)

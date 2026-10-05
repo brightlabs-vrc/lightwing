@@ -178,9 +178,9 @@ export function LeaderboardPage() {
             <table className="w-full text-left font-sans text-sm border-collapse">
               <thead>
                 <tr className="border-b-2 border-retro-border font-pixel text-xs text-retro-muted bg-retro-bg/60">
-                  <th className="p-3 w-16">RANK</th>
+                  <th className="p-3 w-20 text-center">RANK</th>
                   <th className="p-3">DRIVER</th>
-                  <th className="p-3 w-24">TIER</th>
+                  <th className="p-3 w-24 text-center">TIER</th>
                   <th className="p-3 text-right">TOTAL POINTS</th>
                   <th className="p-3 text-right">AVG POSITION</th>
                   <th className="p-3 text-right">AVG PTS / SEASON</th>
@@ -190,7 +190,7 @@ export function LeaderboardPage() {
               </thead>
               <tbody className="divide-y divide-retro-border">
                 {entries.map((e: LeaderboardEntry, idx: number) => {
-                  const globalRank = (page - 1) * pageSize + idx + 1
+                  const displayRank = e.rank || (page - 1) * pageSize + idx + 1
                   const targetSlug = e.slug || e.userId
 
                   return (
@@ -198,21 +198,24 @@ export function LeaderboardPage() {
                       key={e.userId}
                       className="hover:bg-retro-bg/50 transition-colors duration-150"
                     >
-                      <td className="p-3 font-pixel text-sm">
-                        {globalRank === 1 ? (
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-bold text-xs shadow">
-                            🥇 1
+                      <td className="p-3 font-pixel text-sm text-center">
+                        {displayRank === 1 ? (
+                          <span className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-bold text-xs shadow whitespace-nowrap">
+                            <span>🥇</span>
+                            <span>1</span>
                           </span>
-                        ) : globalRank === 2 ? (
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300 text-slate-900 font-bold text-xs shadow">
-                            🥈 2
+                        ) : displayRank === 2 ? (
+                          <span className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-full bg-slate-300 text-slate-900 font-bold text-xs shadow whitespace-nowrap">
+                            <span>🥈</span>
+                            <span>2</span>
                           </span>
-                        ) : globalRank === 3 ? (
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700 text-amber-100 font-bold text-xs shadow">
-                            🥉 3
+                        ) : displayRank === 3 ? (
+                          <span className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-full bg-amber-700 text-amber-100 font-bold text-xs shadow whitespace-nowrap">
+                            <span>🥉</span>
+                            <span>3</span>
                           </span>
                         ) : (
-                          <span className="text-retro-muted font-bold">#{globalRank}</span>
+                          <span className="text-retro-muted font-bold">#{displayRank}</span>
                         )}
                       </td>
 
@@ -229,7 +232,7 @@ export function LeaderboardPage() {
                         )}
                       </td>
 
-                      <td className="p-3">
+                      <td className="p-3 text-center">
                         {e.classTier ? (
                           <PixelBadge tone="purple">{e.classTier}</PixelBadge>
                         ) : (

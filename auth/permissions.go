@@ -104,11 +104,11 @@ func roleHasPermission(role string, resource Resource, action Action) bool {
 	return false
 }
 
-// validSlugRe matches team slug format: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-var validSlugRe = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+// validSlugRe matches team slug format: ^[a-z0-9._-]+$
+var validSlugRe = regexp.MustCompile(`^[a-z0-9._-]+$`)
 
-// userSlugRe matches user slug format: ^[a-z0-9]+$
-var userSlugRe = regexp.MustCompile(`^[a-z0-9]+$`)
+// userSlugRe matches user slug format: ^[a-z0-9._-]+$
+var userSlugRe = regexp.MustCompile(`^[a-z0-9._-]+$`)
 
 // RESERVED_SLUGS is the set of URL-path segments reserved by the frontend
 // router. These can never be used as user or team slugs.

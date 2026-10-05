@@ -2066,6 +2066,7 @@ export namespace teammanager {
     export interface TeamMemberSummary {
         userId: string
         name: string
+        slug?: string | null
         role: string
     }
 
@@ -2496,6 +2497,7 @@ type CallParameters = Omit<RequestInit, "method" | "body" | "headers"> & {
 
 export namespace scorecalc {
     export interface LeaderboardEntry {
+        rank: number
         userId: string
         name: string
         slug: string | null

@@ -35,9 +35,10 @@ type TeamStats struct {
 
 // TeamMemberSummary is a single membership with display name.
 type TeamMemberSummary struct {
-	UserID string `json:"userId"`
-	Name   string `json:"name"`
-	Role   string `json:"role"`
+	UserID string  `json:"userId"`
+	Name   string  `json:"name"`
+	Slug   *string `json:"slug"`
+	Role   string  `json:"role"`
 }
 
 // Team is a team with its members and aggregate statistics.
@@ -140,9 +141,15 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 		if m.Role == auth.AdministratorRole {
 			adminCount++
 		}
+		var slug *string
+		if m.Slug.Valid && m.Slug.String != "" {
+			s := m.Slug.String
+			slug = &s
+		}
 		summaries = append(summaries, TeamMemberSummary{
 			UserID: m.UserId,
 			Name:   displayName(m.Name, m.VrchatUsername),
+			Slug:   slug,
 			Role:   m.Role,
 		})
 	}

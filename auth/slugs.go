@@ -97,7 +97,7 @@ func replaceNonAlnum(s, rep string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '-' || r == '_' {
 			b.WriteRune(r)
 		} else {
 			b.WriteString(rep)
@@ -106,13 +106,13 @@ func replaceNonAlnum(s, rep string) string {
 	return b.String()
 }
 
-// toLowerAlnum converts to lowercase and strips non-alphanumeric chars.
+// toLowerAlnum converts to lowercase and keeps alphanumeric, periods, dashes, and underscores.
 func toLowerAlnum(s string) string {
 	var b strings.Builder
 	for _, r := range s {
 		if r >= 'A' && r <= 'Z' {
 			b.WriteRune(r + 32)
-		} else if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+		} else if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '-' || r == '_' {
 			b.WriteRune(r)
 		}
 	}
