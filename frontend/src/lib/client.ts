@@ -35,6 +35,7 @@ export default class Client {
     public readonly auth: auth.ServiceClient
     public readonly eventmanager: eventmanager.ServiceClient
     public readonly teammanager: teammanager.ServiceClient
+    public readonly scorecalc: scorecalc.ServiceClient
     private readonly options: ClientOptions
     private readonly target: string
 
@@ -52,6 +53,7 @@ export default class Client {
         this.auth = new auth.ServiceClient(base)
         this.eventmanager = new eventmanager.ServiceClient(base)
         this.teammanager = new teammanager.ServiceClient(base)
+        this.scorecalc = new scorecalc.ServiceClient(base)
     }
 
     /**
@@ -2451,6 +2453,66 @@ type CallParameters = Omit<RequestInit, "method" | "body" | "headers"> & {
     query?: Record<string, string | string[]>
 }
 
+
+export namespace scorecalc {
+    export interface LeaderboardEntry {
+        userId: string
+        name: string
+        slug: string | null
+        image: string | null
+        classTier: string | null
+        totalPoints: number
+        averagePosition: number
+        averagePointsPerSeason: number
+        eventsParticipated: number
+        racesParticipated: number
+        wins: number
+    }
+
+    export interface LeaderboardResponse {
+        entries: LeaderboardEntry[]
+        total: number
+        calculatedAt: string
+    }
+
+    export interface GetLeaderboardParams {
+        SortBy?: string
+        Search?: string
+        ClassTier?: string
+        Limit?: number
+        Offset?: number
+        ForceRecalculate?: boolean
+    }
+
+    export class ServiceClient {
+        private baseClient: BaseClient
+
+        constructor(baseClient: BaseClient) {
+            this.baseClient = baseClient
+            this.GetLeaderboard = this.GetLeaderboard.bind(this)
+            this.RecalculateLeaderboard = this.RecalculateLeaderboard.bind(this)
+        }
+
+        public async GetLeaderboard(params: GetLeaderboardParams): Promise<LeaderboardResponse> {
+            const query = makeRecord<string, string | string[]>({
+                sortBy: params.SortBy,
+                search: params.Search,
+                classTier: params.ClassTier,
+                limit: params.Limit !== undefined ? String(params.Limit) : undefined,
+                offset: params.Offset !== undefined ? String(params.Offset) : undefined,
+                forceRecalculate: params.ForceRecalculate !== undefined ? String(params.ForceRecalculate) : undefined,
+            })
+
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/leaderboard`, undefined, {query})
+            return await resp.json() as LeaderboardResponse
+        }
+
+        public async RecalculateLeaderboard(): Promise<LeaderboardResponse> {
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/leaderboard/recalculate`)
+            return await resp.json() as LeaderboardResponse
+        }
+    }
+}
 
 // A fetcher is the prototype for the inbuilt Fetch function
 export type Fetcher = typeof fetch;

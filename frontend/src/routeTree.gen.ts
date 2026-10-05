@@ -10,11 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as UserRouteImport } from './routes/$user'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as EventsIndexRouteImport } from './routes/events/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as UUserRouteImport } from './routes/u/$user'
+import { Route as TTeamRouteImport } from './routes/t/$team'
 import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
 import { Route as AdminEventsRouteImport } from './routes/admin/events'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
@@ -28,9 +32,19 @@ const OnboardingRoute = OnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserRoute = UserRouteImport.update({
+  id: '/$user',
+  path: '/$user',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -51,6 +65,16 @@ const EventsIndexRoute = EventsIndexRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UUserRoute = UUserRouteImport.update({
+  id: '/u/$user',
+  path: '/u/$user',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TTeamRoute = TTeamRouteImport.update({
+  id: '/t/$team',
+  path: '/t/$team',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsEventIdRoute = EventsEventIdRouteImport.update({
@@ -91,10 +115,14 @@ const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$user': typeof UserRoute
   '/auth': typeof AuthRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
+  '/t/$team': typeof TTeamRoute
+  '/u/$user': typeof UUserRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
   '/profile/': typeof ProfileIndexRoute
@@ -106,10 +134,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$user': typeof UserRoute
   '/auth': typeof AuthRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
+  '/t/$team': typeof TTeamRoute
+  '/u/$user': typeof UUserRoute
   '/admin': typeof AdminIndexRoute
   '/events': typeof EventsIndexRoute
   '/profile': typeof ProfileIndexRoute
@@ -122,10 +154,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$user': typeof UserRoute
   '/auth': typeof AuthRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/onboarding': typeof OnboardingRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
+  '/t/$team': typeof TTeamRoute
+  '/u/$user': typeof UUserRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
   '/profile/': typeof ProfileIndexRoute
@@ -139,10 +175,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$user'
     | '/auth'
+    | '/leaderboard'
     | '/onboarding'
     | '/admin/events'
     | '/events/$eventId'
+    | '/t/$team'
+    | '/u/$user'
     | '/admin/'
     | '/events/'
     | '/profile/'
@@ -154,10 +194,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$user'
     | '/auth'
+    | '/leaderboard'
     | '/onboarding'
     | '/admin/events'
     | '/events/$eventId'
+    | '/t/$team'
+    | '/u/$user'
     | '/admin'
     | '/events'
     | '/profile'
@@ -169,10 +213,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/$user'
     | '/auth'
+    | '/leaderboard'
     | '/onboarding'
     | '/admin/events'
     | '/events/$eventId'
+    | '/t/$team'
+    | '/u/$user'
     | '/admin/'
     | '/events/'
     | '/profile/'
@@ -185,10 +233,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  UserRoute: typeof UserRoute
   AuthRoute: typeof AuthRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   OnboardingRoute: typeof OnboardingRoute
   AdminEventsRoute: typeof AdminEventsRouteWithChildren
   EventsEventIdRoute: typeof EventsEventIdRoute
+  TTeamRoute: typeof TTeamRoute
+  UUserRoute: typeof UUserRoute
   AdminIndexRoute: typeof AdminIndexRoute
   EventsIndexRoute: typeof EventsIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
@@ -207,11 +259,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$user': {
+      id: '/$user'
+      path: '/$user'
+      fullPath: '/$user'
+      preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -240,6 +306,20 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$user': {
+      id: '/u/$user'
+      path: '/u/$user'
+      fullPath: '/u/$user'
+      preLoaderRoute: typeof UUserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$team': {
+      id: '/t/$team'
+      path: '/t/$team'
+      fullPath: '/t/$team'
+      preLoaderRoute: typeof TTeamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/$eventId': {
@@ -308,10 +388,14 @@ const AdminEventsRouteWithChildren = AdminEventsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  UserRoute: UserRoute,
   AuthRoute: AuthRoute,
+  LeaderboardRoute: LeaderboardRoute,
   OnboardingRoute: OnboardingRoute,
   AdminEventsRoute: AdminEventsRouteWithChildren,
   EventsEventIdRoute: EventsEventIdRoute,
+  TTeamRoute: TTeamRoute,
+  UUserRoute: UUserRoute,
   AdminIndexRoute: AdminIndexRoute,
   EventsIndexRoute: EventsIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
