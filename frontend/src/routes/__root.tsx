@@ -100,7 +100,6 @@ function RootLayout() {
 
                 {!loading && !session ? (
                   <PixelStack direction="row" gap={2} align="center">
-                    <PixelBadge tone="neutral">OFFLINE</PixelBadge>
                     <PixelButton asChild variant="solid" tone="purple" size="sm">
                       <Link to="/auth">SIGN IN</Link>
                     </PixelButton>
@@ -116,7 +115,7 @@ function RootLayout() {
         </main>
 
         <footer className="w-full px-6 pb-12 text-center font-pixel text-xs text-retro-muted border-t-2 border-retro-border pt-6">
-          Lightwing Prototype &copy; 2026, Umamusume Racing Society. All rights reserved. Neigh.
+          Project Lightwing &copy; 2026 is made with <3 by Bright Labs. Neigh.
         </footer>
       </div>
       <Suspense>
