@@ -500,7 +500,7 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 			EventID:         r.EventId,
 			EventName:       r.EventName,
 			EventTag:        r.EventTag,
-			EventScheduledAt: nullTime(r.EventScheduledAt),
+			EventScheduledAt: nullTime(timePtrFromNull(r.EventScheduledAt)),
 		})
 	}
 

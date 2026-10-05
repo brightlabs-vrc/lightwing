@@ -76,8 +76,11 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
         <PixelStack direction="row" gap={5} align="center" wrap justify="between">
           <PixelStack direction="row" gap={5} align="center" wrap>
             <img
-              src={user.image || `https://avatar.vercel.sh/${user.id}`}
+              src={user.image || '/fallback_avatar.jpg'}
               alt={displayName}
+              onError={(e) => {
+                e.currentTarget.src = '/fallback_avatar.jpg'
+              }}
               className="w-20 h-20 rounded-full border-4 border-retro-border bg-retro-bg object-cover shadow-md"
             />
             <PixelStack gap={1}>

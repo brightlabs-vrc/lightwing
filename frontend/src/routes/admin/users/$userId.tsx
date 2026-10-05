@@ -350,6 +350,9 @@ function AdminUserDetailPage() {
                               <img
                                 src={profile.image}
                                 alt={`${profile.name}'s Avatar`}
+                                onError={(e) => {
+                                  e.currentTarget.src = '/fallback_avatar.jpg'
+                                }}
                                 style={{
                                   width: '110px',
                                   height: '110px',

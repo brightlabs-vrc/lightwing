@@ -23,7 +23,7 @@ function UserHeaderDropdown({ session, signOutUser }: UserHeaderDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const displayName = session.user.vrchatUsername || session.user.name
-  const avatarUrl = session.user.image || `https://avatar.vercel.sh/${session.user.id}`
+  const avatarUrl = session.user.image || '/fallback_avatar.jpg'
   const userSlug = session.user.slug || session.user.id
 
   useEffect(() => {
@@ -49,6 +49,9 @@ function UserHeaderDropdown({ session, signOutUser }: UserHeaderDropdownProps) {
         <img
           src={avatarUrl}
           alt={displayName}
+          onError={(e) => {
+            e.currentTarget.src = '/fallback_avatar.jpg'
+          }}
           className="w-8 h-8 rounded-full object-cover"
         />
       </button>
