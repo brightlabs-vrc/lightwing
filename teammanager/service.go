@@ -182,21 +182,32 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 	var totalPointsSum float64
 	var avgPosSum float64
 	var avgPtsPerEventSum float64
+	activeMembersWithPoints := 0
+	activeMembersWithEvents := 0
 	validPosMembers := 0
 
 	for _, s := range stats {
-		totalPointsSum += float64(s.TotalPoints)
+		if s.TotalPoints > 0 {
+			totalPointsSum += float64(s.TotalPoints)
+			activeMembersWithPoints++
+		}
 		if s.AvgPosition > 0 {
 			avgPosSum += s.AvgPosition
 			validPosMembers++
 		}
 		if s.EventsParticipated > 0 {
 			avgPtsPerEventSum += float64(s.TotalPoints) / float64(s.EventsParticipated)
+			activeMembersWithEvents++
 		}
 	}
 
 	memberCount := float64(len(stats))
-	ptsAvg := totalPointsSum / memberCount
+
+	var ptsAvg *float64
+	if activeMembersWithPoints > 0 {
+		avg := totalPointsSum / memberCount
+		ptsAvg = &avg
+	}
 
 	var rankAvg *float64
 	if validPosMembers > 0 {
@@ -205,14 +216,14 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 	}
 
 	var ptsPerEventAvg *float64
-	if memberCount > 0 {
+	if activeMembersWithEvents > 0 {
 		avg := avgPtsPerEventSum / memberCount
 		ptsPerEventAvg = &avg
 	}
 
 	return TeamStats{
 		RankingAverage:        rankAvg,
-		PointsAverage:         &ptsAvg,
+		PointsAverage:         ptsAvg,
 		SeasonRank:            nil,
 		AveragePointsPerEvent: ptsPerEventAvg,
 	}, nil
