@@ -818,3 +818,59 @@ export async function getPublicTeamProfile(teamOrSlug: string): Promise<teammana
     ],
   }
 }
+
+export async function getUserRaceRecords(
+  userId: string,
+  limit?: number,
+  offset?: number,
+): Promise<eventmanager.ListUserRaceRecordsResponse> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.GetUserRaceRecords({
+      userId,
+      Limit: limit ?? 10,
+      Offset: offset ?? 0,
+    })
+  }
+
+  const mockRecords: eventmanager.UserRaceRecordView[] = [
+    {
+      resultId: 'res_mock_001',
+      position: 1,
+      points: 10,
+      finishTime: '1:08.5',
+      resultStatus: null,
+      resultCreatedAt: now,
+      raceId: 'race_mock_001',
+      raceName: 'Summer Sprint Turf',
+      raceSequence: 1,
+      raceGrade: 'OP',
+      eventId: 'evt_mock_001',
+      eventName: 'Summer Sprint Invitational',
+      eventTag: 'OFFICIAL',
+      eventScheduledAt: now,
+    },
+    {
+      resultId: 'res_mock_004',
+      position: null,
+      points: 0,
+      finishTime: null,
+      resultStatus: 'DEFERRED',
+      resultCreatedAt: now,
+      raceId: 'race_mock_002',
+      raceName: 'Summer Sprint Dirt',
+      raceSequence: 2,
+      raceGrade: 'OP',
+      eventId: 'evt_mock_001',
+      eventName: 'Summer Sprint Invitational',
+      eventTag: 'OFFICIAL',
+      eventScheduledAt: now,
+    },
+  ]
+
+  const total = mockRecords.length
+  const sliced = mockRecords.slice(offset ?? 0, (offset ?? 0) + (limit ?? 10))
+  return {
+    records: sliced,
+    total,
+  }
+}

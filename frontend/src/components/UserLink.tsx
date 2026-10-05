@@ -34,10 +34,12 @@ export const UserLink: React.FC<UserLinkProps> = ({
       )
     }
 
-    const targetPath = slug ? `/${slug}` : `/u/${userId}`
+    // Always resolve to slug path /:user if slug exists, otherwise fallback to /:user with userId
+    const targetSlug = slug || userId
     return (
       <Link
-        to={targetPath}
+        to="/$user"
+        params={{ user: targetSlug }}
         className={`text-retro-primary hover:underline font-bold ${className}`}
         style={style}
       >

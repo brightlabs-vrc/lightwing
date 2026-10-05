@@ -191,7 +191,7 @@ export function LeaderboardPage() {
               <tbody className="divide-y divide-retro-border">
                 {entries.map((e: LeaderboardEntry, idx: number) => {
                   const globalRank = (page - 1) * pageSize + idx + 1
-                  const profilePath = e.slug ? `/${e.slug}` : `/u/${e.userId}`
+                  const targetSlug = e.slug || e.userId
 
                   return (
                     <tr
@@ -218,7 +218,8 @@ export function LeaderboardPage() {
 
                       <td className="p-3">
                         <Link
-                          to={profilePath}
+                          to="/$user"
+                          params={{ user: targetSlug }}
                           className="font-pixel text-sm text-retro-primary hover:underline font-bold"
                         >
                           {e.name}

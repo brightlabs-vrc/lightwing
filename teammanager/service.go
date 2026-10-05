@@ -170,6 +170,54 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 	}
 }
 
+func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
+	stats, err := q().GetTeamMembersLeaderboardStats(ctx, teamID)
+	if err != nil {
+		return TeamStats{}, err
+	}
+	if len(stats) == 0 {
+		return TeamStats{}, nil
+	}
+
+	var totalPointsSum float64
+	var avgPosSum float64
+	var avgPtsPerEventSum float64
+	validPosMembers := 0
+
+	for _, s := range stats {
+		totalPointsSum += float64(s.TotalPoints)
+		if s.AvgPosition > 0 {
+			avgPosSum += s.AvgPosition
+			validPosMembers++
+		}
+		if s.EventsParticipated > 0 {
+			avgPtsPerEventSum += float64(s.TotalPoints) / float64(s.EventsParticipated)
+		}
+	}
+
+	memberCount := float64(len(stats))
+	ptsAvg := totalPointsSum / memberCount
+
+	var rankAvg *float64
+	if validPosMembers > 0 {
+		avg := avgPosSum / float64(validPosMembers)
+		rankAvg = &avg
+	}
+
+	var ptsPerEventAvg *float64
+	if memberCount > 0 {
+		avg := avgPtsPerEventSum / memberCount
+		ptsPerEventAvg = &avg
+	}
+
+	return TeamStats{
+		RankingAverage:        rankAvg,
+		PointsAverage:         &ptsAvg,
+		SeasonRank:            nil,
+		AveragePointsPerEvent: ptsPerEventAvg,
+	}, nil
+}
+
 func loadTeam(ctx context.Context, id string) (*Team, error) {
 	row, err := q().GetOrgByID(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -182,7 +230,21 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 	if err != nil {
 		return nil, err
 	}
-	return toTeam(toOrg(row), members), nil
+	t := toTeam(toOrg(row), members)
+	computedStats, err := computeTeamStats(ctx, id)
+	if err == nil {
+		// Override stats with dynamically calculated averages
+		if computedStats.RankingAverage != nil {
+			t.Stats.RankingAverage = computedStats.RankingAverage
+		}
+		if computedStats.PointsAverage != nil {
+			t.Stats.PointsAverage = computedStats.PointsAverage
+		}
+		if computedStats.AveragePointsPerEvent != nil {
+			t.Stats.AveragePointsPerEvent = computedStats.AveragePointsPerEvent
+		}
+	}
+	return t, nil
 }
 
 func touchOrg(ctx context.Context, id string) error {

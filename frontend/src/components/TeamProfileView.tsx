@@ -20,35 +20,29 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
     <PixelContainer maxWidth="full" padding="md">
       {/* Header Card */}
       <PixelCard className="bg-retro-surface mb-8 border-2 border-retro-border-strong">
-        <PixelStack direction="row" gap={6} align="center" wrap justify="between">
-          <PixelStack direction="row" gap={5} align="center" wrap>
-            {team.logo ? (
-              <img
-                src={team.logo}
-                alt={team.name}
-                className="w-20 h-20 rounded border-2 border-retro-border bg-retro-bg object-cover shadow"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-2xl font-bold flex items-center justify-center">
-                {team.name.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-            <PixelStack gap={1}>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-pixel text-retro-text tracking-wide font-bold">
-                  {team.name}
-                </h1>
-                <PixelBadge tone="purple">TEAM ORGANIZATION</PixelBadge>
-              </div>
-              <div className="font-sans text-sm text-retro-muted font-semibold">
-                @{team.slug}
-              </div>
-            </PixelStack>
+        <PixelStack direction="row" gap={5} align="center" wrap>
+          {team.logo ? (
+            <img
+              src={team.logo}
+              alt={team.name}
+              className="w-20 h-20 rounded border-2 border-retro-border bg-retro-bg object-cover shadow"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-2xl font-bold flex items-center justify-center">
+              {team.name.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <PixelStack gap={1}>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-pixel text-retro-text tracking-wide font-bold">
+                {team.name}
+              </h1>
+              <PixelBadge tone="purple">TEAM ORGANIZATION</PixelBadge>
+            </div>
+            <div className="font-sans text-sm text-retro-muted font-semibold">
+              @{team.slug}
+            </div>
           </PixelStack>
-
-          <PixelButton asChild variant="soft" tone="neutral" size="sm">
-            <Link to="/leaderboard">BACK TO LEADERBOARD</Link>
-          </PixelButton>
         </PixelStack>
       </PixelCard>
 

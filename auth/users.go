@@ -17,10 +17,11 @@ import (
 //
 // Mirrors ts-legacy/auth/users.ts TeamAffiliation
 type TeamAffiliation struct {
-	OrganizationID   string `json:"organizationId"`
-	Name             string `json:"name"`
-	Slug             string `json:"slug"`
-	Role             string `json:"role"`
+	OrganizationID   string  `json:"organizationId"`
+	Name             string  `json:"name"`
+	Slug             string  `json:"slug"`
+	Logo             *string `json:"logo"`
+	Role             string  `json:"role"`
 }
 
 // UserProfile is the public representation of a user, as returned by
@@ -108,10 +109,16 @@ func loadTeamsForUsers(ctx context.Context, userIDs []string) (map[string][]Team
 
 	teamsByUser := make(map[string][]TeamAffiliation)
 	for _, a := range affils {
+		var logo *string
+		if a.Logo.Valid && a.Logo.String != "" {
+			l := a.Logo.String
+			logo = &l
+		}
 		teamsByUser[a.UserId] = append(teamsByUser[a.UserId], TeamAffiliation{
 			OrganizationID: a.ID,
 			Name:           a.Name,
 			Slug:           a.Slug,
+			Logo:           logo,
 			Role:           a.Role,
 		})
 	}

@@ -27,7 +27,6 @@ function ProfilePage() {
   const { session } = useAuth()
   const { toast } = useToast()
   const [biography, setBiography] = useState('')
-  const [careerOverview, setCareerOverview] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
   const [slug, setSlug] = useState('')
 
@@ -41,19 +40,17 @@ function ProfilePage() {
   useEffect(() => {
     if (profile) {
       setBiography(profile.biography ?? '')
-      setCareerOverview(profile.careerOverview ?? '')
       setVrchatUsername(profile.vrchatUsername ?? '')
       setSlug(profile.slug ?? '')
     }
   }, [profile])
 
   const updateMutation = useMutation({
-    mutationFn: (data: { biography: string; careerOverview: string; vrchatUsername: string; slug: string }) =>
+    mutationFn: (data: { biography: string; vrchatUsername: string; slug: string }) =>
       updateMyProfile(
         session?.user.id ?? '',
         {
           biography: data.biography || null,
-          careerOverview: data.careerOverview || null,
           vrchatUsername: data.vrchatUsername || null,
           slug: data.slug || undefined,
         },
@@ -100,14 +97,6 @@ function ProfilePage() {
             placeholder="Tell us about yourself..."
           />
 
-          <PixelTextarea
-            label="CAREER OVERVIEW"
-            rows={3}
-            value={careerOverview}
-            onChange={(e) => setCareerOverview(e.target.value)}
-            placeholder="Summarize your competitive career..."
-          />
-
           <PixelInput
             label="VRCHAT USERNAME"
             placeholder="e.g. user123"
@@ -131,7 +120,7 @@ function ProfilePage() {
                 toast({ tone: 'red', title: 'Slug must contain only lowercase letters and numbers.' })
                 return
               }
-              updateMutation.mutate({ biography, careerOverview, vrchatUsername, slug: trimmedSlug })
+              updateMutation.mutate({ biography, vrchatUsername, slug: trimmedSlug })
             }}
           >
             {updateMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}

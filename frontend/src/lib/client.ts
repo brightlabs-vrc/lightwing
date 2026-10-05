@@ -173,6 +173,7 @@ export namespace auth {
         organizationId: string
         name: string
         slug: string
+        logo?: string | null
         role: string
     }
 
@@ -981,6 +982,34 @@ export namespace eventmanager {
         results: RaceResultView[]
     }
 
+    export interface UserRaceRecordView {
+        resultId: string
+        position?: number | null
+        points: number
+        finishTime?: string | null
+        resultStatus?: string | null
+        resultCreatedAt: string
+        raceId: string
+        raceName: string
+        raceSequence: number
+        raceGrade?: string | null
+        eventId: string
+        eventName: string
+        eventTag: string
+        eventScheduledAt?: string | null
+    }
+
+    export interface ListUserRaceRecordsParams {
+        userId: string
+        Limit: number
+        Offset: number
+    }
+
+    export interface ListUserRaceRecordsResponse {
+        records: UserRaceRecordView[]
+        total: number
+    }
+
     /**
      * RecomputePointsRequest mirrors RecomputePointsParams.
      */
@@ -1184,6 +1213,7 @@ export namespace eventmanager {
             this.ListEventAdmins = this.ListEventAdmins.bind(this)
             this.ListEvents = this.ListEvents.bind(this)
             this.ListPublicEvents = this.ListPublicEvents.bind(this)
+            this.GetUserRaceRecords = this.GetUserRaceRecords.bind(this)
             this.ListRaceEventMembers = this.ListRaceEventMembers.bind(this)
             this.ListRaceEvents = this.ListRaceEvents.bind(this)
             this.ListRaceResults = this.ListRaceResults.bind(this)
@@ -1595,6 +1625,16 @@ export namespace eventmanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/api/race-events-list`, undefined, {query})
             return await resp.json() as ReorderRaceEventsResponse
+        }
+
+        public async GetUserRaceRecords(params: ListUserRaceRecordsParams): Promise<ListUserRaceRecordsResponse> {
+            const query = makeRecord<string, string | string[]>({
+                limit:  String(params.Limit),
+                offset: String(params.Offset),
+            })
+
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/users/${encodeURIComponent(params.userId)}/race-records`, undefined, {query})
+            return await resp.json() as ListUserRaceRecordsResponse
         }
 
         public async ListRaceResults(params: RaceResultsQuery): Promise<RaceResultsResponse> {
