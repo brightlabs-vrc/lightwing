@@ -115,7 +115,7 @@ function RootLayout() {
         </main>
 
         <footer className="w-full px-6 pb-12 text-center font-pixel text-xs text-retro-muted border-t-2 border-retro-border pt-6">
-          Project Lightwing &copy; 2026 is made with <3 by Bright Labs. Neigh.
+          Project Lightwing &copy; 2026 is made with {'<3'} by Bright Labs. Neigh.
         </footer>
       </div>
       <Suspense>
