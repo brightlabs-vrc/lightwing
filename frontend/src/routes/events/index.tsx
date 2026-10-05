@@ -134,6 +134,11 @@ function EventsPage() {
                           <h2 className="text-xl font-pixel tracking-wide text-retro-text">
                             {event.name}
                           </h2>
+                          {event.ownerName && (
+                            <div className="font-pixel text-[11px] text-retro-primary">
+                              ORGANIZER: {event.ownerName.toUpperCase()}
+                            </div>
+                          )}
                           {event.scheduledAt && (
                             <div className="font-pixel text-[11px] text-retro-gold">
                               SCHEDULED: {formatLocalDateTime(event.scheduledAt)}
