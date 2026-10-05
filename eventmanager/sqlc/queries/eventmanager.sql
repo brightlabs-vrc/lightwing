@@ -121,8 +121,12 @@ SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1);
 
 -- Full event row (replaces eventColumns scans).
 -- name: GetEventRow :one
-SELECT id, name, description, "ownerType", "organizationId", "ownerUserId", status, tag, "deletedAt", "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction", "granularParticipation", "signupsLocked", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations", "createdAt", "updatedAt"
-FROM "event" WHERE id = $1;
+SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+FROM "event" e
+LEFT JOIN "organization" o ON e."organizationId" = o.id
+LEFT JOIN "user" u ON e."ownerUserId" = u.id
+WHERE e.id = $1;
 
 -- Full race row (replaces raceEventColumns scans).
 -- name: GetRaceEventRow :one
@@ -175,8 +179,11 @@ e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granul
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
-(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id)
+(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
 FROM "event" e
+LEFT JOIN "organization" o ON e."organizationId" = o.id
+LEFT JOIN "user" u ON e."ownerUserId" = u.id
 WHERE ($1::text = '' OR e."organizationId" = $1)
   AND ($2::text = '' OR e."classRestriction"::text = $2)
   AND ($3::text = '' OR e.tag = $3)
@@ -196,8 +203,11 @@ e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granul
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
-(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id)
+(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
 FROM "event" e
+LEFT JOIN "organization" o ON e."organizationId" = o.id
+LEFT JOIN "user" u ON e."ownerUserId" = u.id
 WHERE e.status IN ('PENDING','ONGOING','CONCLUDED')
 ORDER BY e."createdAt" DESC LIMIT $1::int OFFSET $2::int;
 

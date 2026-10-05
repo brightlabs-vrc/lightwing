@@ -451,8 +451,12 @@ func (q *Queries) GetEventMemberCount(ctx context.Context, eventid string) (int6
 }
 
 const getEventRow = `-- name: GetEventRow :one
-SELECT id, name, description, "ownerType", "organizationId", "ownerUserId", status, tag, "deletedAt", "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction", "granularParticipation", "signupsLocked", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations", "createdAt", "updatedAt"
-FROM "event" WHERE id = $1
+SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+FROM "event" e
+LEFT JOIN "organization" o ON e."organizationId" = o.id
+LEFT JOIN "user" u ON e."ownerUserId" = u.id
+WHERE e.id = $1
 `
 
 type GetEventRowRow struct {
@@ -476,6 +480,7 @@ type GetEventRowRow struct {
 	MaxConcurrentRaceParticipations sql.NullInt32
 	CreatedAt                       time.Time
 	UpdatedAt                       time.Time
+	OwnerName                       sql.NullString
 }
 
 // Full event row (replaces eventColumns scans).
@@ -503,6 +508,7 @@ func (q *Queries) GetEventRow(ctx context.Context, id string) (GetEventRowRow, e
 		&i.MaxConcurrentRaceParticipations,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerName,
 	)
 	return i, err
 }
@@ -1330,8 +1336,11 @@ e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granul
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
-(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id)
+(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
 FROM "event" e
+LEFT JOIN "organization" o ON e."organizationId" = o.id
+LEFT JOIN "user" u ON e."ownerUserId" = u.id
 WHERE ($1::text = '' OR e."organizationId" = $1)
   AND ($2::text = '' OR e."classRestriction"::text = $2)
   AND ($3::text = '' OR e.tag = $3)
@@ -1372,6 +1381,7 @@ type ListEventsRow struct {
 	UpdatedAt                       time.Time
 	Count                           int64
 	Count_2                         int64
+	OwnerName                       sql.NullString
 }
 
 // Event list page with optional filters (empty means absent).
@@ -1413,6 +1423,7 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListE
 			&i.UpdatedAt,
 			&i.Count,
 			&i.Count_2,
+			&i.OwnerName,
 		); err != nil {
 			return nil, err
 		}
@@ -1512,8 +1523,11 @@ e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granul
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
-(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id)
+(SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
 FROM "event" e
+LEFT JOIN "organization" o ON e."organizationId" = o.id
+LEFT JOIN "user" u ON e."ownerUserId" = u.id
 WHERE e.status IN ('PENDING','ONGOING','CONCLUDED')
 ORDER BY e."createdAt" DESC LIMIT $1::int OFFSET $2::int
 `
@@ -1544,6 +1558,7 @@ type ListPublicEventsRow struct {
 	UpdatedAt                       time.Time
 	Count                           int64
 	Count_2                         int64
+	OwnerName                       sql.NullString
 }
 
 // Public event list page.
@@ -1577,6 +1592,7 @@ func (q *Queries) ListPublicEvents(ctx context.Context, arg ListPublicEventsPara
 			&i.UpdatedAt,
 			&i.Count,
 			&i.Count_2,
+			&i.OwnerName,
 		); err != nil {
 			return nil, err
 		}

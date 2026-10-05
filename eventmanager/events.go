@@ -63,6 +63,7 @@ type EventListItem struct {
 	OwnerType                       string  `json:"ownerType"`
 	OrganizationID                  *string `json:"organizationId"`
 	OwnerUserID                     *string `json:"ownerUserId"`
+	OwnerName                       *string `json:"ownerName"`
 	Status                          string  `json:"status"`
 	Tag                             string  `json:"tag"`
 	DeletedAt                       *string `json:"deletedAt,omitempty"`
@@ -147,6 +148,7 @@ type EventDetail struct {
 	OwnerType                       string             `json:"ownerType"`
 	OrganizationID                  *string            `json:"organizationId"`
 	OwnerUserID                     *string            `json:"ownerUserId"`
+	OwnerName                       *string            `json:"ownerName"`
 	Status                          string             `json:"status"`
 	Tag                             string             `json:"tag"`
 	DeletedAt                       *string            `json:"deletedAt,omitempty"`
@@ -223,6 +225,7 @@ type eventRow struct {
 	OwnerType                       string
 	OrganizationID                  sql.NullString
 	OwnerUserID                     sql.NullString
+	OwnerName                       sql.NullString
 	Status                          string
 	Tag                             string
 	DeletedAt                       *time.Time
@@ -249,6 +252,7 @@ func toEventRow(r sqlc.GetEventRowRow) *eventRow {
 		ID: r.ID, Name: r.Name, Description: r.Description,
 		OwnerType: stringFromAny(r.OwnerType),
 		OrganizationID: r.OrganizationId, OwnerUserID: r.OwnerUserId,
+		OwnerName: r.OwnerName,
 		Status: r.Status, Tag: r.Tag, DeletedAt: timePtrFromNull(r.DeletedAt),
 		ScoringType: int(r.ScoringType), ScoringRulesMode: r.ScoringRulesMode,
 		CustomScoringTables: customTables,
@@ -413,7 +417,8 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 	return &EventDetail{
 		ID: e.ID, Name: e.Name, Description: nullString(e.Description),
 		OwnerType: e.OwnerType, OrganizationID: nullString(e.OrganizationID),
-		OwnerUserID: nullString(e.OwnerUserID), Status: e.Status, Tag: e.Tag,
+		OwnerUserID: nullString(e.OwnerUserID), OwnerName: nullString(e.OwnerName),
+		Status: e.Status, Tag: e.Tag,
 		DeletedAt: nullTime(e.DeletedAt),
 		ScoringType: e.ScoringType, ScoringTypeLabel: scoringLabel(e.ScoringType),
 		ScoringRulesMode: nullString(e.ScoringRulesMode), CustomScoringTables: customTables,
@@ -682,6 +687,7 @@ func toListItem(r sqlc.ListEventsRow) EventListItem {
 		OwnerType: stringFromAny(r.OwnerType),
 		OrganizationID: nullString(r.OrganizationId),
 		OwnerUserID: nullString(r.OwnerUserId),
+		OwnerName: nullString(r.OwnerName),
 		Status: r.Status, Tag: r.Tag, DeletedAt: nullTime(timePtrFromNull(r.DeletedAt)),
 		ScoringType: int(r.ScoringType), ScoringTypeLabel: scoringLabel(int(r.ScoringType)),
 		ClassRestriction: classTierPtr(nullStringFromAny(r.ClassRestriction)),
@@ -707,6 +713,7 @@ func toPublicListItem(r sqlc.ListPublicEventsRow) sqlc.ListEventsRow {
 		MaxConcurrentRaceParticipations: r.MaxConcurrentRaceParticipations,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Count: r.Count, Count_2: r.Count_2,
+		OwnerName: r.OwnerName,
 	}
 }
 

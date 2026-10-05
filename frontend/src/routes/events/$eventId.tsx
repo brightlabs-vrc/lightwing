@@ -220,6 +220,11 @@ function EventDetailPage() {
           <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
             <PixelStack gap={1}>
               <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">{event.name}</h1>
+              {event.ownerName && (
+                <div className="font-pixel text-xs text-retro-primary">
+                  ORGANIZER: {event.ownerName.toUpperCase()}
+                </div>
+              )}
               {event.scheduledAt && (
                 <div className="font-pixel text-xs text-retro-gold">
                   SCHEDULED: <time dateTime={event.scheduledAt}>{formatLocalDateTime(event.scheduledAt)}</time>
