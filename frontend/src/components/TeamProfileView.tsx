@@ -104,7 +104,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                 team.members.map((m) => (
                   <tr key={m.userId} className="hover:bg-retro-surface/50 transition-colors">
                     <td className="p-3">
-                      <UserLink userId={m.userId} name={m.name} />
+                      <UserLink userId={m.userId} name={m.name} slug={m.slug} />
                     </td>
                     <td className="p-3 text-right">
                       <PixelBadge tone={m.role === 'ADMINISTRATOR' ? 'purple' : 'neutral'}>

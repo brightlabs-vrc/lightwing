@@ -5,13 +5,25 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"encore.dev/beta/errs"
+	"encore.dev/storage/cache"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/scorecalc"
+	"encore.app/shared"
 )
+
+type userRaceRecordsCacheKey struct {
+	Key string
+}
+
+var userRaceRecordsCache = cache.NewStructKeyspace[userRaceRecordsCacheKey, ListUserRaceRecordsResponse](shared.Cache, cache.KeyspaceConfig{
+	KeyPattern:    "user_records/:Key",
+	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
+})
 
 // Per-race results. Event admins assign points to participants on a specific
 // race event; the event-level aggregate is recomputed by scorecalc.
@@ -515,7 +527,20 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 //encore:api public method=GET path=/api/users/:userId/race-records
 func GetUserRaceRecords(ctx context.Context, userId string, p *ListUserRaceRecordsParams) (*ListUserRaceRecordsResponse, error) {
 	p.UserID = userId
-	return ListUserRaceRecordsCore(ctx, p)
+	cacheKey := fmt.Sprintf("%s:%d:%d", userId, p.Limit, p.Offset)
+	if userRaceRecordsCache != nil {
+		if cached, err := userRaceRecordsCache.Get(ctx, userRaceRecordsCacheKey{Key: cacheKey}); err == nil {
+			return &cached, nil
+		}
+	}
+	res, err := ListUserRaceRecordsCore(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	if userRaceRecordsCache != nil {
+		_ = userRaceRecordsCache.Set(ctx, userRaceRecordsCacheKey{Key: cacheKey}, *res)
+	}
+	return res, nil
 }
 
 // --- Auto-deferral ---

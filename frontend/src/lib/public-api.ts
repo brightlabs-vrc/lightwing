@@ -691,6 +691,7 @@ export async function getLeaderboard(
 
   const mockEntries: LeaderboardEntry[] = [
     {
+      rank: 1,
       userId: 'mock-user-1',
       name: 'Thunder Bolt',
       slug: 'thunder-bolt',
@@ -704,6 +705,7 @@ export async function getLeaderboard(
       wins: 3,
     },
     {
+      rank: 2,
       userId: 'mock-user-2',
       name: 'Shadow Runner',
       slug: 'shadow-runner',
@@ -717,6 +719,7 @@ export async function getLeaderboard(
       wins: 1,
     },
     {
+      rank: 3,
       userId: 'mock-admin-1',
       name: 'Mock Admin',
       slug: 'mock-admin',
