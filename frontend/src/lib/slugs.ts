@@ -30,7 +30,7 @@ export function isValidSlug(slug: string): boolean {
   if (slug.length < 3 || slug.length > 24) {
     return false;
   }
-  if (!/^[a-z0-9._-]+$/.test(slug)) {
+  if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(slug)) {
     return false;
   }
   if (isReservedSlug(slug)) {
@@ -46,7 +46,7 @@ export function isValidUserSlug(slug: string): boolean {
   if (slug.length < 4 || slug.length > 24) {
     return false;
   }
-  if (!/^[a-z0-9._-]+$/.test(slug)) {
+  if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(slug)) {
     return false;
   }
   if (isReservedSlug(slug)) {
@@ -56,13 +56,13 @@ export function isValidUserSlug(slug: string): boolean {
 }
 
 /**
- * Normalizes a string into a URL-friendly slug (lowercase, preserving alphanumeric, periods, dashes, and underscores).
+ * Normalizes a string into a URL-friendly slug (lowercase, hyphen-separated).
  */
 export function slugify(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }

@@ -2,6 +2,7 @@ package scorecalc
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"strings"
 	"sync"
@@ -142,6 +143,12 @@ func CalculateAndCacheLeaderboard(ctx context.Context) ([]LeaderboardEntry, time
 	inMemoryLeaderboard = data
 	inMemoryLeaderboardMu.Unlock()
 
+	if leaderboardCache != nil {
+		if b, err := json.Marshal(data); err == nil {
+			_ = leaderboardCache.Set(ctx, leaderboardCacheKey{ID: "global"}, leaderboardCacheValue{DataJSON: string(b)})
+		}
+	}
+
 	rlog.Info("Successfully calculated and cached global leaderboard")
 	return entries, now, nil
 }
@@ -156,6 +163,18 @@ func getLeaderboardData(ctx context.Context, forceRecalculate bool) ([]Leaderboa
 			return entries, ts, nil
 		}
 		inMemoryLeaderboardMu.RUnlock()
+
+		if leaderboardCache != nil {
+			if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: "global"}); err == nil && val.DataJSON != "" {
+				var cached cachedLeaderboardData
+				if err := json.Unmarshal([]byte(val.DataJSON), &cached); err == nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
+					inMemoryLeaderboardMu.Lock()
+					inMemoryLeaderboard = &cached
+					inMemoryLeaderboardMu.Unlock()
+					return cached.Entries, cached.CalculatedAt, nil
+				}
+			}
+		}
 	}
 
 	return CalculateAndCacheLeaderboard(ctx)

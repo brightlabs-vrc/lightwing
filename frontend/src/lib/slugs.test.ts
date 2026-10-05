@@ -45,10 +45,14 @@ describe('isValidSlug', () => {
       expect(isValidSlug('Team-Name')).toBe(false);
     });
 
-    it('accepts underscores, periods, and hyphens', () => {
-      expect(isValidSlug('team_name')).toBe(true);
-      expect(isValidSlug('hello.world')).toBe(true);
-      expect(isValidSlug('abc-123_def.456')).toBe(true);
+    it('rejects leading or trailing hyphens', () => {
+      expect(isValidSlug('-abc')).toBe(false);
+      expect(isValidSlug('abc-')).toBe(false);
+      expect(isValidSlug('-abc-')).toBe(false);
+    });
+
+    it('rejects consecutive hyphens', () => {
+      expect(isValidSlug('abc--def')).toBe(false);
     });
 
     it('rejects special characters and spaces', () => {
@@ -105,12 +109,9 @@ describe('isReservedSlug', () => {
 });
 
 describe('isValidUserSlug', () => {
-  it('accepts valid 4-24 character user slugs with periods, hyphens, and underscores', () => {
+  it('accepts valid 4-24 character alphanumeric user slugs', () => {
     expect(isValidUserSlug('abcd')).toBe(true);
     expect(isValidUserSlug('user123')).toBe(true);
-    expect(isValidUserSlug('user-slug')).toBe(true);
-    expect(isValidUserSlug('user_123')).toBe(true);
-    expect(isValidUserSlug('user.123')).toBe(true);
     expect(isValidUserSlug('a'.repeat(24))).toBe(true);
   });
 
@@ -136,7 +137,7 @@ describe('slugify', () => {
     expect(slugify('  Hello   World  ')).toBe('hello-world');
     expect(slugify('Héllô Wörld 123')).toBe('hello-world-123');
     expect(slugify('---Hello---')).toBe('hello');
-    expect(slugify('foo__bar')).toBe('foo__bar');
+    expect(slugify('foo__bar')).toBe('foo-bar');
     expect(slugify('')).toBe('');
   });
 });

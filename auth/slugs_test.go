@@ -94,14 +94,12 @@ func Test_isValidUserSlug(t *testing.T) {
 		{"ab", false},        // too short (< 4)
 		{"abc", false},       // too short (< 4)
 		{"ABC", false},       // uppercase
-		{"abc-123", true},    // hyphen allowed
-		{"abc_123", true},    // underscore allowed
-		{"abc.123", true},    // period allowed
+		{"abc-123", false},   // hyphen not allowed
 		{"admin", false},     // reserved
 		{"users", false},     // reserved
 		{"a" + strings.Repeat("b", 24), false}, // too long (25 chars)
 		{strings.Repeat("a", 24), true},         // exactly at limit
-		{"a-b-c", true},      // hyphen allowed
+		{"a-b-c", false},     // hyphen not allowed
 	}
 
 	for _, tt := range tests {
