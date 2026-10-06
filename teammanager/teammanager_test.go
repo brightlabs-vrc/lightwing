@@ -45,7 +45,8 @@ func insertTestUser(t *testing.T, ctx context.Context, id, name, siteRole string
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", biography, "vrchatUsername", slug, "createdAt", "updatedAt")
-		 VALUES ($1, $2, $3, '', $4, '', '', $5, $6, $6)`,
+		 VALUES ($1, $2, $3, '', $4, '', '', $5, $6, $6)
+		 ON CONFLICT (id) DO UPDATE SET "siteRole" = EXCLUDED."siteRole"`,
 		id, name, id+"@example.com", siteRole, id, now,
 	)
 	if err != nil {
@@ -447,6 +448,24 @@ func TestCreateTeam(t *testing.T) {
 	})
 }
 
+func hasMember(team *Team, userID string) bool {
+	for _, m := range team.Members {
+		if m.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMemberWithRole(team *Team, userID, role string) bool {
+	for _, m := range team.Members {
+		if m.UserID == userID && m.Role == role {
+			return true
+		}
+	}
+	return false
+}
+
 // Mirrors teams.test.ts → "addTeamMember, updateTeamMemberRole, and
 // removeTeamMember endpoints and limitations".
 func TestTeamMembers(t *testing.T) {
@@ -536,24 +555,6 @@ func TestTeamMembers(t *testing.T) {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
 		}
 	})
-}
-
-func hasMember(team *Team, userID string) bool {
-	for _, m := range team.Members {
-		if m.UserID == userID {
-			return true
-		}
-	}
-	return false
-}
-
-func hasMemberWithRole(team *Team, userID, role string) bool {
-	for _, m := range team.Members {
-		if m.UserID == userID && m.Role == role {
-			return true
-		}
-	}
-	return false
 }
 
 // Covers updateTeam: metadata edits, slug validation/collision, and guards.

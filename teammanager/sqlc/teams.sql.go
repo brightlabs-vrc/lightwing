@@ -1252,6 +1252,36 @@ func (q *Queries) UpdateMemberRole(ctx context.Context, arg UpdateMemberRolePara
 	return err
 }
 
+const updateOrg = `-- name: UpdateOrg :exec
+UPDATE "organization"
+SET "slug" = $1,
+    "updatedAt" = $2,
+    "name" = COALESCE($3, "name"),
+    "logo" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "logo") END
+WHERE id = $6
+`
+
+type UpdateOrgParams struct {
+	Slug      string
+	UpdatedAt sql.NullTime
+	Name      sql.NullString
+	ClearLogo bool
+	Logo      sql.NullString
+	ID        string
+}
+
+func (q *Queries) UpdateOrg(ctx context.Context, arg UpdateOrgParams) error {
+	_, err := q.db.ExecContext(ctx, updateOrg,
+		arg.Slug,
+		arg.UpdatedAt,
+		arg.Name,
+		arg.ClearLogo,
+		arg.Logo,
+		arg.ID,
+	)
+	return err
+}
+
 const updateOrgStatus = `-- name: UpdateOrgStatus :exec
 UPDATE "organization"
 SET status = $1, "updatedAt" = CURRENT_TIMESTAMP

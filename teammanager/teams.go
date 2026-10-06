@@ -329,7 +329,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 	if p.Logo != nil {
 		logo = sql.NullString{String: *p.Logo, Valid: true}
 	}
-	err = q().UpdateTeam(ctx, sqlc.UpdateTeamParams{
+	err = q().UpdateOrg(ctx, sqlc.UpdateOrgParams{
 		Slug:      nextSlug,
 		UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		Name:      name,

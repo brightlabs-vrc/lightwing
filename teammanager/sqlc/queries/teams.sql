@@ -24,6 +24,14 @@ VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTA
 -- name: TouchOrg :exec
 UPDATE "organization" SET "updatedAt" = $1 WHERE id = $2;
 
+-- name: UpdateOrg :exec
+UPDATE "organization"
+SET "slug" = sqlc.arg('slug'),
+    "updatedAt" = sqlc.arg('updated_at'),
+    "name" = COALESCE(sqlc.narg('name'), "name"),
+    "logo" = CASE WHEN sqlc.arg('clear_logo')::boolean THEN NULL ELSE COALESCE(sqlc.narg('logo'), "logo") END
+WHERE id = sqlc.arg('id');
+
 -- name: UpdateOrgStatus :exec
 UPDATE "organization"
 SET status = $1, "updatedAt" = CURRENT_TIMESTAMP

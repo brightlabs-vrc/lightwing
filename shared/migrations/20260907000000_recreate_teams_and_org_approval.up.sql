@@ -1,3 +1,11 @@
+-- Add EVENT_ADMIN enum value to SiteRole if it exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SiteRole') THEN
+        ALTER TYPE "SiteRole" ADD VALUE IF NOT EXISTS 'EVENT_ADMIN';
+    END IF;
+END $$;
+
 -- Recreate team table
 CREATE TABLE IF NOT EXISTS "team" (
     "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
