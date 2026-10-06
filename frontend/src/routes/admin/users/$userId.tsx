@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
 import { getAdminUserProfile, updateAdminUserSiteRole, updateAdminUserProfile, updateAdminUserClass } from '../../../lib/admin-api'
+import { isValidUserSlug } from '../../../lib/slugs'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import type { auth, eventmanager } from '../../../lib/client'
@@ -94,8 +95,8 @@ function AdminUserDetailPage() {
       setError('Slug must be between 4 and 24 characters.')
       return
     }
-    if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
-      setError('Slug must contain only lowercase letters and numbers.')
+    if (trimmedSlug && !isValidUserSlug(trimmedSlug)) {
+      setError('Slug must contain only lowercase letters, numbers, periods, dashes, and underscores.')
       return
     }
 
@@ -244,7 +245,7 @@ function AdminUserDetailPage() {
                               />
                             </div>
                             <div className="slds-m-top_xx-small text-slate-400" style={{ fontSize: '11px' }}>
-                              Slugs must be between 4 and 24 lowercase alphanumeric characters.
+                              Slugs must be between 4 and 24 lowercase alphanumeric characters, periods, dashes, or underscores.
                             </div>
                           </div>
 

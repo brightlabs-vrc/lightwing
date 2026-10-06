@@ -115,6 +115,14 @@ describe('isValidUserSlug', () => {
     expect(isValidUserSlug('a'.repeat(24))).toBe(true);
   });
 
+  it('accepts user slugs containing dashes, periods, and underscores', () => {
+    expect(isValidUserSlug('user.name')).toBe(true);
+    expect(isValidUserSlug('user-name')).toBe(true);
+    expect(isValidUserSlug('user_name')).toBe(true);
+    expect(isValidUserSlug('u.s.e.r')).toBe(true);
+    expect(isValidUserSlug('user_123.test-1')).toBe(true);
+  });
+
   it('rejects user slugs under 4 characters or over 24 characters', () => {
     expect(isValidUserSlug('abc')).toBe(false);
     expect(isValidUserSlug('a'.repeat(25))).toBe(false);
