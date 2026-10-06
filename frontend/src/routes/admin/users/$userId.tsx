@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
-import { requireSiteAdmin } from '../../../lib/auth-guard'
+import { requireAdminPanel } from '../../../lib/auth-guard'
 import { getAdminUserProfile, updateAdminUserSiteRole, updateAdminUserProfile, updateAdminUserClass } from '../../../lib/admin-api'
 import { isValidUserSlug } from '../../../lib/slugs'
 import { AdminLayout } from '../-AdminLayout'
@@ -11,7 +11,7 @@ import type { ClassTier, SiteRole } from '../../../types'
 
 export const Route = createFileRoute('/admin/users/$userId')({
   beforeLoad: async ({ location }) => {
-    await requireSiteAdmin(location)
+    await requireAdminPanel(location)
   },
   component: AdminUserDetailPage,
 })
@@ -19,6 +19,7 @@ export const Route = createFileRoute('/admin/users/$userId')({
 function AdminUserDetailPage() {
   const { userId } = Route.useParams()
   const { session } = useAuth()
+  const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
   const [profile, setProfile] = useState<auth.UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [updatingRole, setUpdatingRole] = useState(false)
@@ -442,16 +443,24 @@ function AdminUserDetailPage() {
 
 
                       {/* Trigger Edit Button */}
-                      <div className="slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditing(true)}
-                          className="slds-button slds-button_brand"
-                          style={{ padding: '8px 24px', fontSize: '14px', borderRadius: '4px' }}
-                        >
-                          Edit Profile Details
-                        </button>
-                      </div>
+                      {isSiteAdmin ? (
+                        <div className="slds-m-bottom_large" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditing(true)}
+                            className="slds-button slds-button_brand"
+                            style={{ padding: '8px 24px', fontSize: '14px', borderRadius: '4px' }}
+                          >
+                            Edit Profile Details
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="slds-box slds-m-bottom_large" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '0.75rem 1rem' }}>
+                          <p className="text-slate-500 text-xs">
+                            Read-only view (Event Administrator access). Site Administrator privileges are required to edit user account details.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -473,39 +482,41 @@ function AdminUserDetailPage() {
                   </div>
 
                   {/* SITE ROLE ADJUSTMENT ACTIONS */}
-                  {userId !== session?.user.id ? (
-                    <div style={{ borderTop: '1px solid #dddbda', paddingTop: '1.5rem' }}>
-                      <p className="slds-text-title text-slate-500 slds-m-bottom_small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Adjust Global Authorization Privilege</p>
-                      <div className="slds-grid slds-wrap" style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => adjustSiteRole('SITE_ADMIN')}
-                          disabled={updatingRole || profile.siteRole === 'SITE_ADMIN'}
-                          className="slds-button slds-button_success"
-                          style={{ padding: '6px 16px', background: '#2e7d32', color: '#fff' }}
-                        >
-                          Grant SITE_ADMIN Privilege
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => adjustSiteRole('USER')}
-                          disabled={updatingRole || profile.siteRole === 'USER'}
-                          className="slds-button slds-button_destructive"
-                          style={{ padding: '6px 16px', background: '#d32f2f', color: '#fff' }}
-                        >
-                          Revoke to USER Privilege
-                        </button>
+                  {isSiteAdmin && (
+                    userId !== session?.user.id ? (
+                      <div style={{ borderTop: '1px solid #dddbda', paddingTop: '1.5rem' }}>
+                        <p className="slds-text-title text-slate-500 slds-m-bottom_small" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Adjust Global Authorization Privilege</p>
+                        <div className="slds-grid slds-wrap" style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => adjustSiteRole('SITE_ADMIN')}
+                            disabled={updatingRole || profile.siteRole === 'SITE_ADMIN'}
+                            className="slds-button slds-button_success"
+                            style={{ padding: '6px 16px', background: '#2e7d32', color: '#fff' }}
+                          >
+                            Grant SITE_ADMIN Privilege
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustSiteRole('USER')}
+                            disabled={updatingRole || profile.siteRole === 'USER'}
+                            className="slds-button slds-button_destructive"
+                            style={{ padding: '6px 16px', background: '#d32f2f', color: '#fff' }}
+                          >
+                            Revoke to USER Privilege
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="slds-box slds-theme_shade" style={{ background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '4px', padding: '1rem', marginTop: '1.5rem' }}>
-                      <p className="text-amber-800 text-sm font-semibold" style={{ color: '#92400e', fontWeight: 'bold' }}>
-                        Self-Privilege Safeguard
-                      </p>
-                      <p className="text-amber-700 text-xs slds-m-top_xx-small" style={{ color: '#b45309' }}>
-                        You cannot modify your own global siteRole privileges while active in your current session.
-                      </p>
-                    </div>
+                    ) : (
+                      <div className="slds-box slds-theme_shade" style={{ background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '4px', padding: '1rem', marginTop: '1.5rem' }}>
+                        <p className="text-amber-800 text-sm font-semibold" style={{ color: '#92400e', fontWeight: 'bold' }}>
+                          Self-Privilege Safeguard
+                        </p>
+                        <p className="text-amber-700 text-xs slds-m-top_xx-small" style={{ color: '#b45309' }}>
+                          You cannot modify your own global siteRole privileges while active in your current session.
+                        </p>
+                      </div>
+                    )
                   )}
                 </div>
               ) : (

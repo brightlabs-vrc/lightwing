@@ -25,6 +25,7 @@ type SubmitOrgApplicationRequest struct {
 
 type SubmitTeamApplicationRequest struct {
 	Authorization            string   `header:"Authorization"`
+	TeamID                   *string  `json:"teamId,omitempty"`
 	Name                     string   `json:"name"`
 	Slug                     *string  `json:"slug,omitempty"`
 	Logo                     *string  `json:"logo,omitempty"`
@@ -362,6 +363,77 @@ func submitTeamApplication(ctx context.Context, p *SubmitTeamApplicationRequest)
 	if err != nil {
 		return nil, err
 	}
+
+	if p.TeamID != nil && *p.TeamID != "" {
+		teamRow, err := q().GetTeamByID(ctx, *p.TeamID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		isTeamAdmin := false
+		roster, err := q().ListRosterForTeam(ctx, teamRow.ID)
+		if err == nil {
+			for _, m := range roster {
+				if m.UserId == actor.UserID && m.Role.Valid && m.Role.String == auth.AdministratorRole {
+					isTeamAdmin = true
+					break
+				}
+			}
+		}
+		if !isTeamAdmin && !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+			primOrg, err := q().GetPrimaryOrgForTeam(ctx, teamRow.ID)
+			if err == nil && primOrg.ID != "" {
+				role, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{OrganizationId: primOrg.ID, UserId: actor.UserID})
+				if err == nil && role == auth.AdministratorRole {
+					isTeamAdmin = true
+				}
+			}
+		}
+		if !isTeamAdmin && !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "must be a team administrator to apply to an organization"}
+		}
+
+		if strings.TrimSpace(p.PrimaryOrganizationID) == "" {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "primary organization ID is required"}
+		}
+
+		primOrg, err := q().GetOrgByID(ctx, p.PrimaryOrganizationID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "primary organization not found"}
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !primOrg.Status.Valid || primOrg.Status.String != "APPROVED" {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "primary organization must be approved"}
+		}
+
+		if currentPrim, err := q().GetPrimaryOrgForTeam(ctx, teamRow.ID); err == nil && currentPrim.ID != "" {
+			_ = q().DeleteTeamOrganization(ctx, sqlc.DeleteTeamOrganizationParams{
+				TeamId:         teamRow.ID,
+				OrganizationId: currentPrim.ID,
+			})
+		}
+		_ = q().InsertTeamOrganization(ctx, sqlc.InsertTeamOrganizationParams{
+			TeamId:         teamRow.ID,
+			OrganizationId: p.PrimaryOrganizationID,
+			IsPrimary:      true,
+		})
+
+		_ = q().UpdateTeamStatus(ctx, sqlc.UpdateTeamStatusParams{
+			Status:            "PENDING",
+			ReviewedByUserId: sql.NullString{},
+			ReviewedAt:        sql.NullTime{},
+			ID:                teamRow.ID,
+		})
+
+		invalidateTeamCache(ctx, teamRow.ID)
+		return getTeamApplicationView(ctx, teamRow.ID)
+	}
+
 	if strings.TrimSpace(p.Name) == "" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "team name is required"}
 	}

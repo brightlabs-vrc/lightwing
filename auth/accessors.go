@@ -11,6 +11,9 @@ import (
 // AdministratorRole is the org-level role name for organization administrators.
 const AdministratorRole = administratorRole
 
+// MemberRole is the default org-level role name.
+const MemberRole = memberRole
+
 // AdministratorRoleLimit is the max number of administrators per organization.
 const AdministratorRoleLimit = administratorRoleLimit
 

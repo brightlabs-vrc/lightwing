@@ -189,8 +189,8 @@ func createTeam(ctx context.Context, authorization, name string, logo *string) (
 	if err != nil {
 		return nil, err
 	}
-	if !auth.IsSiteAdmin(actor.SiteRole) {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "site administrator privilege required"}
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required"}
 	}
 
 	slug := slugifyTeamName(name)
@@ -246,7 +246,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 		return nil, err
 	}
 
-	if !auth.IsSiteAdmin(actor.SiteRole) {
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
 		if primOrg.ID != "" {
 			role, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
 				OrganizationId: primOrg.ID,
@@ -345,6 +345,108 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 	}
 	invalidateTeamCache(ctx, id)
 	return loadTeam(ctx, id)
+}
+
+// --- convertTeamToOrg ---
+
+type ConvertTeamToOrgRequest struct {
+	Authorization string `header:"Authorization"`
+	TeamID        string `json:"teamId"`
+}
+
+func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team, error) {
+	actor, err := auth.ResolveActor(ctx, authorization)
+	if err != nil {
+		return nil, err
+	}
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required"}
+	}
+
+	teamRow, err := q().GetTeamByID(ctx, teamID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	orgID := teamID
+	existingOrg, errOrg := q().GetOrgByID(ctx, teamID)
+	if errOrg == nil {
+		orgID = existingOrg.ID
+	} else {
+		orgSlug := teamRow.Slug
+		if existingOrgBySlug, errSlug := q().GetOrgBySlug(ctx, orgSlug); errSlug == nil && existingOrgBySlug.ID != teamID {
+			orgSlug = teamRow.Slug + "-org"
+		}
+
+		var logoVal sql.NullString
+		if teamRow.Logo.Valid && teamRow.Logo.String != "" {
+			logoVal = teamRow.Logo
+		}
+
+		newOrgID, err := q().CreateOrg(ctx, sqlc.CreateOrgParams{
+			Name:              teamRow.Name,
+			Slug:              orgSlug,
+			Logo:              logoVal,
+			OrgType:           sql.NullString{String: "ORGANIZATION", Valid: true},
+			Status:            sql.NullString{String: "APPROVED", Valid: true},
+			DiscordInvite:     sql.NullString{String: "", Valid: false},
+			VrchatGroupId:     sql.NullString{String: "", Valid: false},
+			SubmittedByUserId: teamRow.SubmittedByUserId,
+			UpdatedAt:         sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		})
+		if err != nil && !isUniqueViolation(err) {
+			return nil, err
+		}
+		if err == nil {
+			orgID = newOrgID
+		}
+	}
+
+	roster, err := q().ListRosterForTeam(ctx, teamID)
+	if err == nil {
+		for _, m := range roster {
+			mRole := auth.MemberRole
+			if m.Role.Valid && m.Role.String == auth.AdministratorRole {
+				mRole = auth.AdministratorRole
+			}
+			_ = q().InsertMember(ctx, sqlc.InsertMemberParams{
+				OrganizationId: orgID,
+				UserId:         m.UserId,
+				Role:           mRole,
+			})
+		}
+	}
+
+	if primOrg, err := q().GetPrimaryOrgForTeam(ctx, teamID); err == nil && primOrg.ID != "" {
+		if primOrg.ID != orgID {
+			_ = q().DeleteTeamOrganization(ctx, sqlc.DeleteTeamOrganizationParams{
+				TeamId:         teamID,
+				OrganizationId: primOrg.ID,
+			})
+		}
+	}
+
+	if _, err := q().CheckTeamOrgLink(ctx, sqlc.CheckTeamOrgLinkParams{
+		TeamId:         teamID,
+		OrganizationId: orgID,
+	}); err != nil {
+		_ = q().InsertTeamOrganization(ctx, sqlc.InsertTeamOrganizationParams{
+			TeamId:         teamID,
+			OrganizationId: orgID,
+			IsPrimary:      true,
+		})
+	}
+
+	invalidateTeamCache(ctx, teamID)
+	return loadTeam(ctx, teamID)
+}
+
+//encore:api public method=POST path=/api/admin/teams/convert-to-org
+func (s *Service) ConvertTeamToOrg(ctx context.Context, p *ConvertTeamToOrgRequest) (*Team, error) {
+	return convertTeamToOrg(ctx, p.Authorization, p.TeamID)
 }
 
 // --- HTTP endpoints (thin wrappers over the cores above) ---

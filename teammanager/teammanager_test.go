@@ -316,6 +316,56 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 			t.Errorf("unlinkedTeam.Organizations = %+v, want 1 org", unlinkedTeam.Organizations)
 		}
 	})
+
+	t.Run("ConvertTeamToOrg and existing team application flow", func(t *testing.T) {
+		siteAdminUser := nextTeamID("site-admin-cvt")
+		insertTestUser(t, ctx, siteAdminUser, "Convert Site Admin", "SITE_ADMIN")
+		siteAdminTok := insertTestSession(t, ctx, siteAdminUser)
+
+		// Create an approved organization
+		targetOrgID := createOrgWithMembers(t, ctx, nextTeamID("org-target"), "Target Organization", nextTeamID("target-org-slug"), []memberSpec{
+			{userID: siteAdminUser, role: "administrator", name: "Site Admin"},
+		})
+		_, _ = db.Exec(ctx, `UPDATE "organization" SET status = 'APPROVED' WHERE id = $1`, targetOrgID)
+
+		// Create a team via createTeam
+		teamName := "Velocity Racing"
+		newTeam, err := createTeam(ctx, bearer(siteAdminTok), teamName, nil)
+		if err != nil {
+			t.Fatalf("createTeam failed: %v", err)
+		}
+
+		// Add an admin user to the new team
+		teamAdminUser := nextTeamID("user-team-admin")
+		insertTestUser(t, ctx, teamAdminUser, "Team Admin User", "USER")
+		teamAdminTok := insertTestSession(t, ctx, teamAdminUser)
+		_, err = addTeamMember(ctx, bearer(siteAdminTok), newTeam.ID, teamAdminUser, "administrator")
+		if err != nil {
+			t.Fatalf("addTeamMember failed: %v", err)
+		}
+
+		// Convert team to organization
+		convertedTeam, err := convertTeamToOrg(ctx, bearer(siteAdminTok), newTeam.ID)
+		if err != nil {
+			t.Fatalf("convertTeamToOrg failed: %v", err)
+		}
+		if convertedTeam == nil || convertedTeam.PrimaryOrganizationID == "" {
+			t.Errorf("convertTeamToOrg returned invalid team: %+v", convertedTeam)
+		}
+
+		// Existing team applies to join target organization
+		appView, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
+			Authorization:         bearer(teamAdminTok),
+			TeamID:                sptr(newTeam.ID),
+			PrimaryOrganizationID: targetOrgID,
+		})
+		if err != nil {
+			t.Fatalf("submitTeamApplication for existing team failed: %v", err)
+		}
+		if appView.Status != "PENDING" || appView.PrimaryOrganization.ID != targetOrgID {
+			t.Errorf("appView = %+v, want PENDING with primary org = %s", appView, targetOrgID)
+		}
+	})
 }
 
 // Mirrors teams.test.ts → "updateTeamStats enforces permission and updates

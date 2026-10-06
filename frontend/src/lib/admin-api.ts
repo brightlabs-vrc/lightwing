@@ -1708,8 +1708,25 @@ export async function submitOrganizationApplication(
   return appView
 }
 
+export async function convertAdminTeamToOrg(
+  teamId: string,
+  authorization: string,
+): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.ConvertTeamToOrg({
+      teamId,
+      Authorization: authorization,
+    })
+  }
+
+  const team = mockTeamsList.find((t) => t.id === teamId)
+  if (!team) throw new Error('Mock team not found')
+  return team
+}
+
 export async function submitTeamApplication(
   params: {
+    teamId?: string
     name: string
     slug?: string
     logo?: string | null
@@ -1722,6 +1739,7 @@ export async function submitTeamApplication(
   if (!MOCK_MODE) {
     return appClient.teammanager.SubmitTeamApplication({
       Authorization: authorization,
+      teamId: params.teamId ?? null,
       name: params.name,
       slug: params.slug ?? null,
       logo: params.logo ?? null,
