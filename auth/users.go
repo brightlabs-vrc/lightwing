@@ -242,21 +242,9 @@ type UpdateUserProfileParams struct {
 	VrchatUsername *string `json:"vrchatUsername,omitempty"`
 }
 
-// updateUserProfile updates a user's editable profile fields. A user may
-// only edit their own record; site admins may edit any profile.
-//
-// Mirrors ts-legacy/auth/users.ts updateUserProfile
-func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, params *UpdateUserProfileParams) (*UserProfile, error) {
-	if actor.UserID != targetUserID && !isSiteAdmin(actor.SiteRole) {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot edit another user's profile"}
-	}
-
-	existing, err := loadUserRow(ctx, targetUserID)
-	if err != nil {
-		return nil, err
-	}
-
-	up := sqlc.UpdateUserProfileParams{UpdatedAt: time.Now().UTC(), ID: targetUserID}
+// buildUpdateUserProfileParams constructs and validates UpdateUserProfileParams from input params and existing row.
+func buildUpdateUserProfileParams(ctx context.Context, existing *userRow, params *UpdateUserProfileParams) (*sqlc.UpdateUserProfileParams, error) {
+	up := &sqlc.UpdateUserProfileParams{UpdatedAt: time.Now().UTC(), ID: existing.ID}
 
 	if params.Name != nil {
 		up.Name = sql.NullString{String: *params.Name, Valid: true}
@@ -290,7 +278,29 @@ func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, p
 		up.VrchatSet = true
 		up.VrchatVal = nullIfEmpty(*params.VrchatUsername)
 	}
-	if err := q().UpdateUserProfile(ctx, up); err != nil {
+	return up, nil
+}
+
+// updateUserProfile updates a user's editable profile fields. A user may
+// only edit their own record; site admins may edit any profile.
+//
+// Mirrors ts-legacy/auth/users.ts updateUserProfile
+func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, params *UpdateUserProfileParams) (*UserProfile, error) {
+	if actor.UserID != targetUserID && !isSiteAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot edit another user's profile"}
+	}
+
+	existing, err := loadUserRow(ctx, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	up, err := buildUpdateUserProfileParams(ctx, existing, params)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := q().UpdateUserProfile(ctx, *up); err != nil {
 		return nil, fmt.Errorf("failed to update user profile: %w", err)
 	}
 	oldSlug := ""
