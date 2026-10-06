@@ -365,19 +365,32 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 
 	teamRow, err := q().GetTeamByID(ctx, teamID)
 	if errors.Is(err, sql.ErrNoRows) {
+		teamRow, err = q().GetTeamBySlug(ctx, teamID)
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		if orgRow, orgErr := q().GetOrgByID(ctx, teamID); orgErr == nil {
+			invalidateTeamCache(ctx, orgRow.ID)
+			return loadTeam(ctx, orgRow.ID)
+		}
+		if orgRow, orgErr := q().GetOrgBySlug(ctx, teamID); orgErr == nil {
+			invalidateTeamCache(ctx, orgRow.ID)
+			return loadTeam(ctx, orgRow.ID)
+		}
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	orgID := teamID
-	existingOrg, errOrg := q().GetOrgByID(ctx, teamID)
+	targetTeamID := teamRow.ID
+
+	orgID := targetTeamID
+	existingOrg, errOrg := q().GetOrgByID(ctx, targetTeamID)
 	if errOrg == nil {
 		orgID = existingOrg.ID
 	} else {
 		orgSlug := teamRow.Slug
-		if existingOrgBySlug, errSlug := q().GetOrgBySlug(ctx, orgSlug); errSlug == nil && existingOrgBySlug.ID != teamID {
+		if existingOrgBySlug, errSlug := q().GetOrgBySlug(ctx, orgSlug); errSlug == nil && existingOrgBySlug.ID != targetTeamID {
 			orgSlug = teamRow.Slug + "-org"
 		}
 
@@ -405,7 +418,7 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 		}
 	}
 
-	roster, err := q().ListRosterForTeam(ctx, teamID)
+	roster, err := q().ListRosterForTeam(ctx, targetTeamID)
 	if err == nil {
 		for _, m := range roster {
 			mRole := auth.MemberRole
@@ -420,28 +433,28 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 		}
 	}
 
-	if primOrg, err := q().GetPrimaryOrgForTeam(ctx, teamID); err == nil && primOrg.ID != "" {
+	if primOrg, err := q().GetPrimaryOrgForTeam(ctx, targetTeamID); err == nil && primOrg.ID != "" {
 		if primOrg.ID != orgID {
 			_ = q().DeleteTeamOrganization(ctx, sqlc.DeleteTeamOrganizationParams{
-				TeamId:         teamID,
+				TeamId:         targetTeamID,
 				OrganizationId: primOrg.ID,
 			})
 		}
 	}
 
 	if _, err := q().CheckTeamOrgLink(ctx, sqlc.CheckTeamOrgLinkParams{
-		TeamId:         teamID,
+		TeamId:         targetTeamID,
 		OrganizationId: orgID,
 	}); err != nil {
 		_ = q().InsertTeamOrganization(ctx, sqlc.InsertTeamOrganizationParams{
-			TeamId:         teamID,
+			TeamId:         targetTeamID,
 			OrganizationId: orgID,
 			IsPrimary:      true,
 		})
 	}
 
-	invalidateTeamCache(ctx, teamID)
-	return loadTeam(ctx, teamID)
+	invalidateTeamCache(ctx, targetTeamID)
+	return loadTeam(ctx, targetTeamID)
 }
 
 //encore:api public method=POST path=/api/admin/teams/convert-to-org

@@ -394,7 +394,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 		},
 	}
 
-	computedStats, err := computeTeamStats(ctx, row.ID)
+	computedStats, err := computeTeamStats(ctx, orgObj.ID)
 	if err == nil {
 		if computedStats.RankingAverage != nil {
 			t.Stats.RankingAverage = computedStats.RankingAverage
