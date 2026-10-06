@@ -1,6 +1,8 @@
-# The URS Competitive Portal (Project Lightwing)
+# UmaKeiba (Project Lightwing)
 
-The URS Competitive Portal is a full-stack application to facilitate the management of competitive events, including registration, scheduling, and results tracking. What normally would be a tonload of google sheets and forms is now in one place~
+UmaKeiba is a full-stack application to facilitate the management of competitive events, including registration, scheduling, and results tracking. What normally would be a tonload of google sheets and forms is now in one place~
+
+UmaKeiba was originally designed to accomodate the large-scale event hosting needs of the Umamusume Racing Society (URS) for their competitive racing events. The system is designed to automate the work that would otherwise require a team ten times their scale. Since then, this has been redesigned to accomodate more than one organization to allow any sufficiently sized community to run Keiba-style racing events.
 
 Lightwing is built with the following technologies:
 
