@@ -2008,6 +2008,52 @@ export namespace teammanager {
         initialRoster?: string[]
     }
 
+    export interface AdminOrganizationItem {
+        id: string
+        name: string
+        slug: string
+        logo?: string
+        orgType: string
+        status: string
+        discordInvite?: string
+        vrchatGroupId?: string
+        submittedByUserId?: string
+        administratorSlotsRemaining: number
+        memberCount: number
+        createdAt: string
+        updatedAt?: string
+    }
+
+    export interface ListAdminOrganizationsRequest {
+        search?: string
+        limit?: number
+        offset?: number
+    }
+
+    export interface ListAdminOrganizationsResponse {
+        organizations: AdminOrganizationItem[]
+        total: number
+    }
+
+    export interface CreateAdminOrganizationRequest {
+        Authorization: string
+        name: string
+        logo?: string
+        discordInvite?: string
+        vrchatGroupId?: string
+    }
+
+    export interface UpdateAdminOrganizationRequest {
+        id: string
+        Authorization: string
+        name?: string
+        slug?: string
+        logo?: string
+        clearLogo?: boolean
+        discordInvite?: string
+        vrchatGroupId?: string
+    }
+
     export interface ConvertTeamToOrgRequest {
         Authorization: string
         teamId: string
@@ -2235,6 +2281,31 @@ export namespace teammanager {
             this.LinkSecondaryOrganization = this.LinkSecondaryOrganization.bind(this)
             this.UnlinkSecondaryOrganization = this.UnlinkSecondaryOrganization.bind(this)
             this.ListApprovedOrganizations = this.ListApprovedOrganizations.bind(this)
+            this.ListAdminOrganizations = this.ListAdminOrganizations.bind(this)
+            this.CreateAdminOrganization = this.CreateAdminOrganization.bind(this)
+            this.UpdateAdminOrganization = this.UpdateAdminOrganization.bind(this)
+        }
+
+        public async ListAdminOrganizations(params: ListAdminOrganizationsRequest): Promise<ListAdminOrganizationsResponse> {
+            const query = makeRecord<string, string>({
+                limit: params.limit !== undefined ? String(params.limit) : undefined,
+                offset: params.offset !== undefined ? String(params.offset) : undefined,
+                search: params.search,
+            })
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/admin/organizations`, undefined, {query})
+            return await resp.json() as ListAdminOrganizationsResponse
+        }
+
+        public async CreateAdminOrganization(params: CreateAdminOrganizationRequest): Promise<Team> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/admin/organizations`, JSON.stringify(params), {headers})
+            return await resp.json() as Team
+        }
+
+        public async UpdateAdminOrganization(params: UpdateAdminOrganizationRequest): Promise<Team> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/admin/organizations`, JSON.stringify(params), {headers})
+            return await resp.json() as Team
         }
 
         public async ConvertTeamToOrg(params: ConvertTeamToOrgRequest): Promise<Team> {

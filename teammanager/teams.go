@@ -383,25 +383,49 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 	}
 
 	targetTeamID := teamRow.ID
+	targetSlug := teamRow.Slug
 
+	// 1. Fetch team roster before removing team records
+	roster, _ := q().ListRosterForTeam(ctx, targetTeamID)
+
+	// 2. Delete team links and team record, freeing targetSlug in the team table
+	_ = q().DeleteTeamOrganizationsForTeam(ctx, targetTeamID)
+	_ = q().DeleteTeamMembersForTeam(ctx, targetTeamID)
+	_ = q().DeleteTeam(ctx, targetTeamID)
+
+	// 3. Create or update organization record
 	orgID := targetTeamID
 	existingOrg, errOrg := q().GetOrgByID(ctx, targetTeamID)
 	if errOrg == nil {
 		orgID = existingOrg.ID
+		_ = q().UpdateOrg(ctx, sqlc.UpdateOrgParams{
+			Slug:      targetSlug,
+			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:      sql.NullString{String: teamRow.Name, Valid: true},
+			ClearLogo: !teamRow.Logo.Valid || teamRow.Logo.String == "",
+			Logo:      teamRow.Logo,
+			ID:        orgID,
+		})
+	} else if existingOrgBySlug, errSlug := q().GetOrgBySlug(ctx, targetSlug); errSlug == nil {
+		orgID = existingOrgBySlug.ID
+		_ = q().UpdateOrg(ctx, sqlc.UpdateOrgParams{
+			Slug:      targetSlug,
+			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:      sql.NullString{String: teamRow.Name, Valid: true},
+			ClearLogo: !teamRow.Logo.Valid || teamRow.Logo.String == "",
+			Logo:      teamRow.Logo,
+			ID:        orgID,
+		})
 	} else {
-		orgSlug := teamRow.Slug
-		if existingOrgBySlug, errSlug := q().GetOrgBySlug(ctx, orgSlug); errSlug == nil && existingOrgBySlug.ID != targetTeamID {
-			orgSlug = teamRow.Slug + "-org"
-		}
-
 		var logoVal sql.NullString
 		if teamRow.Logo.Valid && teamRow.Logo.String != "" {
 			logoVal = teamRow.Logo
 		}
 
-		newOrgID, err := q().CreateOrg(ctx, sqlc.CreateOrgParams{
+		newOrgID, err := q().CreateOrgWithID(ctx, sqlc.CreateOrgWithIDParams{
+			ID:                targetTeamID,
 			Name:              teamRow.Name,
-			Slug:              orgSlug,
+			Slug:              targetSlug,
 			Logo:              logoVal,
 			OrgType:           sql.NullString{String: "ORGANIZATION", Valid: true},
 			Status:            sql.NullString{String: "APPROVED", Valid: true},
@@ -410,51 +434,339 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 			SubmittedByUserId: teamRow.SubmittedByUserId,
 			UpdatedAt:         sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		})
-		if err != nil && !isUniqueViolation(err) {
-			return nil, err
-		}
 		if err == nil {
 			orgID = newOrgID
 		}
 	}
 
-	roster, err := q().ListRosterForTeam(ctx, targetTeamID)
-	if err == nil {
-		for _, m := range roster {
-			mRole := auth.MemberRole
-			if m.Role.Valid && m.Role.String == auth.AdministratorRole {
-				mRole = auth.AdministratorRole
-			}
-			_ = q().InsertMember(ctx, sqlc.InsertMemberParams{
-				OrganizationId: orgID,
-				UserId:         m.UserId,
-				Role:           mRole,
-			})
+	// 4. Migrate roster into member table
+	for _, m := range roster {
+		mRole := auth.MemberRole
+		if m.Role.Valid && m.Role.String == auth.AdministratorRole {
+			mRole = auth.AdministratorRole
 		}
-	}
-
-	if primOrg, err := q().GetPrimaryOrgForTeam(ctx, targetTeamID); err == nil && primOrg.ID != "" {
-		if primOrg.ID != orgID {
-			_ = q().DeleteTeamOrganization(ctx, sqlc.DeleteTeamOrganizationParams{
-				TeamId:         targetTeamID,
-				OrganizationId: primOrg.ID,
-			})
-		}
-	}
-
-	if _, err := q().CheckTeamOrgLink(ctx, sqlc.CheckTeamOrgLinkParams{
-		TeamId:         targetTeamID,
-		OrganizationId: orgID,
-	}); err != nil {
-		_ = q().InsertTeamOrganization(ctx, sqlc.InsertTeamOrganizationParams{
-			TeamId:         targetTeamID,
+		_ = q().InsertMember(ctx, sqlc.InsertMemberParams{
 			OrganizationId: orgID,
-			IsPrimary:      true,
+			UserId:         m.UserId,
+			Role:           mRole,
 		})
 	}
 
 	invalidateTeamCache(ctx, targetTeamID)
-	return loadTeam(ctx, targetTeamID)
+	invalidateTeamCache(ctx, orgID)
+	return loadTeam(ctx, orgID)
+}
+
+// --- Admin Organization Management ---
+
+type AdminOrganizationItem struct {
+	ID                          string  `json:"id"`
+	Name                        string  `json:"name"`
+	Slug                        string  `json:"slug"`
+	Logo                        *string `json:"logo"`
+	OrgType                     string  `json:"orgType"`
+	Status                      string  `json:"status"`
+	DiscordInvite               *string `json:"discordInvite,omitempty"`
+	VrchatGroupId               *string `json:"vrchatGroupId,omitempty"`
+	SubmittedByUserId           *string `json:"submittedByUserId,omitempty"`
+	AdministratorSlotsRemaining int     `json:"administratorSlotsRemaining"`
+	MemberCount                 int     `json:"memberCount"`
+	CreatedAt                   string  `json:"createdAt"`
+	UpdatedAt                   *string `json:"updatedAt,omitempty"`
+}
+
+type ListAdminOrganizationsRequest struct {
+	Search string `query:"search"`
+	Limit  int    `query:"limit"`
+	Offset int    `query:"offset"`
+}
+
+type ListAdminOrganizationsResponse struct {
+	Organizations []AdminOrganizationItem `json:"organizations"`
+	Total         int                     `json:"total"`
+}
+
+type CreateAdminOrganizationRequest struct {
+	Authorization string  `header:"Authorization"`
+	Name          string  `json:"name"`
+	Logo          *string `json:"logo,omitempty"`
+	DiscordInvite *string `json:"discordInvite,omitempty"`
+	VrchatGroupId *string `json:"vrchatGroupId,omitempty"`
+}
+
+type UpdateAdminOrganizationRequest struct {
+	ID            string  `json:"id"`
+	Authorization string  `header:"Authorization"`
+	Name          *string `json:"name,omitempty"`
+	Slug          *string `json:"slug,omitempty"`
+	Logo          *string `json:"logo,omitempty"`
+	ClearLogo     bool    `json:"clearLogo,omitempty"`
+	DiscordInvite *string `json:"discordInvite,omitempty"`
+	VrchatGroupId *string `json:"vrchatGroupId,omitempty"`
+}
+
+func listAdminOrganizations(ctx context.Context, search string, limit, offset int) (*ListAdminOrganizationsResponse, error) {
+	var total int64
+	var rows []sqlc.AdminOrgRow
+	var err error
+
+	if search == "" {
+		if total, err = q().CountAdminOrgs(ctx); err != nil {
+			return nil, err
+		}
+		rows, err = q().ListAdminOrgs(ctx, sqlc.ListAdminOrgsParams{
+			Limit:  int32(limit),
+			Offset: int32(offset),
+		})
+	} else {
+		if total, err = q().CountAdminOrgsBySearch(ctx, search); err != nil {
+			return nil, err
+		}
+		rows, err = q().ListAdminOrgsBySearch(ctx, sqlc.ListAdminOrgsBySearchParams{
+			Search: search,
+			Limit:  int32(limit),
+			Offset: int32(offset),
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	orgIDs := make([]string, 0, len(rows))
+	for _, r := range rows {
+		orgIDs = append(orgIDs, r.ID)
+	}
+
+	countsByOrg := make(map[string]struct{ members, admins int })
+	if len(orgIDs) > 0 {
+		countRows, err := q().BatchCountMembersAndAdmins(ctx, sqlc.BatchCountMembersAndAdminsParams{
+			Role:    auth.AdministratorRole,
+			Column2: orgIDs,
+		})
+		if err == nil {
+			for _, cr := range countRows {
+				countsByOrg[cr.OrganizationId] = struct{ members, admins int }{
+					members: int(cr.Count),
+					admins:  int(cr.Count_2),
+				}
+			}
+		}
+	}
+
+	items := make([]AdminOrganizationItem, 0, len(rows))
+	for _, r := range rows {
+		var logo, discord, vrchat, submitted *string
+		if r.Logo.Valid && r.Logo.String != "" {
+			l := r.Logo.String
+			logo = &l
+		}
+		if r.DiscordInvite.Valid && r.DiscordInvite.String != "" {
+			d := r.DiscordInvite.String
+			discord = &d
+		}
+		if r.VrchatGroupId.Valid && r.VrchatGroupId.String != "" {
+			v := r.VrchatGroupId.String
+			vrchat = &v
+		}
+		if r.SubmittedByUserId.Valid && r.SubmittedByUserId.String != "" {
+			s := r.SubmittedByUserId.String
+			submitted = &s
+		}
+		var updatedAt *string
+		if r.UpdatedAt.Valid {
+			u := r.UpdatedAt.Time.Format(time.RFC3339)
+			updatedAt = &u
+		}
+
+		counts := countsByOrg[r.ID]
+		slots := auth.AdministratorRoleLimit - counts.admins
+		if slots < 0 {
+			slots = 0
+		}
+
+		orgType := "ORGANIZATION"
+		if r.OrgType.Valid && r.OrgType.String != "" {
+			orgType = r.OrgType.String
+		}
+		status := "APPROVED"
+		if r.Status.Valid && r.Status.String != "" {
+			status = r.Status.String
+		}
+
+		items = append(items, AdminOrganizationItem{
+			ID:                          r.ID,
+			Name:                        r.Name,
+			Slug:                        r.Slug,
+			Logo:                        logo,
+			OrgType:                     orgType,
+			Status:                      status,
+			DiscordInvite:               discord,
+			VrchatGroupId:               vrchat,
+			SubmittedByUserId:           submitted,
+			AdministratorSlotsRemaining: slots,
+			MemberCount:                 counts.members,
+			CreatedAt:                   r.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:                   updatedAt,
+		})
+	}
+
+	return &ListAdminOrganizationsResponse{Organizations: items, Total: int(total)}, nil
+}
+
+func createAdminOrganization(ctx context.Context, authorization, name string, logo, discordInvite, vrchatGroupId *string) (*Team, error) {
+	actor, err := auth.ResolveActor(ctx, authorization)
+	if err != nil {
+		return nil, err
+	}
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required"}
+	}
+
+	slug := slugifyTeamName(name)
+	if _, err := q().OrgIDBySlug(ctx, slug); err == nil {
+		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization with this slug already exists"}
+	}
+
+	var logoVal, discordVal, vrchatVal sql.NullString
+	if logo != nil && *logo != "" {
+		logoVal = sql.NullString{String: *logo, Valid: true}
+	}
+	if discordInvite != nil && *discordInvite != "" {
+		discordVal = sql.NullString{String: *discordInvite, Valid: true}
+	}
+	if vrchatGroupId != nil && *vrchatGroupId != "" {
+		vrchatVal = sql.NullString{String: *vrchatGroupId, Valid: true}
+	}
+
+	id, err := q().CreateOrg(ctx, sqlc.CreateOrgParams{
+		Name:              name,
+		Slug:              slug,
+		Logo:              logoVal,
+		OrgType:           sql.NullString{String: "ORGANIZATION", Valid: true},
+		Status:            sql.NullString{String: "APPROVED", Valid: true},
+		DiscordInvite:     discordVal,
+		VrchatGroupId:     vrchatVal,
+		SubmittedByUserId: sql.NullString{String: actor.UserID, Valid: true},
+		UpdatedAt:         sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	})
+	if isUniqueViolation(err) {
+		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization with this slug already exists"}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	_ = q().InsertMember(ctx, sqlc.InsertMemberParams{
+		OrganizationId: id,
+		UserId:         actor.UserID,
+		Role:           auth.AdministratorRole,
+	})
+
+	return loadTeam(ctx, id)
+}
+
+func updateAdminOrganization(ctx context.Context, authorization, id string, p *UpdateTeamParams, discordInvite, vrchatGroupId *string) (*Team, error) {
+	actor, err := auth.ResolveActor(ctx, authorization)
+	if err != nil {
+		return nil, err
+	}
+
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		role, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
+			OrganizationId: id,
+			UserId:         actor.UserID,
+		})
+		if err != nil || role != auth.AdministratorRole {
+			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update organization metadata"}
+		}
+	}
+
+	existingOrgID := id
+	existingOrgSlug := ""
+	if row, err := q().GetOrgByID(ctx, id); err == nil {
+		existingOrgSlug = row.Slug
+	} else if slugRow, errSlug := q().GetOrgBySlug(ctx, id); errSlug == nil {
+		existingOrgID = slugRow.ID
+		existingOrgSlug = slugRow.Slug
+	} else {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "organization not found"}
+	}
+
+	nextSlug := existingOrgSlug
+	if p.Slug != nil && *p.Slug != existingOrgSlug {
+		if !auth.IsValidSlug(*p.Slug) {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid slug format or length"}
+		}
+		if _, err := q().OrgIDBySlug(ctx, *p.Slug); err == nil {
+			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization slug is already in use"}
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		nextSlug = *p.Slug
+	}
+
+	var name, logo, discord, vrchat sql.NullString
+	if p.Name != nil {
+		name = sql.NullString{String: *p.Name, Valid: true}
+	}
+	if p.Logo != nil {
+		logo = sql.NullString{String: *p.Logo, Valid: true}
+	}
+	if discordInvite != nil {
+		discord = sql.NullString{String: *discordInvite, Valid: true}
+	}
+	if vrchatGroupId != nil {
+		vrchat = sql.NullString{String: *vrchatGroupId, Valid: true}
+	}
+
+	err = q().UpdateOrgDetails(ctx, sqlc.UpdateOrgDetailsParams{
+		Slug:          nextSlug,
+		UpdatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		Name:          name,
+		ClearLogo:     p.ClearLogo,
+		Logo:          logo,
+		DiscordInvite: discord,
+		VrchatGroupId: vrchat,
+		ID:            existingOrgID,
+	})
+	if isUniqueViolation(err) {
+		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization slug is already in use"}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Also update team if record exists in team table
+	if _, errTeam := q().GetTeamByID(ctx, existingOrgID); errTeam == nil {
+		_ = q().UpdateTeam(ctx, sqlc.UpdateTeamParams{
+			Slug:      nextSlug,
+			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:      name,
+			ClearLogo: p.ClearLogo,
+			Logo:      logo,
+			ID:        existingOrgID,
+		})
+	}
+
+	invalidateTeamCache(ctx, existingOrgID)
+	return loadTeam(ctx, existingOrgID)
+}
+
+//encore:api public method=GET path=/api/admin/organizations
+func (s *Service) ListAdminOrganizations(ctx context.Context, p *ListAdminOrganizationsRequest) (*ListAdminOrganizationsResponse, error) {
+	return listAdminOrganizations(ctx, p.Search, p.Limit, p.Offset)
+}
+
+//encore:api public method=POST path=/api/admin/organizations
+func (s *Service) CreateAdminOrganization(ctx context.Context, p *CreateAdminOrganizationRequest) (*Team, error) {
+	return createAdminOrganization(ctx, p.Authorization, p.Name, p.Logo, p.DiscordInvite, p.VrchatGroupId)
+}
+
+//encore:api public method=PATCH path=/api/admin/organizations
+func (s *Service) UpdateAdminOrganization(ctx context.Context, p *UpdateAdminOrganizationRequest) (*Team, error) {
+	return updateAdminOrganization(ctx, p.Authorization, p.ID, &UpdateTeamParams{
+		Name: p.Name, Slug: p.Slug, Logo: p.Logo, ClearLogo: p.ClearLogo,
+	}, p.DiscordInvite, p.VrchatGroupId)
 }
 
 //encore:api public method=POST path=/api/admin/teams/convert-to-org

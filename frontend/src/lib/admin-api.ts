@@ -1581,6 +1581,49 @@ export async function getAdminTeam(id: string): Promise<teammanager.Team> {
   return team
 }
 
+export async function listAdminOrganizations(search = '', limit = 10, offset = 0) {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.ListAdminOrganizations({ search, limit, offset })
+  }
+  return { organizations: [], total: 0 }
+}
+
+export async function createAdminOrganization(
+  params: { name: string; logo?: string | null; discordInvite?: string | null; vrchatGroupId?: string | null },
+  authHeader: string
+) {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.CreateAdminOrganization({
+      Authorization: authHeader,
+      name: params.name,
+      logo: params.logo ?? undefined,
+      discordInvite: params.discordInvite ?? undefined,
+      vrchatGroupId: params.vrchatGroupId ?? undefined,
+    })
+  }
+  throw new Error('Not implemented in mock mode')
+}
+
+export async function updateAdminOrganization(
+  id: string,
+  params: { name?: string; slug?: string; logo?: string | null; clearLogo?: boolean; discordInvite?: string | null; vrchatGroupId?: string | null },
+  authHeader: string
+) {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.UpdateAdminOrganization({
+      id,
+      Authorization: authHeader,
+      name: params.name,
+      slug: params.slug,
+      logo: params.logo ?? undefined,
+      clearLogo: params.clearLogo,
+      discordInvite: params.discordInvite ?? undefined,
+      vrchatGroupId: params.vrchatGroupId ?? undefined,
+    })
+  }
+  throw new Error('Not implemented in mock mode')
+}
+
 export async function updateAdminTeamStats(
   id: string,
   params: {

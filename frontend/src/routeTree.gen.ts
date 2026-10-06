@@ -25,9 +25,11 @@ import { Route as AdminEventsRouteImport } from './routes/admin/events'
 import { Route as AdminApprovalsRouteImport } from './routes/admin/approvals'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 import { Route as AdminTeamsIndexRouteImport } from './routes/admin/teams/index'
+import { Route as AdminOrganizationsIndexRouteImport } from './routes/admin/organizations/index'
 import { Route as TeamsManageIdRouteImport } from './routes/teams/manage.$id'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
 import { Route as AdminTeamsTeamIdRouteImport } from './routes/admin/teams/$teamId'
+import { Route as AdminOrganizationsOrgIdRouteImport } from './routes/admin/organizations/$orgId'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events/$eventId'
 
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -110,6 +112,11 @@ const AdminTeamsIndexRoute = AdminTeamsIndexRouteImport.update({
   path: '/admin/teams/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminOrganizationsIndexRoute = AdminOrganizationsIndexRouteImport.update({
+  id: '/admin/organizations/',
+  path: '/admin/organizations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsManageIdRoute = TeamsManageIdRouteImport.update({
   id: '/teams/manage/$id',
   path: '/teams/manage/$id',
@@ -123,6 +130,11 @@ const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
 const AdminTeamsTeamIdRoute = AdminTeamsTeamIdRouteImport.update({
   id: '/admin/teams/$teamId',
   path: '/admin/teams/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminOrganizationsOrgIdRoute = AdminOrganizationsOrgIdRouteImport.update({
+  id: '/admin/organizations/$orgId',
+  path: '/admin/organizations/$orgId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
@@ -147,9 +159,11 @@ export interface FileRoutesByFullPath {
   '/events/': typeof EventsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
+  '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
   '/teams/manage/$id': typeof TeamsManageIdRoute
+  '/admin/organizations/': typeof AdminOrganizationsIndexRoute
   '/admin/teams/': typeof AdminTeamsIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
@@ -169,9 +183,11 @@ export interface FileRoutesByTo {
   '/events': typeof EventsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
+  '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
   '/teams/manage/$id': typeof TeamsManageIdRoute
+  '/admin/organizations': typeof AdminOrganizationsIndexRoute
   '/admin/teams': typeof AdminTeamsIndexRoute
   '/admin/users': typeof AdminUsersIndexRoute
 }
@@ -192,9 +208,11 @@ export interface FileRoutesById {
   '/events/': typeof EventsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
+  '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
   '/teams/manage/$id': typeof TeamsManageIdRoute
+  '/admin/organizations/': typeof AdminOrganizationsIndexRoute
   '/admin/teams/': typeof AdminTeamsIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
@@ -216,9 +234,11 @@ export interface FileRouteTypes {
     | '/events/'
     | '/profile/'
     | '/admin/events/$eventId'
+    | '/admin/organizations/$orgId'
     | '/admin/teams/$teamId'
     | '/admin/users/$userId'
     | '/teams/manage/$id'
+    | '/admin/organizations/'
     | '/admin/teams/'
     | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
@@ -238,9 +258,11 @@ export interface FileRouteTypes {
     | '/events'
     | '/profile'
     | '/admin/events/$eventId'
+    | '/admin/organizations/$orgId'
     | '/admin/teams/$teamId'
     | '/admin/users/$userId'
     | '/teams/manage/$id'
+    | '/admin/organizations'
     | '/admin/teams'
     | '/admin/users'
   id:
@@ -260,9 +282,11 @@ export interface FileRouteTypes {
     | '/events/'
     | '/profile/'
     | '/admin/events/$eventId'
+    | '/admin/organizations/$orgId'
     | '/admin/teams/$teamId'
     | '/admin/users/$userId'
     | '/teams/manage/$id'
+    | '/admin/organizations/'
     | '/admin/teams/'
     | '/admin/users/'
   fileRoutesById: FileRoutesById
@@ -282,9 +306,11 @@ export interface RootRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   EventsIndexRoute: typeof EventsIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
+  AdminOrganizationsOrgIdRoute: typeof AdminOrganizationsOrgIdRoute
   AdminTeamsTeamIdRoute: typeof AdminTeamsTeamIdRoute
   AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
   TeamsManageIdRoute: typeof TeamsManageIdRoute
+  AdminOrganizationsIndexRoute: typeof AdminOrganizationsIndexRoute
   AdminTeamsIndexRoute: typeof AdminTeamsIndexRoute
   AdminUsersIndexRoute: typeof AdminUsersIndexRoute
 }
@@ -403,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTeamsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/organizations/': {
+      id: '/admin/organizations/'
+      path: '/admin/organizations'
+      fullPath: '/admin/organizations/'
+      preLoaderRoute: typeof AdminOrganizationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/manage/$id': {
       id: '/teams/manage/$id'
       path: '/teams/manage/$id'
@@ -422,6 +455,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/teams/$teamId'
       fullPath: '/admin/teams/$teamId'
       preLoaderRoute: typeof AdminTeamsTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/organizations/$orgId': {
+      id: '/admin/organizations/$orgId'
+      path: '/admin/organizations/$orgId'
+      fullPath: '/admin/organizations/$orgId'
+      preLoaderRoute: typeof AdminOrganizationsOrgIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/events/$eventId': {
@@ -461,9 +501,11 @@ const rootRouteChildren: RootRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   EventsIndexRoute: EventsIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
+  AdminOrganizationsOrgIdRoute: AdminOrganizationsOrgIdRoute,
   AdminTeamsTeamIdRoute: AdminTeamsTeamIdRoute,
   AdminUsersUserIdRoute: AdminUsersUserIdRoute,
   TeamsManageIdRoute: TeamsManageIdRoute,
+  AdminOrganizationsIndexRoute: AdminOrganizationsIndexRoute,
   AdminTeamsIndexRoute: AdminTeamsIndexRoute,
   AdminUsersIndexRoute: AdminUsersIndexRoute,
 }

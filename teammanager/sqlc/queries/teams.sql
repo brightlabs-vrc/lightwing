@@ -21,6 +21,10 @@ SELECT slug FROM "organization" WHERE id = $1;
 INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, $9) RETURNING id;
 
+-- name: CreateOrgWithID :one
+INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10) RETURNING id;
+
 -- name: TouchOrg :exec
 UPDATE "organization" SET "updatedAt" = $1 WHERE id = $2;
 
@@ -117,6 +121,48 @@ VALUES ($1, $2, $3, CURRENT_TIMESTAMP);
 -- name: DeleteTeamOrganization :exec
 DELETE FROM "teamOrganization"
 WHERE "teamId" = $1 AND "organizationId" = $2;
+
+-- name: DeleteTeamOrganizationsForTeam :exec
+DELETE FROM "teamOrganization"
+WHERE "teamId" = $1;
+
+-- name: DeleteTeamMembersForTeam :exec
+DELETE FROM "teamMember"
+WHERE "teamId" = $1;
+
+-- name: DeleteTeam :exec
+DELETE FROM "team"
+WHERE id = $1;
+
+-- name: UpdateOrgDetails :exec
+UPDATE "organization"
+SET "slug" = sqlc.arg('slug'),
+    "updatedAt" = sqlc.arg('updated_at'),
+    "name" = COALESCE(sqlc.narg('name'), "name"),
+    "logo" = CASE WHEN sqlc.arg('clear_logo')::boolean THEN NULL ELSE COALESCE(sqlc.narg('logo'), "logo") END,
+    "discordInvite" = COALESCE(sqlc.narg('discord_invite'), "discordInvite"),
+    "vrchatGroupId" = COALESCE(sqlc.narg('vrchat_group_id'), "vrchatGroupId")
+WHERE id = sqlc.arg('id');
+
+-- name: CountAdminOrgs :one
+SELECT COUNT(*) FROM "organization";
+
+-- name: CountAdminOrgsBySearch :one
+SELECT COUNT(*) FROM "organization"
+WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%';
+
+-- name: ListAdminOrgs :many
+SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+FROM "organization"
+ORDER BY name ASC
+LIMIT NULLIF($1::int, 0) OFFSET $2;
+
+-- name: ListAdminOrgsBySearch :many
+SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+FROM "organization"
+WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%'
+ORDER BY name ASC
+LIMIT NULLIF($2::int, 0) OFFSET $3;
 
 -- name: GetPrimaryOrgForTeam :one
 SELECT o.id, o.name, o.slug, o.logo, o."orgType", o.status

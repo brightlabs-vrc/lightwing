@@ -3,7 +3,9 @@ package teammanager
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -353,10 +355,42 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 			t.Errorf("convertTeamToOrg returned invalid team: %+v", convertedTeam)
 		}
 
-		// Existing team applies to join target organization
+		// Verify team record in `team` table is deleted
+		if _, err := q().GetTeamByID(ctx, newTeam.ID); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("expected team record to be deleted, got err = %v", err)
+		}
+
+		// Verify organization record exists with migrated roster
+		orgRow, err := q().GetOrgByID(ctx, convertedTeam.ID)
+		if err != nil {
+			t.Fatalf("GetOrgByID failed: %v", err)
+		}
+		if orgRow.Name != teamName {
+			t.Errorf("orgRow.Name = %s, want %s", orgRow.Name, teamName)
+		}
+
+		// Check roster in member table
+		members, err := q().ListMemberRows(ctx, convertedTeam.ID)
+		if err != nil {
+			t.Fatalf("ListMemberRows failed: %v", err)
+		}
+		if len(members) == 0 {
+			t.Errorf("expected migrated roster members in organization, got 0")
+		}
+
+		// Existing team applies to join target organization (using a newly created team)
+		secondTeam, err := createTeam(ctx, bearer(siteAdminTok), "Second Velocity Team", nil)
+		if err != nil {
+			t.Fatalf("createTeam secondTeam failed: %v", err)
+		}
+		_, err = addTeamMember(ctx, bearer(siteAdminTok), secondTeam.ID, teamAdminUser, "administrator")
+		if err != nil {
+			t.Fatalf("addTeamMember for secondTeam failed: %v", err)
+		}
+
 		appView, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
 			Authorization:         bearer(teamAdminTok),
-			TeamID:                sptr(newTeam.ID),
+			TeamID:                sptr(secondTeam.ID),
 			PrimaryOrganizationID: targetOrgID,
 		})
 		if err != nil {
