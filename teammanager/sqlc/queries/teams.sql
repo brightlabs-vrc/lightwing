@@ -21,6 +21,10 @@ SELECT slug FROM "organization" WHERE id = $1;
 INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, $9) RETURNING id;
 
+-- name: CreateOrgWithID :one
+INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10) RETURNING id;
+
 -- name: TouchOrg :exec
 UPDATE "organization" SET "updatedAt" = $1 WHERE id = $2;
 

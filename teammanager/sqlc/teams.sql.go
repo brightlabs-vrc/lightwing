@@ -211,6 +211,42 @@ func (q *Queries) CreateOrg(ctx context.Context, arg CreateOrgParams) (string, e
 	return id, err
 }
 
+const createOrgWithID = `-- name: CreateOrgWithID :one
+INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10) RETURNING id
+`
+
+type CreateOrgWithIDParams struct {
+	ID                string
+	Name              string
+	Slug              string
+	Logo              sql.NullString
+	OrgType           sql.NullString
+	Status            sql.NullString
+	DiscordInvite     sql.NullString
+	VrchatGroupId     sql.NullString
+	SubmittedByUserId sql.NullString
+	UpdatedAt         sql.NullTime
+}
+
+func (q *Queries) CreateOrgWithID(ctx context.Context, arg CreateOrgWithIDParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, createOrgWithID,
+		arg.ID,
+		arg.Name,
+		arg.Slug,
+		arg.Logo,
+		arg.OrgType,
+		arg.Status,
+		arg.DiscordInvite,
+		arg.VrchatGroupId,
+		arg.SubmittedByUserId,
+		arg.UpdatedAt,
+	)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO "team" (id, name, slug, logo, status, "submittedByUserId", "createdAt", "updatedAt")
 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id

@@ -422,7 +422,8 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 			logoVal = teamRow.Logo
 		}
 
-		newOrgID, err := q().CreateOrg(ctx, sqlc.CreateOrgParams{
+		newOrgID, err := q().CreateOrgWithID(ctx, sqlc.CreateOrgWithIDParams{
+			ID:                targetTeamID,
 			Name:              teamRow.Name,
 			Slug:              targetSlug,
 			Logo:              logoVal,
