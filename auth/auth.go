@@ -70,6 +70,32 @@ func discordUserAvatarURL(user *discordAuthUser) string {
 
 // --- API Endpoints ---
 
+// handleDebugSignIn creates a debug user session and formats the redirect response
+// with the session token appended as a URL fragment.
+func handleDebugSignIn(ctx context.Context, redirectTo string) (*SignInSocialResponse, error) {
+	sessionToken, serr := ensureDebugUserSession(ctx)
+	if serr != nil {
+		rlog.Error("failed to create debug session", "err", serr)
+		return nil, &errs.Error{
+			Code:    errs.Internal,
+			Message: "failed to create debug session",
+		}
+	}
+	targetURL := redirectTo
+	parsed, err := url.Parse(targetURL)
+	if err == nil {
+		if parsed.Fragment != "" {
+			parsed.Fragment += "&access_token=" + sessionToken
+		} else {
+			parsed.Fragment = "access_token=" + sessionToken
+		}
+		targetURL = parsed.String()
+	}
+	return &SignInSocialResponse{
+		RedirectURL: targetURL,
+	}, nil
+}
+
 // SignInSocial returns a redirect URL to start the Discord OAuth flow.
 //
 //encore:api public method=GET path=/auth/sign-in/social
@@ -80,27 +106,7 @@ func (s *Service) SignInSocial(ctx context.Context, p *SignInSocialParams) (*Sig
 	}
 
 	if debugLoginEnabled() {
-		sessionToken, serr := ensureDebugUserSession(ctx)
-		if serr != nil {
-			rlog.Error("failed to create debug session", "err", serr)
-			return nil, &errs.Error{
-				Code:    errs.Internal,
-				Message: "failed to create debug session",
-			}
-		}
-		targetURL := redirectTo
-		parsed, err := url.Parse(targetURL)
-		if err == nil {
-			if parsed.Fragment != "" {
-				parsed.Fragment += "&access_token=" + sessionToken
-			} else {
-				parsed.Fragment = "access_token=" + sessionToken
-			}
-			targetURL = parsed.String()
-		}
-		return &SignInSocialResponse{
-			RedirectURL: targetURL,
-		}, nil
+		return handleDebugSignIn(ctx, redirectTo)
 	}
 
 	state := generateState()
