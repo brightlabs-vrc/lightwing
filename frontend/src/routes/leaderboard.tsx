@@ -12,7 +12,6 @@ import {
 } from '@pxlkit/ui-kit'
 import {
   getLeaderboard,
-  recalculateLeaderboard,
   LeaderboardEntry,
   LeaderboardResponse,
 } from '../lib/public-api'
@@ -30,43 +29,31 @@ export function LeaderboardPage() {
   const [pageSize, setPageSize] = useState(10)
 
   const [loading, setLoading] = useState(true)
-  const [isRecalculating, setIsRecalculating] = useState(false)
   const [data, setData] = useState<LeaderboardResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchLeaderboard = async (forceRecalc = false) => {
+  const fetchLeaderboard = async () => {
     try {
-      if (forceRecalc) {
-        setIsRecalculating(true)
-        const res = await recalculateLeaderboard()
-        setData(res)
-      } else {
-        setLoading(true)
-        const res = await getLeaderboard({
-          SortBy: sortBy,
-          Search: search.trim(),
-          ClassTier: classTier,
-          Limit: pageSize,
-          Offset: (page - 1) * pageSize,
-        })
-        setData(res)
-      }
+      setLoading(true)
+      const res = await getLeaderboard({
+        SortBy: sortBy,
+        Search: search.trim(),
+        ClassTier: classTier,
+        Limit: pageSize,
+        Offset: (page - 1) * pageSize,
+      })
+      setData(res)
       setError(null)
     } catch (err: any) {
       setError(err?.message || 'Failed to load leaderboard')
     } finally {
       setLoading(false)
-      setIsRecalculating(false)
     }
   }
 
   useEffect(() => {
     void fetchLeaderboard()
   }, [sortBy, search, classTier, page, pageSize])
-
-  const handleRecalculate = () => {
-    void fetchLeaderboard(true)
-  }
 
   const entries: LeaderboardEntry[] = data?.entries ?? []
   const total = data?.total ?? 0
@@ -77,17 +64,6 @@ export function LeaderboardPage() {
         title="GLOBAL STANDINGS & LEADERBOARD"
         titleTone="gold"
         size="lg"
-        actions={
-          <PixelButton
-            variant="soft"
-            tone="purple"
-            size="sm"
-            onClick={handleRecalculate}
-            disabled={isRecalculating || loading}
-          >
-            {isRecalculating ? 'RECALCULATING...' : 'REFRESH STANDINGS'}
-          </PixelButton>
-        }
       />
 
       {/* Filter Bar */}

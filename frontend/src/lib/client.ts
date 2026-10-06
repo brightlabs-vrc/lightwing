@@ -2523,7 +2523,6 @@ export namespace scorecalc {
         ClassTier?: string
         Limit?: number
         Offset?: number
-        ForceRecalculate?: boolean
     }
 
     export class ServiceClient {
@@ -2532,7 +2531,6 @@ export namespace scorecalc {
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
             this.GetLeaderboard = this.GetLeaderboard.bind(this)
-            this.RecalculateLeaderboard = this.RecalculateLeaderboard.bind(this)
         }
 
         public async GetLeaderboard(params: GetLeaderboardParams): Promise<LeaderboardResponse> {
@@ -2542,15 +2540,9 @@ export namespace scorecalc {
                 classTier: params.ClassTier,
                 limit: params.Limit !== undefined ? String(params.Limit) : undefined,
                 offset: params.Offset !== undefined ? String(params.Offset) : undefined,
-                forceRecalculate: params.ForceRecalculate !== undefined ? String(params.ForceRecalculate) : undefined,
             })
 
             const resp = await this.baseClient.callTypedAPI("GET", `/api/leaderboard`, undefined, {query})
-            return await resp.json() as LeaderboardResponse
-        }
-
-        public async RecalculateLeaderboard(): Promise<LeaderboardResponse> {
-            const resp = await this.baseClient.callTypedAPI("POST", `/api/leaderboard/recalculate`)
             return await resp.json() as LeaderboardResponse
         }
     }
