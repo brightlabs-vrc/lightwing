@@ -341,7 +341,7 @@ func setUserSiteRole(ctx context.Context, actor *Actor, params *SetUserSiteRoleP
 	if !isSiteAdmin(actor.SiteRole) {
 		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "site admin required"}
 	}
-	if params.SiteRole != string(SiteRoleUser) && params.SiteRole != string(SiteRoleSiteAdmin) {
+	if params.SiteRole != string(SiteRoleUser) && params.SiteRole != string(SiteRoleSiteAdmin) && params.SiteRole != string(SiteRoleEventAdmin) {
 		return nil, &errs.Error{
 			Code:    errs.InvalidArgument,
 			Message: fmt.Sprintf("invalid site role: %s", params.SiteRole),

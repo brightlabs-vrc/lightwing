@@ -18,6 +18,35 @@ type ListTeamMembersResponse struct {
 }
 
 func listTeamMembers(ctx context.Context, id, search string, limit, offset int) (*ListTeamMembersResponse, error) {
+	// Try roster for team first
+	_, teamErr := q().GetTeamByID(ctx, id)
+	if teamErr == nil {
+		roster, err := q().ListRosterForTeam(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		members := make([]MemberListItem, 0, len(roster))
+		for _, m := range roster {
+			var slug *string
+			if m.Slug.Valid && m.Slug.String != "" {
+				s := m.Slug.String
+				slug = &s
+			}
+			role := "member"
+			if m.Role.Valid && m.Role.String != "" {
+				role = m.Role.String
+			}
+			members = append(members, MemberListItem{
+				UserID: m.UserId,
+				Name:   displayName(m.Name, m.VrchatUsername),
+				Slug:   slug,
+				Role:   role,
+			})
+		}
+		return &ListTeamMembersResponse{Members: members, Total: len(members)}, nil
+	}
+
+	// Fallback to org members
 	var total int64
 	var stubs []memberStub
 	var err error
@@ -89,26 +118,61 @@ type memberStub struct {
 	Slug           sql.NullString
 }
 
+func resolvePrimaryOrgOrTarget(ctx context.Context, id string) (string, error) {
+	primOrg, err := q().GetPrimaryOrgForTeam(ctx, id)
+	if err == nil {
+		return primOrg.ID, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	// Fallback: check if id is an organization directly
+	orgID, err := q().OrgIDByID(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return orgID, nil
+}
+
 // --- addTeamMember (mirrors addTeamMember) ---
 
 func addTeamMember(ctx context.Context, authorization, id, userID, role string) (*Team, error) {
-	if _, _, err := auth.RequirePermission(ctx, authorization, id, "member", "create"); err != nil {
+	targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+	if err != nil {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+	}
+
+	if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "create"); err != nil {
 		return nil, err
 	}
 	targetRole := role
 	if targetRole == "" {
 		targetRole = "member"
 	}
-	if _, err := q().OrgIDByID(ctx, id); errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
-	} else if err != nil {
-		return nil, err
-	}
+
 	if _, err := q().UserIDByID(ctx, userID); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	} else if err != nil {
 		return nil, err
 	}
+
+	// Check if this is a team
+	teamRow, teamErr := q().GetTeamByID(ctx, id)
+	if teamErr == nil {
+		if err := q().InsertTeamMemberRow(ctx, sqlc.InsertTeamMemberRowParams{
+			TeamId: teamRow.ID,
+			UserId: userID,
+			Role:   sql.NullString{String: targetRole, Valid: true},
+		}); isUniqueViolation(err) {
+			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "user is already a member of this team"}
+		} else if err != nil {
+			return nil, err
+		}
+		invalidateTeamCache(ctx, id)
+		return loadTeam(ctx, id)
+	}
+
+	// Else organization fallback
 	if targetRole == auth.AdministratorRole {
 		if err := assertAdminCapNotReached(ctx, id); err != nil {
 			return nil, err
@@ -142,9 +206,30 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 // --- updateTeamMemberRole (mirrors updateTeamMemberRole) ---
 
 func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role string) (*Team, error) {
-	if _, _, err := auth.RequirePermission(ctx, authorization, id, "member", "update"); err != nil {
+	targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+	if err != nil {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+	}
+
+	if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "update"); err != nil {
 		return nil, err
 	}
+
+	// Check if this is a team
+	teamRow, teamErr := q().GetTeamByID(ctx, id)
+	if teamErr == nil {
+		if err := q().UpdateTeamMemberRoleRow(ctx, sqlc.UpdateTeamMemberRoleRowParams{
+			Role:   sql.NullString{String: role, Valid: true},
+			TeamId: teamRow.ID,
+			UserId: userID,
+		}); err != nil {
+			return nil, err
+		}
+		invalidateTeamCache(ctx, id)
+		return loadTeam(ctx, id)
+	}
+
+	// Org fallback
 	currentRole, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
 		OrganizationId: id,
 		UserId:         userID,
@@ -178,9 +263,29 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 // --- removeTeamMember (mirrors removeTeamMember) ---
 
 func removeTeamMember(ctx context.Context, authorization, id, userID string) (*Team, error) {
-	if _, _, err := auth.RequirePermission(ctx, authorization, id, "member", "delete"); err != nil {
+	targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+	if err != nil {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+	}
+
+	if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "delete"); err != nil {
 		return nil, err
 	}
+
+	// Check if this is a team
+	teamRow, teamErr := q().GetTeamByID(ctx, id)
+	if teamErr == nil {
+		if err := q().DeleteTeamMemberRow(ctx, sqlc.DeleteTeamMemberRowParams{
+			TeamId: teamRow.ID,
+			UserId: userID,
+		}); err != nil {
+			return nil, err
+		}
+		invalidateTeamCache(ctx, id)
+		return loadTeam(ctx, id)
+	}
+
+	// Org fallback
 	if _, err := q().MemberIDByOrgAndUser(ctx, sqlc.MemberIDByOrgAndUserParams{
 		OrganizationId: id,
 		UserId:         userID,
@@ -203,12 +308,8 @@ func removeTeamMember(ctx context.Context, authorization, id, userID string) (*T
 	return loadTeam(ctx, id)
 }
 
-// --- HTTP endpoints (thin wrappers over the cores above) ---
-//
-// Member ids travel in the body/query rather than :path params because this
-// Encore version only accepts scalar params alongside path params.
+// --- HTTP endpoints ---
 
-// ListTeamMembersRequest carries the team id plus search/pagination query params.
 type ListTeamMembersRequest struct {
 	ID     string `query:"id"`
 	Search string `query:"search"`
@@ -221,7 +322,6 @@ func (s *Service) ListTeamMembers(ctx context.Context, p *ListTeamMembersRequest
 	return listTeamMembers(ctx, p.ID, p.Search, p.Limit, p.Offset)
 }
 
-// AddTeamMemberRequest carries the team id, auth header, and new membership.
 type AddTeamMemberRequest struct {
 	ID            string `json:"id"`
 	Authorization string `header:"Authorization"`
@@ -234,7 +334,6 @@ func (s *Service) AddTeamMember(ctx context.Context, p *AddTeamMemberRequest) (*
 	return addTeamMember(ctx, p.Authorization, p.ID, p.UserID, p.Role)
 }
 
-// UpdateTeamMemberRoleRequest carries the team/user ids, auth header, and role.
 type UpdateTeamMemberRoleRequest struct {
 	ID            string `json:"id"`
 	UserID        string `json:"userId"`
@@ -247,7 +346,6 @@ func (s *Service) UpdateTeamMemberRole(ctx context.Context, p *UpdateTeamMemberR
 	return updateTeamMemberRole(ctx, p.Authorization, p.ID, p.UserID, p.Role)
 }
 
-// RemoveTeamMemberRequest carries the team/user ids plus the auth header.
 type RemoveTeamMemberRequest struct {
 	ID            string `query:"id"`
 	UserID        string `query:"userId"`

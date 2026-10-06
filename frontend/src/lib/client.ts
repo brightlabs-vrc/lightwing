@@ -1959,6 +1959,93 @@ export namespace eventmanager {
  * all state lives in the shared lightwing database (db).
  */
 export namespace teammanager {
+    export interface LinkedOrganization {
+        id: string
+        name: string
+        slug: string
+        logo?: string | null
+        orgType: string
+        status: string
+        isPrimary: boolean
+    }
+
+    export interface OrgApplicationView {
+        id: string
+        name: string
+        slug: string
+        logo?: string | null
+        orgType: string
+        status: string
+        discordInvite: string
+        vrchatGroupId: string
+        submittedByUserId: string
+        createdAt: string
+        updatedAt: string
+        members: TeamMemberSummary[]
+    }
+
+    export interface TeamApplicationView {
+        id: string
+        name: string
+        slug: string
+        logo?: string | null
+        status: string
+        submittedByUserId: string
+        createdAt: string
+        updatedAt: string
+        primaryOrganization: LinkedOrganization
+        secondaryOrganizations: LinkedOrganization[]
+        members: TeamMemberSummary[]
+    }
+
+    export interface SubmitOrgApplicationRequest {
+        Authorization: string
+        name: string
+        slug?: string | null
+        logo?: string | null
+        discordInvite: string
+        vrchatGroupId: string
+        initialRoster?: string[]
+    }
+
+    export interface SubmitTeamApplicationRequest {
+        Authorization: string
+        name: string
+        slug?: string | null
+        logo?: string | null
+        primaryOrganizationId: string
+        secondaryOrganizationIds?: string[]
+        initialRoster?: string[]
+    }
+
+    export interface ListApplicationsResponse {
+        organizations: OrgApplicationView[]
+        teams: TeamApplicationView[]
+    }
+
+    export interface ListOrganizationsResponse {
+        organizations: LinkedOrganization[]
+    }
+
+    export interface ReviewApplicationRequest {
+        Authorization: string
+        id: string
+        type: string
+        action: string
+    }
+
+    export interface LinkSecondaryOrgRequest {
+        Authorization: string
+        teamId: string
+        organizationId: string
+    }
+
+    export interface UnlinkSecondaryOrgRequest {
+        Authorization: string
+        teamId: string
+        organizationId: string
+    }
+
     /**
      * AddTeamMemberRequest carries the team id, auth header, and new membership.
      */
@@ -2043,6 +2130,9 @@ export namespace teammanager {
         name: string
         slug: string
         logo: string
+        status?: string
+        primaryOrganizationId?: string
+        organizations?: LinkedOrganization[]
         stats: TeamStats
         administratorSlotsRemaining: number
         members: TeamMemberSummary[]
@@ -2131,6 +2221,53 @@ export namespace teammanager {
             this.UpdateTeam = this.UpdateTeam.bind(this)
             this.UpdateTeamMemberRole = this.UpdateTeamMemberRole.bind(this)
             this.UpdateTeamStats = this.UpdateTeamStats.bind(this)
+            this.SubmitOrganizationApplication = this.SubmitOrganizationApplication.bind(this)
+            this.SubmitTeamApplication = this.SubmitTeamApplication.bind(this)
+            this.ListApplications = this.ListApplications.bind(this)
+            this.ReviewApplication = this.ReviewApplication.bind(this)
+            this.LinkSecondaryOrganization = this.LinkSecondaryOrganization.bind(this)
+            this.UnlinkSecondaryOrganization = this.UnlinkSecondaryOrganization.bind(this)
+            this.ListApprovedOrganizations = this.ListApprovedOrganizations.bind(this)
+        }
+
+        public async SubmitOrganizationApplication(params: SubmitOrgApplicationRequest): Promise<OrgApplicationView> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/applications/organization`, JSON.stringify(params), {headers})
+            return await resp.json() as OrgApplicationView
+        }
+
+        public async SubmitTeamApplication(params: SubmitTeamApplicationRequest): Promise<TeamApplicationView> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/applications/team`, JSON.stringify(params), {headers})
+            return await resp.json() as TeamApplicationView
+        }
+
+        public async ListApplications(params: { Authorization: string }): Promise<ListApplicationsResponse> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/admin/applications`, undefined, {headers})
+            return await resp.json() as ListApplicationsResponse
+        }
+
+        public async ReviewApplication(params: ReviewApplicationRequest): Promise<void> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            await this.baseClient.callTypedAPI("POST", `/api/admin/applications/review`, JSON.stringify(params), {headers})
+        }
+
+        public async LinkSecondaryOrganization(params: LinkSecondaryOrgRequest): Promise<Team> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/teams/link-secondary`, JSON.stringify(params), {headers})
+            return await resp.json() as Team
+        }
+
+        public async UnlinkSecondaryOrganization(params: UnlinkSecondaryOrgRequest): Promise<Team> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/teams/unlink-secondary`, JSON.stringify(params), {headers})
+            return await resp.json() as Team
+        }
+
+        public async ListApprovedOrganizations(): Promise<ListOrganizationsResponse> {
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/organizations`)
+            return await resp.json() as ListOrganizationsResponse
         }
 
         public async AddTeamMember(params: AddTeamMemberRequest): Promise<Team> {

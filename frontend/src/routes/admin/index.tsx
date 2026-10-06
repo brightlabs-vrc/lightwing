@@ -1,11 +1,11 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
-import { requireSiteAdmin } from '../../lib/auth-guard'
+import { requireAdminPanel } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 
 export const Route = createFileRoute('/admin/')({
   beforeLoad: async ({ location }) => {
-    await requireSiteAdmin(location)
+    await requireAdminPanel(location)
   },
   component: AdminPage,
 })
@@ -78,6 +78,35 @@ function AdminPage() {
             <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
               <Link to="/admin/events" className="slds-button slds-button_brand" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
                 Manage Events
+              </Link>
+            </footer>
+          </article>
+        </div>
+
+        <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
+          <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
+            <div className="slds-card__header slds-grid">
+              <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
+                  <span className="slds-icon_container slds-icon-standard-approval" style={{ fontSize: '20px' }}>📋</span>
+                </div>
+                <div className="slds-media__body">
+                  <h2 className="slds-card__header-title">
+                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      Pending Approvals
+                    </span>
+                  </h2>
+                </div>
+              </header>
+            </div>
+            <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
+              <p className="slds-text-body_regular slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+                Review pending organization and competitive team registration applications submitted by community members.
+              </p>
+            </div>
+            <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
+              <Link to="/admin/approvals" className="slds-button slds-button_neutral" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+                Review Queue
               </Link>
             </footer>
           </article>

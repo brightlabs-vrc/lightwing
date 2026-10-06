@@ -87,6 +87,11 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
                   <span className="slds-truncate">Teams</span>
                 </Link>
               </li>
+              <li className={`slds-context-bar__item ${isCurrent('/admin/approvals') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
+                <Link to="/admin/approvals" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
+                  <span className="slds-truncate">Approvals</span>
+                </Link>
+              </li>
               <li className="slds-context-bar__item" style={{ display: 'inline-flex', marginLeft: 'auto' }}>
                 <Link to="/" className="slds-context-bar__label-action" style={{ textDecoration: 'none', color: '#0176d3', fontWeight: 'bold' }}>
                   <span className="slds-truncate">← Back to Portal</span>

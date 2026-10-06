@@ -1,7 +1,7 @@
 import { Link, Outlet, createFileRoute, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { requireSiteAdmin } from '../../lib/auth-guard'
+import { requireAdminPanel } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
 import type { ClassTier, EventOwnerType, EventStatus, EventTag } from '../../types'
@@ -17,7 +17,7 @@ import { SldsSkeletonList } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/admin/events')({
   beforeLoad: async ({ location }) => {
-    await requireSiteAdmin(location)
+    await requireAdminPanel(location)
   },
   component: AdminEventsListPage,
 })

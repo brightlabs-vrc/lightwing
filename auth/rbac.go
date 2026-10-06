@@ -127,6 +127,9 @@ func requirePermission(ctx context.Context, authorization string, organizationId
 	if isSiteAdmin(actor.SiteRole) {
 		return actor, string(actor.SiteRole), nil
 	}
+	if isEventAdmin(actor.SiteRole) && (resource == ResourceEvent || resource == ResourceRaceEvent || resource == ResourceRaceResult) {
+		return actor, string(actor.SiteRole), nil
+	}
 	role, err := getMemberRole(ctx, organizationId, actor.UserID)
 	if err != nil {
 		return nil, "", err
@@ -171,7 +174,7 @@ func requireEventPermission(ctx context.Context, authorization string, eventId s
 	if err != nil {
 		return nil, err
 	}
-	if isSiteAdmin(actor.SiteRole) {
+	if isSiteAdmin(actor.SiteRole) || isEventAdmin(actor.SiteRole) {
 		return actor, nil
 	}
 

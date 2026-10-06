@@ -37,8 +37,9 @@ const (
 type SiteRoleName string
 
 const (
-	SiteRoleUser      SiteRoleName = "USER"
-	SiteRoleSiteAdmin SiteRoleName = "SITE_ADMIN"
+	SiteRoleUser       SiteRoleName = "USER"
+	SiteRoleSiteAdmin  SiteRoleName = "SITE_ADMIN"
+	SiteRoleEventAdmin SiteRoleName = "EVENT_ADMIN"
 )
 
 const siteAdminRoleName = "SITE_ADMIN"
@@ -49,6 +50,11 @@ const siteAdminRoleName = "SITE_ADMIN"
 // Mirrors ts-legacy/auth/permissions.ts isSiteAdmin
 func isSiteAdmin(siteRole SiteRoleName) bool {
 	return siteRole == SiteRoleSiteAdmin
+}
+
+// isEventAdmin returns true when the site role is EVENT_ADMIN.
+func isEventAdmin(siteRole SiteRoleName) bool {
+	return siteRole == SiteRoleEventAdmin
 }
 
 // administratorRole is the org-level role name for organization administrators.

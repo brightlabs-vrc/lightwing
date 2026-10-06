@@ -45,7 +45,8 @@ func insertTestUser(t *testing.T, ctx context.Context, id, name, siteRole string
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", biography, "vrchatUsername", slug, "createdAt", "updatedAt")
-		 VALUES ($1, $2, $3, '', $4, '', '', $5, $6, $6)`,
+		 VALUES ($1, $2, $3, '', $4, '', '', $5, $6, $6)
+		 ON CONFLICT (id) DO UPDATE SET "siteRole" = EXCLUDED."siteRole"`,
 		id, name, id+"@example.com", siteRole, id, now,
 	)
 	if err != nil {
@@ -180,6 +181,143 @@ func TestGetTeam(t *testing.T) {
 	})
 }
 
+func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
+	ctx := context.Background()
+
+	// Setup users and roles
+	applicantUser := nextTeamID("applicant")
+	insertTestUser(t, ctx, applicantUser, "Applicant User", "USER")
+	applicantToken := insertTestSession(t, ctx, applicantUser)
+
+	siteAdmin := nextTeamID("app-site-admin")
+	insertTestUser(t, ctx, siteAdmin, "App Site Admin", "SITE_ADMIN")
+	siteAdminToken := insertTestSession(t, ctx, siteAdmin)
+
+	eventAdmin := nextTeamID("app-event-admin")
+	insertTestUser(t, ctx, eventAdmin, "App Event Admin", "EVENT_ADMIN")
+	eventAdminToken := insertTestSession(t, ctx, eventAdmin)
+
+	t.Run("Submit and review Organization application", func(t *testing.T) {
+		orgApp, err := submitOrganizationApplication(ctx, &SubmitOrgApplicationRequest{
+			Authorization: bearer(applicantToken),
+			Name:          "Apex Esports",
+			DiscordInvite: "https://discord.gg/apex",
+			VrchatGroupID: "grp_apex_123",
+		})
+		if err != nil {
+			t.Fatalf("submitOrganizationApplication failed: %v", err)
+		}
+		if orgApp.Status != "PENDING" || orgApp.DiscordInvite != "https://discord.gg/apex" {
+			t.Errorf("orgApp = %+v, want PENDING with discord invite", orgApp)
+		}
+
+		// EVENT_ADMIN cannot see org applications
+		listEvt, err := listAdminApplications(ctx, bearer(eventAdminToken))
+		if err != nil {
+			t.Fatalf("listAdminApplications failed for EVENT_ADMIN: %v", err)
+		}
+		if len(listEvt.Organizations) != 0 {
+			t.Errorf("EVENT_ADMIN should not see org applications: %+v", listEvt.Organizations)
+		}
+
+		// SITE_ADMIN sees org applications
+		listSite, err := listAdminApplications(ctx, bearer(siteAdminToken))
+		if err != nil {
+			t.Fatalf("listAdminApplications failed for SITE_ADMIN: %v", err)
+		}
+		found := false
+		for _, o := range listSite.Organizations {
+			if o.ID == orgApp.ID {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("org app %s not found in site admin list", orgApp.ID)
+		}
+
+		// Approve organization application
+		err = reviewApplication(ctx, &ReviewApplicationRequest{
+			Authorization: bearer(siteAdminToken),
+			ID:            orgApp.ID,
+			Type:          "ORGANIZATION",
+			Action:        "APPROVE",
+		})
+		if err != nil {
+			t.Fatalf("reviewApplication APPROVE failed: %v", err)
+		}
+	})
+
+	t.Run("Submit team application and primary/secondary org linking", func(t *testing.T) {
+		// Create 2 approved organizations
+		org1ID := createOrgWithMembers(t, ctx, nextTeamID("org-prim"), "Primary Org", nextTeamID("prim-slug"), []memberSpec{
+			{userID: applicantUser, role: "administrator", name: "Applicant"},
+		})
+		org2ID := createOrgWithMembers(t, ctx, nextTeamID("org-sec"), "Secondary Org", nextTeamID("sec-slug"), []memberSpec{
+			{userID: applicantUser, role: "administrator", name: "Applicant"},
+		})
+		_, _ = db.Exec(ctx, `UPDATE "organization" SET status = 'APPROVED' WHERE id IN ($1, $2)`, org1ID, org2ID)
+
+		teamApp, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
+			Authorization:         bearer(applicantToken),
+			Name:                  "Apex Racing Red",
+			PrimaryOrganizationID: org1ID,
+		})
+		if err != nil {
+			t.Fatalf("submitTeamApplication failed: %v", err)
+		}
+		if teamApp.Status != "PENDING" || teamApp.PrimaryOrganization.ID != org1ID {
+			t.Errorf("teamApp = %+v, want PENDING linked to org1", teamApp)
+		}
+
+		// Approve team application via EVENT_ADMIN
+		err = reviewApplication(ctx, &ReviewApplicationRequest{
+			Authorization: bearer(eventAdminToken),
+			ID:            teamApp.ID,
+			Type:          "TEAM",
+			Action:        "APPROVE",
+		})
+		if err != nil {
+			t.Fatalf("reviewApplication for team failed: %v", err)
+		}
+
+		// Link secondary org
+		linkedTeam, err := linkSecondaryOrganization(ctx, &LinkSecondaryOrgRequest{
+			Authorization:  bearer(applicantToken),
+			TeamID:         teamApp.ID,
+			OrganizationID: org2ID,
+		})
+		if err != nil {
+			t.Fatalf("linkSecondaryOrganization failed: %v", err)
+		}
+		if len(linkedTeam.Organizations) != 2 {
+			t.Errorf("linkedTeam.Organizations = %+v, want 2 orgs", linkedTeam.Organizations)
+		}
+
+		// Cannot unlink primary org
+		_, err = unlinkSecondaryOrganization(ctx, &UnlinkSecondaryOrgRequest{
+			Authorization:  bearer(applicantToken),
+			TeamID:         teamApp.ID,
+			OrganizationID: org1ID,
+		})
+		if err == nil {
+			t.Fatal("expected error when unlinking primary org")
+		}
+
+		// Unlink secondary org succeeds
+		unlinkedTeam, err := unlinkSecondaryOrganization(ctx, &UnlinkSecondaryOrgRequest{
+			Authorization:  bearer(applicantToken),
+			TeamID:         teamApp.ID,
+			OrganizationID: org2ID,
+		})
+		if err != nil {
+			t.Fatalf("unlinkSecondaryOrganization failed: %v", err)
+		}
+		if len(unlinkedTeam.Organizations) != 1 {
+			t.Errorf("unlinkedTeam.Organizations = %+v, want 1 org", unlinkedTeam.Organizations)
+		}
+	})
+}
+
 // Mirrors teams.test.ts → "updateTeamStats enforces permission and updates
 // only provided fields" + the missing-organization case.
 func TestUpdateTeamStats(t *testing.T) {
@@ -310,6 +448,24 @@ func TestCreateTeam(t *testing.T) {
 	})
 }
 
+func hasMember(team *Team, userID string) bool {
+	for _, m := range team.Members {
+		if m.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMemberWithRole(team *Team, userID, role string) bool {
+	for _, m := range team.Members {
+		if m.UserID == userID && m.Role == role {
+			return true
+		}
+	}
+	return false
+}
+
 // Mirrors teams.test.ts → "addTeamMember, updateTeamMemberRole, and
 // removeTeamMember endpoints and limitations".
 func TestTeamMembers(t *testing.T) {
@@ -399,24 +555,6 @@ func TestTeamMembers(t *testing.T) {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
 		}
 	})
-}
-
-func hasMember(team *Team, userID string) bool {
-	for _, m := range team.Members {
-		if m.UserID == userID {
-			return true
-		}
-	}
-	return false
-}
-
-func hasMemberWithRole(team *Team, userID, role string) bool {
-	for _, m := range team.Members {
-		if m.UserID == userID && m.Role == role {
-			return true
-		}
-	}
-	return false
 }
 
 // Covers updateTeam: metadata edits, slug validation/collision, and guards.
