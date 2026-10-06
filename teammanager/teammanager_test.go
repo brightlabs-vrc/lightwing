@@ -366,6 +366,56 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 			t.Errorf("appView = %+v, want PENDING with primary org = %s", appView, targetOrgID)
 		}
 	})
+
+	t.Run("ConvertTeamToOrg fallback and slug lookups", func(t *testing.T) {
+		siteAdminUser := nextTeamID("site-admin-cvt2")
+		insertTestUser(t, ctx, siteAdminUser, "Convert Site Admin 2", "SITE_ADMIN")
+		siteAdminTok := insertTestSession(t, ctx, siteAdminUser)
+
+		// 1. Create a team and convert by team slug
+		newTeam, err := createTeam(ctx, bearer(siteAdminTok), "Slug Team Test", nil)
+		if err != nil {
+			t.Fatalf("createTeam failed: %v", err)
+		}
+		convertedBySlug, err := convertTeamToOrg(ctx, bearer(siteAdminTok), newTeam.Slug)
+		if err != nil {
+			t.Fatalf("convertTeamToOrg by slug failed: %v", err)
+		}
+		if convertedBySlug.ID != newTeam.ID {
+			t.Errorf("convertedBySlug.ID = %s, want %s", convertedBySlug.ID, newTeam.ID)
+		}
+
+		// 2. Convert a legacy organization (record in `organization` table) by ID
+		legacyOrgSlug := nextTeamID("legacy-org-slug")
+		legacyOrgID := createOrgWithMembers(t, ctx, nextTeamID("org-legacy"), "Legacy Org", legacyOrgSlug, []memberSpec{
+			{userID: siteAdminUser, role: "administrator", name: "Site Admin"},
+		})
+		convertedLegacyID, err := convertTeamToOrg(ctx, bearer(siteAdminTok), legacyOrgID)
+		if err != nil {
+			t.Fatalf("convertTeamToOrg for legacy org ID failed: %v", err)
+		}
+		if convertedLegacyID.ID != legacyOrgID {
+			t.Errorf("convertedLegacyID.ID = %s, want %s", convertedLegacyID.ID, legacyOrgID)
+		}
+
+		// 3. Convert a legacy organization by slug
+		convertedLegacySlug, err := convertTeamToOrg(ctx, bearer(siteAdminTok), legacyOrgSlug)
+		if err != nil {
+			t.Fatalf("convertTeamToOrg for legacy org slug failed: %v", err)
+		}
+		if convertedLegacySlug.ID != legacyOrgID {
+			t.Errorf("convertedLegacySlug.ID = %s, want %s", convertedLegacySlug.ID, legacyOrgID)
+		}
+
+		// 4. Missing team returns 404 Not Found
+		_, err = convertTeamToOrg(ctx, bearer(siteAdminTok), "missing-team-or-org-12345")
+		if err == nil {
+			t.Fatal("expected error for missing team/org")
+		}
+		if errs.Code(err) != errs.NotFound {
+			t.Errorf("code = %v, want not_found", errs.Code(err))
+		}
+	})
 }
 
 // Mirrors teams.test.ts → "updateTeamStats enforces permission and updates

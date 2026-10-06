@@ -10,39 +10,66 @@ import {
 } from '@pxlkit/ui-kit'
 import type { teammanager } from '../lib/client'
 import { UserLink } from './UserLink'
+import { useAuth } from '../hooks/useAuth'
 
 interface TeamProfileViewProps {
   team: teammanager.Team
 }
 
 export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
+  const { session } = useAuth()
+  const currentUserId = session?.user?.id
+  const currentSiteRole = session?.user?.siteRole
+
+  const isTeamAdmin = Boolean(
+    currentUserId && (
+      currentSiteRole === 'SITE_ADMIN' ||
+      currentSiteRole === 'EVENT_ADMIN' ||
+      team.members?.some(
+        (m) =>
+          m.userId === currentUserId &&
+          (m.role.toLowerCase() === 'administrator' || m.role.toLowerCase() === 'organizationadministrator')
+      )
+    )
+  )
+
   return (
     <PixelContainer maxWidth="full" padding="md">
       {/* Header Card */}
       <PixelCard className="bg-retro-surface mb-8 border-2 border-retro-border-strong">
-        <PixelStack direction="row" gap={5} align="center" wrap>
-          {team.logo ? (
-            <img
-              src={team.logo}
-              alt={team.name}
-              className="w-20 h-20 rounded border-2 border-retro-border bg-retro-bg object-cover shadow"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-2xl font-bold flex items-center justify-center">
-              {team.name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <PixelStack gap={1}>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-pixel text-retro-text tracking-wide font-bold">
-                {team.name}
-              </h1>
-              <PixelBadge tone="purple">TEAM ORGANIZATION</PixelBadge>
-            </div>
-            <div className="font-sans text-sm text-retro-muted font-semibold">
-              @{team.slug}
-            </div>
+        <PixelStack direction="row" gap={5} align="center" wrap justify="between">
+          <PixelStack direction="row" gap={5} align="center" wrap>
+            {team.logo ? (
+              <img
+                src={team.logo}
+                alt={team.name}
+                className="w-20 h-20 rounded border-2 border-retro-border bg-retro-bg object-cover shadow"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-2xl font-bold flex items-center justify-center">
+                {team.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <PixelStack gap={1}>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl font-pixel text-retro-text tracking-wide font-bold">
+                  {team.name}
+                </h1>
+                <PixelBadge tone="purple">TEAM ORGANIZATION</PixelBadge>
+              </div>
+              <div className="font-sans text-sm text-retro-muted font-semibold">
+                @{team.slug}
+              </div>
+            </PixelStack>
           </PixelStack>
+
+          {isTeamAdmin && (
+            <PixelButton asChild variant="solid" tone="purple" size="sm">
+              <Link to="/teams/manage/$id" params={{ id: team.id }}>
+                MANAGE TEAM
+              </Link>
+            </PixelButton>
+          )}
         </PixelStack>
       </PixelCard>
 
