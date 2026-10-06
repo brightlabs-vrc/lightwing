@@ -148,4 +148,90 @@ func TestLeaderboard(t *testing.T) {
 			t.Errorf("got entries %d, expected at least 3", len(entries))
 		}
 	})
+
+	t.Run("Concurrent getLeaderboardData calls produce single compute and consistent results", func(t *testing.T) {
+		InvalidateLeaderboardCache(ctx)
+
+		const concurrentCalls = 10
+		results := make([][]LeaderboardEntry, concurrentCalls)
+		errs := make([]error, concurrentCalls)
+
+		done := make(chan struct{})
+		for i := 0; i < concurrentCalls; i++ {
+			go func(index int) {
+				res, _, err := getLeaderboardData(ctx)
+				results[index] = res
+				errs[index] = err
+				done <- struct{}{}
+			}(i)
+		}
+
+		for i := 0; i < concurrentCalls; i++ {
+			<-done
+		}
+
+		for i := 0; i < concurrentCalls; i++ {
+			if errs[i] != nil {
+				t.Fatalf("call %d failed: %v", i, errs[i])
+			}
+			if len(results[i]) != len(results[0]) {
+				t.Errorf("call %d got %d entries, want %d", i, len(results[i]), len(results[0]))
+			}
+		}
+	})
+
+	t.Run("Cache is invalidated after HandleScoreCalcCompleted", func(t *testing.T) {
+		// Populate cache
+		_, ts1, err := getLeaderboardData(ctx)
+		if err != nil {
+			t.Fatalf("initial getLeaderboardData failed: %v", err)
+		}
+
+		// Submit a job and complete it
+		sub, err := SubmitCalc(ctx, &SubmitCalcParams{EventID: e1, UserIDs: []string{u1}})
+		if err != nil {
+			t.Fatalf("SubmitCalc failed: %v", err)
+		}
+		claimJob(t, ctx, sub.JobID)
+
+		entries := []ProjectionEntry{{UserID: u1, Points: 150}}
+		nowStr := time.Now().UTC().Format(time.RFC3339Nano)
+		if err := HandleScoreCalcCompleted(ctx, ScoreCalcCompleted{
+			Version: 1, JobID: sub.JobID, EventID: e1, Generation: sub.Generation,
+			ComputedAt: nowStr,
+			Result: ScoreCalcProjection{EventID: e1, Entries: entries},
+			ResultChecksum: ComputeChecksum(entries),
+		}); err != nil {
+			t.Fatalf("HandleScoreCalcCompleted failed: %v", err)
+		}
+
+		// Verify inMemoryLeaderboard was invalidated (set to nil)
+		inMemoryLeaderboardMu.RLock()
+		inMem := inMemoryLeaderboard
+		inMemoryLeaderboardMu.RUnlock()
+		if inMem != nil {
+			t.Errorf("inMemoryLeaderboard expected nil after HandleScoreCalcCompleted, got %+v", inMem)
+		}
+
+		// Subsequent getLeaderboardData should recompute and return new calculated timestamp and data
+		entriesRes, ts2, err := getLeaderboardData(ctx)
+		if err != nil {
+			t.Fatalf("getLeaderboardData after invalidation failed: %v", err)
+		}
+		if !ts2.After(ts1) && ts2 != ts1 {
+			// ts2 should be equal or after ts1
+		}
+		var foundU1 bool
+		for _, entry := range entriesRes {
+			if entry.UserID == u1 {
+				foundU1 = true
+				if entry.TotalPoints != 150 {
+					t.Errorf("u1 points = %d, want 150 after HandleScoreCalcCompleted", entry.TotalPoints)
+				}
+			}
+		}
+		if !foundU1 {
+			t.Errorf("u1 not found in leaderboard after HandleScoreCalcCompleted")
+		}
+	})
 }

@@ -235,6 +235,7 @@ func HandleScoreCalcCompleted(ctx context.Context, event ScoreCalcCompleted) err
 	if eventDetailCache != nil {
 		_, _ = eventDetailCache.Delete(ctx, eventDetailKey{ID: event.EventID})
 	}
+	InvalidateLeaderboardCache(ctx)
 	if _, err := ScoreCalcStatusTopic.Publish(ctx, ScoreCalcStatusEvent{
 		EventID: event.EventID, UserIDs: userIDs,
 		Status: "completed", Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
