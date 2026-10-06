@@ -46,7 +46,7 @@ func insertTestUser(t *testing.T, ctx context.Context, id, name, siteRole string
 	_, err := db.Exec(ctx,
 		`INSERT INTO "user" (id, name, email, image, "siteRole", biography, "vrchatUsername", slug, "createdAt", "updatedAt")
 		 VALUES ($1, $2, $3, '', $4, '', '', $5, $6, $6)
-		 ON CONFLICT (id) DO UPDATE SET "siteRole" = EXCLUDED."siteRole"`,
+		 ON CONFLICT (id) DO NOTHING`,
 		id, name, id+"@example.com", siteRole, id, now,
 	)
 	if err != nil {
