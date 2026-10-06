@@ -39,12 +39,11 @@ type LeaderboardResponse struct {
 
 // GetLeaderboardParams specifies sorting, filtering, and pagination query params.
 type GetLeaderboardParams struct {
-	SortBy           string `query:"sortBy"`           // "points", "avgPosition", "avgPointsPerSeason"
-	Search           string `query:"search"`           // search driver name or slug
-	ClassTier        string `query:"classTier"`        // filter by class tier e.g. "G1", "G2", "G3", "OP"
-	Limit            int    `query:"limit"`            // pagination limit
-	Offset           int    `query:"offset"`           // pagination offset
-	ForceRecalculate bool   `query:"forceRecalculate"` // bypass cache if true
+	SortBy    string `query:"sortBy"`    // "points", "avgPosition", "avgPointsPerSeason"
+	Search    string `query:"search"`    // search driver name or slug
+	ClassTier string `query:"classTier"` // filter by class tier e.g. "G1", "G2", "G3", "OP"
+	Limit     int    `query:"limit"`     // pagination limit
+	Offset    int    `query:"offset"`    // pagination offset
 }
 
 // Internal cache struct for the calculated leaderboard data.
@@ -153,26 +152,24 @@ func CalculateAndCacheLeaderboard(ctx context.Context) ([]LeaderboardEntry, time
 	return entries, now, nil
 }
 
-func getLeaderboardData(ctx context.Context, forceRecalculate bool) ([]LeaderboardEntry, time.Time, error) {
-	if !forceRecalculate {
-		inMemoryLeaderboardMu.RLock()
-		if inMemoryLeaderboard != nil && time.Since(inMemoryLeaderboard.CalculatedAt) < 10*time.Minute {
-			entries := inMemoryLeaderboard.Entries
-			ts := inMemoryLeaderboard.CalculatedAt
-			inMemoryLeaderboardMu.RUnlock()
-			return entries, ts, nil
-		}
+func getLeaderboardData(ctx context.Context) ([]LeaderboardEntry, time.Time, error) {
+	inMemoryLeaderboardMu.RLock()
+	if inMemoryLeaderboard != nil && time.Since(inMemoryLeaderboard.CalculatedAt) < 10*time.Minute {
+		entries := inMemoryLeaderboard.Entries
+		ts := inMemoryLeaderboard.CalculatedAt
 		inMemoryLeaderboardMu.RUnlock()
+		return entries, ts, nil
+	}
+	inMemoryLeaderboardMu.RUnlock()
 
-		if leaderboardCache != nil {
-			if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: "global"}); err == nil && val.DataJSON != "" {
-				var cached cachedLeaderboardData
-				if err := json.Unmarshal([]byte(val.DataJSON), &cached); err == nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
-					inMemoryLeaderboardMu.Lock()
-					inMemoryLeaderboard = &cached
-					inMemoryLeaderboardMu.Unlock()
-					return cached.Entries, cached.CalculatedAt, nil
-				}
+	if leaderboardCache != nil {
+		if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: "global"}); err == nil && val.DataJSON != "" {
+			var cached cachedLeaderboardData
+			if err := json.Unmarshal([]byte(val.DataJSON), &cached); err == nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
+				inMemoryLeaderboardMu.Lock()
+				inMemoryLeaderboard = &cached
+				inMemoryLeaderboardMu.Unlock()
+				return cached.Entries, cached.CalculatedAt, nil
 			}
 		}
 	}
@@ -181,11 +178,11 @@ func getLeaderboardData(ctx context.Context, forceRecalculate bool) ([]Leaderboa
 }
 
 // GetLeaderboard returns global leaderboard rankings with filtering, sorting, and pagination.
-// Results are cached by scorecalc for 10 minutes or until invalidated by a score update.
+// Results are cached by scorecalc for 10 minutes or until recalculated after an event's conclusion.
 //
 //encore:api public method=GET path=/api/leaderboard
 func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardResponse, error) {
-	entries, calculatedAt, err := getLeaderboardData(ctx, p.ForceRecalculate)
+	entries, calculatedAt, err := getLeaderboardData(ctx)
 	if err != nil {
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to calculate leaderboard"}
 	}
@@ -281,21 +278,6 @@ func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardR
 	return &LeaderboardResponse{
 		Entries:      pageEntries,
 		Total:        total,
-		CalculatedAt: calculatedAt.Format(time.RFC3339),
-	}, nil
-}
-
-// RecalculateLeaderboard explicitly triggers a leaderboard recalculation and refreshes the cache.
-//
-//encore:api public method=POST path=/api/leaderboard/recalculate
-func RecalculateLeaderboard(ctx context.Context) (*LeaderboardResponse, error) {
-	entries, calculatedAt, err := CalculateAndCacheLeaderboard(ctx)
-	if err != nil {
-		return nil, &errs.Error{Code: errs.Internal, Message: "failed to recalculate leaderboard"}
-	}
-	return &LeaderboardResponse{
-		Entries:      entries,
-		Total:        len(entries),
 		CalculatedAt: calculatedAt.Format(time.RFC3339),
 	}, nil
 }

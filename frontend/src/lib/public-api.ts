@@ -685,7 +685,6 @@ export async function getLeaderboard(
       ClassTier: params.ClassTier,
       Limit: params.Limit,
       Offset: params.Offset,
-      ForceRecalculate: params.ForceRecalculate,
     })
   }
 
@@ -768,13 +767,6 @@ export async function getLeaderboard(
     total: filtered.length,
     calculatedAt: new Date().toISOString(),
   }
-}
-
-export async function recalculateLeaderboard(): Promise<LeaderboardResponse> {
-  if (!MOCK_MODE) {
-    return appClient.scorecalc.RecalculateLeaderboard()
-  }
-  return getLeaderboard({ ForceRecalculate: true })
 }
 
 export async function getPublicUserProfile(userOrSlug: string): Promise<auth.UserProfile> {

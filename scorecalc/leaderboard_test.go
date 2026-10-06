@@ -74,9 +74,9 @@ func TestLeaderboard(t *testing.T) {
 	}
 
 	t.Run("GetLeaderboard sorted by points", func(t *testing.T) {
+		InvalidateLeaderboardCache(ctx)
 		res, err := GetLeaderboard(ctx, &GetLeaderboardParams{
-			SortBy:           "points",
-			ForceRecalculate: true,
+			SortBy: "points",
 		})
 		if err != nil {
 			t.Fatalf("GetLeaderboard failed: %v", err)
@@ -139,13 +139,13 @@ func TestLeaderboard(t *testing.T) {
 		}
 	})
 
-	t.Run("RecalculateLeaderboard explicitly refreshes cache", func(t *testing.T) {
-		res, err := RecalculateLeaderboard(ctx)
+	t.Run("CalculateAndCacheLeaderboard explicitly refreshes cache", func(t *testing.T) {
+		entries, _, err := CalculateAndCacheLeaderboard(ctx)
 		if err != nil {
-			t.Fatalf("RecalculateLeaderboard failed: %v", err)
+			t.Fatalf("CalculateAndCacheLeaderboard failed: %v", err)
 		}
-		if res.Total < 3 {
-			t.Errorf("got total %d, expected at least 3", res.Total)
+		if len(entries) < 3 {
+			t.Errorf("got entries %d, expected at least 3", len(entries))
 		}
 	})
 }

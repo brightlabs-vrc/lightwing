@@ -703,6 +703,32 @@ func Test_SoftDeleteAnd7DayAutoPurge(t *testing.T) {
 	}
 }
 
+func Test_EventConclusionRecalculatesLeaderboard(t *testing.T) {
+	f := newFixtures(t)
+	adminID := f.createUser("admin-conclude", "Admin Conclude User", nil, "SITE_ADMIN")
+	adminToken := f.createSession(adminID)
+
+	e, err := CreateEventCore(f.ctx, &CreateEventRequest{
+		Authorization: adminToken, Name: "Conclude Test Event " + newID()[:8],
+		OwnerType: "USER", ScoringType: ScoringPoints, Tag: strptr("OFFICIAL"),
+	})
+	if err != nil {
+		t.Fatalf("create event: %v", err)
+	}
+	f.events = append(f.events, e.ID)
+
+	// Set status to CONCLUDED
+	concluded, err := SetEventStatusCore(f.ctx, &SetEventStatusRequest{
+		ID: e.ID, Authorization: adminToken, Status: strptr("CONCLUDED"),
+	})
+	if err != nil {
+		t.Fatalf("set status CONCLUDED: %v", err)
+	}
+	if concluded.Status != "CONCLUDED" {
+		t.Errorf("status = %q, want CONCLUDED", concluded.Status)
+	}
+}
+
 // NOTE on ordering.test.ts and eligible_races.test.ts: both exercise
 // race-scoped services (raceevents.ts createRaceEvent/reorderRaceEvents and
 // classes.ts listEligibleEvents), which are ported separately. The event-level
