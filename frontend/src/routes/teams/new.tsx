@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { requireAuth } from '../../lib/auth-guard'
 import { AlertBanner } from '../../components/AlertBanner'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
-import { submitOrganizationApplication, submitTeamApplication, listApprovedOrganizations } from '../../lib/admin-api'
+import { submitOrganizationApplication, submitTeamApplication, listApprovedOrganizations, listAdminTeams } from '../../lib/admin-api'
 import type { teammanager } from '../../lib/client'
 
 export const Route = createFileRoute('/teams/new')({
@@ -19,7 +19,7 @@ function NewTeamWizardPage() {
   const navigate = useNavigate()
 
   const [step, setStep] = useState<number>(1)
-  const [appType, setAppType] = useState<'ORGANIZATION' | 'TEAM' | null>(null)
+  const [appType, setAppType] = useState<'ORGANIZATION' | 'TEAM' | 'EXISTING_TEAM' | null>(null)
 
   // Details
   const [name, setName] = useState('')
@@ -36,6 +36,8 @@ function NewTeamWizardPage() {
   const [primaryOrgId, setPrimaryOrgId] = useState('')
   const [secondaryOrgIds, setSecondaryOrgIds] = useState<string[]>([])
   const [approvedOrgs, setApprovedOrgs] = useState<teammanager.LinkedOrganization[]>([])
+  const [userTeams, setUserTeams] = useState<teammanager.TeamListItem[]>([])
+  const [selectedExistingTeamId, setSelectedExistingTeamId] = useState('')
   const [teamRoster, setTeamRoster] = useState<string[]>([])
   const [newTeamMemberId, setNewTeamMemberId] = useState('')
 
@@ -44,13 +46,21 @@ function NewTeamWizardPage() {
   const [error, setError] = useState<string | null>(null)
   const [submittedSuccess, setSubmittedSuccess] = useState(false)
 
-  // Load approved organizations for Team path
+  // Load approved organizations and existing teams
   useEffect(() => {
-    async function fetchOrgs() {
+    async function fetchOrgsAndTeams() {
       setLoadingOrgs(true)
       try {
-        const res = await listApprovedOrganizations()
-        setApprovedOrgs(res.organizations || [])
+        const [orgsRes, teamsRes] = await Promise.all([
+          listApprovedOrganizations(),
+          listAdminTeams('', 100, 0).catch(() => ({ teams: [], total: 0 })),
+        ])
+        setApprovedOrgs(orgsRes.organizations || [])
+        setUserTeams(teamsRes.teams || [])
+
+        if (teamsRes.teams && teamsRes.teams.length > 0) {
+          setSelectedExistingTeamId(teamsRes.teams[0].id)
+        }
 
         // Prefer orgs user administrates
         if (session?.user.teams && session.user.teams.length > 0) {
@@ -60,8 +70,8 @@ function NewTeamWizardPage() {
           } else {
             setPrimaryOrgId(session.user.teams[0].organizationId)
           }
-        } else if (res.organizations && res.organizations.length > 0) {
-          setPrimaryOrgId(res.organizations[0].id)
+        } else if (orgsRes.organizations && orgsRes.organizations.length > 0) {
+          setPrimaryOrgId(orgsRes.organizations[0].id)
         }
       } catch (err) {
         // ignore fallback
@@ -69,7 +79,7 @@ function NewTeamWizardPage() {
         setLoadingOrgs(false)
       }
     }
-    void fetchOrgs()
+    void fetchOrgsAndTeams()
   }, [session])
 
   const token = session?.session.token
@@ -132,6 +142,19 @@ function NewTeamWizardPage() {
           },
           authHeader,
         )
+      } else if (appType === 'EXISTING_TEAM') {
+        const selectedTeam = userTeams.find((t) => t.id === selectedExistingTeamId)
+        if (!selectedExistingTeamId || !primaryOrgId) {
+          throw new Error('Existing Team and Target Organization selections are required.')
+        }
+        await submitTeamApplication(
+          {
+            teamId: selectedExistingTeamId,
+            name: selectedTeam?.name || 'Existing Team',
+            primaryOrganizationId: primaryOrgId,
+          },
+          authHeader,
+        )
       } else {
         if (!primaryOrgId) {
           throw new Error('Primary Organization selection is required.')
@@ -168,7 +191,7 @@ function NewTeamWizardPage() {
               Application Submitted!
             </h2>
             <p className="slds-text-body_regular text-slate-600 slds-m-top_small" style={{ color: '#514f4d', fontSize: '0.95rem' }}>
-              Your application for <strong>{name}</strong> ({appType}) has been recorded. Administrators will review your submission shortly.
+              Your application for <strong>{appType === 'EXISTING_TEAM' ? userTeams.find((t) => t.id === selectedExistingTeamId)?.name || 'Team' : name}</strong> ({appType}) has been recorded. Administrators will review your submission shortly.
             </p>
             <div className="slds-m-top_large" style={{ marginTop: '1.5rem' }}>
               <button
@@ -207,7 +230,7 @@ function NewTeamWizardPage() {
             </p>
 
             <div className="slds-grid slds-wrap slds-gutters" style={{ display: 'flex', gap: '16px' }}>
-              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
+              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
                 <article
                   onClick={() => { setAppType('ORGANIZATION'); setStep(2); }}
                   className={`slds-card slds-card_boundary ${appType === 'ORGANIZATION' ? 'border-blue-600 bg-blue-50' : ''}`}
@@ -225,7 +248,7 @@ function NewTeamWizardPage() {
                 </article>
               </div>
 
-              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
+              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
                 <article
                   onClick={() => { setAppType('TEAM'); setStep(2); }}
                   className={`slds-card slds-card_boundary ${appType === 'TEAM' ? 'border-blue-600 bg-blue-50' : ''}`}
@@ -236,7 +259,25 @@ function NewTeamWizardPage() {
                     <div className="slds-media__body">
                       <h2 className="slds-text-heading_small font-bold" style={{ fontWeight: 'bold' }}>New Competitive Team</h2>
                       <p className="slds-text-body_small text-slate-500" style={{ fontSize: '12px', color: '#514f4d' }}>
-                        Register a competitive racing team operating under an approved organization.
+                        Register a new competitive racing team operating under an approved organization.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
+                <article
+                  onClick={() => { setAppType('EXISTING_TEAM'); setStep(2); }}
+                  className={`slds-card slds-card_boundary ${appType === 'EXISTING_TEAM' ? 'border-blue-600 bg-blue-50' : ''}`}
+                  style={{ cursor: 'pointer', padding: '1.5rem', border: appType === 'EXISTING_TEAM' ? '2px solid #0176d3' : '1px solid #dddbda', borderRadius: '6px', height: '100%' }}
+                >
+                  <div className="slds-media slds-media_center">
+                    <span style={{ fontSize: '2rem', marginRight: '1rem' }}>🏎️</span>
+                    <div className="slds-media__body">
+                      <h2 className="slds-text-heading_small font-bold" style={{ fontWeight: 'bold' }}>Existing Team Application</h2>
+                      <p className="slds-text-body_small text-slate-500" style={{ fontSize: '12px', color: '#514f4d' }}>
+                        Apply for a pre-existing team to join an approved organization.
                       </p>
                     </div>
                   </div>
@@ -246,115 +287,200 @@ function NewTeamWizardPage() {
           </div>
         )}
 
-        {/* STEP 2: DETAILS */}
+        {/* STEP 2: DETAILS OR EXISTING TEAM SELECTION */}
         {step === 2 && (
           <div>
-            <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-              {appType === 'ORGANIZATION' ? 'Organization Details' : 'Team Details'}
-            </h2>
+            {appType === 'EXISTING_TEAM' ? (
+              <>
+                <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  Existing Team Organization Application
+                </h2>
+                <p className="slds-text-body_small text-slate-500 slds-m-bottom_medium" style={{ color: '#514f4d' }}>
+                  Select your pre-existing team and the target organization you wish to join.
+                </p>
 
-            <div className="slds-form slds-form_stacked">
-              <div className="slds-form-element slds-m-bottom_medium">
-                <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={appType === 'ORGANIZATION' ? 'e.g. Apex Esports Global' : 'e.g. Apex Racing Syndicate'}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="slds-input"
-                  style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                />
-              </div>
-
-              <div className="slds-form-element slds-m-bottom_medium">
-                <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Custom Slug (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. apex-esports"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  className="slds-input"
-                  style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                />
-              </div>
-
-              <div className="slds-form-element slds-m-bottom_medium">
-                <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Logo Image URL (Optional)</label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/logo.png"
-                  value={logo}
-                  onChange={(e) => setLogo(e.target.value)}
-                  className="slds-input"
-                  style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                />
-              </div>
-
-              {appType === 'ORGANIZATION' && (
-                <>
+                <div className="slds-form slds-form_stacked">
                   <div className="slds-form-element slds-m-bottom_medium">
                     <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                      Discord Invite URL <span className="text-red-500">*</span>
+                      Select Existing Team <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="url"
-                      required
-                      placeholder="https://discord.gg/yourserver"
-                      value={discordInvite}
-                      onChange={(e) => setDiscordInvite(e.target.value)}
-                      className="slds-input"
-                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                    />
+                    {userTeams.length === 0 ? (
+                      <p className="text-slate-500 text-sm">No existing teams found.</p>
+                    ) : (
+                      <select
+                        value={selectedExistingTeamId}
+                        onChange={(e) => setSelectedExistingTeamId(e.target.value)}
+                        className="slds-select"
+                        style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                      >
+                        <option value="">-- Choose Existing Team --</option>
+                        {userTeams.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.slug})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   <div className="slds-form-element slds-m-bottom_medium">
                     <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                      VRChat Group ID <span className="text-red-500">*</span>
+                      Target Organization <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={primaryOrgId}
+                      onChange={(e) => setPrimaryOrgId(e.target.value)}
+                      className="slds-select"
+                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                    >
+                      <option value="">-- Select Target Organization --</option>
+                      {approvedOrgs.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name} ({o.slug})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="slds-button slds-button_neutral"
+                  >
+                    &larr; Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedExistingTeamId) {
+                        setError('Please select an existing team.')
+                        return
+                      }
+                      if (!primaryOrgId) {
+                        setError('Please select a target organization.')
+                        return
+                      }
+                      setError(null)
+                      setStep(3)
+                    }}
+                    className="slds-button slds-button_brand"
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
+                  {appType === 'ORGANIZATION' ? 'Organization Details' : 'Team Details'}
+                </h2>
+
+                <div className="slds-form slds-form_stacked">
+                  <div className="slds-form-element slds-m-bottom_medium">
+                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
+                      Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. grp_12345"
-                      value={vrchatGroupId}
-                      onChange={(e) => setVrchatGroupId(e.target.value)}
+                      placeholder={appType === 'ORGANIZATION' ? 'e.g. Apex Esports Global' : 'e.g. Apex Racing Syndicate'}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
                       className="slds-input"
                       style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                     />
                   </div>
-                </>
-              )}
-            </div>
 
-            <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="slds-button slds-button_neutral"
-              >
-                &larr; Back
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!name.trim()) {
-                    setError('Name is required.')
-                    return
-                  }
-                  if (appType === 'ORGANIZATION' && (!discordInvite.trim() || !vrchatGroupId.trim())) {
-                    setError('Discord Invite and VRChat Group ID are required.')
-                    return
-                  }
-                  setError(null)
-                  setStep(3)
-                }}
-                className="slds-button slds-button_brand"
-              >
-                Next &rarr;
-              </button>
-            </div>
+                  <div className="slds-form-element slds-m-bottom_medium">
+                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Custom Slug (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. apex-esports"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                      className="slds-input"
+                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                    />
+                  </div>
+
+                  <div className="slds-form-element slds-m-bottom_medium">
+                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Logo Image URL (Optional)</label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/logo.png"
+                      value={logo}
+                      onChange={(e) => setLogo(e.target.value)}
+                      className="slds-input"
+                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                    />
+                  </div>
+
+                  {appType === 'ORGANIZATION' && (
+                    <>
+                      <div className="slds-form-element slds-m-bottom_medium">
+                        <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
+                          Discord Invite URL <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="url"
+                          required
+                          placeholder="https://discord.gg/yourserver"
+                          value={discordInvite}
+                          onChange={(e) => setDiscordInvite(e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        />
+                      </div>
+
+                      <div className="slds-form-element slds-m-bottom_medium">
+                        <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
+                          VRChat Group ID <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. grp_12345"
+                          value={vrchatGroupId}
+                          onChange={(e) => setVrchatGroupId(e.target.value)}
+                          className="slds-input"
+                          style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="slds-button slds-button_neutral"
+                  >
+                    &larr; Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!name.trim()) {
+                        setError('Name is required.')
+                        return
+                      }
+                      if (appType === 'ORGANIZATION' && (!discordInvite.trim() || !vrchatGroupId.trim())) {
+                        setError('Discord Invite and VRChat Group ID are required.')
+                        return
+                      }
+                      setError(null)
+                      setStep(3)
+                    }}
+                    className="slds-button slds-button_brand"
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -468,24 +594,59 @@ function NewTeamWizardPage() {
                   Secondary Organizations ("Also operates in...")
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {approvedOrgs
-                    .filter((o) => o.id !== primaryOrgId)
-                    .map((o) => (
-                      <label key={o.id} className="slds-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                          type="checkbox"
-                          checked={secondaryOrgIds.includes(o.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSecondaryOrgIds([...secondaryOrgIds, o.id])
-                            } else {
-                              setSecondaryOrgIds(secondaryOrgIds.filter((id) => id !== o.id))
-                            }
-                          }}
-                        />
-                        <span>{o.name}</span>
-                      </label>
-                    ))}
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSecondaryOrgIds([...secondaryOrgIds, e.target.value])
+                      }
+                    }}
+                    className="slds-select"
+                    style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                  >
+                    <option value="">-- Add Secondary Organization --</option>
+                    {approvedOrgs
+                      .filter((o) => o.id !== primaryOrgId && !secondaryOrgIds.includes(o.id))
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name} ({o.slug})
+                        </option>
+                      ))}
+                  </select>
+
+                  {secondaryOrgIds.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                      {secondaryOrgIds.map((secId) => {
+                        const org = approvedOrgs.find((o) => o.id === secId)
+                        return (
+                          <div
+                            key={secId}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '8px 12px',
+                              background: '#f8fafc',
+                              border: '1px solid #dddbda',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            <span style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                              {org ? `${org.name} (${org.slug})` : secId}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSecondaryOrgIds(secondaryOrgIds.filter((id) => id !== secId))}
+                              className="slds-button slds-button_destructive"
+                              style={{ fontSize: '11px', padding: '2px 8px' }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -585,28 +746,59 @@ function NewTeamWizardPage() {
         )}
 
         {/* REVIEW & SUBMIT STEP */}
-        {((step === 4 && appType === 'ORGANIZATION') || (step === 5 && appType === 'TEAM')) && (
+        {((step === 4 && appType === 'ORGANIZATION') ||
+          (step === 5 && appType === 'TEAM') ||
+          (step === 3 && appType === 'EXISTING_TEAM')) && (
           <div>
             <h2 className="slds-text-heading_medium font-bold slds-m-bottom_medium" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
               Review Your Application
             </h2>
 
             <div className="slds-box bg-slate-50 slds-m-bottom_medium" style={{ background: '#f8fafc', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-              <p><strong>Type:</strong> {appType}</p>
-              <p><strong>Name:</strong> {name}</p>
-              {slug && <p><strong>Slug:</strong> {slug}</p>}
+              <p><strong>Type:</strong> {appType === 'EXISTING_TEAM' ? 'EXISTING TEAM APPLICATION' : appType}</p>
 
-              {appType === 'ORGANIZATION' && (
+              {appType === 'EXISTING_TEAM' ? (
                 <>
-                  <p><strong>Discord Invite:</strong> {discordInvite}</p>
-                  <p><strong>VRChat Group ID:</strong> {vrchatGroupId}</p>
+                  <p>
+                    <strong>Team:</strong>{' '}
+                    {userTeams.find((t) => t.id === selectedExistingTeamId)?.name || selectedExistingTeamId}
+                    {userTeams.find((t) => t.id === selectedExistingTeamId)?.slug && (
+                      <span> (@{userTeams.find((t) => t.id === selectedExistingTeamId)?.slug})</span>
+                    )}
+                  </p>
+                  <p>
+                    <strong>Target Organization:</strong>{' '}
+                    {approvedOrgs.find((o) => o.id === primaryOrgId)?.name || primaryOrgId}
+                  </p>
                 </>
-              )}
-
-              {appType === 'TEAM' && (
+              ) : (
                 <>
-                  <p><strong>Primary Organization ID:</strong> {primaryOrgId}</p>
-                  {secondaryOrgIds.length > 0 && <p><strong>Secondary Organizations:</strong> {secondaryOrgIds.join(', ')}</p>}
+                  <p><strong>Name:</strong> {name}</p>
+                  {slug && <p><strong>Slug:</strong> {slug}</p>}
+
+                  {appType === 'ORGANIZATION' && (
+                    <>
+                      <p><strong>Discord Invite:</strong> {discordInvite}</p>
+                      <p><strong>VRChat Group ID:</strong> {vrchatGroupId}</p>
+                    </>
+                  )}
+
+                  {appType === 'TEAM' && (
+                    <>
+                      <p>
+                        <strong>Primary Organization:</strong>{' '}
+                        {approvedOrgs.find((o) => o.id === primaryOrgId)?.name || primaryOrgId}
+                      </p>
+                      {secondaryOrgIds.length > 0 && (
+                        <p>
+                          <strong>Secondary Organizations:</strong>{' '}
+                          {secondaryOrgIds
+                            .map((secId) => approvedOrgs.find((o) => o.id === secId)?.name || secId)
+                            .join(', ')}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </>
               )}
             </div>
