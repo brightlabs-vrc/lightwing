@@ -354,6 +354,58 @@ func Test_getMemberRole(t *testing.T) {
 	}
 }
 
+func Test_EventAdminPermissions(t *testing.T) {
+	ctx := context.Background()
+
+	insertTestUser(t, ctx, "event-admin-1", "Event Admin", string(SiteRoleEventAdmin), "eventadmin1")
+	insertTestSession(t, ctx, "event-admin-1", "event-admin-token-1", time.Now().Add(1*time.Hour))
+
+	t.Run("IsEventAdmin detection", func(t *testing.T) {
+		if !IsEventAdmin(SiteRoleEventAdmin) {
+			t.Errorf("IsEventAdmin(SiteRoleEventAdmin) = false, want true")
+		}
+		if IsEventAdmin(SiteRoleUser) {
+			t.Errorf("IsEventAdmin(SiteRoleUser) = true, want false")
+		}
+	})
+
+	t.Run("EVENT_ADMIN permitted on event resources in requirePermission", func(t *testing.T) {
+		for _, res := range []Resource{ResourceEvent, ResourceRaceEvent, ResourceRaceResult} {
+			actor, role, err := requirePermission(ctx, "Bearer event-admin-token-1", "any-org", res, ActionUpdate)
+			if err != nil {
+				t.Errorf("requirePermission failed for EVENT_ADMIN on %s: %v", res, err)
+			}
+			if role != string(SiteRoleEventAdmin) {
+				t.Errorf("role = %q, want %q", role, SiteRoleEventAdmin)
+			}
+			if actor.UserID != "event-admin-1" {
+				t.Errorf("actor.UserID = %q, want %q", actor.UserID, "event-admin-1")
+			}
+		}
+	})
+
+	t.Run("EVENT_ADMIN denied on non-event resources in requirePermission", func(t *testing.T) {
+		for _, res := range []Resource{ResourceOrganization, ResourceMember, ResourceInvitation} {
+			_, _, err := requirePermission(ctx, "Bearer event-admin-token-1", "non-existent-org", res, ActionRead)
+			if err == nil {
+				t.Errorf("requirePermission should fail for EVENT_ADMIN on %s", res)
+			} else if !isPermissionDenied(err) {
+				t.Errorf("expected permission denied on %s, got: %v", res, err)
+			}
+		}
+	})
+
+	t.Run("EVENT_ADMIN permitted in requireEventPermission", func(t *testing.T) {
+		actor, err := requireEventPermission(ctx, "Bearer event-admin-token-1", "event-user-owned", ActionUpdate)
+		if err != nil {
+			t.Fatalf("requireEventPermission failed for EVENT_ADMIN: %v", err)
+		}
+		if actor.UserID != "event-admin-1" {
+			t.Errorf("actor.UserID = %q, want %q", actor.UserID, "event-admin-1")
+		}
+	})
+}
+
 // isUnauthenticated checks if err is an Unauthenticated error.
 func isUnauthenticated(err error) bool {
 	return err != nil && errs.Code(err) == errs.Unauthenticated

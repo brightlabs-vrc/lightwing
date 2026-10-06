@@ -8,7 +8,7 @@ export type EventTag = 'OFFICIAL' | 'COMMUNITY'
 
 export type EventOwnerType = 'USER' | 'ORGANIZATION'
 
-export type SiteRole = 'USER' | 'SITE_ADMIN'
+export type SiteRole = 'USER' | 'SITE_ADMIN' | 'EVENT_ADMIN'
 
 export const CLASS_TIER_LABELS: Record<ClassTier, string> = {
   PRE_OP: 'PRE-OP',

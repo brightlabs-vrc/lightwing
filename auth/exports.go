@@ -22,3 +22,7 @@ func RequireEventPermission(ctx context.Context, authorization string, eventId s
 func IsSiteAdmin(siteRole SiteRoleName) bool {
 	return isSiteAdmin(siteRole)
 }
+
+func IsEventAdmin(siteRole SiteRoleName) bool {
+	return isEventAdmin(siteRole)
+}

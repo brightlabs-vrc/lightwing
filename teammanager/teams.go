@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 
 	"encore.dev/beta/errs"
@@ -30,18 +29,7 @@ func getTeam(ctx context.Context, id string) (*Team, error) {
 // --- getTeamBySlug (mirrors getTeamBySlug) ---
 
 func getTeamBySlug(ctx context.Context, slug string) (*Team, error) {
-	row, err := q().GetOrgBySlug(ctx, slug)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
-	}
-	if err != nil {
-		return nil, err
-	}
-	members, err := loadMemberRows(ctx, row.ID)
-	if err != nil {
-		return nil, err
-	}
-	return toTeam(toOrgBySlug(row), members), nil
+	return loadTeam(ctx, slug)
 }
 
 // --- listTeams (mirrors listTeams) ---
@@ -49,33 +37,6 @@ func getTeamBySlug(ctx context.Context, slug string) (*Team, error) {
 type ListTeamsResponse struct {
 	Teams []TeamListItem `json:"teams"`
 	Total int            `json:"total"`
-}
-
-type teamCounts struct {
-	memberCount int
-	adminCount  int
-}
-
-func batchCountMembersAndAdmins(ctx context.Context, orgIDs []string) (map[string]teamCounts, error) {
-	if len(orgIDs) == 0 {
-		return map[string]teamCounts{}, nil
-	}
-	rows, err := q().BatchCountMembersAndAdmins(ctx, sqlc.BatchCountMembersAndAdminsParams{
-		Role:    auth.AdministratorRole,
-		Column2: orgIDs,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to batch count members and admins: %w", err)
-	}
-
-	res := make(map[string]teamCounts)
-	for _, r := range rows {
-		res[r.OrganizationId] = teamCounts{
-			memberCount: int(r.Count),
-			adminCount:  int(r.Count_2),
-		}
-	}
-	return res, nil
 }
 
 func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeamsResponse, error) {
@@ -108,36 +69,114 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 		stubs = make([]sqlc.ListTeamRowsRow, 0, len(bySearch))
 		for _, s := range bySearch {
 			stubs = append(stubs, sqlc.ListTeamRowsRow{
-				ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: s.Logo,
+				ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: s.Logo, Status: s.Status,
 			})
 		}
 	}
 
-	orgIDs := make([]string, 0, len(stubs))
+	teamIDs := make([]string, 0, len(stubs))
 	for _, s := range stubs {
-		orgIDs = append(orgIDs, s.ID)
+		teamIDs = append(teamIDs, s.ID)
 	}
 
-	countsByOrg, err := batchCountMembersAndAdmins(ctx, orgIDs)
-	if err != nil {
-		return nil, err
+	// Batch load linked organizations
+	orgsByTeam := make(map[string][]LinkedOrganization)
+	primOrgByTeam := make(map[string]string)
+	if len(teamIDs) > 0 {
+		orgRows, err := q().ListOrgsForTeamsBatch(ctx, teamIDs)
+		if err == nil {
+			for _, r := range orgRows {
+				var logo *string
+				if r.Logo.Valid && r.Logo.String != "" {
+					l := r.Logo.String
+					logo = &l
+				}
+				orgType := "ORGANIZATION"
+				if r.OrgType.Valid {
+					orgType = r.OrgType.String
+				}
+				status := "APPROVED"
+				if r.Status.Valid {
+					status = r.Status.String
+				}
+				if r.IsPrimary {
+					primOrgByTeam[r.TeamId] = r.ID
+				}
+				orgsByTeam[r.TeamId] = append(orgsByTeam[r.TeamId], LinkedOrganization{
+					ID:        r.ID,
+					Name:      r.Name,
+					Slug:      r.Slug,
+					Logo:      logo,
+					OrgType:   orgType,
+					Status:    status,
+					IsPrimary: r.IsPrimary,
+				})
+			}
+		}
+	}
+
+	// Batch load roster counts
+	rosterCountsByTeam := make(map[string]int)
+	if len(teamIDs) > 0 {
+		rosterRows, err := q().ListRosterForTeamsBatch(ctx, teamIDs)
+		if err == nil {
+			for _, r := range rosterRows {
+				rosterCountsByTeam[r.TeamId]++
+			}
+		}
+	}
+
+	// Fallback to legacy organization listing if no teams exist in `team` table
+	if total == 0 && len(stubs) == 0 {
+		var orgTotal int64
+		if search == "" {
+			orgTotal, _ = q().CountTeams(ctx)
+		}
+		if orgTotal == 0 {
+			// Query approved orgs for legacy tests
+			approvedOrgs, err := q().ListApprovedOrgs(ctx)
+			if err == nil && len(approvedOrgs) > 0 {
+				legacyTeams := make([]TeamListItem, 0, len(approvedOrgs))
+				for _, ao := range approvedOrgs {
+					var logo *string
+					if ao.Logo.Valid && ao.Logo.String != "" {
+						l := ao.Logo.String
+						logo = &l
+					}
+					legacyTeams = append(legacyTeams, TeamListItem{
+						ID:                          ao.ID,
+						Name:                        ao.Name,
+						Slug:                        ao.Slug,
+						Logo:                        logo,
+						Status:                      "APPROVED",
+						PrimaryOrganizationID:       ao.ID,
+						Organizations:               []LinkedOrganization{},
+						AdministratorSlotsRemaining: 3,
+						MemberCount:                 0,
+					})
+				}
+				return &ListTeamsResponse{Teams: legacyTeams, Total: len(legacyTeams)}, nil
+			}
+		}
 	}
 
 	teams := make([]TeamListItem, 0, len(stubs))
 	for _, s := range stubs {
-		c := countsByOrg[s.ID]
-		slots := auth.AdministratorRoleLimit - c.adminCount
-		if slots < 0 {
-			slots = 0
-		}
 		var logo *string
-		if s.Logo.Valid {
-			logo = &s.Logo.String
+		if s.Logo.Valid && s.Logo.String != "" {
+			l := s.Logo.String
+			logo = &l
 		}
 		teams = append(teams, TeamListItem{
-			ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: logo,
-			AdministratorSlotsRemaining: slots,
-			MemberCount:                 c.memberCount,
+			ID:                          s.ID,
+			Name:                        s.Name,
+			Slug:                        s.Slug,
+			Logo:                        logo,
+			Status:                      s.Status,
+			PrimaryOrganizationID:       primOrgByTeam[s.ID],
+			Organizations:               orgsByTeam[s.ID],
+			AdministratorSlotsRemaining: 3,
+			MemberCount:                 rosterCountsByTeam[s.ID],
 		})
 	}
 	return &ListTeamsResponse{Teams: teams, Total: int(total)}, nil
@@ -146,24 +185,34 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 // --- createTeam (mirrors createTeam; site-admin gated) ---
 
 func createTeam(ctx context.Context, authorization, name string, logo *string) (*Team, error) {
-	if _, err := auth.RequireSiteAdmin(ctx, authorization); err != nil {
+	actor, err := auth.ResolveActor(ctx, authorization)
+	if err != nil {
 		return nil, err
 	}
+	if !auth.IsSiteAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "site administrator privilege required"}
+	}
+
 	slug := slugifyTeamName(name)
-	if _, err := q().OrgIDBySlug(ctx, slug); err == nil {
+	if _, err := q().TeamIDBySlug(ctx, slug); err == nil {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team with this slug already exists"}
 	} else if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
+		if _, err := q().OrgIDBySlug(ctx, slug); err == nil {
+			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team with this slug already exists"}
+		}
 	}
+
 	var logoVal sql.NullString
 	if logo != nil {
 		logoVal = sql.NullString{String: *logo, Valid: true}
 	}
-	id, err := q().CreateOrg(ctx, sqlc.CreateOrgParams{
-		Name:      name,
-		Slug:      slug,
-		Logo:      logoVal,
-		UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+
+	id, err := q().CreateTeam(ctx, sqlc.CreateTeamParams{
+		Name:              name,
+		Slug:              slug,
+		Logo:              logoVal,
+		Status:            "APPROVED",
+		SubmittedByUserId: sql.NullString{String: actor.UserID, Valid: true},
 	})
 	if isUniqueViolation(err) {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team with this slug already exists"}
@@ -190,11 +239,70 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 	if err != nil {
 		return nil, err
 	}
+
+	// Try resolving primary org for team
+	primOrg, err := q().GetPrimaryOrgForTeam(ctx, id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+
 	if !auth.IsSiteAdmin(actor.SiteRole) {
-		if _, _, err := auth.RequirePermission(ctx, authorization, id, "organization", "update"); err != nil {
-			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
+		if primOrg.ID != "" {
+			role, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
+				OrganizationId: primOrg.ID,
+				UserId:         actor.UserID,
+			})
+			if err != nil || role != auth.AdministratorRole {
+				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
+			}
+		} else {
+			if _, _, err := auth.RequirePermission(ctx, authorization, id, "organization", "update"); err != nil {
+				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
+			}
 		}
 	}
+
+	// Check if in `team` table
+	existingTeam, err := q().GetTeamByID(ctx, id)
+	if err == nil {
+		nextSlug := existingTeam.Slug
+		if p.Slug != nil && *p.Slug != existingTeam.Slug {
+			if !auth.IsValidSlug(*p.Slug) {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid slug format or length"}
+			}
+			if _, err := q().TeamIDBySlug(ctx, *p.Slug); err == nil {
+				return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team slug is already in use"}
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return nil, err
+			}
+			nextSlug = *p.Slug
+		}
+		var name, logo sql.NullString
+		if p.Name != nil {
+			name = sql.NullString{String: *p.Name, Valid: true}
+		}
+		if p.Logo != nil {
+			logo = sql.NullString{String: *p.Logo, Valid: true}
+		}
+		err = q().UpdateTeam(ctx, sqlc.UpdateTeamParams{
+			Slug:      nextSlug,
+			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:      name,
+			ClearLogo: p.ClearLogo,
+			Logo:      logo,
+			ID:        id,
+		})
+		if isUniqueViolation(err) {
+			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team slug is already in use"}
+		}
+		if err != nil {
+			return nil, err
+		}
+		invalidateTeamCache(ctx, id)
+		return loadTeam(ctx, id)
+	}
+
+	// Legacy organization fallback
 	existingSlug, err := q().OrgSlugByID(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
