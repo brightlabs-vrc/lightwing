@@ -68,6 +68,8 @@ var (
 
 	inMemoryLeaderboardMu sync.RWMutex
 	inMemoryLeaderboard   *cachedLeaderboardData
+
+	recomputeMu sync.Mutex
 )
 
 // InvalidateLeaderboardCache clears cached leaderboard calculation so the next query re-aggregates.
@@ -153,6 +155,30 @@ func CalculateAndCacheLeaderboard(ctx context.Context) ([]LeaderboardEntry, time
 }
 
 func getLeaderboardData(ctx context.Context) ([]LeaderboardEntry, time.Time, error) {
+	inMemoryLeaderboardMu.RLock()
+	if inMemoryLeaderboard != nil && time.Since(inMemoryLeaderboard.CalculatedAt) < 10*time.Minute {
+		entries := inMemoryLeaderboard.Entries
+		ts := inMemoryLeaderboard.CalculatedAt
+		inMemoryLeaderboardMu.RUnlock()
+		return entries, ts, nil
+	}
+	inMemoryLeaderboardMu.RUnlock()
+
+	if leaderboardCache != nil {
+		if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: "global"}); err == nil && val.DataJSON != "" {
+			var cached cachedLeaderboardData
+			if err := json.Unmarshal([]byte(val.DataJSON), &cached); err == nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
+				inMemoryLeaderboardMu.Lock()
+				inMemoryLeaderboard = &cached
+				inMemoryLeaderboardMu.Unlock()
+				return cached.Entries, cached.CalculatedAt, nil
+			}
+		}
+	}
+
+	recomputeMu.Lock()
+	defer recomputeMu.Unlock()
+
 	inMemoryLeaderboardMu.RLock()
 	if inMemoryLeaderboard != nil && time.Since(inMemoryLeaderboard.CalculatedAt) < 10*time.Minute {
 		entries := inMemoryLeaderboard.Entries

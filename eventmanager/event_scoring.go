@@ -217,7 +217,6 @@ func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDe
 		}
 		if st == "CONCLUDED" {
 			scorecalc.InvalidateLeaderboardCache(ctx)
-			_, _, _ = scorecalc.CalculateAndCacheLeaderboard(ctx)
 		}
 	}
 
