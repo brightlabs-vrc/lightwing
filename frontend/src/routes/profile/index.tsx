@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { requireAuth } from '../../lib/auth-guard'
 import { getMyProfile, updateMyProfile } from '../../lib/public-api'
+import { isValidUserSlug } from '../../lib/slugs'
 import {
   PixelContainer,
   PixelStack,
@@ -84,7 +85,7 @@ function ProfilePage() {
           <PixelInput
             label="HANDLE"
             placeholder="e.g. competitorhandle"
-            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters and numbers only)."
+            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters, numbers, periods, dashes, and underscores)."
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
           />
@@ -116,8 +117,8 @@ function ProfilePage() {
                 toast({ tone: 'red', title: 'Slug must be between 4 and 24 characters.' })
                 return
               }
-              if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
-                toast({ tone: 'red', title: 'Slug must contain only lowercase letters and numbers.' })
+              if (trimmedSlug && !isValidUserSlug(trimmedSlug)) {
+                toast({ tone: 'red', title: 'Slug must contain only lowercase letters, numbers, periods, dashes, and underscores.' })
                 return
               }
               updateMutation.mutate({ biography, vrchatUsername, slug: trimmedSlug })
