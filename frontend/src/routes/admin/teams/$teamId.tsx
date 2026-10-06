@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
-import { requireSiteAdmin } from '../../../lib/auth-guard'
+import { requireAdminPanel } from '../../../lib/auth-guard'
 import {
   getAdminTeam,
   updateAdminTeamStats,
@@ -11,6 +11,7 @@ import {
   removeAdminTeamMember,
   listAdminUsers,
   listAdminTeamMembers,
+  convertAdminTeamToOrg,
 } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
@@ -21,7 +22,7 @@ import type { teammanager, auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/teams/$teamId')({
   beforeLoad: async ({ location }) => {
-    await requireSiteAdmin(location)
+    await requireAdminPanel(location)
   },
   component: AdminTeamDetailPage,
 })
@@ -53,6 +54,9 @@ function AdminTeamDetailPage() {
   const [averagePointsPerEvent, setAveragePointsPerEvent] = useState('')
   const [updatingStats, setUpdatingStats] = useState(false)
   const [statsError, setStatsError] = useState<string | null>(null)
+
+  // Convert Team state
+  const [convertingOrg, setConvertingOrg] = useState(false)
 
   // Edit Team Parameters form state
   const [teamName, setTeamName] = useState('')
@@ -238,6 +242,24 @@ function AdminTeamDetailPage() {
     }
   }
 
+  async function handleConvertToOrg() {
+    if (!authHeader || !team) return
+    if (!confirm('Are you sure you want to promote/convert this team into an organization?')) return
+
+    setConvertingOrg(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const updated = await convertAdminTeamToOrg(teamId, authHeader)
+      setTeam(updated)
+      setSuccess('Team converted to organization successfully.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to convert team to organization')
+    } finally {
+      setConvertingOrg(false)
+    }
+  }
+
   const roleOptions = [
     { value: 'member', label: 'Member' },
     { value: 'administrator', label: 'Administrator' },
@@ -245,6 +267,14 @@ function AdminTeamDetailPage() {
 
   const actions = (
     <div style={{ display: 'flex', gap: '8px' }}>
+      <button
+        type="button"
+        onClick={() => void handleConvertToOrg()}
+        disabled={convertingOrg}
+        className="slds-button slds-button_neutral"
+      >
+        {convertingOrg ? 'Converting...' : 'Convert to Organization'}
+      </button>
       <button
         type="button"
         onClick={() => {

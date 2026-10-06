@@ -26,8 +26,14 @@ type TeamStatsUpdate struct {
 }
 
 func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStatsUpdate) (*Team, error) {
-	if _, _, err := auth.RequirePermission(ctx, authorization, id, "organization", "update"); err != nil {
+	actor, err := auth.ResolveActor(ctx, authorization)
+	if err != nil {
 		return nil, err
+	}
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		if _, _, err := auth.RequirePermission(ctx, authorization, id, "organization", "update"); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := q().OrgIDByID(ctx, id); errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}

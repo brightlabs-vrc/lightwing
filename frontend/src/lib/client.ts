@@ -2008,8 +2008,14 @@ export namespace teammanager {
         initialRoster?: string[]
     }
 
+    export interface ConvertTeamToOrgRequest {
+        Authorization: string
+        teamId: string
+    }
+
     export interface SubmitTeamApplicationRequest {
         Authorization: string
+        teamId?: string
         name: string
         slug?: string | null
         logo?: string | null
@@ -2212,6 +2218,7 @@ export namespace teammanager {
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
             this.AddTeamMember = this.AddTeamMember.bind(this)
+            this.ConvertTeamToOrg = this.ConvertTeamToOrg.bind(this)
             this.CreateTeam = this.CreateTeam.bind(this)
             this.GetTeam = this.GetTeam.bind(this)
             this.GetTeamBySlug = this.GetTeamBySlug.bind(this)
@@ -2228,6 +2235,12 @@ export namespace teammanager {
             this.LinkSecondaryOrganization = this.LinkSecondaryOrganization.bind(this)
             this.UnlinkSecondaryOrganization = this.UnlinkSecondaryOrganization.bind(this)
             this.ListApprovedOrganizations = this.ListApprovedOrganizations.bind(this)
+        }
+
+        public async ConvertTeamToOrg(params: ConvertTeamToOrgRequest): Promise<Team> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/admin/teams/convert-to-org`, JSON.stringify(params), {headers})
+            return await resp.json() as Team
         }
 
         public async SubmitOrganizationApplication(params: SubmitOrgApplicationRequest): Promise<OrgApplicationView> {

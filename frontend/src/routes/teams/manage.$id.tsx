@@ -12,6 +12,7 @@ import {
   linkSecondaryOrganization,
   unlinkSecondaryOrganization,
   listApprovedOrganizations,
+  submitTeamApplication,
 } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
@@ -48,6 +49,7 @@ function ManageTeamPage() {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false)
   const [isLinkOrgModalOpen, setIsLinkOrgModalOpen] = useState(false)
+  const [isApplyOrgModalOpen, setIsApplyOrgModalOpen] = useState(false)
 
   // Edit Team Parameters form state
   const [teamName, setTeamName] = useState('')
@@ -66,6 +68,11 @@ function ManageTeamPage() {
   const [targetOrgId, setTargetOrgId] = useState('')
   const [linkingOrg, setLinkingOrg] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
+
+  // Apply to Org form state
+  const [applyTargetOrgId, setApplyTargetOrgId] = useState('')
+  const [applyingOrg, setApplyingOrg] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
 
   const authHeader = useMemo(() => {
     const token = session?.session.token
@@ -232,6 +239,32 @@ function ManageTeamPage() {
     }
   }
 
+  async function handleApplyToOrg(evt: React.FormEvent) {
+    evt.preventDefault()
+    if (!applyTargetOrgId || !authHeader || !team) return
+
+    setApplyingOrg(true)
+    setApplyError(null)
+    try {
+      await submitTeamApplication(
+        {
+          teamId: team.id,
+          name: team.name,
+          slug: team.slug,
+          primaryOrganizationId: applyTargetOrgId,
+        },
+        authHeader,
+      )
+      setIsApplyOrgModalOpen(false)
+      setSuccess('Application to join organization submitted successfully. Awaiting administrative review.')
+      void loadTeamData()
+    } catch (cause) {
+      setApplyError(cause instanceof Error ? cause.message : 'Failed to submit organization application')
+    } finally {
+      setApplyingOrg(false)
+    }
+  }
+
   const roleOptions = [
     { value: 'member', label: 'Member' },
     { value: 'administrator', label: 'Administrator' },
@@ -255,6 +288,13 @@ function ManageTeamPage() {
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => { setApplyError(null); setIsApplyOrgModalOpen(true); }}
+                className="slds-button slds-button_neutral"
+              >
+                Apply to Organization
+              </button>
               <button
                 type="button"
                 onClick={() => { setTeamError(null); setIsTeamModalOpen(true); }}
@@ -483,6 +523,39 @@ function ManageTeamPage() {
               <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" onClick={() => setIsMemberModalOpen(false)} className="slds-button slds-button_neutral">Cancel</button>
                 <button type="submit" disabled={addingMember} className="slds-button slds-button_brand">{addingMember ? 'Adding...' : 'Add Competitor'}</button>
+              </footer>
+            </form>
+          </div>
+        </section>
+      )}
+
+      {/* APPLY TO ORGANIZATION MODAL */}
+      {isApplyOrgModalOpen && (
+        <section role="dialog" tabIndex={-1} className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
+          <div className="slds-modal__container" style={{ maxWidth: '36rem', width: '90%' }}>
+            <header className="slds-modal__header">
+              <button onClick={() => setIsApplyOrgModalOpen(false)} className="slds-button slds-modal__close">✕</button>
+              <h2 className="slds-modal__title font-bold">Apply Team to Organization</h2>
+            </header>
+            <form onSubmit={handleApplyToOrg}>
+              <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
+                {applyError && <AlertBanner variant="error">{applyError}</AlertBanner>}
+                <div className="slds-form-element">
+                  <label className="slds-form-element__label font-bold">Target Organization</label>
+                  <select value={applyTargetOrgId} onChange={(e) => setApplyTargetOrgId(e.target.value)} className="slds-select" required>
+                    <option value="">-- Choose Target Organization --</option>
+                    {approvedOrgs.map((o) => (
+                      <option key={o.id} value={o.id}>{o.name} (@{o.slug})</option>
+                    ))}
+                  </select>
+                  <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', marginTop: '4px' }}>
+                    Submitting will send an application for this team to join the selected organization, subject to review by system administrators.
+                  </p>
+                </div>
+              </div>
+              <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" onClick={() => setIsApplyOrgModalOpen(false)} className="slds-button slds-button_neutral">Cancel</button>
+                <button type="submit" disabled={applyingOrg} className="slds-button slds-button_brand">{applyingOrg ? 'Submitting...' : 'Submit Application'}</button>
               </footer>
             </form>
           </div>

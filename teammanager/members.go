@@ -137,13 +137,20 @@ func resolvePrimaryOrgOrTarget(ctx context.Context, id string) (string, error) {
 // --- addTeamMember (mirrors addTeamMember) ---
 
 func addTeamMember(ctx context.Context, authorization, id, userID, role string) (*Team, error) {
-	targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		return nil, err
 	}
 
-	if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "create"); err != nil {
-		return nil, err
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+		if err != nil {
+			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		}
+
+		if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "create"); err != nil {
+			return nil, err
+		}
 	}
 	targetRole := role
 	if targetRole == "" {
@@ -206,13 +213,20 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 // --- updateTeamMemberRole (mirrors updateTeamMemberRole) ---
 
 func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role string) (*Team, error) {
-	targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		return nil, err
 	}
 
-	if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "update"); err != nil {
-		return nil, err
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+		if err != nil {
+			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		}
+
+		if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "update"); err != nil {
+			return nil, err
+		}
 	}
 
 	// Check if this is a team
@@ -263,13 +277,20 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 // --- removeTeamMember (mirrors removeTeamMember) ---
 
 func removeTeamMember(ctx context.Context, authorization, id, userID string) (*Team, error) {
-	targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		return nil, err
 	}
 
-	if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "delete"); err != nil {
-		return nil, err
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+		if err != nil {
+			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		}
+
+		if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "delete"); err != nil {
+			return nil, err
+		}
 	}
 
 	// Check if this is a team
