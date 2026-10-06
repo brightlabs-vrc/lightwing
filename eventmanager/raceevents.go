@@ -674,7 +674,7 @@ func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEve
 	if err != nil {
 		return nil, err
 	}
-	if !memberExists {
+	if !memberExists && !e.GranularParticipation {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
 	if !isEligibleTier(userTier, raceRestriction(r, e)) {
@@ -709,6 +709,13 @@ func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEve
 					Details: detailsMap{"code": CodeGranularUserRaceLimitReached, "limit": int(e.MaxConcurrentRaceParticipations.Int64), "currentCount": int(joinedCount)}}
 			}
 		}
+		if !memberExists && e.GranularParticipation {
+			if err := qq.InsertEventMemberSimple(ctx, sqlc.InsertEventMemberSimpleParams{
+				ID: "eventmember-" + newID()[:8], EventId: p.EventID, UserId: p.UserID,
+			}); err != nil {
+				return nil, err
+			}
+		}
 		if err := qq.InsertRaceEventMember(ctx, sqlc.InsertRaceEventMemberParams{
 			ID: "racemember-" + newID()[:8], RaceEventId: p.RaceID, UserId: p.UserID,
 		}); err != nil {
@@ -733,6 +740,38 @@ func AddRaceEventMember(ctx context.Context, p *RaceMemberRequest) (*RaceEventDe
 	return AddRaceEventMemberCore(ctx, p)
 }
 
+// removeRaceMemberUser removes a user from a race and handles granular participation cleanup.
+func removeRaceMemberUser(ctx context.Context, e *eventRow, eventID, raceID, userID string) error {
+	memberExists, err := q().EventMemberExists(ctx, sqlc.EventMemberExistsParams{
+		EventId: eventID, UserId: userID,
+	})
+	if err != nil {
+		return err
+	}
+	if !memberExists {
+		return &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
+	}
+	if err := q().DeleteRaceEventMember(ctx, sqlc.DeleteRaceEventMemberParams{
+		RaceEventId: raceID, UserId: userID,
+	}); err != nil {
+		return err
+	}
+	if e.GranularParticipation {
+		activeCount64, err := q().GetActiveRaceCountForUser(ctx, sqlc.GetActiveRaceCountForUserParams{
+			UserId: userID, EventId: eventID,
+		})
+		if err != nil {
+			return err
+		}
+		if activeCount64 == 0 {
+			if err := RemoveMemberFromEvent(ctx, eventID, userID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // RemoveRaceEventMemberCore removes a participant from a race. On granular
 // events, losing the last race membership also removes event membership.
 func RemoveRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEventDetail, error) {
@@ -746,33 +785,8 @@ func RemoveRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*Race
 	if _, err := requireRaceEvent(ctx, p.EventID, p.RaceID); err != nil {
 		return nil, err
 	}
-	var memberExists bool
-	memberExists, err = q().EventMemberExists(ctx, sqlc.EventMemberExistsParams{
-		EventId: p.EventID, UserId: p.UserID,
-	})
-	if err != nil {
+	if err := removeRaceMemberUser(ctx, e, p.EventID, p.RaceID, p.UserID); err != nil {
 		return nil, err
-	}
-	if !memberExists {
-		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
-	}
-	if err := q().DeleteRaceEventMember(ctx, sqlc.DeleteRaceEventMemberParams{
-		RaceEventId: p.RaceID, UserId: p.UserID,
-	}); err != nil {
-		return nil, err
-	}
-	if e.GranularParticipation {
-		activeCount64, err := q().GetActiveRaceCountForUser(ctx, sqlc.GetActiveRaceCountForUserParams{
-			UserId: p.UserID, EventId: p.EventID,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if activeCount64 == 0 {
-			if err := RemoveMemberFromEvent(ctx, p.EventID, p.UserID); err != nil {
-				return nil, err
-			}
-		}
 	}
 	rr, err := requireRaceEvent(ctx, p.EventID, p.RaceID)
 	if err != nil {
@@ -953,33 +967,8 @@ func LeaveRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDeta
 	if err != nil {
 		return nil, err
 	}
-	userID := actor.UserID
-	memberExists, err := q().EventMemberExists(ctx, sqlc.EventMemberExistsParams{
-		EventId: p.EventID, UserId: userID,
-	})
-	if err != nil {
+	if err := removeRaceMemberUser(ctx, e, p.EventID, p.RaceID, actor.UserID); err != nil {
 		return nil, err
-	}
-	if !memberExists {
-		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
-	}
-	if err := q().DeleteRaceEventMember(ctx, sqlc.DeleteRaceEventMemberParams{
-		RaceEventId: p.RaceID, UserId: userID,
-	}); err != nil {
-		return nil, err
-	}
-	if e.GranularParticipation {
-		activeCount64, err := q().GetActiveRaceCountForUser(ctx, sqlc.GetActiveRaceCountForUserParams{
-			UserId: userID, EventId: p.EventID,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if activeCount64 == 0 {
-			if err := RemoveMemberFromEvent(ctx, p.EventID, userID); err != nil {
-				return nil, err
-			}
-		}
 	}
 	rr, err := requireRaceEvent(ctx, p.EventID, p.RaceID)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"encore.dev/beta/errs"
+	"encore.dev/cron"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/shared"
@@ -62,6 +63,7 @@ type EventListItem struct {
 	OwnerType                       string  `json:"ownerType"`
 	OrganizationID                  *string `json:"organizationId"`
 	OwnerUserID                     *string `json:"ownerUserId"`
+	OwnerName                       *string `json:"ownerName"`
 	Status                          string  `json:"status"`
 	Tag                             string  `json:"tag"`
 	DeletedAt                       *string `json:"deletedAt,omitempty"`
@@ -146,6 +148,7 @@ type EventDetail struct {
 	OwnerType                       string             `json:"ownerType"`
 	OrganizationID                  *string            `json:"organizationId"`
 	OwnerUserID                     *string            `json:"ownerUserId"`
+	OwnerName                       *string            `json:"ownerName"`
 	Status                          string             `json:"status"`
 	Tag                             string             `json:"tag"`
 	DeletedAt                       *string            `json:"deletedAt,omitempty"`
@@ -222,6 +225,7 @@ type eventRow struct {
 	OwnerType                       string
 	OrganizationID                  sql.NullString
 	OwnerUserID                     sql.NullString
+	OwnerName                       sql.NullString
 	Status                          string
 	Tag                             string
 	DeletedAt                       *time.Time
@@ -248,6 +252,7 @@ func toEventRow(r sqlc.GetEventRowRow) *eventRow {
 		ID: r.ID, Name: r.Name, Description: r.Description,
 		OwnerType: stringFromAny(r.OwnerType),
 		OrganizationID: r.OrganizationId, OwnerUserID: r.OwnerUserId,
+		OwnerName: sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""},
 		Status: r.Status, Tag: r.Tag, DeletedAt: timePtrFromNull(r.DeletedAt),
 		ScoringType: int(r.ScoringType), ScoringRulesMode: r.ScoringRulesMode,
 		CustomScoringTables: customTables,
@@ -318,7 +323,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		}
 	}
 
-	// Event members; granular events only surface members active in a race.
+	// Event members.
 	type memberRow struct {
 		UserID string
 		Name   string
@@ -331,9 +336,6 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 	}
 	for _, em := range emrows {
 		m := memberRow{UserID: em.UserId, Name: em.VrchatUsername, Tier: nullStringFromAny(em.ClassTier)}
-		if e.GranularParticipation && !activeUserIDs[m.UserID] {
-			continue
-		}
 		members = append(members, m)
 	}
 
@@ -415,7 +417,8 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 	return &EventDetail{
 		ID: e.ID, Name: e.Name, Description: nullString(e.Description),
 		OwnerType: e.OwnerType, OrganizationID: nullString(e.OrganizationID),
-		OwnerUserID: nullString(e.OwnerUserID), Status: e.Status, Tag: e.Tag,
+		OwnerUserID: nullString(e.OwnerUserID), OwnerName: nullString(e.OwnerName),
+		Status: e.Status, Tag: e.Tag,
 		DeletedAt: nullTime(e.DeletedAt),
 		ScoringType: e.ScoringType, ScoringTypeLabel: scoringLabel(e.ScoringType),
 		ScoringRulesMode: nullString(e.ScoringRulesMode), CustomScoringTables: customTables,
@@ -645,10 +648,18 @@ func CreateEvent(ctx context.Context, p *CreateEventRequest) (*EventDetail, erro
 
 // PurgeExpiredDeletedEvents permanently deletes events in PENDING_DELETION state
 // that were deleted more than 7 days ago.
+//
+//encore:api private
 func PurgeExpiredDeletedEvents(ctx context.Context) error {
 	threshold := time.Now().UTC().AddDate(0, 0, -7)
 	return q().PurgeExpiredDeletedEvents(ctx, sql.NullTime{Time: threshold, Valid: true})
 }
+
+var _ = cron.NewJob("purge-deleted-events", cron.JobConfig{
+	Title:    "Purge expired soft-deleted events",
+	Every:    1 * cron.Hour,
+	Endpoint: PurgeExpiredDeletedEvents,
+})
 
 // ListEventsQuery carries optional filters plus pagination.
 //
@@ -676,6 +687,7 @@ func toListItem(r sqlc.ListEventsRow) EventListItem {
 		OwnerType: stringFromAny(r.OwnerType),
 		OrganizationID: nullString(r.OrganizationId),
 		OwnerUserID: nullString(r.OwnerUserId),
+		OwnerName: nullString(sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""}),
 		Status: r.Status, Tag: r.Tag, DeletedAt: nullTime(timePtrFromNull(r.DeletedAt)),
 		ScoringType: int(r.ScoringType), ScoringTypeLabel: scoringLabel(int(r.ScoringType)),
 		ClassRestriction: classTierPtr(nullStringFromAny(r.ClassRestriction)),
@@ -701,13 +713,12 @@ func toPublicListItem(r sqlc.ListPublicEventsRow) sqlc.ListEventsRow {
 		MaxConcurrentRaceParticipations: r.MaxConcurrentRaceParticipations,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Count: r.Count, Count_2: r.Count_2,
+		OwnerName: r.OwnerName,
 	}
 }
 
 // ListEventsCore lists events with optional filters.
 func ListEventsCore(ctx context.Context, q *ListEventsQuery) (*ListEventsResponse, error) {
-	_ = PurgeExpiredDeletedEvents(ctx)
-
 	qq := sqlc.New(std())
 	total, err := qq.CountEvents(ctx, sqlc.CountEventsParams{
 		Column1: q.OrganizationID,
@@ -753,7 +764,6 @@ type ListPublicEventsQuery struct {
 
 // ListPublicEventsCore lists non-draft, active events (PENDING, ONGOING, CONCLUDED).
 func ListPublicEventsCore(ctx context.Context, q *ListPublicEventsQuery) (*ListEventsResponse, error) {
-	_ = PurgeExpiredDeletedEvents(ctx)
 	limit := q.Limit
 	if limit == 0 {
 		limit = 10

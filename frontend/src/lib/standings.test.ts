@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { inferFinishTimes, parseMarginToSeconds, type DerivedRow, type EditedResult, EMPTY_EDIT } from "./standings";
+import { inferFinishTimes, parseMarginToSeconds, parsePenaltyStatus, formatPenaltyStatus, type DerivedRow, type EditedResult, EMPTY_EDIT } from "./standings";
 
 function makeMockRow(
   userId: string,
@@ -344,6 +344,32 @@ describe("inferFinishTimes", () => {
       expect(result.edits.user3.finishTime).toBe("");
       expect(result.edits.user5.finishTime).toBe("");
     }
+  });
+});
+
+describe("parsePenaltyStatus & formatPenaltyStatus", () => {
+  test("parses standard and terminal penalty statuses", () => {
+    expect(parsePenaltyStatus("")).toEqual({ type: "NONE" });
+    expect(parsePenaltyStatus("dsq")).toEqual({ type: "DSQ" });
+    expect(parsePenaltyStatus("DNF")).toEqual({ type: "DNF" });
+    expect(parsePenaltyStatus("DNS")).toEqual({ type: "DNS" });
+    expect(parsePenaltyStatus("DEFERRED")).toEqual({ type: "DEFERRED" });
+  });
+
+  test("parses POS and PTS reduction penalty statuses", () => {
+    expect(parsePenaltyStatus("PEN (POS-3)")).toEqual({ type: "POS", amount: 3 });
+    expect(parsePenaltyStatus("pen (pos-5)")).toEqual({ type: "POS", amount: 5 });
+    expect(parsePenaltyStatus("PEN (PTS-3)")).toEqual({ type: "PTS", amount: 3 });
+    expect(parsePenaltyStatus("pen (pts-10)")).toEqual({ type: "PTS", amount: 10 });
+  });
+
+  test("formats penalty status strings correctly", () => {
+    expect(formatPenaltyStatus("NONE")).toBe("");
+    expect(formatPenaltyStatus("DSQ")).toBe("DSQ");
+    expect(formatPenaltyStatus("DNF")).toBe("DNF");
+    expect(formatPenaltyStatus("DNS")).toBe("DNS");
+    expect(formatPenaltyStatus("POS", 3)).toBe("PEN (POS-3)");
+    expect(formatPenaltyStatus("PTS", 5)).toBe("PEN (PTS-5)");
   });
 });
 

@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { requireAuth } from '../../lib/auth-guard'
 import { getMyProfile, updateMyProfile } from '../../lib/public-api'
+import { isValidUserSlug } from '../../lib/slugs'
 import {
   PixelContainer,
   PixelStack,
@@ -27,7 +28,6 @@ function ProfilePage() {
   const { session } = useAuth()
   const { toast } = useToast()
   const [biography, setBiography] = useState('')
-  const [careerOverview, setCareerOverview] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
   const [slug, setSlug] = useState('')
 
@@ -41,19 +41,17 @@ function ProfilePage() {
   useEffect(() => {
     if (profile) {
       setBiography(profile.biography ?? '')
-      setCareerOverview(profile.careerOverview ?? '')
       setVrchatUsername(profile.vrchatUsername ?? '')
       setSlug(profile.slug ?? '')
     }
   }, [profile])
 
   const updateMutation = useMutation({
-    mutationFn: (data: { biography: string; careerOverview: string; vrchatUsername: string; slug: string }) =>
+    mutationFn: (data: { biography: string; vrchatUsername: string; slug: string }) =>
       updateMyProfile(
         session?.user.id ?? '',
         {
           biography: data.biography || null,
-          careerOverview: data.careerOverview || null,
           vrchatUsername: data.vrchatUsername || null,
           slug: data.slug || undefined,
         },
@@ -87,7 +85,7 @@ function ProfilePage() {
           <PixelInput
             label="HANDLE"
             placeholder="e.g. competitorhandle"
-            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters and numbers only)."
+            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters, numbers, periods, dashes, and underscores)."
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
           />
@@ -98,14 +96,6 @@ function ProfilePage() {
             value={biography}
             onChange={(e) => setBiography(e.target.value)}
             placeholder="Tell us about yourself..."
-          />
-
-          <PixelTextarea
-            label="CAREER OVERVIEW"
-            rows={3}
-            value={careerOverview}
-            onChange={(e) => setCareerOverview(e.target.value)}
-            placeholder="Summarize your competitive career..."
           />
 
           <PixelInput
@@ -127,11 +117,11 @@ function ProfilePage() {
                 toast({ tone: 'red', title: 'Slug must be between 4 and 24 characters.' })
                 return
               }
-              if (trimmedSlug && !/^[a-z0-9]+$/.test(trimmedSlug)) {
-                toast({ tone: 'red', title: 'Slug must contain only lowercase letters and numbers.' })
+              if (trimmedSlug && !isValidUserSlug(trimmedSlug)) {
+                toast({ tone: 'red', title: 'Slug must contain only lowercase letters, numbers, periods, dashes, and underscores.' })
                 return
               }
-              updateMutation.mutate({ biography, careerOverview, vrchatUsername, slug: trimmedSlug })
+              updateMutation.mutate({ biography, vrchatUsername, slug: trimmedSlug })
             }}
           >
             {updateMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}

@@ -3,6 +3,7 @@ package eventmanager
 import (
 	"context"
 	"testing"
+	"time"
 
 	"encore.dev/beta/errs"
 )
@@ -87,6 +88,65 @@ func Test_GranularResultsGating(t *testing.T) {
 		Results: []*RaceResultInput{{UserID: p2, Points: intptr(8)}},
 	}); err == nil {
 		t.Error("merge including non-race member should fail, got nil")
+	}
+}
+
+func Test_GranularEventMembersSurfacedAndSelectableForRace(t *testing.T) {
+	f := newFixtures(t)
+	ctx := context.Background()
+
+	admin := f.createUser("gradmin2", "Granular Admin 2", nil, "SITE_ADMIN")
+	authHeader := f.createSession(admin)
+	p1 := f.createUser("grpart3", "Participant Three", nil, "USER")
+
+	eventID := f.createEventDirect(admin, "Granular Event 2", "UNOFFICIAL", nil, true)
+
+	// Add p1 as event member
+	addedEvent, err := AddEventMemberCore(ctx, &AddEventMemberRequest{
+		EventID: eventID, UserID: p1, Authorization: authHeader,
+	})
+	if err != nil {
+		t.Fatalf("AddEventMemberCore: %v", err)
+	}
+
+	// Verify p1 is in EventDetail.Members immediately
+	found := false
+	for _, m := range addedEvent.Members {
+		if m.UserID == p1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected %q to be in EventDetail.Members after AddEventMemberCore on granular event", p1)
+	}
+
+	// Create a race
+	race, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
+		EventID: eventID, Authorization: authHeader, Name: "Race 1",
+		DistanceMeters: 1000, TrackType: "Dirt", Location: "Tokyo",
+	})
+	if err != nil {
+		t.Fatalf("CreateRaceEventCore: %v", err)
+	}
+
+	// Add p1 to race
+	addedRace, err := AddRaceEventMemberCore(ctx, &RaceMemberRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p1, Authorization: authHeader,
+	})
+	if err != nil {
+		t.Fatalf("AddRaceEventMemberCore: %v", err)
+	}
+
+	foundInRace := false
+	for _, rm := range addedRace.Members {
+		if rm.UserID == p1 {
+			foundInRace = true
+			break
+		}
+	}
+	if !foundInRace {
+		t.Errorf("expected %q to be in RaceEventDetail.Members after AddRaceEventMemberCore", p1)
 	}
 }
 
@@ -482,4 +542,64 @@ func findResult(results []*RaceResultView, userID string) *RaceResultView {
 		}
 	}
 	return nil
+}
+
+func Test_BenchmarkApplyAutoDeferralsForEvent(t *testing.T) {
+	f := newFixtures(t)
+	ctx := context.Background()
+
+	admin := f.createUser("bmadmin", "Benchmark Admin", nil, "SITE_ADMIN")
+
+	numUsers := 50
+	numRaces := 10
+
+	users := make([]string, numUsers)
+	for i := 0; i < numUsers; i++ {
+		users[i] = f.createUser("bmuser", "Benchmark User", nil, "USER")
+	}
+
+	eventID := f.createEventDirect(admin, "Benchmark Event", "UNOFFICIAL", nil, false)
+	for _, u := range users {
+		f.addEventMemberDirect(eventID, u)
+	}
+
+	raceIDs := make([]string, numRaces)
+	now := time.Now().UTC()
+	for i := 0; i < numRaces; i++ {
+		rid := "race-" + newID()[:8]
+		if _, err := db.Exec(ctx,
+			`INSERT INTO "race_event" (id, "eventId", name, sequence, "distanceMeters", "trackType", location, grade, "createdAt", "updatedAt")
+			 VALUES ($1, $2, $3, $4, 1200, 'Turf', 'Kyoto', 'OP', $5, $5)`,
+			rid, eventID, "Race OP", i+1, now); err != nil {
+			t.Fatalf("insert race %d: %v", i, err)
+		}
+		raceIDs[i] = rid
+	}
+
+	// Make each user win race 1 (sequence 1)
+	for _, u := range users {
+		resID := "raceresult-" + newID()[:8]
+		if _, err := db.Exec(ctx,
+			`INSERT INTO "race_result" (id, "raceEventId", "userId", position, points, "createdAt", "updatedAt")
+			 VALUES ($1, $2, $3, 1, 12, $4, $4)`,
+			resID, raceIDs[0], u, now); err != nil {
+			t.Fatalf("assign win: %v", err)
+		}
+	}
+
+	iterations := 20
+	var totalDuration time.Duration
+
+	for i := 0; i < iterations; i++ {
+		_, _ = db.Exec(ctx, `DELETE FROM "race_result" WHERE "resultStatus" = 'DEFERRED' AND "raceEventId" IN (SELECT id FROM "race_event" WHERE "eventId" = $1)`, eventID)
+
+		start := time.Now()
+		if err := ApplyAutoDeferralsForEvent(ctx, eventID, nil); err != nil {
+			t.Fatalf("ApplyAutoDeferralsForEvent: %v", err)
+		}
+		totalDuration += time.Since(start)
+	}
+
+	avgMs := float64(totalDuration.Milliseconds()) / float64(iterations)
+	t.Logf("BENCHMARK_RESULT: %d iterations, total time: %v, average per call: %.2f ms", iterations, totalDuration, avgMs)
 }

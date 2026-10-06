@@ -1,6 +1,10 @@
 import { appClient } from './api'
 import { MOCK_MODE } from './mock-mode'
-import type { auth, eventmanager } from './client'
+import type { auth, eventmanager, scorecalc, teammanager } from './client'
+
+export type LeaderboardEntry = scorecalc.LeaderboardEntry
+export type LeaderboardResponse = scorecalc.LeaderboardResponse
+export type GetLeaderboardParams = scorecalc.GetLeaderboardParams
 
 const now = new Date().toISOString()
 
@@ -159,6 +163,7 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       ownerType: 'ORGANIZATION',
       organizationId: 'org_mock_urs',
       ownerUserId: null,
+      ownerName: 'UMA Racing Society',
       status: 'PENDING',
       tag: 'OFFICIAL',
       scoringType: 1,
@@ -234,6 +239,7 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       ownerType: 'USER',
       organizationId: null,
       ownerUserId: 'mock-user-2',
+      ownerName: 'Shadow',
       status: 'CONCLUDED',
       scoringType: 2,
       scoringTypeLabel: 'ladder-elo',
@@ -300,6 +306,7 @@ export async function listPublicEvents(
     ownerType: e.ownerType,
     organizationId: e.organizationId,
     ownerUserId: e.ownerUserId,
+    ownerName: e.ownerName ?? null,
     status: e.status,
     tag: e.tag ?? 'OFFICIAL',
     deletedAt: e.deletedAt ?? null,
@@ -666,4 +673,199 @@ export async function leaveRaceEvent(
 
   saveMockEvents(mockPublicEvents)
   return updatedRace
+}
+
+export async function getLeaderboard(
+  params: GetLeaderboardParams = {},
+): Promise<LeaderboardResponse> {
+  if (!MOCK_MODE) {
+    return appClient.scorecalc.GetLeaderboard({
+      SortBy: params.SortBy,
+      Search: params.Search,
+      ClassTier: params.ClassTier,
+      Limit: params.Limit,
+      Offset: params.Offset,
+    })
+  }
+
+  const mockEntries: LeaderboardEntry[] = [
+    {
+      rank: 1,
+      userId: 'mock-user-1',
+      name: 'Thunder Bolt',
+      slug: 'thunder-bolt',
+      image: null,
+      classTier: 'OP',
+      totalPoints: 120,
+      averagePosition: 1.2,
+      averagePointsPerSeason: 60.0,
+      eventsParticipated: 2,
+      racesParticipated: 4,
+      wins: 3,
+    },
+    {
+      rank: 2,
+      userId: 'mock-user-2',
+      name: 'Shadow Runner',
+      slug: 'shadow-runner',
+      image: null,
+      classTier: 'G3',
+      totalPoints: 95,
+      averagePosition: 2.1,
+      averagePointsPerSeason: 47.5,
+      eventsParticipated: 2,
+      racesParticipated: 4,
+      wins: 1,
+    },
+    {
+      rank: 3,
+      userId: 'mock-admin-1',
+      name: 'Mock Admin',
+      slug: 'mock-admin',
+      image: null,
+      classTier: null,
+      totalPoints: 40,
+      averagePosition: 3.5,
+      averagePointsPerSeason: 20.0,
+      eventsParticipated: 1,
+      racesParticipated: 2,
+      wins: 0,
+    },
+  ]
+
+  let filtered = [...mockEntries]
+  if (params.Search) {
+    const s = params.Search.toLowerCase()
+    filtered = filtered.filter(
+      (e) =>
+        e.name.toLowerCase().includes(s) ||
+        (e.slug && e.slug.toLowerCase().includes(s)),
+    )
+  }
+
+  if (params.ClassTier) {
+    const ct = params.ClassTier.toUpperCase()
+    filtered = filtered.filter(
+      (e) => e.classTier && e.classTier.toUpperCase() === ct,
+    )
+  }
+
+  if (params.SortBy === 'avgPosition') {
+    filtered.sort((a, b) => a.averagePosition - b.averagePosition)
+  } else if (params.SortBy === 'avgPointsPerSeason') {
+    filtered.sort((a, b) => b.averagePointsPerSeason - a.averagePointsPerSeason)
+  } else {
+    filtered.sort((a, b) => b.totalPoints - a.totalPoints)
+  }
+
+  const offset = params.Offset ?? 0
+  const limit = params.Limit ?? 10
+  const pageEntries = filtered.slice(offset, offset + limit)
+
+  return {
+    entries: pageEntries,
+    total: filtered.length,
+    calculatedAt: new Date().toISOString(),
+  }
+}
+
+export async function getPublicUserProfile(userOrSlug: string): Promise<auth.UserProfile> {
+  if (!MOCK_MODE) {
+    try {
+      return await appClient.auth.GetUserBySlug({ Slug: userOrSlug })
+    } catch {
+      return await appClient.auth.GetUser(userOrSlug)
+    }
+  }
+
+  for (const user of mockUserProfileMap.values()) {
+    if (user.id === userOrSlug || user.slug === userOrSlug) {
+      return user
+    }
+  }
+  throw new Error('User not found')
+}
+
+export async function getPublicTeamProfile(teamOrSlug: string): Promise<teammanager.Team> {
+  if (!MOCK_MODE) {
+    try {
+      return await appClient.teammanager.GetTeamBySlug({ Slug: teamOrSlug })
+    } catch {
+      return await appClient.teammanager.GetTeam(teamOrSlug)
+    }
+  }
+
+  return {
+    id: 'org_mock_urs',
+    name: 'UMA Racing Society',
+    slug: 'uma-racing-society',
+    logo: 'https://placehold.co/120x120/2563eb/ffffff?text=UMA',
+    administratorSlotsRemaining: 3,
+    stats: {
+      rankingAverage: 1.5,
+      pointsAverage: 88.5,
+      seasonRank: 1,
+      averagePointsPerEvent: 95.0,
+    },
+    members: [
+      { userId: 'mock-user-1', name: 'Thunder Bolt', role: 'ADMINISTRATOR' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', role: 'MEMBER' },
+    ],
+  }
+}
+
+export async function getUserRaceRecords(
+  userId: string,
+  limit?: number,
+  offset?: number,
+): Promise<eventmanager.ListUserRaceRecordsResponse> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.GetUserRaceRecords({
+      userId,
+      Limit: limit ?? 10,
+      Offset: offset ?? 0,
+    })
+  }
+
+  const mockRecords: eventmanager.UserRaceRecordView[] = [
+    {
+      resultId: 'res_mock_001',
+      position: 1,
+      points: 10,
+      finishTime: '1:08.5',
+      resultStatus: null,
+      resultCreatedAt: now,
+      raceId: 'race_mock_001',
+      raceName: 'Summer Sprint Turf',
+      raceSequence: 1,
+      raceGrade: 'OP',
+      eventId: 'evt_mock_001',
+      eventName: 'Summer Sprint Invitational',
+      eventTag: 'OFFICIAL',
+      eventScheduledAt: now,
+    },
+    {
+      resultId: 'res_mock_004',
+      position: null,
+      points: 0,
+      finishTime: null,
+      resultStatus: 'DEFERRED',
+      resultCreatedAt: now,
+      raceId: 'race_mock_002',
+      raceName: 'Summer Sprint Dirt',
+      raceSequence: 2,
+      raceGrade: 'OP',
+      eventId: 'evt_mock_001',
+      eventName: 'Summer Sprint Invitational',
+      eventTag: 'OFFICIAL',
+      eventScheduledAt: now,
+    },
+  ]
+
+  const total = mockRecords.length
+  const sliced = mockRecords.slice(offset ?? 0, (offset ?? 0) + (limit ?? 10))
+  return {
+    records: sliced,
+    total,
+  }
 }

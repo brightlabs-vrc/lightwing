@@ -113,10 +113,20 @@ function EventDetailPage() {
   const isGranular = event.granularParticipation
 
   const participantColumns: PixelTableColumn<eventmanager.EventMemberView>[] = [
-    { key: 'name', header: 'NAME', render: (m) => <span className="font-medium">{m.name}</span> },
+    {
+      key: 'name',
+      header: 'NAME',
+      width: '35%',
+      render: (m) => (
+        <div className="truncate font-medium max-w-[200px]" title={m.name}>
+          {m.name}
+        </div>
+      ),
+    },
     {
       key: 'classTier',
       header: 'CLASS TIER',
+      width: 120,
       render: (m) =>
         m.classTier ? (
           <PixelBadge tone="neutral">{CLASS_TIER_LABELS[m.classTier as any]}</PixelBadge>
@@ -124,11 +134,44 @@ function EventDetailPage() {
           <span className="text-retro-muted">-</span>
         ),
     },
+    ...(isGranular
+      ? [
+          {
+            key: 'registeredRaces',
+            header: 'REGISTERED RACES',
+            render: (m: eventmanager.EventMemberView) => {
+              const userRaces = (event.raceEvents ?? []).filter((r) =>
+                (r.members ?? []).some((rm) => rm.userId === m.userId)
+              )
+              if (userRaces.length === 0) {
+                return <span className="text-retro-muted text-xs">NONE</span>
+              }
+              return (
+                <div className="flex gap-1 flex-wrap max-h-20 overflow-y-auto">
+                  {userRaces.map((r) => (
+                    <PixelBadge key={r.id} tone="neutral" title={`#${r.sequence} ${r.name}`}>
+                      #{r.sequence} {r.name}
+                    </PixelBadge>
+                  ))}
+                </div>
+              )
+            },
+          },
+        ]
+      : []),
   ]
 
   const pointsColumns: PixelTableColumn<eventmanager.PointsEntryView>[] = [
     { key: 'rank', header: '#', width: 64, render: (_e, idx) => idx + 1 },
-    { key: 'name', header: 'PARTICIPANT', render: (e) => <span className="font-medium">{e.name}</span> },
+    {
+      key: 'name',
+      header: 'PARTICIPANT',
+      render: (e) => (
+        <div className="truncate font-medium max-w-[240px]" title={e.name}>
+          {e.name}
+        </div>
+      ),
+    },
     {
       key: 'points',
       header: 'TOTAL POINTS',
@@ -140,7 +183,15 @@ function EventDetailPage() {
 
   const ladderColumns: PixelTableColumn<eventmanager.LadderEntryView>[] = [
     { key: 'rank', header: 'RANK', width: 64, render: (e) => e.rank },
-    { key: 'name', header: 'PARTICIPANT', render: (e) => <span className="font-medium">{e.name}</span> },
+    {
+      key: 'name',
+      header: 'PARTICIPANT',
+      render: (e) => (
+        <div className="truncate font-medium max-w-[240px]" title={e.name}>
+          {e.name}
+        </div>
+      ),
+    },
     {
       key: 'elo',
       header: 'ELO',
@@ -169,6 +220,11 @@ function EventDetailPage() {
           <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
             <PixelStack gap={1}>
               <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">{event.name}</h1>
+              {event.ownerName && (
+                <div className="font-pixel text-xs text-retro-primary">
+                  ORGANIZER: {event.ownerName.toUpperCase()}
+                </div>
+              )}
               {event.scheduledAt && (
                 <div className="font-pixel text-xs text-retro-gold">
                   SCHEDULED: <time dateTime={event.scheduledAt}>{formatLocalDateTime(event.scheduledAt)}</time>
@@ -381,60 +437,74 @@ function RaceStandingsTable({
     {
       key: 'position',
       header: 'POS',
-      width: 64,
+      width: 60,
       render: (r) => <span className="font-pixel">{r.position ?? '-'}</span>,
     },
     {
       key: 'gateNumber',
       header: 'DRAW',
-      width: 64,
+      width: 60,
       render: (r) => <span>{r.gateNumber ?? '-'}</span>,
     },
     {
       key: 'participant',
       header: 'PARTICIPANT',
+      width: 180,
       render: (r) => {
         const member = members.find((m) => m.userId === r.userId)
-        return <span className="font-medium">{member?.name ?? r.userId}</span>
+        const name = member?.name ?? r.userId
+        return (
+          <div className="truncate font-medium max-w-[170px]" title={name}>
+            {name}
+          </div>
+        )
       },
     },
     {
       key: 'points',
       header: 'POINTS',
       align: 'right',
-      width: 96,
+      width: 80,
       render: (r) => <span className="text-retro-primary">{r.points}</span>,
     },
     {
       key: 'finishTime',
       header: 'FINISH TIME',
+      width: 100,
       render: (r) => <span>{r.finishTime ?? '-'}</span>,
     },
     {
       key: 'margin',
       header: 'MARGIN',
+      width: 90,
       render: (r) => <span>{r.margin ?? '-'}</span>,
     },
     {
       key: 'passingOrder',
       header: 'PASSING ORDER',
+      width: 120,
       render: (r) => <span>{r.passingOrder ?? '-'}</span>,
     },
     {
       key: 'final3F',
       header: 'FINAL 3F',
+      width: 90,
       render: (r) => <span>{r.final3F ?? '-'}</span>,
     },
     {
       key: 'resultStatus',
       header: 'RESULT',
-      width: 80,
+      width: 110,
       render: (r) => {
-        const status = r.resultStatus?.toUpperCase()
+        const rawStatus = r.resultStatus ?? ''
+        const status = rawStatus.toUpperCase()
         if (status === 'DSQ') return <span className="text-red-600 font-bold">DSQ</span>
         if (status === 'DNF') return <span className="text-orange-600 font-bold">DNF</span>
         if (status === 'DNS') return <span className="text-amber-600 font-bold">DNS</span>
         if (status === 'DEFERRED') return <span className="text-slate-500 font-bold" title="Deferred - Already won an OP">DEFERRED</span>
+        if (status.startsWith('PEN (POS-') || status.startsWith('PEN (PTS-')) {
+          return <span className="text-red-600 font-bold">{rawStatus}</span>
+        }
         return <span className="text-retro-muted">-</span>
       },
     },

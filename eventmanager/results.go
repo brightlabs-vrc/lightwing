@@ -5,13 +5,25 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"encore.dev/beta/errs"
+	"encore.dev/storage/cache"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/scorecalc"
+	"encore.app/shared"
 )
+
+type userRaceRecordsCacheKey struct {
+	Key string
+}
+
+var userRaceRecordsCache = cache.NewStructKeyspace[userRaceRecordsCacheKey, ListUserRaceRecordsResponse](shared.Cache, cache.KeyspaceConfig{
+	KeyPattern:    "user_records/:Key",
+	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
+})
 
 // Per-race results. Event admins assign points to participants on a specific
 // race event; the event-level aggregate is recomputed by scorecalc.
@@ -432,6 +444,105 @@ func ListRaceResults(ctx context.Context, q *RaceResultsQuery) (*RaceResultsResp
 	return ListRaceResultsCore(ctx, q)
 }
 
+// UserRaceRecordView represents a single race result entry in a user's career records.
+type UserRaceRecordView struct {
+	ResultID        string  `json:"resultId"`
+	Position        *int    `json:"position"`
+	Points          int     `json:"points"`
+	FinishTime      *string `json:"finishTime"`
+	ResultStatus    *string `json:"resultStatus"`
+	ResultCreatedAt string  `json:"resultCreatedAt"`
+	RaceID          string  `json:"raceId"`
+	RaceName        string  `json:"raceName"`
+	RaceSequence    int     `json:"raceSequence"`
+	RaceGrade       *string `json:"raceGrade"`
+	EventID         string  `json:"eventId"`
+	EventName       string  `json:"eventName"`
+	EventTag        string  `json:"eventTag"`
+	EventScheduledAt *string `json:"eventScheduledAt"`
+}
+
+// ListUserRaceRecordsParams carries request query params for user race records.
+type ListUserRaceRecordsParams struct {
+	UserID string `query:"userId"`
+	Limit  int    `query:"limit"`
+	Offset int    `query:"offset"`
+}
+
+// ListUserRaceRecordsResponse holds the paginated user race records.
+type ListUserRaceRecordsResponse struct {
+	Records []UserRaceRecordView `json:"records"`
+	Total   int                  `json:"total"`
+}
+
+// ListUserRaceRecordsCore fetches race records for a specific user.
+func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) (*ListUserRaceRecordsResponse, error) {
+	if p.UserID == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "userId is required"}
+	}
+
+	total64, err := q().CountUserRaceRecords(ctx, p.UserID)
+	if err != nil {
+		return nil, err
+	}
+	total := int(total64)
+
+	rows, err := q().ListUserRaceRecords(ctx, sqlc.ListUserRaceRecordsParams{
+		UserId:  p.UserID,
+		Column2: int32(p.Limit),
+		Column3: int32(p.Offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	records := make([]UserRaceRecordView, 0, len(rows))
+	for _, r := range rows {
+		records = append(records, UserRaceRecordView{
+			ResultID:        r.ResultId,
+			Position:        nullInt(sql.NullInt64{Int64: int64(r.Position.Int32), Valid: r.Position.Valid}),
+			Points:          int(r.Points),
+			FinishTime:      nullString(r.FinishTime),
+			ResultStatus:    nullString(r.ResultStatus),
+			ResultCreatedAt: isoTime(r.ResultCreatedAt),
+			RaceID:          r.RaceId,
+			RaceName:        r.RaceName,
+			RaceSequence:    int(r.RaceSequence),
+			RaceGrade:       nullString(r.RaceGrade),
+			EventID:         r.EventId,
+			EventName:       r.EventName,
+			EventTag:        r.EventTag,
+			EventScheduledAt: nullTime(timePtrFromNull(r.EventScheduledAt)),
+		})
+	}
+
+	return &ListUserRaceRecordsResponse{
+		Records: records,
+		Total:   total,
+	}, nil
+}
+
+// GetUserRaceRecords returns paginated race records for a given user.
+//
+//encore:api public method=GET path=/api/users/:userId/race-records
+func GetUserRaceRecords(ctx context.Context, userId string, p *ListUserRaceRecordsParams) (*ListUserRaceRecordsResponse, error) {
+	p.UserID = userId
+	cacheKey := fmt.Sprintf("%s:%d:%d", userId, p.Limit, p.Offset)
+	if userRaceRecordsCache != nil {
+		if cached, err := userRaceRecordsCache.Get(ctx, userRaceRecordsCacheKey{Key: cacheKey}); err == nil {
+			return &cached, nil
+		}
+	}
+	res, err := ListUserRaceRecordsCore(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	if userRaceRecordsCache != nil {
+		_ = userRaceRecordsCache.Set(ctx, userRaceRecordsCacheKey{Key: cacheKey}, *res)
+	}
+	return res, nil
+}
+
 // --- Auto-deferral ---
 
 // Auto-deferral: a user placing 1st in an auto-defer grade race (e.g. OP)
@@ -564,6 +675,11 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 		}
 		lookup[ri.raceID][ri.userID] = ri
 	}
+	var batchIDs []string
+	var batchRaceIDs []string
+	var batchUserIDs []string
+	now := time.Now().UTC()
+
 	for raceID, users := range raceUsers {
 		seq := raceSeqs[raceID]
 		for userID := range users {
@@ -573,12 +689,9 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 
 			if shouldDefer {
 				if existing == nil {
-					if err := q().InsertDeferredResult(ctx, sqlc.InsertDeferredResultParams{
-						ID: "raceresult-" + newID()[:8], RaceEventId: raceID, UserId: userID,
-						CreatedAt: time.Now().UTC(),
-					}); err != nil {
-						return err
-					}
+					batchIDs = append(batchIDs, "raceresult-"+newID()[:8])
+					batchRaceIDs = append(batchRaceIDs, raceID)
+					batchUserIDs = append(batchUserIDs, userID)
 				} else if !existing.resultStatus.Valid || existing.resultStatus.String == "DEFERRED" {
 					if !existing.resultStatus.Valid || existing.points != 0 {
 						if err := q().MarkResultDeferred(ctx, existing.id); err != nil {
@@ -604,6 +717,17 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 					}
 				}
 			}
+		}
+	}
+
+	if len(batchIDs) > 0 {
+		if err := q().InsertDeferredResultsBatch(ctx, sqlc.InsertDeferredResultsBatchParams{
+			Column1:   batchIDs,
+			Column2:   batchRaceIDs,
+			Column3:   batchUserIDs,
+			CreatedAt: now,
+		}); err != nil {
+			return err
 		}
 	}
 	return nil

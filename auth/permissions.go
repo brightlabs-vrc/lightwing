@@ -2,6 +2,7 @@ package auth
 
 import (
 	"regexp"
+	"slices"
 )
 
 // permissions.go: RBAC role/permission matrix.
@@ -83,32 +84,33 @@ var roleStatements = map[string]roleStatement{
 	},
 }
 
+// roleActions returns the slice of allowed actions for a given role and resource.
+func roleActions(role string, resource Resource) ([]Action, bool) {
+	statements, ok := roleStatements[role]
+	if !ok {
+		return nil, false
+	}
+	actions, ok := statements[resource]
+	return actions, ok
+}
+
 // roleHasPermission checks whether a role grants a given action on a resource.
 // Unknown roles and resources are denied.
 //
 // Mirrors ts-legacy/auth/permissions.ts roleHasPermission
 func roleHasPermission(role string, resource Resource, action Action) bool {
-	statements, ok := roleStatements[role]
+	actions, ok := roleActions(role, resource)
 	if !ok {
 		return false
 	}
-	actions, ok := statements[resource]
-	if !ok {
-		return false
-	}
-	for _, a := range actions {
-		if a == action {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(actions, action)
 }
 
-// validSlugRe matches team slug format: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-var validSlugRe = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+// validSlugRe matches team slug format: ^[a-z0-9]+(?:[._-][a-z0-9]+)*$
+var validSlugRe = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
 
-// userSlugRe matches user slug format: ^[a-z0-9]+$
-var userSlugRe = regexp.MustCompile(`^[a-z0-9]+$`)
+// userSlugRe matches user slug format: ^[a-z0-9]+(?:[._-][a-z0-9]+)*$
+var userSlugRe = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
 
 // RESERVED_SLUGS is the set of URL-path segments reserved by the frontend
 // router. These can never be used as user or team slugs.

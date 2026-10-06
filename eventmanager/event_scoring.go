@@ -9,6 +9,7 @@ import (
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
+	"encore.app/scorecalc"
 )
 
 // Event scoring endpoints: points overview, ladder matches, status changes,
@@ -213,6 +214,9 @@ func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDe
 			}); err != nil {
 				return nil, err
 			}
+		}
+		if st == "CONCLUDED" {
+			scorecalc.InvalidateLeaderboardCache(ctx)
 		}
 	}
 

@@ -1,9 +1,96 @@
-import React, { Suspense } from 'react'
+import React, { Suspense, useState, useRef, useEffect } from 'react'
 import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { PixelContainer, PixelStack, PixelButton, PixelBadge } from '@pxlkit/ui-kit'
 import { PxlKitIcon } from '@pxlkit/core'
 import { Trophy } from '@pxlkit/gamification'
 import { useAuth } from '../hooks/useAuth'
+
+interface UserHeaderDropdownProps {
+  session: {
+    user: {
+      id: string
+      name: string
+      slug?: string | null
+      image?: string | null
+      vrchatUsername?: string | null
+    }
+  }
+  signOutUser: (redirectUrl?: string) => Promise<void>
+}
+
+function UserHeaderDropdown({ session, signOutUser }: UserHeaderDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const displayName = session.user.vrchatUsername || session.user.name
+  const avatarUrl = session.user.image || '/fallback_avatar.jpg'
+  const userSlug = session.user.slug || session.user.id
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex items-center gap-2 p-1 border-2 border-retro-border hover:border-retro-primary rounded-full transition-colors bg-retro-surface focus:outline-none"
+        title={displayName}
+      >
+        <img
+          src={avatarUrl}
+          alt={displayName}
+          onError={(e) => {
+            e.currentTarget.src = '/fallback_avatar.jpg'
+          }}
+          className="w-8 h-8 rounded-full object-cover"
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 bg-retro-surface border-2 border-retro-border-strong rounded shadow-lg z-50 py-1 font-pixel text-xs">
+          <div className="px-3 py-2 border-b border-retro-border text-retro-text font-bold truncate">
+            {displayName}
+          </div>
+          <Link
+            to="/$user"
+            params={{ user: userSlug }}
+            onClick={() => setIsOpen(false)}
+            className="block px-3 py-2 text-retro-text hover:bg-retro-bg hover:text-retro-primary transition-colors"
+          >
+            MY PROFILE
+          </Link>
+          <Link
+            to="/profile"
+            onClick={() => setIsOpen(false)}
+            className="block px-3 py-2 text-retro-text hover:bg-retro-bg hover:text-retro-primary transition-colors"
+          >
+            EDIT PROFILE
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false)
+              void signOutUser('/auth')
+            }}
+            className="w-full text-left px-3 py-2 text-retro-red hover:bg-retro-bg transition-colors border-t border-retro-border"
+          >
+            SIGN OUT
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const TanStackRouterDevtools =
   import.meta.env.PROD
@@ -70,6 +157,9 @@ function RootLayout() {
                 <PixelButton asChild variant="ghost" tone="neutral" size="sm">
                   <Link to="/events">EVENTS</Link>
                 </PixelButton>
+                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
+                  <Link to="/leaderboard">LEADERBOARD</Link>
+                </PixelButton>
                 {isSiteAdmin ? (
                   <PixelButton asChild variant="soft" tone="gold" size="sm">
                     <Link to="/admin">ADMIN</Link>
@@ -81,26 +171,14 @@ function RootLayout() {
                 ) : null}
 
                 {!loading && session ? (
-                  <PixelStack direction="row" gap={2} align="center" className="site-account">
-                    <PixelButton asChild variant="outline" tone="neutral" size="sm">
-                      <Link to="/profile" title="Edit Profile">
-                        {session.user.vrchatUsername ?? session.user.name.toUpperCase()}
-                      </Link>
-                    </PixelButton>
-                    <PixelButton
-                      variant="solid"
-                      tone="red"
-                      size="sm"
-                      onClick={() => void signOutUser('/auth')}
-                    >
-                      SIGN OUT
-                    </PixelButton>
-                  </PixelStack>
+                  <UserHeaderDropdown
+                    session={session}
+                    signOutUser={signOutUser}
+                  />
                 ) : null}
 
                 {!loading && !session ? (
                   <PixelStack direction="row" gap={2} align="center">
-                    <PixelBadge tone="neutral">OFFLINE</PixelBadge>
                     <PixelButton asChild variant="solid" tone="purple" size="sm">
                       <Link to="/auth">SIGN IN</Link>
                     </PixelButton>
@@ -116,7 +194,7 @@ function RootLayout() {
         </main>
 
         <footer className="w-full px-6 pb-12 text-center font-pixel text-xs text-retro-muted border-t-2 border-retro-border pt-6">
-          Lightwing Prototype &copy; 2026, Umamusume Racing Society. All rights reserved. Neigh.
+          Project Lightwing &copy; 2026 is made with {'<3'} by Bright Labs. Neigh.
         </footer>
       </div>
       <Suspense>

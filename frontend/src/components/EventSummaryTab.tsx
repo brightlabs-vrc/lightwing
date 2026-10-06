@@ -91,51 +91,67 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
         </h3>
         {selectedEvent.scoringType === 1 ? (
           selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
-            <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.leaderboardTable}`}>
-              <thead>
-                <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Rank</div></th>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Name</div></th>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">User ID</div></th>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Total Points</div></th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedEvent.pointsOverview.map((item, idx) => (
-                  <tr key={item.userId} className="slds-hint-parent">
-                    <td><strong>{idx + 1}</strong></td>
-                    <td><UserLink userId={item.userId} name={item.name} /></td>
-                    <td><code className="text-xs">{item.userId}</code></td>
-                    <td><strong>{item.points} pts</strong></td>
+            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+              <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.leaderboardTable}`} style={{ width: '100%', tableLayout: 'fixed' }}>
+                <thead>
+                  <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '70px' }}><div className="slds-truncate" title="Rank">Rank</div></th>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '40%', minWidth: '160px' }}><div className="slds-truncate" title="Name">Name</div></th>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '35%', minWidth: '140px' }}><div className="slds-truncate" title="User ID">User ID</div></th>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Total Points">Total Points</div></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {selectedEvent.pointsOverview.map((item, idx) => (
+                    <tr key={item.userId} className="slds-hint-parent">
+                      <td><strong>{idx + 1}</strong></td>
+                      <td>
+                        <div className="slds-truncate" title={item.name}>
+                          <UserLink userId={item.userId} name={item.name} />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="slds-truncate" title={item.userId}>
+                          <code className="text-xs">{item.userId}</code>
+                        </div>
+                      </td>
+                      <td><strong>{item.points} pts</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="slds-text-body_small text-slate-500">No participants score standings loaded.</p>
           )
         ) : (
           selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
-            <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.leaderboardTable}`}>
-              <thead>
-                <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Rank</div></th>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Name</div></th>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Rating (ELO)</div></th>
-                  <th scope="col" style={{ fontWeight: 'bold' }}><div className="slds-truncate">Wins / Losses</div></th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedEvent.ladderOverview.map((item) => (
-                  <tr key={item.userId} className="slds-hint-parent">
-                    <td><strong>{item.rank}</strong></td>
-                    <td><UserLink userId={item.userId} name={item.name} /></td>
-                    <td><strong>{item.elo}</strong></td>
-                    <td>{item.wins}W - {item.losses}L</td>
+            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+              <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.leaderboardTable}`} style={{ width: '100%', tableLayout: 'fixed' }}>
+                <thead>
+                  <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '70px' }}><div className="slds-truncate" title="Rank">Rank</div></th>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '45%', minWidth: '160px' }}><div className="slds-truncate" title="Name">Name</div></th>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Rating (ELO)">Rating (ELO)</div></th>
+                    <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Wins / Losses">Wins / Losses</div></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {selectedEvent.ladderOverview.map((item) => (
+                    <tr key={item.userId} className="slds-hint-parent">
+                      <td><strong>{item.rank}</strong></td>
+                      <td>
+                        <div className="slds-truncate" title={item.name}>
+                          <UserLink userId={item.userId} name={item.name} />
+                        </div>
+                      </td>
+                      <td><strong>{item.elo}</strong></td>
+                      <td>{item.wins}W - {item.losses}L</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="slds-text-body_small text-slate-500">No ladder match results computed yet.</p>
           )

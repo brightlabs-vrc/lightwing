@@ -11,6 +11,7 @@ import {
   PixelCard,
   PixelBadge,
   PixelSectionHeader,
+  PixelButton,
   PixelSpinner,
   PixelEmptyState,
 } from '@pxlkit/ui-kit'
@@ -66,10 +67,12 @@ function EventsPage() {
   const { session } = useAuth()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CONCLUDED' | 'ALL'>('ACTIVE')
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['public-events', page, pageSize],
-    queryFn: () => listPublicEvents(pageSize, (page - 1) * pageSize),
+    queryKey: ['public-events'],
+    queryFn: () => listPublicEvents(100, 0),
   })
 
   if (isLoading) {
@@ -97,8 +100,33 @@ function EventsPage() {
     )
   }
 
-  // Filter events to exclude DRAFT and PENDING_DELETION
-  const publicEvents = data?.events.filter((event) => event.status !== 'DRAFT' && event.status !== 'PENDING_DELETION') || []
+  // Exclude DRAFT and PENDING_DELETION
+  const allEvents = data?.events.filter((event) => event.status !== 'DRAFT' && event.status !== 'PENDING_DELETION') || []
+
+  // Apply tab filter
+  const tabFiltered = allEvents.filter((e) => {
+    if (activeTab === 'ACTIVE') {
+      return e.status === 'ONGOING' || e.status === 'PENDING'
+    }
+    if (activeTab === 'CONCLUDED') {
+      return e.status === 'CONCLUDED'
+    }
+    return true
+  })
+
+  // Apply search filter
+  const searchTrimmed = searchQuery.trim().toLowerCase()
+  const filteredEvents = tabFiltered.filter((e) => {
+    if (!searchTrimmed) return true
+    const nameMatch = e.name.toLowerCase().includes(searchTrimmed)
+    const descMatch = e.description ? e.description.toLowerCase().includes(searchTrimmed) : false
+    const ownerMatch = e.ownerName ? e.ownerName.toLowerCase().includes(searchTrimmed) : false
+    return nameMatch || descMatch || ownerMatch
+  })
+
+  // Paginate
+  const totalCount = filteredEvents.length
+  const paginatedEvents = filteredEvents.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <PixelContainer maxWidth="full" padding="md">
@@ -107,19 +135,70 @@ function EventsPage() {
         titleTone="purple"
         size="lg"
         actions={
-          <PixelBadge tone="neutral">{publicEvents.length} ACTIVE</PixelBadge>
+          <PixelBadge tone="neutral">{filteredEvents.length} EVENTS</PixelBadge>
         }
       />
 
-      <PixelStack gap={6} className="mt-6">
-        {publicEvents.length === 0 ? (
+      {/* Centered Search Box */}
+      <div className="flex justify-center mt-6 mb-4">
+        <input
+          type="text"
+          placeholder="Search events by name, description, or organizer..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value)
+            setPage(1)
+          }}
+          className="w-full max-w-md px-4 py-2 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary text-center shadow-sm"
+        />
+      </div>
+
+      {/* Tab Filter Controls */}
+      <div className="flex justify-center items-center gap-2 mb-6">
+        <PixelButton
+          variant={activeTab === 'ACTIVE' ? 'solid' : 'ghost'}
+          tone={activeTab === 'ACTIVE' ? 'purple' : 'neutral'}
+          size="sm"
+          onClick={() => {
+            setActiveTab('ACTIVE')
+            setPage(1)
+          }}
+        >
+          ACTIVE EVENTS
+        </PixelButton>
+        <PixelButton
+          variant={activeTab === 'CONCLUDED' ? 'solid' : 'ghost'}
+          tone={activeTab === 'CONCLUDED' ? 'purple' : 'neutral'}
+          size="sm"
+          onClick={() => {
+            setActiveTab('CONCLUDED')
+            setPage(1)
+          }}
+        >
+          CONCLUDED EVENTS
+        </PixelButton>
+        <PixelButton
+          variant={activeTab === 'ALL' ? 'solid' : 'ghost'}
+          tone={activeTab === 'ALL' ? 'purple' : 'neutral'}
+          size="sm"
+          onClick={() => {
+            setActiveTab('ALL')
+            setPage(1)
+          }}
+        >
+          SHOW ALL
+        </PixelButton>
+      </div>
+
+      <PixelStack gap={6}>
+        {paginatedEvents.length === 0 ? (
           <PixelEmptyState
-            title="No public events active"
-            description="There are no public events running at this moment."
+            title="No events found"
+            description="No events match your selected status tab or search criteria."
           />
         ) : (
           <>
-            {publicEvents.map((event) => {
+            {paginatedEvents.map((event) => {
               return (
                 <Link
                   key={event.id}
@@ -134,6 +213,11 @@ function EventsPage() {
                           <h2 className="text-xl font-pixel tracking-wide text-retro-text">
                             {event.name}
                           </h2>
+                          {event.ownerName && (
+                            <div className="font-pixel text-[11px] text-retro-primary">
+                              ORGANIZER: {event.ownerName.toUpperCase()}
+                            </div>
+                          )}
                           {event.scheduledAt && (
                             <div className="font-pixel text-[11px] text-retro-gold">
                               SCHEDULED: {formatLocalDateTime(event.scheduledAt)}
@@ -177,7 +261,7 @@ function EventsPage() {
             <Pagination
               page={page}
               pageSize={pageSize}
-              total={data?.total || 0}
+              total={totalCount}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
               variant="pixel"

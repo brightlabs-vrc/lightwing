@@ -1,6 +1,8 @@
-# The URS Competitive Portal (Project Lightwing)
+# UmaKeiba (Project Lightwing)
 
-The URS Competitive Portal is a full-stack application to facilitate the management of competitive events, including registration, scheduling, and results tracking. What normally would be a tonload of google sheets and forms is now in one place~
+UmaKeiba is a full-stack application to facilitate the management of competitive events, including registration, scheduling, and results tracking. What normally would be a tonload of google sheets and forms is now in one place~
+
+UmaKeiba was originally designed to accomodate the large-scale event hosting needs of the Umamusume Racing Society (URS) for their competitive racing events. The system is designed to automate the work that would otherwise require a team ten times their scale. Since then, this has been redesigned to accomodate more than one organization to allow any sufficiently sized community to run Keiba-style racing events.
 
 Lightwing is built with the following technologies:
 
@@ -65,7 +67,6 @@ Because this application works with OIDC, you will need the following secrets se
 
 - `DISCORD_AUTH_CLIENT_ID`: the client ID of the Discord OIDC application.
 - `DISCORD_AUTH_CLIENT_SECRET`: the client secret of the Discord OIDC application.
-- `DISCORD_BOT_TOKEN`: the bot token Encore uses to check server roles automatically. This bot must be added to the server with the `View Channels` and `Read Messages` permissions.
 - `SESSION_COOKIE_SECRET`: signs the session cookie (only the better-auth-compatible cookie routes use it; empty in local dev yields a dev-only key).
 
 Set them in the dashboard (Settings → Secrets) or via `encore secret set --env <env> <name>` —

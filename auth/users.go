@@ -9,18 +9,39 @@ import (
 	"time"
 
 	"encore.dev/beta/errs"
+	"encore.dev/storage/cache"
 
 	"encore.app/auth/sqlc"
+	"encore.app/shared"
 )
+
+type userProfileCacheKey struct {
+	ID string
+}
+
+var userProfileCache = cache.NewStructKeyspace[userProfileCacheKey, UserProfile](shared.Cache, cache.KeyspaceConfig{
+	KeyPattern:    "user_profile/:ID",
+	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
+})
+
+func invalidateUserProfileCache(ctx context.Context, userID string, slug string) {
+	if userProfileCache != nil {
+		_, _ = userProfileCache.Delete(ctx, userProfileCacheKey{ID: userID})
+		if slug != "" {
+			_, _ = userProfileCache.Delete(ctx, userProfileCacheKey{ID: "slug:" + slug})
+		}
+	}
+}
 
 // TeamAffiliation represents a user's membership in an organization.
 //
 // Mirrors ts-legacy/auth/users.ts TeamAffiliation
 type TeamAffiliation struct {
-	OrganizationID   string `json:"organizationId"`
-	Name             string `json:"name"`
-	Slug             string `json:"slug"`
-	Role             string `json:"role"`
+	OrganizationID   string  `json:"organizationId"`
+	Name             string  `json:"name"`
+	Slug             string  `json:"slug"`
+	Logo             *string `json:"logo"`
+	Role             string  `json:"role"`
 }
 
 // UserProfile is the public representation of a user, as returned by
@@ -108,10 +129,16 @@ func loadTeamsForUsers(ctx context.Context, userIDs []string) (map[string][]Team
 
 	teamsByUser := make(map[string][]TeamAffiliation)
 	for _, a := range affils {
+		var logo *string
+		if a.Logo.Valid && a.Logo.String != "" {
+			l := a.Logo.String
+			logo = &l
+		}
 		teamsByUser[a.UserId] = append(teamsByUser[a.UserId], TeamAffiliation{
 			OrganizationID: a.ID,
 			Name:           a.Name,
 			Slug:           a.Slug,
+			Logo:           logo,
 			Role:           a.Role,
 		})
 	}
@@ -158,13 +185,33 @@ func loadUserProfile(ctx context.Context, userID string) (*UserProfile, error) {
 //
 // Mirrors ts-legacy/auth/users.ts getUserProfile
 func getUserProfile(ctx context.Context, userID string) (*UserProfile, error) {
-	return loadUserProfile(ctx, userID)
+	if userProfileCache != nil {
+		if cached, err := userProfileCache.Get(ctx, userProfileCacheKey{ID: userID}); err == nil {
+			return &cached, nil
+		}
+	}
+	profile, err := loadUserProfile(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if userProfileCache != nil {
+		_ = userProfileCache.Set(ctx, userProfileCacheKey{ID: userID}, *profile)
+		if profile.Slug != nil && *profile.Slug != "" {
+			_ = userProfileCache.Set(ctx, userProfileCacheKey{ID: "slug:" + *profile.Slug}, *profile)
+		}
+	}
+	return profile, nil
 }
 
 // getUserProfileBySlug fetches a user profile by slug.
 //
 // Mirrors ts-legacy/auth/users.ts getUserProfileBySlug
 func getUserProfileBySlug(ctx context.Context, slug string) (*UserProfile, error) {
+	if userProfileCache != nil {
+		if cached, err := userProfileCache.Get(ctx, userProfileCacheKey{ID: "slug:" + slug}); err == nil {
+			return &cached, nil
+		}
+	}
 	userID, err := q().GetUserBySlug(ctx, sql.NullString{String: slug, Valid: true})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
@@ -172,7 +219,15 @@ func getUserProfileBySlug(ctx context.Context, slug string) (*UserProfile, error
 	if err != nil {
 		return nil, err
 	}
-	return loadUserProfile(ctx, userID)
+	profile, err := loadUserProfile(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if userProfileCache != nil {
+		_ = userProfileCache.Set(ctx, userProfileCacheKey{ID: userID}, *profile)
+		_ = userProfileCache.Set(ctx, userProfileCacheKey{ID: "slug:" + slug}, *profile)
+	}
+	return profile, nil
 }
 
 // UpdateUserProfileParams are the editable profile fields. A nil pointer
@@ -187,21 +242,9 @@ type UpdateUserProfileParams struct {
 	VrchatUsername *string `json:"vrchatUsername,omitempty"`
 }
 
-// updateUserProfile updates a user's editable profile fields. A user may
-// only edit their own record; site admins may edit any profile.
-//
-// Mirrors ts-legacy/auth/users.ts updateUserProfile
-func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, params *UpdateUserProfileParams) (*UserProfile, error) {
-	if actor.UserID != targetUserID && !isSiteAdmin(actor.SiteRole) {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot edit another user's profile"}
-	}
-
-	existing, err := loadUserRow(ctx, targetUserID)
-	if err != nil {
-		return nil, err
-	}
-
-	up := sqlc.UpdateUserProfileParams{UpdatedAt: time.Now().UTC(), ID: targetUserID}
+// buildUpdateUserProfileParams constructs and validates UpdateUserProfileParams from input params and existing row.
+func buildUpdateUserProfileParams(ctx context.Context, existing *userRow, params *UpdateUserProfileParams) (*sqlc.UpdateUserProfileParams, error) {
+	up := &sqlc.UpdateUserProfileParams{UpdatedAt: time.Now().UTC(), ID: existing.ID}
 
 	if params.Name != nil {
 		up.Name = sql.NullString{String: *params.Name, Valid: true}
@@ -235,8 +278,42 @@ func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, p
 		up.VrchatSet = true
 		up.VrchatVal = nullIfEmpty(*params.VrchatUsername)
 	}
-	if err := q().UpdateUserProfile(ctx, up); err != nil {
+	return up, nil
+}
+
+// updateUserProfile updates a user's editable profile fields. A user may
+// only edit their own record; site admins may edit any profile.
+//
+// Mirrors ts-legacy/auth/users.ts updateUserProfile
+func updateUserProfile(ctx context.Context, actor *Actor, targetUserID string, params *UpdateUserProfileParams) (*UserProfile, error) {
+	if actor.UserID != targetUserID && !isSiteAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot edit another user's profile"}
+	}
+
+	existing, err := loadUserRow(ctx, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	up, err := buildUpdateUserProfileParams(ctx, existing, params)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := q().UpdateUserProfile(ctx, *up); err != nil {
 		return nil, fmt.Errorf("failed to update user profile: %w", err)
+	}
+	oldSlug := ""
+	if existing.Slug.Valid {
+		oldSlug = existing.Slug.String
+	}
+	newSlug := oldSlug
+	if params.Slug != nil {
+		newSlug = *params.Slug
+	}
+	invalidateUserProfileCache(ctx, targetUserID, oldSlug)
+	if newSlug != oldSlug {
+		invalidateUserProfileCache(ctx, targetUserID, newSlug)
 	}
 	return loadUserProfile(ctx, targetUserID)
 }
@@ -279,6 +356,7 @@ func setUserSiteRole(ctx context.Context, actor *Actor, params *SetUserSiteRoleP
 	}); err != nil {
 		return nil, fmt.Errorf("failed to set user site role: %w", err)
 	}
+	invalidateUserProfileCache(ctx, params.UserID, "")
 	return loadUserProfile(ctx, params.UserID)
 }
 

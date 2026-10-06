@@ -81,9 +81,9 @@ SELECT id, name, email, image, slug, biography, "careerOverview",
        "vrchatUsername", "classTier", "siteRole"::text, "createdAt", "updatedAt"
 FROM "user" WHERE id = $1;
 
--- Team affiliations for a batch of users.
+-- Team affiliations for a batch of users (includes organization logo).
 -- name: ListTeamAffiliations :many
-SELECT m."userId", o.id, o.name, o.slug, m.role
+SELECT m."userId", o.id, o.name, o.slug, o.logo, m.role
 FROM "member" m
 JOIN "organization" o ON o.id = m."organizationId"
 WHERE m."userId" = ANY($1::text[])
