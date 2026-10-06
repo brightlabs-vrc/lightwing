@@ -357,6 +357,25 @@ function AdminTeamDetailPage() {
                   </div>
 
                   <div className="slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '10px' }}>
+                    <h3 className="font-bold text-slate-700 slds-m-bottom_small" style={{ fontWeight: 'bold' }}>
+                      Linked Organizations ({team.organizations?.length || 0})
+                    </h3>
+                    <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                      {(team.organizations || []).map((org) => (
+                        <li key={org.id} className="slds-item slds-p-vertical_x-small" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <span className="font-bold text-slate-900" style={{ fontSize: '13px', fontWeight: 'bold' }}>{org.name}</span>
+                            <span className="text-slate-500" style={{ fontSize: '11px', marginLeft: '6px' }}>@{org.slug}</span>
+                          </div>
+                          <span className={`slds-badge ${org.isPrimary ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            {org.isPrimary ? 'Primary' : 'Secondary'}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '10px' }}>
                     <h3 className="font-bold text-slate-700 slds-m-bottom_small" style={{ fontWeight: 'bold' }}>Historical Statistics</h3>
 
                     <div className="slds-grid slds-wrap slds-gutters">

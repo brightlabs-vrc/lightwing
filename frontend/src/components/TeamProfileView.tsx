@@ -46,6 +46,55 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
         </PixelStack>
       </PixelCard>
 
+      {/* Affiliated Organizations Section */}
+      {team.organizations && team.organizations.length > 0 && (
+        <div className="mb-8">
+          <PixelSectionHeader
+            title={`AFFILIATED ORGANIZATIONS (${team.organizations.length})`}
+            titleTone="cyan"
+            size="md"
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            {team.organizations.map((org) => (
+              <PixelCard key={org.id} className="bg-retro-surface p-4 border-2 border-retro-border hover:border-retro-primary transition-colors">
+                <PixelStack direction="row" gap={3} align="center">
+                  {org.logo ? (
+                    <img
+                      src={org.logo}
+                      alt={org.name}
+                      className="w-12 h-12 rounded border border-retro-border bg-retro-bg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded border border-retro-border bg-retro-primary/10 text-retro-primary font-pixel text-lg font-bold flex items-center justify-center">
+                      {org.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <PixelStack gap={1} className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link
+                        to="/t/$team"
+                        params={{ team: org.slug || org.id }}
+                        className="font-pixel text-sm text-retro-text hover:text-retro-primary font-bold truncate"
+                        title={org.name}
+                      >
+                        {org.name}
+                      </Link>
+                      <PixelBadge tone={org.isPrimary ? 'green' : 'purple'}>
+                        {org.isPrimary ? 'PRIMARY' : 'SECONDARY'}
+                      </PixelBadge>
+                    </div>
+                    <div className="font-sans text-xs text-retro-muted font-semibold truncate">
+                      @{org.slug}
+                    </div>
+                  </PixelStack>
+                </PixelStack>
+              </PixelCard>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Team Aggregate Statistics */}
       <PixelSectionHeader
         title="TEAM STATISTICS"
