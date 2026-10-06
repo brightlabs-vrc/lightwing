@@ -346,7 +346,7 @@ function ManageTeamPage() {
                 </div>
 
                 <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {(team.organizations || []).map((org) => (
+                  {(team.organizations || []).filter((org) => org.id !== team.id).map((org) => (
                     <li key={org.id} className="slds-item slds-p-vertical_small" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f2f1' }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -372,6 +372,11 @@ function ManageTeamPage() {
                       )}
                     </li>
                   ))}
+                  {(team.organizations || []).filter((org) => org.id !== team.id).length === 0 && (
+                    <li className="slds-item text-xs text-slate-500" style={{ padding: '8px 0', fontSize: '12px', color: '#64748b' }}>
+                      No external parent organizations linked.
+                    </li>
+                  )}
                 </ul>
               </article>
             </div>

@@ -33,6 +33,12 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
     )
   )
 
+  const affiliatedOrganizations = (team.organizations || []).filter(
+    (org) => org.id !== team.id
+  )
+
+  const isStandaloneOrg = affiliatedOrganizations.length === 0 || team.primaryOrganizationId === team.id
+
   return (
     <PixelContainer maxWidth="full" padding="md">
       {/* Header Card */}
@@ -55,7 +61,9 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                 <h1 className="text-2xl font-pixel text-retro-text tracking-wide font-bold">
                   {team.name}
                 </h1>
-                <PixelBadge tone="purple">TEAM ORGANIZATION</PixelBadge>
+                <PixelBadge tone="purple">
+                  {isStandaloneOrg ? 'ORGANIZATION' : 'TEAM ORGANIZATION'}
+                </PixelBadge>
               </div>
               <div className="font-sans text-sm text-retro-muted font-semibold">
                 @{team.slug}
@@ -66,7 +74,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
           {isTeamAdmin && (
             <PixelButton asChild variant="solid" tone="purple" size="sm">
               <Link to="/teams/manage/$id" params={{ id: team.id }}>
-                MANAGE TEAM
+                {isStandaloneOrg ? 'MANAGE ORG' : 'MANAGE TEAM'}
               </Link>
             </PixelButton>
           )}
@@ -74,16 +82,16 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
       </PixelCard>
 
       {/* Affiliated Organizations Section */}
-      {team.organizations && team.organizations.length > 0 && (
+      {affiliatedOrganizations.length > 0 && (
         <div className="mb-8">
           <PixelSectionHeader
-            title={`AFFILIATED ORGANIZATIONS (${team.organizations.length})`}
+            title={`AFFILIATED ORGANIZATIONS (${affiliatedOrganizations.length})`}
             titleTone="cyan"
             size="md"
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-            {team.organizations.map((org) => (
+            {affiliatedOrganizations.map((org) => (
               <PixelCard key={org.id} className="bg-retro-surface p-4 border-2 border-retro-border hover:border-retro-primary transition-colors">
                 <PixelStack direction="row" gap={3} align="center">
                   {org.logo ? (
