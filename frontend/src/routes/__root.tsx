@@ -166,6 +166,17 @@ function RootLayout() {
                   </PixelButton>
                 ) : null}
 
+                {!loading && session && (isSiteAdmin || (session.user.teams && session.user.teams.length > 0)) ? (
+                  <PixelButton asChild variant="soft" tone="purple" size="sm">
+                    <Link
+                      to="/teams/manage/$id"
+                      params={{ id: session.user.teams && session.user.teams.length > 0 ? session.user.teams[0].organizationId : 'org_mock_urs' }}
+                    >
+                      ORG ADMIN
+                    </Link>
+                  </PixelButton>
+                ) : null}
+
                 {loading ? (
                   <PixelBadge tone="neutral">LOADING...</PixelBadge>
                 ) : null}

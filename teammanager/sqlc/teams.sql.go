@@ -213,6 +213,57 @@ func (q *Queries) CreateOrg(ctx context.Context, arg CreateOrgParams) (string, e
 	return id, err
 }
 
+const listMemberOrgsForUser = `-- name: ListMemberOrgsForUser :many
+SELECT DISTINCT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, m.role
+FROM "organization" o
+JOIN "member" m ON o.id = m."organizationId"
+WHERE m."userId" = $1
+ORDER BY o.name ASC
+`
+
+type ListMemberOrgsForUserRow struct {
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	OrgType     sql.NullString
+	Status      sql.NullString
+	Role        string
+}
+
+func (q *Queries) ListMemberOrgsForUser(ctx context.Context, userid string) ([]ListMemberOrgsForUserRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMemberOrgsForUser, userid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMemberOrgsForUserRow
+	for rows.Next() {
+		var i ListMemberOrgsForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Logo,
+			&i.Description,
+			&i.OrgType,
+			&i.Status,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createOrgWithID = `-- name: CreateOrgWithID :one
 INSERT INTO "organization" (id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, $11) RETURNING id

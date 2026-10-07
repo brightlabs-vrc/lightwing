@@ -106,9 +106,21 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
           </PixelStack>
 
           {isSelf && (
-            <PixelButton asChild variant="solid" tone="purple" size="sm">
-              <Link to="/profile">EDIT PROFILE</Link>
-            </PixelButton>
+            <PixelStack direction="row" gap={2}>
+              {(session?.user.siteRole === 'SITE_ADMIN' || (user.teams && user.teams.length > 0)) && (
+                <PixelButton asChild variant="soft" tone="purple" size="sm">
+                  <Link
+                    to="/teams/manage/$id"
+                    params={{ id: user.teams && user.teams.length > 0 ? user.teams[0].organizationId : 'org_mock_urs' }}
+                  >
+                    ORG ADMIN
+                  </Link>
+                </PixelButton>
+              )}
+              <PixelButton asChild variant="solid" tone="purple" size="sm">
+                <Link to="/profile">EDIT PROFILE</Link>
+              </PixelButton>
+            </PixelStack>
           )}
         </PixelStack>
       </PixelCard>
