@@ -11,8 +11,15 @@ import {
 import { AlertBanner } from './AlertBanner'
 import { UserLink } from './UserLink'
 import { DEFAULT_SCORING_TABLES } from '../lib/scoringDefaults'
+import {
+  PixelButton,
+  PixelBadge,
+  PixelAlert,
+  PixelModal,
+} from '@pxlkit/ui-kit'
 
 interface StandingsEditorProps {
+  variant?: 'pixel' | 'slds'
   raceName: string
   isRaceOngoing: boolean
   isRaceNotStarted: boolean
@@ -36,6 +43,7 @@ interface StandingsEditorProps {
 }
 
 export function StandingsEditor({
+  variant = 'slds',
   raceName,
   isRaceOngoing,
   isRaceNotStarted,
@@ -57,6 +65,109 @@ export function StandingsEditor({
   customScoringTables,
   raceGrade,
 }: StandingsEditorProps) {
+  const isPixel = variant === 'pixel'
+
+  if (isPixel) {
+    return (
+      <article className={`p-4 rounded border-2 border-retro-border bg-retro-surface ${noTopMargin ? '' : 'mt-6'}`}>
+        <div className="flex justify-between items-center pb-4 mb-4 border-b border-retro-border flex-wrap gap-2">
+          <div>
+            <h3 className="font-pixel text-base font-bold text-retro-text">
+              STANDINGS GRID: {raceName.toUpperCase()}
+            </h3>
+            <p className="font-sans text-xs text-retro-muted">
+              Assign finishes for registered event participants. Click on a participant or Penalty button to issue conduct penalties. Status: {isRaceNotStarted ? 'Not Started' : isRaceOngoing ? 'Ongoing (Live - Provisional Saving Allowed)' : 'Concluded'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isRaceNotStarted && !isRaceOngoing && (
+              <PixelButton
+                variant="ghost"
+                tone="neutral"
+                size="sm"
+                onClick={onInferTimes}
+                disabled={savingBatch || loadingResults}
+                title="Fill in missing finish times from the leader's time plus each horse's margin/length"
+              >
+                INFER TIMES
+              </PixelButton>
+            )}
+            <PixelButton
+              variant="ghost"
+              tone="neutral"
+              size="sm"
+              onClick={onCancel}
+              disabled={savingBatch || loadingResults}
+            >
+              CANCEL
+            </PixelButton>
+            <PixelButton
+              variant="solid"
+              tone="purple"
+              size="sm"
+              onClick={onSave}
+              disabled={savingBatch || loadingResults || changeSummary.totalCount === 0}
+              title={isRaceNotStarted ? 'Save draw numbers' : isRaceOngoing ? 'Save provisional standings' : 'Save final standings'}
+            >
+              {savingBatch ? 'SAVING...' : isRaceNotStarted ? `SAVE DRAW NUMBERS (${changeSummary.totalCount})` : `SAVE (${changeSummary.totalCount})`}
+            </PixelButton>
+          </div>
+        </div>
+
+        <div className="space-y-3 mb-4">
+          {isRaceNotStarted && (
+            <PixelAlert
+              tone="cyan"
+              message="Race has not started yet. You can set or edit the Draw (Gate Number) for each competitor below. Other finish-related fields will be enabled once the race starts."
+            />
+          )}
+
+          {isRaceOngoing && (
+            <PixelAlert
+              tone="cyan"
+              message="Race is currently Ongoing (Live). You can save results now as Provisional Standings. You can still edit or finalize them once the race concludes."
+            />
+          )}
+
+          {changeSummary.totalCount > 0 && !isRaceOngoing && (
+            <div className="flex items-center justify-between p-3 bg-retro-bg border border-retro-border rounded">
+              <span className="font-sans text-xs text-retro-text">
+                Unsaved changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
+                {changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}
+                {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save" above to submit.
+              </span>
+              <PixelButton variant="ghost" tone="neutral" size="sm" onClick={onResetAll}>
+                RESET ALL
+              </PixelButton>
+            </div>
+          )}
+        </div>
+
+        {loadingResults ? (
+          <p className="font-pixel text-xs text-retro-muted">LOADING RACE RESULTS DATA...</p>
+        ) : memberCount === 0 ? (
+          <p className="font-pixel text-xs text-retro-muted">
+            NO REGISTERED EVENT PARTICIPANTS FOUND. ADD PARTICIPANTS FIRST.
+          </p>
+        ) : (
+          <StandingsTable
+            variant="pixel"
+            rows={rows}
+            onResultChange={onResultChange}
+            onTogglePendingDeletion={onTogglePendingDeletion}
+            onUndoRow={onUndoRow}
+            scoringType={scoringType}
+            scoringRulesMode={scoringRulesMode}
+            customScoringTables={customScoringTables}
+            raceGrade={raceGrade}
+            isRaceNotStarted={isRaceNotStarted}
+          />
+        )}
+      </article>
+    )
+  }
+
   return (
     <article
       className={`slds-card ${noTopMargin ? '' : 'slds-m-top_large'}`}
@@ -160,6 +271,7 @@ export function StandingsEditor({
           </div>
         ) : (
           <StandingsTable
+            variant="slds"
             rows={rows}
             onResultChange={onResultChange}
             onTogglePendingDeletion={onTogglePendingDeletion}
@@ -177,6 +289,7 @@ export function StandingsEditor({
 }
 
 interface StandingsTableProps {
+  variant?: 'pixel' | 'slds'
   rows: DerivedRow[]
   onResultChange: (userId: string, field: keyof EditedResult, value: string) => void
   onTogglePendingDeletion: (userId: string) => void
@@ -189,6 +302,7 @@ interface StandingsTableProps {
 }
 
 function StandingsTable({
+  variant = 'slds',
   rows,
   onResultChange,
   onTogglePendingDeletion,
@@ -200,6 +314,7 @@ function StandingsTable({
   isRaceNotStarted = false,
 }: StandingsTableProps) {
   const [penaltyTarget, setPenaltyTarget] = useState<{ userId: string; name: string; currentStatus: string } | null>(null)
+  const isPixel = variant === 'pixel'
 
   const getPreviewPoints = (positionStr: string, resultStatus: string): number => {
     const statusUpper = (resultStatus || '').trim().toUpperCase()
@@ -237,10 +352,223 @@ function StandingsTable({
     return basePoints
   }
 
+  if (isPixel) {
+    return (
+      <div>
+        {penaltyTarget && (
+          <PenaltyDialogue
+            variant="pixel"
+            participantName={penaltyTarget.name}
+            currentStatus={penaltyTarget.currentStatus}
+            onApply={(newStatus) => {
+              onResultChange(penaltyTarget.userId, 'resultStatus', newStatus)
+              setPenaltyTarget(null)
+            }}
+            onClose={() => setPenaltyTarget(null)}
+          />
+        )}
+
+        <div className="overflow-x-auto w-full border border-retro-border rounded bg-retro-bg">
+          <table className="w-full text-left font-sans text-xs border-collapse min-w-[1000px]">
+            <thead>
+              <tr className="bg-retro-surface border-b border-retro-border font-pixel text-[11px] text-retro-muted uppercase">
+                <th className="p-3 w-[160px]">Competitor Name</th>
+                <th className="p-3 w-[120px]">User ID</th>
+                <th className="p-3 w-[80px]">Draw</th>
+                <th className="p-3 w-[80px]">Position</th>
+                <th className="p-3 w-[80px]">Points</th>
+                <th className="p-3 w-[100px]">Finish Time</th>
+                <th className="p-3 w-[85px]">Behind</th>
+                <th className="p-3 w-[100px]">Passing Order</th>
+                <th className="p-3 w-[85px]">Final 3F</th>
+                <th className="p-3 w-[130px]">Penalty</th>
+                <th className="p-3 w-[140px]">Status</th>
+                <th className="p-3 w-[130px]">Staged Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ member, savedResult, edit, rowState }) => {
+                const isDeleted = rowState === 'pending_delete'
+                const isModified = rowState === 'modified'
+                const isNew = rowState === 'new'
+
+                return (
+                  <tr
+                    key={member.userId}
+                    className={`border-b border-retro-border transition-colors ${
+                      isDeleted
+                        ? 'bg-red-950/30 line-through opacity-60'
+                        : isModified
+                        ? 'bg-purple-950/20'
+                        : isNew
+                        ? 'bg-green-950/20'
+                        : 'hover:bg-retro-surface/50'
+                    }`}
+                  >
+                    <td className="p-2">
+                      <div
+                        className="cursor-pointer truncate font-medium text-retro-text"
+                        onClick={() => !isDeleted && setPenaltyTarget({ userId: member.userId, name: member.name, currentStatus: edit.resultStatus })}
+                        title={`Click ${member.name} to issue penalty`}
+                      >
+                        <UserLink userId={member.userId} name={member.name} />
+                      </div>
+                    </td>
+                    <td className="p-2">
+                      <code className="text-xs text-retro-muted truncate block">{member.userId}</code>
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="number"
+                        placeholder="Draw"
+                        value={edit.gateNumber}
+                        onChange={(e) => onResultChange(member.userId, 'gateNumber', e.target.value)}
+                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="number"
+                        placeholder="None"
+                        disabled={isDeleted || isRaceNotStarted}
+                        value={edit.position}
+                        onChange={(e) => onResultChange(member.userId, 'position', e.target.value)}
+                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                      />
+                    </td>
+                    <td className="p-2 text-center">
+                      {scoringType === 1 ? (
+                        <div className="font-bold text-retro-primary text-xs">
+                          {getPreviewPoints(edit.position, edit.resultStatus)} pts
+                        </div>
+                      ) : (
+                        <input
+                          type="number"
+                          placeholder="0"
+                          disabled={isDeleted || isRaceNotStarted}
+                          value={edit.points}
+                          onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
+                          className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                        />
+                      )}
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        placeholder="1:32.1"
+                        disabled={isDeleted || isRaceNotStarted}
+                        value={edit.finishTime}
+                        onChange={(e) => onResultChange(member.userId, 'finishTime', e.target.value)}
+                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        placeholder="nose"
+                        disabled={isDeleted || isRaceNotStarted}
+                        value={edit.margin}
+                        onChange={(e) => onResultChange(member.userId, 'margin', e.target.value)}
+                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        placeholder="3-2-1"
+                        disabled={isDeleted || isRaceNotStarted}
+                        value={edit.passingOrder}
+                        onChange={(e) => onResultChange(member.userId, 'passingOrder', e.target.value)}
+                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        placeholder="34.5"
+                        disabled={isDeleted || isRaceNotStarted}
+                        value={edit.final3F}
+                        onChange={(e) => onResultChange(member.userId, 'final3F', e.target.value)}
+                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <PixelButton
+                        variant="ghost"
+                        tone={edit.resultStatus ? 'pink' : 'neutral'}
+                        size="sm"
+                        disabled={isDeleted}
+                        onClick={() => setPenaltyTarget({ userId: member.userId, name: member.name, currentStatus: edit.resultStatus })}
+                        className="w-full"
+                      >
+                        {edit.resultStatus ? edit.resultStatus : 'PENALTY'}
+                      </PixelButton>
+                    </td>
+                    <td className="p-2">
+                      {isDeleted ? (
+                        <PixelBadge tone="pink">PENDING DELETION</PixelBadge>
+                      ) : isModified ? (
+                        <PixelBadge tone="cyan">MODIFIED</PixelBadge>
+                      ) : isNew ? (
+                        <PixelBadge tone="green">NEW</PixelBadge>
+                      ) : savedResult ? (
+                        <PixelBadge tone={savedResult.resultStatus ? 'pink' : 'purple'}>
+                          {savedResult.resultStatus ? savedResult.resultStatus : isRaceNotStarted ? `DRAW ${savedResult.gateNumber ?? 'N/A'}` : `POS ${savedResult.position ?? 'N/A'} (${savedResult.points} PTS)`}
+                        </PixelBadge>
+                      ) : (
+                        <PixelBadge tone="neutral">UNRECORDED</PixelBadge>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      <div className="flex gap-1">
+                        {isDeleted ? (
+                          <PixelButton variant="ghost" tone="green" size="sm" onClick={() => onTogglePendingDeletion(member.userId)}>
+                            RESTORE
+                          </PixelButton>
+                        ) : isModified || isNew ? (
+                          <>
+                            <PixelButton variant="ghost" tone="neutral" size="sm" onClick={() => onUndoRow(member.userId)}>
+                              RESET
+                            </PixelButton>
+                            {savedResult && (
+                              <PixelButton variant="ghost" tone="red" size="sm" onClick={() => onTogglePendingDeletion(member.userId)}>
+                                REMOVE
+                              </PixelButton>
+                            )}
+                          </>
+                        ) : savedResult ? (
+                          <PixelButton variant="ghost" tone="red" size="sm" onClick={() => onTogglePendingDeletion(member.userId)}>
+                            REMOVE
+                          </PixelButton>
+                        ) : (
+                          <span className="font-pixel text-[10px] text-retro-muted py-1">NO CHANGES</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-3 bg-retro-bg border border-retro-border rounded mt-4 font-sans text-xs text-retro-text">
+          <h4 className="font-pixel text-xs font-bold text-retro-text mb-1">EXPLANATION OF STANDINGS UPDATE ACTIONS</h4>
+          <ul className="list-disc list-inside space-y-1 text-retro-muted">
+            <li><strong>Conduct Penalties</strong> - Click on a participant or the "Penalty" button to launch the penalty dialogue for DSQ, DNF, DNS, Position Reduction PEN (POS-x), or Points Reduction PEN (PTS-x).</li>
+            <li><strong>Staging Changes</strong> - Edits to the standings are compiled locally. Highlighting shows which rows have modified values or are pending deletion.</li>
+            <li><strong>Smart Save Standings</strong> - The system analyzes your edits and executes the safest, most performant update automatically when you click "Save".</li>
+          </ul>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       {penaltyTarget && (
         <PenaltyDialogue
+          variant="slds"
           participantName={penaltyTarget.name}
           currentStatus={penaltyTarget.currentStatus}
           onApply={(newStatus) => {
@@ -526,6 +854,7 @@ function StandingsTable({
 }
 
 interface PenaltyDialogueProps {
+  variant?: 'pixel' | 'slds'
   participantName: string
   currentStatus: string
   onApply: (status: string) => void
@@ -533,6 +862,7 @@ interface PenaltyDialogueProps {
 }
 
 function PenaltyDialogue({
+  variant = 'slds',
   participantName,
   currentStatus,
   onApply,
@@ -547,6 +877,84 @@ function PenaltyDialogue({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onApply(previewTag)
+  }
+
+  if (variant === 'pixel') {
+    return (
+      <PixelModal open onClose={onClose} title="ISSUE CONDUCT PENALTY">
+        <form onSubmit={handleSubmit} className="space-y-4 font-sans text-xs text-retro-text">
+          <div>
+            <span className="font-pixel text-xs text-retro-muted">PARTICIPANT: </span>
+            <strong className="font-pixel text-xs text-retro-text">{participantName}</strong>
+          </div>
+
+          <div>
+            <label className="block font-pixel text-xs text-retro-text mb-2">PENALTY TYPE</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { type: 'NONE', label: 'None (Clear Penalty)' },
+                { type: 'DSQ', label: 'Disqualification (DSQ)' },
+                { type: 'DNF', label: 'Did Not Finish (DNF)' },
+                { type: 'DNS', label: 'Did Not Start (DNS)' },
+                { type: 'POS', label: 'Position Reduction' },
+                { type: 'PTS', label: 'Points Reduction' },
+              ].map(({ type, label }) => (
+                <label
+                  key={type}
+                  className={`flex items-center gap-2 p-2 rounded border cursor-pointer ${
+                    selectedType === type
+                      ? 'border-retro-primary bg-retro-bg font-bold'
+                      : 'border-retro-border bg-retro-surface hover:border-retro-muted'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="penaltyTypePixel"
+                    value={type}
+                    checked={selectedType === type}
+                    onChange={() => setSelectedType(type as PenaltyType)}
+                    className="accent-retro-primary"
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {(selectedType === 'POS' || selectedType === 'PTS') && (
+            <div className="p-3 bg-retro-bg border border-retro-border rounded space-y-1">
+              <label className="block font-pixel text-xs text-retro-text mb-1">
+                {selectedType === 'POS' ? 'POSITIONS TO DEMOTE' : 'POINTS TO DEDUCT'}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={amount}
+                onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                className="w-full px-3 py-1.5 bg-retro-surface border border-retro-border rounded font-sans text-xs text-retro-text focus:outline-none focus:border-retro-primary"
+              />
+            </div>
+          )}
+
+          <div className="flex justify-between items-center p-3 bg-retro-bg border border-retro-border rounded">
+            <span className="font-pixel text-xs text-retro-muted">RESULT STATUS BADGE:</span>
+            <PixelBadge tone={previewTag ? 'pink' : 'neutral'}>
+              {previewTag || 'Normal (No Penalty)'}
+            </PixelBadge>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+            <PixelButton variant="ghost" tone="neutral" onClick={onClose}>
+              CANCEL
+            </PixelButton>
+            <PixelButton variant="solid" tone="purple" type="submit">
+              APPLY PENALTY
+            </PixelButton>
+          </div>
+        </form>
+      </PixelModal>
+    )
   }
 
   return (

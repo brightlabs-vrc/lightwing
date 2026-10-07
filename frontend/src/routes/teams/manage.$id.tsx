@@ -28,6 +28,7 @@ import {
   addEventMember,
 } from '../../lib/admin-api'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
+import { RaceMemberCombobox } from '../../components/RaceDetailPane'
 import { Pagination } from '../../components/Pagination'
 import { UserLink } from '../../components/UserLink'
 import { MarkdownView } from '../../components/MarkdownView'
@@ -129,7 +130,7 @@ function ManageOrgPage() {
   // Event form state
   const [eventName, setEventName] = useState('')
   const [eventDescription, setEventDescription] = useState('')
-  const [eventTag, setEventTag] = useState<EventTag>('OFFICIAL')
+  const eventTag: EventTag = 'OFFICIAL'
   const [eventScoringType, setEventScoringType] = useState<number>(1)
   const [eventClassRestriction, setEventClassRestriction] = useState<string>('')
   const [eventGranular, setEventGranular] = useState(true)
@@ -358,7 +359,6 @@ function ManageOrgPage() {
       setIsCreateEventModalOpen(false)
       setEventName('')
       setEventDescription('')
-      setEventTag('OFFICIAL')
       setEventClassRestriction('')
       setEventScheduledAt('')
       setEventParticipantLimit('')
@@ -1060,18 +1060,6 @@ function ManageOrgPage() {
                 />
 
                 <div>
-                  <label className="block font-pixel text-xs text-retro-text mb-1">EVENT HOSTING TAG</label>
-                  <select
-                    value={eventTag}
-                    onChange={(e) => setEventTag(e.target.value as EventTag)}
-                    className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
-                  >
-                    <option value="OFFICIAL">Official (Officially Hosted by Org)</option>
-                    <option value="COMMUNITY">Community (Community Hosted)</option>
-                  </select>
-                </div>
-
-                <div>
                   <label className="block font-pixel text-xs text-retro-text mb-1">SCORING TYPE</label>
                   <select
                     value={eventScoringType}
@@ -1295,6 +1283,7 @@ function OrgEventDetailView({
     handleAddMember,
     handleRemoveMember,
     handleAddRaceMember,
+    handleRemoveRaceMember,
     handleCreateRace,
     handleStartRace,
     handleEndRace,
@@ -1534,22 +1523,6 @@ function OrgEventDetailView({
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 font-pixel text-xs text-retro-text">
-                <span>TAG:</span>
-                <select
-                  disabled={eventStatusSaving}
-                  value={selectedEvent.tag || 'OFFICIAL'}
-                  onChange={(e) => void handleUpdateEventStatus({ tag: e.target.value as any })}
-                  className="px-2 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text"
-                >
-                  {TAG_OPTIONS.map((tg) => (
-                    <option key={tg} value={tg}>
-                      {tg}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <PixelButton
                 variant="ghost"
                 tone={selectedEvent.signupsLocked ? 'pink' : 'purple'}
@@ -1720,31 +1693,37 @@ function OrgEventDetailView({
           <PixelStack gap={4}>
             <PixelSectionHeader title={`EVENT MEMBERS (${selectedEvent.members.length})`} size="sm" />
 
-            {/* Add Member Bar */}
-            <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
-              <div className="flex-1">
-                <UserSearchCombobox value={addMemberUserId} onChange={setAddMemberUserId} />
+            {selectedEvent.granularParticipation ? (
+              <PixelAlert
+                tone="cyan"
+                message="Granular Per-Race Participation Enabled. In granular events, competitors enroll directly into individual races on the Races & Tracks tab. Removing a participant below will un-enroll them from all registered races and remove them from the event."
+              />
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
+                <div className="flex-1">
+                  <UserSearchCombobox value={addMemberUserId} onChange={setAddMemberUserId} />
+                </div>
+                <PixelButton
+                  variant="solid"
+                  tone="purple"
+                  size="sm"
+                  disabled={!addMemberUserId}
+                  onClick={async () => {
+                    if (!addMemberUserId || !authHeader) return
+                    try {
+                      await addEventMember(eventId, addMemberUserId, authHeader)
+                      await detail.reloadCurrentEvent()
+                      setAddMemberUserId('')
+                      toast({ tone: 'green', title: 'Member enrolled in event.' })
+                    } catch (err) {
+                      toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to enroll member' })
+                    }
+                  }}
+                >
+                  + ENROLL MEMBER
+                </PixelButton>
               </div>
-              <PixelButton
-                variant="solid"
-                tone="purple"
-                size="sm"
-                disabled={!addMemberUserId}
-                onClick={async () => {
-                  if (!addMemberUserId || !authHeader) return
-                  try {
-                    await addEventMember(eventId, addMemberUserId, authHeader)
-                    await detail.reloadCurrentEvent()
-                    setAddMemberUserId('')
-                    toast({ tone: 'green', title: 'Member enrolled in event.' })
-                  } catch (err) {
-                    toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to enroll member' })
-                  }
-                }}
-              >
-                + ENROLL MEMBER
-              </PixelButton>
-            </div>
+            )}
 
             {selectedEvent.members.length > 0 ? (
               <PixelTable
@@ -1752,19 +1731,45 @@ function OrgEventDetailView({
                   {
                     key: 'name',
                     header: 'MEMBER NAME',
-                    width: '50%',
+                    width: '35%',
                     render: (m) => <UserLink userId={m.userId} name={m.name} />,
                   },
                   {
                     key: 'classTier',
                     header: 'CLASS TIER',
-                    width: '30%',
+                    width: '20%',
                     render: (m) => <PixelBadge tone="neutral">{m.classTier || 'NONE'}</PixelBadge>,
                   },
+                  ...(selectedEvent.granularParticipation
+                    ? [
+                        {
+                          key: 'registeredRaces',
+                          header: 'REGISTERED RACES',
+                          width: '30%',
+                          render: (m: eventmanager.EventMemberView) => {
+                            const regRaces = (selectedEvent.raceEvents ?? []).filter((r) =>
+                              (r.members ?? []).some((rm) => rm.userId === m.userId)
+                            )
+                            if (regRaces.length === 0) {
+                              return <PixelBadge tone="neutral">NONE</PixelBadge>
+                            }
+                            return (
+                              <div className="flex gap-1 flex-wrap">
+                                {regRaces.map((r) => (
+                                  <PixelBadge key={r.id} tone="purple">
+                                    #{r.sequence} {r.name}
+                                  </PixelBadge>
+                                ))}
+                              </div>
+                            )
+                          },
+                        },
+                      ]
+                    : []),
                   {
                     key: 'action',
                     header: 'ACTION',
-                    width: '20%',
+                    width: '15%',
                     render: (m) => (
                       <PixelButton
                         variant="ghost"
@@ -1862,32 +1867,72 @@ function OrgEventDetailView({
             <PixelCard className="bg-retro-surface">
               <PixelStack gap={6}>
                 {/* Race Members Section */}
-                {selectedEvent.granularParticipation && (
-                  <PixelStack gap={3}>
-                    <PixelSectionHeader title={`RACE PARTICIPANTS (${selectedRace.members?.length || 0})`} size="sm" />
-                    <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
-                      <div className="flex-1">
+                <PixelStack gap={3}>
+                  <PixelSectionHeader
+                    title={`RACE PARTICIPANTS (${(selectedRace.members ?? []).length}${
+                      selectedRace.participantLimit !== null ? ` / ${selectedRace.participantLimit}` : ''
+                    })`}
+                    size="sm"
+                  />
+                  <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
+                    <div className="flex-1">
+                      {selectedEvent.granularParticipation ? (
                         <UserSearchCombobox value={addRaceMemberUserId} onChange={setAddRaceMemberUserId} />
-                      </div>
-                      <PixelButton
-                        variant="solid"
-                        tone="purple"
-                        size="sm"
-                        disabled={!addRaceMemberUserId}
-                        onClick={async () => {
-                          if (!addRaceMemberUserId) return
-                          await handleAddRaceMember(selectedRace.id, addRaceMemberUserId)
-                          setAddRaceMemberUserId('')
-                        }}
-                      >
-                        + REGISTER TO RACE
-                      </PixelButton>
+                      ) : (
+                        <RaceMemberCombobox
+                          value={addRaceMemberUserId}
+                          onChange={setAddRaceMemberUserId}
+                          members={selectedEvent.members.filter(
+                            (em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId)
+                          )}
+                        />
+                      )}
                     </div>
-                  </PixelStack>
-                )}
+                    <PixelButton
+                      variant="solid"
+                      tone="purple"
+                      size="sm"
+                      disabled={!addRaceMemberUserId}
+                      onClick={async () => {
+                        if (!addRaceMemberUserId) return
+                        await handleAddRaceMember(selectedRace.id, addRaceMemberUserId)
+                        setAddRaceMemberUserId('')
+                      }}
+                    >
+                      + REGISTER TO RACE
+                    </PixelButton>
+                  </div>
+
+                  {(selectedRace.members ?? []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {(selectedRace.members ?? []).map((m) => (
+                        <div
+                          key={m.userId}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-retro-bg border border-retro-border rounded font-pixel text-xs text-retro-text"
+                        >
+                          <UserLink userId={m.userId} name={m.name} />
+                          <PixelButton
+                            variant="ghost"
+                            tone="red"
+                            size="sm"
+                            onClick={() => void handleRemoveRaceMember(selectedRace.id, m.userId)}
+                            title="Remove competitor from race"
+                          >
+                            ✕
+                          </PixelButton>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="font-pixel text-xs text-retro-muted">
+                      NO COMPETITORS REGISTERED SPECIFICALLY FOR THIS RACE YET
+                    </span>
+                  )}
+                </PixelStack>
 
                 {/* Standings Grid Editor */}
                 <StandingsEditor
+                  variant="pixel"
                   raceName={selectedRace.name}
                   isRaceOngoing={selectedRace.startsAt !== null && selectedRace.endsAt === null}
                   isRaceNotStarted={selectedRace.startsAt === null}
