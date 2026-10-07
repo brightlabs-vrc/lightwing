@@ -345,68 +345,10 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 		return t, nil
 	}
 
-	// Fallback to `organization` table
-	row, err := q().GetOrgByID(ctx, id)
-	var orgObj *sqlc.Organization
-	if err == nil {
-		orgObj = toOrg(row)
-	} else if errors.Is(err, sql.ErrNoRows) {
-		slugRow, errBySlug := q().GetOrgBySlug(ctx, id)
-		if errBySlug == nil {
-			orgObj = toOrgBySlug(slugRow)
-			err = nil
-		} else {
-			err = errBySlug
-		}
-	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	members, err := loadMemberRows(ctx, orgObj.ID)
-	if err != nil {
-		return nil, err
-	}
-	t := toTeam(orgObj, members)
-
-	var orgLogo *string
-	if orgObj.Logo.Valid && orgObj.Logo.String != "" {
-		l := orgObj.Logo.String
-		orgLogo = &l
-	}
-	orgType := "ORGANIZATION"
-	status := "APPROVED"
-
-	t.Status = status
-	t.PrimaryOrganizationID = orgObj.ID
-	t.Organizations = []LinkedOrganization{
-		{
-			ID:        orgObj.ID,
-			Name:      orgObj.Name,
-			Slug:      orgObj.Slug,
-			Logo:      orgLogo,
-			OrgType:   orgType,
-			Status:    status,
-			IsPrimary: true,
-		},
-	}
-
-	computedStats, err := computeTeamStats(ctx, orgObj.ID)
-	if err == nil {
-		if computedStats.RankingAverage != nil {
-			t.Stats.RankingAverage = computedStats.RankingAverage
-		}
-		if computedStats.PointsAverage != nil {
-			t.Stats.PointsAverage = computedStats.PointsAverage
-		}
-		if computedStats.AveragePointsPerEvent != nil {
-			t.Stats.AveragePointsPerEvent = computedStats.AveragePointsPerEvent
-		}
-	}
-	return t, nil
+	return nil, err
 }
 
 func touchOrg(ctx context.Context, id string) error {

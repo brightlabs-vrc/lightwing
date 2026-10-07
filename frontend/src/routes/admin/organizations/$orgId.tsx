@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireAdminPanel } from '../../../lib/auth-guard'
 import {
-  getAdminTeam,
+  getAdminOrganization,
   updateAdminOrganization,
   addAdminTeamMember,
   updateAdminTeamMemberRole,
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/admin/organizations/$orgId')({
 function AdminOrgDetailPage() {
   const { orgId } = Route.useParams()
   const { session } = useAuth()
-  const [org, setOrg] = useState<teammanager.Team | null>(null)
+  const [org, setOrg] = useState<teammanager.AdminOrganizationDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -67,12 +67,14 @@ function AdminOrgDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const loadedOrg = await getAdminTeam(orgId)
+      const loadedOrg = await getAdminOrganization(orgId)
       setOrg(loadedOrg)
 
       setOrgName(loadedOrg.name || '')
       setOrgSlug(loadedOrg.slug || '')
       setOrgLogo(loadedOrg.logo || '')
+      setDiscordInvite(loadedOrg.discordInvite || '')
+      setVrchatGroupId(loadedOrg.vrchatGroupId || '')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load organization details')
     } finally {
@@ -141,7 +143,7 @@ function AdminOrgDetailPage() {
     setAddingMember(true)
     setMemberError(null)
     try {
-      const updated = await addAdminTeamMember(
+      await addAdminTeamMember(
         orgId,
         {
           userId: selectedUserId,
@@ -149,10 +151,10 @@ function AdminOrgDetailPage() {
         },
         authHeader,
       )
-      setOrg(updated)
       setIsMemberModalOpen(false)
       setSuccess('Staff member added successfully.')
       void fetchRoster()
+      void loadOrgData()
     } catch (cause) {
       setMemberError(cause instanceof Error ? cause.message : 'Failed to add staff member')
     } finally {
@@ -167,10 +169,10 @@ function AdminOrgDetailPage() {
     setError(null)
     setSuccess(null)
     try {
-      const updated = await removeAdminTeamMember(orgId, memberUserId, authHeader)
-      setOrg(updated)
+      await removeAdminTeamMember(orgId, memberUserId, authHeader)
       setSuccess('Staff member removed successfully.')
       void fetchRoster()
+      void loadOrgData()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to remove staff member')
     }
@@ -182,10 +184,10 @@ function AdminOrgDetailPage() {
     setError(null)
     setSuccess(null)
     try {
-      const updated = await updateAdminTeamMemberRole(orgId, memberUserId, newRole, authHeader)
-      setOrg(updated)
+      await updateAdminTeamMemberRole(orgId, memberUserId, newRole, authHeader)
       setSuccess(`Staff role updated to ${newRole} successfully.`)
       void fetchRoster()
+      void loadOrgData()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to change staff role')
     }

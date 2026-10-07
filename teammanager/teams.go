@@ -126,40 +126,6 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 		}
 	}
 
-	// Fallback to legacy organization listing if no teams exist in `team` table
-	if total == 0 && len(stubs) == 0 {
-		var orgTotal int64
-		if search == "" {
-			orgTotal, _ = q().CountTeams(ctx)
-		}
-		if orgTotal == 0 {
-			// Query approved orgs for legacy tests
-			approvedOrgs, err := q().ListApprovedOrgs(ctx)
-			if err == nil && len(approvedOrgs) > 0 {
-				legacyTeams := make([]TeamListItem, 0, len(approvedOrgs))
-				for _, ao := range approvedOrgs {
-					var logo *string
-					if ao.Logo.Valid && ao.Logo.String != "" {
-						l := ao.Logo.String
-						logo = &l
-					}
-					legacyTeams = append(legacyTeams, TeamListItem{
-						ID:                          ao.ID,
-						Name:                        ao.Name,
-						Slug:                        ao.Slug,
-						Logo:                        logo,
-						Status:                      "APPROVED",
-						PrimaryOrganizationID:       ao.ID,
-						Organizations:               []LinkedOrganization{},
-						AdministratorSlotsRemaining: 3,
-						MemberCount:                 0,
-					})
-				}
-				return &ListTeamsResponse{Teams: legacyTeams, Total: len(legacyTeams)}, nil
-			}
-		}
-	}
-
 	teams := make([]TeamListItem, 0, len(stubs))
 	for _, s := range stubs {
 		var logo *string
@@ -184,7 +150,7 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 
 // --- createTeam (mirrors createTeam; site-admin gated) ---
 
-func createTeam(ctx context.Context, authorization, name string, logo *string) (*Team, error) {
+func createTeam(ctx context.Context, authorization, name string, logo *string, primaryOrganizationID *string) (*Team, error) {
 	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
 		return nil, err
@@ -220,6 +186,15 @@ func createTeam(ctx context.Context, authorization, name string, logo *string) (
 	if err != nil {
 		return nil, err
 	}
+
+	if primaryOrganizationID != nil && *primaryOrganizationID != "" {
+		_ = q().InsertTeamOrganization(ctx, sqlc.InsertTeamOrganizationParams{
+			TeamId:         id,
+			OrganizationId: *primaryOrganizationID,
+			IsPrimary:      true,
+		})
+	}
+
 	return loadTeam(ctx, id)
 }
 
@@ -302,49 +277,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 		return loadTeam(ctx, id)
 	}
 
-	// Legacy organization fallback
-	existingSlug, err := q().OrgSlugByID(ctx, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
-	}
-	if err != nil {
-		return nil, err
-	}
-	nextSlug := existingSlug
-	if p.Slug != nil && *p.Slug != existingSlug {
-		if !auth.IsValidSlug(*p.Slug) {
-			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid slug format or length"}
-		}
-		if _, err := q().OrgIDBySlug(ctx, *p.Slug); err == nil {
-			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team slug is already in use"}
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return nil, err
-		}
-		nextSlug = *p.Slug
-	}
-	var name, logo sql.NullString
-	if p.Name != nil {
-		name = sql.NullString{String: *p.Name, Valid: true}
-	}
-	if p.Logo != nil {
-		logo = sql.NullString{String: *p.Logo, Valid: true}
-	}
-	err = q().UpdateOrg(ctx, sqlc.UpdateOrgParams{
-		Slug:      nextSlug,
-		UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
-		Name:      name,
-		ClearLogo: p.ClearLogo,
-		Logo:      logo,
-		ID:        id,
-	})
-	if isUniqueViolation(err) {
-		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team slug is already in use"}
-	}
-	if err != nil {
-		return nil, err
-	}
-	invalidateTeamCache(ctx, id)
-	return loadTeam(ctx, id)
+	return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 }
 
 // --- convertTeamToOrg ---
@@ -354,7 +287,7 @@ type ConvertTeamToOrgRequest struct {
 	TeamID        string `json:"teamId"`
 }
 
-func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team, error) {
+func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*AdminOrganizationDetail, error) {
 	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
 		return nil, err
@@ -370,11 +303,11 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 	if errors.Is(err, sql.ErrNoRows) {
 		if orgRow, orgErr := q().GetOrgByID(ctx, teamID); orgErr == nil {
 			invalidateTeamCache(ctx, orgRow.ID)
-			return loadTeam(ctx, orgRow.ID)
+			return getAdminOrganization(ctx, orgRow.ID)
 		}
 		if orgRow, orgErr := q().GetOrgBySlug(ctx, teamID); orgErr == nil {
 			invalidateTeamCache(ctx, orgRow.ID)
-			return loadTeam(ctx, orgRow.ID)
+			return getAdminOrganization(ctx, orgRow.ID)
 		}
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	}
@@ -454,7 +387,7 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Team,
 
 	invalidateTeamCache(ctx, targetTeamID)
 	invalidateTeamCache(ctx, orgID)
-	return loadTeam(ctx, orgID)
+	return getAdminOrganization(ctx, orgID)
 }
 
 // --- Admin Organization Management ---
@@ -473,6 +406,23 @@ type AdminOrganizationItem struct {
 	MemberCount                 int     `json:"memberCount"`
 	CreatedAt                   string  `json:"createdAt"`
 	UpdatedAt                   *string `json:"updatedAt,omitempty"`
+}
+
+type AdminOrganizationDetail struct {
+	ID                          string              `json:"id"`
+	Name                        string              `json:"name"`
+	Slug                        string              `json:"slug"`
+	Logo                        *string             `json:"logo"`
+	OrgType                     string              `json:"orgType"`
+	Status                      string              `json:"status"`
+	DiscordInvite               *string             `json:"discordInvite,omitempty"`
+	VrchatGroupId               *string             `json:"vrchatGroupId,omitempty"`
+	SubmittedByUserId           *string             `json:"submittedByUserId,omitempty"`
+	AdministratorSlotsRemaining int                 `json:"administratorSlotsRemaining"`
+	MemberCount                 int                 `json:"memberCount"`
+	CreatedAt                   string              `json:"createdAt"`
+	UpdatedAt                   *string             `json:"updatedAt,omitempty"`
+	Members                     []TeamMemberSummary `json:"members"`
 }
 
 type ListAdminOrganizationsRequest struct {
@@ -613,7 +563,107 @@ func listAdminOrganizations(ctx context.Context, search string, limit, offset in
 	return &ListAdminOrganizationsResponse{Organizations: items, Total: int(total)}, nil
 }
 
-func createAdminOrganization(ctx context.Context, authorization, name string, logo, discordInvite, vrchatGroupId *string) (*Team, error) {
+func getAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDetail, error) {
+	var orgID, name, slugStr string
+	var logoVal, discordVal, vrchatVal, submittedVal sql.NullString
+	var orgTypeVal, statusVal sql.NullString
+	var createdAtVal time.Time
+	var updatedAtVal sql.NullTime
+
+	if row, err := q().GetOrgByID(ctx, id); err == nil {
+		orgID, name, slugStr = row.ID, row.Name, row.Slug
+		logoVal, orgTypeVal, statusVal = row.Logo, row.OrgType, row.Status
+		discordVal, vrchatVal, submittedVal = row.DiscordInvite, row.VrchatGroupId, row.SubmittedByUserId
+		createdAtVal, updatedAtVal = row.CreatedAt, row.UpdatedAt
+	} else if slugRow, errSlug := q().GetOrgBySlug(ctx, id); errSlug == nil {
+		orgID, name, slugStr = slugRow.ID, slugRow.Name, slugRow.Slug
+		logoVal, orgTypeVal, statusVal = slugRow.Logo, slugRow.OrgType, slugRow.Status
+		discordVal, vrchatVal, submittedVal = slugRow.DiscordInvite, slugRow.VrchatGroupId, slugRow.SubmittedByUserId
+		createdAtVal, updatedAtVal = slugRow.CreatedAt, slugRow.UpdatedAt
+	} else {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "organization not found"}
+	}
+
+	members, err := loadMemberRows(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	adminCount := 0
+	summaries := make([]TeamMemberSummary, 0, len(members))
+	for _, m := range members {
+		if m.Role == auth.AdministratorRole {
+			adminCount++
+		}
+		var slug *string
+		if m.Slug.Valid && m.Slug.String != "" {
+			s := m.Slug.String
+			slug = &s
+		}
+		summaries = append(summaries, TeamMemberSummary{
+			UserID: m.UserId,
+			Name:   displayName(m.Name, m.VrchatUsername),
+			Slug:   slug,
+			Role:   m.Role,
+		})
+	}
+
+	slots := auth.AdministratorRoleLimit - adminCount
+	if slots < 0 {
+		slots = 0
+	}
+
+	var logo, discord, vrchat, submitted *string
+	if logoVal.Valid && logoVal.String != "" {
+		l := logoVal.String
+		logo = &l
+	}
+	if discordVal.Valid && discordVal.String != "" {
+		d := discordVal.String
+		discord = &d
+	}
+	if vrchatVal.Valid && vrchatVal.String != "" {
+		v := vrchatVal.String
+		vrchat = &v
+	}
+	if submittedVal.Valid && submittedVal.String != "" {
+		s := submittedVal.String
+		submitted = &s
+	}
+	var updatedAt *string
+	if updatedAtVal.Valid {
+		u := updatedAtVal.Time.Format(time.RFC3339)
+		updatedAt = &u
+	}
+
+	orgType := "ORGANIZATION"
+	if orgTypeVal.Valid && orgTypeVal.String != "" {
+		orgType = orgTypeVal.String
+	}
+	status := "APPROVED"
+	if statusVal.Valid && statusVal.String != "" {
+		status = statusVal.String
+	}
+
+	return &AdminOrganizationDetail{
+		ID:                          orgID,
+		Name:                        name,
+		Slug:                        slugStr,
+		Logo:                        logo,
+		OrgType:                     orgType,
+		Status:                      status,
+		DiscordInvite:               discord,
+		VrchatGroupId:               vrchat,
+		SubmittedByUserId:           submitted,
+		AdministratorSlotsRemaining: slots,
+		MemberCount:                 len(members),
+		CreatedAt:                   createdAtVal.Format(time.RFC3339),
+		UpdatedAt:                   updatedAt,
+		Members:                     summaries,
+	}, nil
+}
+
+func createAdminOrganization(ctx context.Context, authorization, name string, logo, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
 	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
 		return nil, err
@@ -662,10 +712,10 @@ func createAdminOrganization(ctx context.Context, authorization, name string, lo
 		Role:           auth.AdministratorRole,
 	})
 
-	return loadTeam(ctx, id)
+	return getAdminOrganization(ctx, id)
 }
 
-func updateAdminOrganization(ctx context.Context, authorization, id string, p *UpdateTeamParams, discordInvite, vrchatGroupId *string) (*Team, error) {
+func updateAdminOrganization(ctx context.Context, authorization, id string, p *UpdateTeamParams, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
 	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
 		return nil, err
@@ -749,7 +799,7 @@ func updateAdminOrganization(ctx context.Context, authorization, id string, p *U
 	}
 
 	invalidateTeamCache(ctx, existingOrgID)
-	return loadTeam(ctx, existingOrgID)
+	return getAdminOrganization(ctx, existingOrgID)
 }
 
 //encore:api public method=GET path=/api/admin/organizations
@@ -757,20 +807,25 @@ func (s *Service) ListAdminOrganizations(ctx context.Context, p *ListAdminOrgani
 	return listAdminOrganizations(ctx, p.Search, p.Limit, p.Offset)
 }
 
+//encore:api public method=GET path=/api/admin/organizations/:id
+func (s *Service) GetAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDetail, error) {
+	return getAdminOrganization(ctx, id)
+}
+
 //encore:api public method=POST path=/api/admin/organizations
-func (s *Service) CreateAdminOrganization(ctx context.Context, p *CreateAdminOrganizationRequest) (*Team, error) {
+func (s *Service) CreateAdminOrganization(ctx context.Context, p *CreateAdminOrganizationRequest) (*AdminOrganizationDetail, error) {
 	return createAdminOrganization(ctx, p.Authorization, p.Name, p.Logo, p.DiscordInvite, p.VrchatGroupId)
 }
 
 //encore:api public method=PATCH path=/api/admin/organizations
-func (s *Service) UpdateAdminOrganization(ctx context.Context, p *UpdateAdminOrganizationRequest) (*Team, error) {
+func (s *Service) UpdateAdminOrganization(ctx context.Context, p *UpdateAdminOrganizationRequest) (*AdminOrganizationDetail, error) {
 	return updateAdminOrganization(ctx, p.Authorization, p.ID, &UpdateTeamParams{
 		Name: p.Name, Slug: p.Slug, Logo: p.Logo, ClearLogo: p.ClearLogo,
 	}, p.DiscordInvite, p.VrchatGroupId)
 }
 
 //encore:api public method=POST path=/api/admin/teams/convert-to-org
-func (s *Service) ConvertTeamToOrg(ctx context.Context, p *ConvertTeamToOrgRequest) (*Team, error) {
+func (s *Service) ConvertTeamToOrg(ctx context.Context, p *ConvertTeamToOrgRequest) (*AdminOrganizationDetail, error) {
 	return convertTeamToOrg(ctx, p.Authorization, p.TeamID)
 }
 
@@ -807,14 +862,15 @@ func (s *Service) ListTeams(ctx context.Context, p *ListTeamsRequest) (*ListTeam
 
 // CreateTeamRequest carries the auth header plus the new team's fields.
 type CreateTeamRequest struct {
-	Authorization string  `header:"Authorization"`
-	Name          string  `json:"name"`
-	Logo          *string `json:"logo,omitempty"`
+	Authorization         string  `header:"Authorization"`
+	Name                  string  `json:"name"`
+	Logo                  *string `json:"logo,omitempty"`
+	PrimaryOrganizationID *string `json:"primaryOrganizationId,omitempty"`
 }
 
 //encore:api public method=POST path=/api/teams
 func (s *Service) CreateTeam(ctx context.Context, p *CreateTeamRequest) (*Team, error) {
-	return createTeam(ctx, p.Authorization, p.Name, p.Logo)
+	return createTeam(ctx, p.Authorization, p.Name, p.Logo, p.PrimaryOrganizationID)
 }
 
 // UpdateTeamRequest carries the target id, auth header, and editable fields.
