@@ -539,9 +539,6 @@ function NewTeamWizardPage() {
                       ))}
                     </select>
                   )}
-                  <p className="text-[11px] font-sans text-retro-muted mt-1">
-                    You must be an administrator of the primary organization to submit team requests.
-                  </p>
                 </div>
 
                 <div>
