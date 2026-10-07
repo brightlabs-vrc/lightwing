@@ -2067,6 +2067,8 @@ export namespace teammanager {
         slug?: string
         logo?: string
         clearLogo?: boolean
+        description?: string
+        clearDescription?: boolean
         discordInvite?: string
         vrchatGroupId?: string
     }

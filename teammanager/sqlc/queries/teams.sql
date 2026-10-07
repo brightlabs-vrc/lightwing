@@ -293,3 +293,10 @@ SET "rankingAverage" = COALESCE(sqlc.narg('ranking_average'), "rankingAverage"),
     "seasonRank" = COALESCE(sqlc.narg('season_rank'), "seasonRank"),
     "averagePointsPerEvent" = COALESCE(sqlc.narg('average_points_per_event'), "averagePointsPerEvent")
 WHERE id = sqlc.arg('id');
+
+-- name: ListMemberOrgsForUser :many
+SELECT DISTINCT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, m.role
+FROM "organization" o
+JOIN "member" m ON o.id = m."organizationId"
+WHERE m."userId" = $1
+ORDER BY o.name ASC;

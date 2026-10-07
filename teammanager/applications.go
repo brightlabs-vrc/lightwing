@@ -550,9 +550,6 @@ func listAdminApplications(ctx context.Context, authorization string) (*ListAppl
 	if err != nil {
 		return nil, err
 	}
-	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required"}
-	}
 
 	resp := &ListApplicationsResponse{
 		Organizations: []OrgApplicationView{},
@@ -573,15 +570,32 @@ func listAdminApplications(ctx context.Context, authorization string) (*ListAppl
 		}
 	}
 
-	// SITE_ADMIN and EVENT_ADMIN see team applications
+	// SITE_ADMIN and site EVENT_ADMIN see all team applications
+	// Org admins and org eventAdmins see team applications targeting their managed orgs
 	teamRows, err := q().ListPendingTeams(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	managedOrgIDs := make(map[string]bool)
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		memberOrgs, err := q().ListMemberOrgsForUser(ctx, actor.UserID)
+		if err == nil {
+			for _, mo := range memberOrgs {
+				r := strings.ToLower(mo.Role)
+				if r == "administrator" || r == "eventadmin" || r == "event_admin" || r == "eventadministrator" {
+					managedOrgIDs[mo.ID] = true
+				}
+			}
+		}
+	}
+
 	for _, t := range teamRows {
 		view, err := getTeamApplicationView(ctx, t.ID)
 		if err == nil {
-			resp.Teams = append(resp.Teams, *view)
+			if auth.IsSiteAdmin(actor.SiteRole) || auth.IsEventAdmin(actor.SiteRole) || managedOrgIDs[view.PrimaryOrganization.ID] {
+				resp.Teams = append(resp.Teams, *view)
+			}
 		}
 	}
 
@@ -611,7 +625,24 @@ func reviewApplication(ctx context.Context, p *ReviewApplicationRequest) error {
 			return err
 		}
 	case "TEAM":
-		if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		isAuthorized := auth.IsSiteAdmin(actor.SiteRole) || auth.IsEventAdmin(actor.SiteRole)
+		if !isAuthorized {
+			// Check if actor is an admin/eventAdmin on the team's primary org
+			primOrg, err := q().GetPrimaryOrgForTeam(ctx, p.ID)
+			if err == nil && primOrg.ID != "" {
+				role, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
+					OrganizationId: primOrg.ID,
+					UserId:         actor.UserID,
+				})
+				if err == nil {
+					r := strings.ToLower(role)
+					if r == "administrator" || r == "eventadmin" || r == "event_admin" || r == "eventadministrator" {
+						isAuthorized = true
+					}
+				}
+			}
+		}
+		if !isAuthorized {
 			return &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required for team applications"}
 		}
 		if err := q().UpdateTeamStatus(ctx, sqlc.UpdateTeamStatusParams{

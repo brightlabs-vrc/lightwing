@@ -1613,7 +1613,7 @@ export async function createAdminOrganization(
 
 export async function updateAdminOrganization(
   id: string,
-  params: { name?: string; slug?: string; logo?: string | null; clearLogo?: boolean; discordInvite?: string | null; vrchatGroupId?: string | null },
+  params: { name?: string; slug?: string; logo?: string | null; clearLogo?: boolean; description?: string | null; clearDescription?: boolean; discordInvite?: string | null; vrchatGroupId?: string | null },
   authHeader: string
 ): Promise<teammanager.AdminOrganizationDetail> {
   if (!MOCK_MODE) {
@@ -1624,6 +1624,8 @@ export async function updateAdminOrganization(
       slug: params.slug,
       logo: params.logo ?? undefined,
       clearLogo: params.clearLogo,
+      description: params.description ?? undefined,
+      clearDescription: params.clearDescription,
       discordInvite: params.discordInvite ?? undefined,
       vrchatGroupId: params.vrchatGroupId ?? undefined,
     })
@@ -1969,6 +1971,7 @@ export async function updateAdminTeam(
     name?: string
     slug?: string
     logo?: string | null
+    description?: string | null
   },
   authorization: string,
 ): Promise<teammanager.Team> {
@@ -1987,6 +1990,9 @@ export async function updateAdminTeam(
   team.name = params.name ?? team.name
   team.slug = params.slug ?? team.slug
   team.logo = params.logo ?? team.logo
+  if (params.description !== undefined) {
+    team.description = params.description
+  }
 
   return team
 }
