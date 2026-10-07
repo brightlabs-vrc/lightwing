@@ -108,39 +108,46 @@ func createOrgWithMembers(t *testing.T, ctx context.Context, id, name, slug stri
 	return id
 }
 
-// Mirrors ts-legacy/teammanager/teams.test.ts → "getTeam returns mapped team
-// with member summaries and stats".
+func createTeamWithRoster(t *testing.T, ctx context.Context, id, name, slug string, members []memberSpec) string {
+	t.Helper()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := db.Exec(ctx,
+		`INSERT INTO "team" (id, name, slug, status, "createdAt", "updatedAt") VALUES ($1, $2, $3, 'APPROVED', $4, $4)`,
+		id, name, slug, now,
+	); err != nil {
+		t.Fatalf("failed to insert team: %v", err)
+	}
+	base := time.Now().UTC()
+	for i, m := range members {
+		insertTestUser(t, ctx, m.userID, m.name, "USER")
+		createdAt := base.Add(time.Duration(i) * time.Microsecond).Format(time.RFC3339Nano)
+		if _, err := db.Exec(ctx,
+			`INSERT INTO "teamMember" (id, "teamId", "userId", role, "createdAt")
+			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4)`,
+			id, m.userID, m.role, createdAt,
+		); err != nil {
+			t.Fatalf("failed to insert team member: %v", err)
+		}
+	}
+	return id
+}
+
+// Tests getTeam for competition teams stored in `team` table.
 func TestGetTeam(t *testing.T) {
 	ctx := context.Background()
-	id := nextTeamID("org-get-team")
-	orgID := createOrgWithMembers(t, ctx, id, "Sky Team", nextTeamID("sky-team"), []memberSpec{
+	id := nextTeamID("team-get-team")
+	teamID := createTeamWithRoster(t, ctx, id, "Sky Team", nextTeamID("sky-team"), []memberSpec{
 		{userID: nextTeamID("user-aster"), role: "administrator", name: "Aster"},
 		{userID: nextTeamID("user-blake"), role: "administrator", name: "Blake"},
 		{userID: nextTeamID("user-casey"), role: "member", name: "Casey"},
 	})
-	if _, err := db.Exec(ctx,
-		`UPDATE "organization" SET "rankingAverage" = $1, "pointsAverage" = $2,
-		 "seasonRank" = $3, "averagePointsPerEvent" = $4 WHERE id = $5`,
-		4.2, 91.5, 7, 14.3, orgID,
-	); err != nil {
-		t.Fatalf("failed to set stats: %v", err)
-	}
 
-	team, err := getTeam(ctx, orgID)
+	team, err := getTeam(ctx, teamID)
 	if err != nil {
 		t.Fatalf("getTeam failed: %v", err)
 	}
-	if team.ID != orgID || team.Name != "Sky Team" || team.Logo != nil {
+	if team.ID != teamID || team.Name != "Sky Team" || team.Logo != nil {
 		t.Errorf("identity = %+v, want Sky Team with nil logo", team)
-	}
-	if team.Stats.RankingAverage == nil || *team.Stats.RankingAverage != 4.2 ||
-		team.Stats.PointsAverage == nil || *team.Stats.PointsAverage != 91.5 ||
-		team.Stats.SeasonRank == nil || *team.Stats.SeasonRank != 7 ||
-		team.Stats.AveragePointsPerEvent == nil || *team.Stats.AveragePointsPerEvent != 14.3 {
-		t.Errorf("stats = %+v, want 4.2/91.5/7/14.3", team.Stats)
-	}
-	if team.AdministratorSlotsRemaining != 1 {
-		t.Errorf("slots = %d, want 1", team.AdministratorSlotsRemaining)
 	}
 	if len(team.Members) != 3 {
 		t.Fatalf("members = %+v, want 3 entries", team.Members)
@@ -155,25 +162,8 @@ func TestGetTeam(t *testing.T) {
 		t.Errorf("member names = %+v, want Aster/Blake/Casey in creation order", team.Members)
 	}
 
-	t.Run("caps administratorSlotsRemaining at zero", func(t *testing.T) {
-		heavyID := nextTeamID("org-admin-slots")
-		createOrgWithMembers(t, ctx, heavyID, "Admin Heavy Team", nextTeamID("admin-heavy"), []memberSpec{
-			{userID: nextTeamID("user-admin-1"), role: "administrator", name: "Admin One"},
-			{userID: nextTeamID("user-admin-2"), role: "administrator", name: "Admin Two"},
-			{userID: nextTeamID("user-admin-3"), role: "administrator", name: "Admin Three"},
-			{userID: nextTeamID("user-admin-4"), role: "administrator", name: "Admin Four"},
-		})
-		team, err := getTeam(ctx, heavyID)
-		if err != nil {
-			t.Fatalf("getTeam failed: %v", err)
-		}
-		if team.AdministratorSlotsRemaining != 0 {
-			t.Errorf("slots = %d, want 0", team.AdministratorSlotsRemaining)
-		}
-	})
-
-	t.Run("throws not found when organization is missing", func(t *testing.T) {
-		_, err := getTeam(ctx, "missing-org")
+	t.Run("throws not found when team is missing", func(t *testing.T) {
+		_, err := getTeam(ctx, "missing-team-999")
 		if err == nil {
 			t.Fatal("expected not found error")
 		}
@@ -181,6 +171,30 @@ func TestGetTeam(t *testing.T) {
 			t.Errorf("code = %v, want not_found", errs.Code(err))
 		}
 	})
+}
+
+// Tests getAdminOrganization for organizations stored in `organization` table.
+func TestGetAdminOrganization(t *testing.T) {
+	ctx := context.Background()
+	id := nextTeamID("org-get-admin")
+	orgID := createOrgWithMembers(t, ctx, id, "Apex Association", nextTeamID("apex-assoc"), []memberSpec{
+		{userID: nextTeamID("user-org-admin1"), role: "administrator", name: "Org Admin One"},
+		{userID: nextTeamID("user-org-admin2"), role: "administrator", name: "Org Admin Two"},
+	})
+
+	orgDetail, err := getAdminOrganization(ctx, orgID)
+	if err != nil {
+		t.Fatalf("getAdminOrganization failed: %v", err)
+	}
+	if orgDetail.ID != orgID || orgDetail.Name != "Apex Association" {
+		t.Errorf("orgDetail = %+v, want Apex Association", orgDetail)
+	}
+	if orgDetail.AdministratorSlotsRemaining != 1 {
+		t.Errorf("slots = %d, want 1", orgDetail.AdministratorSlotsRemaining)
+	}
+	if len(orgDetail.Members) != 2 {
+		t.Fatalf("members = %+v, want 2 entries", orgDetail.Members)
+	}
 }
 
 func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
@@ -332,7 +346,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 
 		// Create a team via createTeam
 		teamName := "Velocity Racing"
-		newTeam, err := createTeam(ctx, bearer(siteAdminTok), teamName, nil)
+		newTeam, err := createTeam(ctx, bearer(siteAdminTok), teamName, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -351,8 +365,8 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		if err != nil {
 			t.Fatalf("convertTeamToOrg failed: %v", err)
 		}
-		if convertedTeam == nil || convertedTeam.PrimaryOrganizationID == "" {
-			t.Errorf("convertTeamToOrg returned invalid team: %+v", convertedTeam)
+		if convertedTeam == nil || convertedTeam.ID == "" {
+			t.Errorf("convertTeamToOrg returned invalid organization: %+v", convertedTeam)
 		}
 
 		// Verify team record in `team` table is deleted
@@ -379,7 +393,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// Existing team applies to join target organization (using a newly created team)
-		secondTeam, err := createTeam(ctx, bearer(siteAdminTok), "Second Velocity Team", nil)
+		secondTeam, err := createTeam(ctx, bearer(siteAdminTok), "Second Velocity Team", nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam secondTeam failed: %v", err)
 		}
@@ -407,7 +421,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		siteAdminTok := insertTestSession(t, ctx, siteAdminUser)
 
 		// 1. Create a team and convert by team slug
-		newTeam, err := createTeam(ctx, bearer(siteAdminTok), "Slug Team Test", nil)
+		newTeam, err := createTeam(ctx, bearer(siteAdminTok), "Slug Team Test", nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -525,7 +539,7 @@ func TestCreateTeam(t *testing.T) {
 		token := insertTestSession(t, ctx, siteAdmin)
 
 		name := fmt.Sprintf("Alpha Racing Syndicate %d", teamTestSeq.Add(1))
-		team, err := createTeam(ctx, bearer(token), name, nil)
+		team, err := createTeam(ctx, bearer(token), name, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -559,7 +573,7 @@ func TestCreateTeam(t *testing.T) {
 		regular := nextTeamID("regular-user-create-team")
 		insertTestUser(t, ctx, regular, "Regular User", "USER")
 		token := insertTestSession(t, ctx, regular)
-		if _, err := createTeam(ctx, bearer(token), "Forbidden Team", nil); err == nil {
+		if _, err := createTeam(ctx, bearer(token), "Forbidden Team", nil, nil); err == nil {
 			t.Fatal("expected permission error")
 		} else if errs.Code(err) != errs.PermissionDenied {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
@@ -571,10 +585,10 @@ func TestCreateTeam(t *testing.T) {
 		insertTestUser(t, ctx, siteAdmin, "Collision Site Admin", "SITE_ADMIN")
 		token := insertTestSession(t, ctx, siteAdmin)
 		name := fmt.Sprintf("Collision Team %d", teamTestSeq.Add(1))
-		if _, err := createTeam(ctx, bearer(token), name, nil); err != nil {
+		if _, err := createTeam(ctx, bearer(token), name, nil, nil); err != nil {
 			t.Fatalf("first createTeam failed: %v", err)
 		}
-		if _, err := createTeam(ctx, bearer(token), name, nil); err == nil {
+		if _, err := createTeam(ctx, bearer(token), name, nil, nil); err == nil {
 			t.Fatal("expected already_exists error")
 		} else if errs.Code(err) != errs.AlreadyExists {
 			t.Errorf("code = %v, want already_exists", errs.Code(err))
@@ -694,17 +708,17 @@ func TestTeamMembers(t *testing.T) {
 // Covers updateTeam: metadata edits, slug validation/collision, and guards.
 func TestUpdateTeam(t *testing.T) {
 	ctx := context.Background()
-	orgID := nextTeamID("org-update-meta")
-	admin := nextTeamID("user-meta-admin")
-	slug := nextTeamID("meta-team")
-	createOrgWithMembers(t, ctx, orgID, "Meta Team", slug, []memberSpec{
-		{userID: admin, role: "administrator", name: "Admin"},
-	})
-	adminToken := insertTestSession(t, ctx, admin)
+	siteAdmin := nextTeamID("site-admin-update-meta")
+	insertTestUser(t, ctx, siteAdmin, "Site Admin Update", "SITE_ADMIN")
+	siteToken := insertTestSession(t, ctx, siteAdmin)
 
-	t.Run("team admin can rename and reslug", func(t *testing.T) {
+	teamID := createTeamWithRoster(t, ctx, nextTeamID("team-update-meta"), "Meta Team", nextTeamID("meta-team"), []memberSpec{
+		{userID: siteAdmin, role: "administrator", name: "Site Admin"},
+	})
+
+	t.Run("site admin can rename and reslug", func(t *testing.T) {
 		newSlug := nextTeamID("renamed-team")
-		team, err := updateTeam(ctx, bearer(adminToken), orgID, &UpdateTeamParams{
+		team, err := updateTeam(ctx, bearer(siteToken), teamID, &UpdateTeamParams{
 			Name: sptr("Renamed Team"),
 			Slug: sptr(newSlug),
 		})
@@ -718,13 +732,13 @@ func TestUpdateTeam(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getTeamBySlug failed: %v", err)
 		}
-		if bySlug.ID != orgID {
-			t.Errorf("bySlug.ID = %q, want %q", bySlug.ID, orgID)
+		if bySlug.ID != teamID {
+			t.Errorf("bySlug.ID = %q, want %q", bySlug.ID, teamID)
 		}
 	})
 
 	t.Run("rejects invalid slug", func(t *testing.T) {
-		if _, err := updateTeam(ctx, bearer(adminToken), orgID, &UpdateTeamParams{
+		if _, err := updateTeam(ctx, bearer(siteToken), teamID, &UpdateTeamParams{
 			Slug: sptr("BAD SLUG!!"),
 		}); err == nil {
 			t.Fatal("expected invalid_argument error")
@@ -734,10 +748,10 @@ func TestUpdateTeam(t *testing.T) {
 	})
 
 	t.Run("rejects slug collision", func(t *testing.T) {
-		otherID := nextTeamID("org-other")
+		otherID := nextTeamID("team-other")
 		otherSlug := nextTeamID("other-team")
-		createOrgWithMembers(t, ctx, otherID, "Other Team", otherSlug, nil)
-		if _, err := updateTeam(ctx, bearer(adminToken), orgID, &UpdateTeamParams{
+		createTeamWithRoster(t, ctx, otherID, "Other Team", otherSlug, nil)
+		if _, err := updateTeam(ctx, bearer(siteToken), teamID, &UpdateTeamParams{
 			Slug: sptr(otherSlug),
 		}); err == nil {
 			t.Fatal("expected already_exists error")
@@ -750,17 +764,14 @@ func TestUpdateTeam(t *testing.T) {
 		outsider := nextTeamID("user-outsider-meta")
 		insertTestUser(t, ctx, outsider, "Outsider", "USER")
 		outsiderToken := insertTestSession(t, ctx, outsider)
-		if _, err := updateTeam(ctx, bearer(outsiderToken), orgID, &UpdateTeamParams{
+		if _, err := updateTeam(ctx, bearer(outsiderToken), teamID, &UpdateTeamParams{
 			Name: sptr("Hijacked"),
 		}); err == nil {
 			t.Fatal("expected permission error")
 		} else if errs.Code(err) != errs.PermissionDenied {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
 		}
-		siteAdmin := nextTeamID("site-admin-meta")
-		insertTestUser(t, ctx, siteAdmin, "Meta Site Admin", "SITE_ADMIN")
-		siteToken := insertTestSession(t, ctx, siteAdmin)
-		if _, err := updateTeam(ctx, bearer(siteToken), "missing-org", &UpdateTeamParams{
+		if _, err := updateTeam(ctx, bearer(siteToken), "missing-team-999", &UpdateTeamParams{
 			Name: sptr("Ghost"),
 		}); err == nil {
 			t.Fatal("expected not found error")
@@ -773,11 +784,11 @@ func TestUpdateTeam(t *testing.T) {
 // Covers getTeamBySlug and listTeamMembers (search + pagination).
 func TestTeamLookups(t *testing.T) {
 	ctx := context.Background()
-	orgID := nextTeamID("org-lookups")
+	teamID := nextTeamID("team-lookups")
 	slug := nextTeamID("lookup-team")
 	alice := nextTeamID("user-alice")
 	bob := nextTeamID("user-bob")
-	createOrgWithMembers(t, ctx, orgID, "Lookup Team", slug, []memberSpec{
+	createTeamWithRoster(t, ctx, teamID, "Lookup Team", slug, []memberSpec{
 		{userID: alice, role: "administrator", name: "Alice"},
 		{userID: bob, role: "member", name: "Bobby"},
 	})
@@ -787,7 +798,7 @@ func TestTeamLookups(t *testing.T) {
 		if err != nil {
 			t.Fatalf("getTeamBySlug failed: %v", err)
 		}
-		if team.ID != orgID || len(team.Members) != 2 {
+		if team.ID != teamID || len(team.Members) != 2 {
 			t.Errorf("team = %+v, want 2 members", team)
 		}
 		if _, err := getTeamBySlug(ctx, "no-such-slug"); err == nil {
@@ -798,21 +809,21 @@ func TestTeamLookups(t *testing.T) {
 	})
 
 	t.Run("listTeamMembers searches and paginates", func(t *testing.T) {
-		resp, err := listTeamMembers(ctx, orgID, "", 0, 0)
+		resp, err := listTeamMembers(ctx, teamID, "", 0, 0)
 		if err != nil {
 			t.Fatalf("listTeamMembers failed: %v", err)
 		}
 		if resp.Total != 2 || len(resp.Members) != 2 {
 			t.Fatalf("resp = %+v, want total 2", resp)
 		}
-		search, err := listTeamMembers(ctx, orgID, "bob", 0, 0)
+		search, err := listTeamMembers(ctx, teamID, "bob", 0, 0)
 		if err != nil {
 			t.Fatalf("search failed: %v", err)
 		}
 		if search.Total != 1 || search.Members[0].Name != "Bobby" {
 			t.Errorf("search = %+v, want Bobby only", search)
 		}
-		page, err := listTeamMembers(ctx, orgID, "", 1, 1)
+		page, err := listTeamMembers(ctx, teamID, "", 1, 1)
 		if err != nil {
 			t.Fatalf("pagination failed: %v", err)
 		}

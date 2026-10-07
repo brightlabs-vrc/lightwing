@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireAdminPanel } from '../../../lib/auth-guard'
@@ -29,6 +29,7 @@ export const Route = createFileRoute('/admin/teams/$teamId')({
 
 function AdminTeamDetailPage() {
   const { teamId } = Route.useParams()
+  const navigate = useNavigate()
   const { session } = useAuth()
   const [team, setTeam] = useState<teammanager.Team | null>(null)
   const [loading, setLoading] = useState(true)
@@ -250,9 +251,9 @@ function AdminTeamDetailPage() {
     setError(null)
     setSuccess(null)
     try {
-      const updated = await convertAdminTeamToOrg(teamId, authHeader)
-      setTeam(updated)
+      const updatedOrg = await convertAdminTeamToOrg(teamId, authHeader)
       setSuccess('Team converted to organization successfully.')
+      navigate({ to: '/admin/organizations/$orgId', params: { orgId: updatedOrg.id } })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to convert team to organization')
     } finally {
@@ -301,7 +302,7 @@ function AdminTeamDetailPage() {
   return (
     <AdminLayout
       title={team ? team.name : 'Team Detail'}
-      subtitle={team ? `Manage demographics, statistics, and organizational roles for team: ${team.slug}` : 'Demographics and roles details'}
+      subtitle={team ? `Manage demographics, statistics, and roster for team: @${team.slug}` : 'Demographics and roles details'}
       actions={team ? actions : undefined}
     >
       <div className="slds-grid slds-wrap slds-gutters">
@@ -338,22 +339,16 @@ function AdminTeamDetailPage() {
                 </div>
 
                 <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.25rem' }}>
-                  {/* Administrator Slots Remaining info */}
-                  <div className="slds-box slds-m-bottom_medium" style={{ background: team.administratorSlotsRemaining > 0 ? '#ecfdf5' : '#fef2f2', border: team.administratorSlotsRemaining > 0 ? '1px solid #a7f3d0' : '1px solid #fecaca', borderRadius: '4px' }}>
-                    <p className="font-bold text-sm" style={{ fontWeight: 'bold', color: team.administratorSlotsRemaining > 0 ? '#065f46' : '#991b1b' }}>
-                      Administrator Slots Remaining
-                    </p>
-                    <p className="text-xl font-extrabold slds-m-top_xx-small" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: team.administratorSlotsRemaining > 0 ? '#047857' : '#dc2626' }}>
-                      {team.administratorSlotsRemaining} / 3 slots
-                    </p>
-                    <p className="text-xs slds-m-top_xx-small text-slate-500">
-                      An organization may have at most three administrators belonging to it.
-                    </p>
+                  <div className="slds-m-bottom_medium">
+                    <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Slug Identifier</p>
+                    <p className="font-semibold text-slate-900">@{team.slug}</p>
                   </div>
 
                   <div className="slds-m-bottom_medium">
-                    <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Slug Identifier</p>
-                    <p className="font-semibold text-slate-900">{team.slug}</p>
+                    <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Team Status</p>
+                    <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px' }}>
+                      {team.status || 'APPROVED'}
+                    </span>
                   </div>
 
                   <div className="slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '10px' }}>

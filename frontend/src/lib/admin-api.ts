@@ -1588,10 +1588,17 @@ export async function listAdminOrganizations(search = '', limit = 10, offset = 0
   return { organizations: [], total: 0 }
 }
 
+export async function getAdminOrganization(id: string): Promise<teammanager.AdminOrganizationDetail> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.GetAdminOrganization(id)
+  }
+  throw new Error('Not implemented in mock mode')
+}
+
 export async function createAdminOrganization(
   params: { name: string; logo?: string | null; discordInvite?: string | null; vrchatGroupId?: string | null },
   authHeader: string
-) {
+): Promise<teammanager.AdminOrganizationDetail> {
   if (!MOCK_MODE) {
     return appClient.teammanager.CreateAdminOrganization({
       Authorization: authHeader,
@@ -1608,7 +1615,7 @@ export async function updateAdminOrganization(
   id: string,
   params: { name?: string; slug?: string; logo?: string | null; clearLogo?: boolean; discordInvite?: string | null; vrchatGroupId?: string | null },
   authHeader: string
-) {
+): Promise<teammanager.AdminOrganizationDetail> {
   if (!MOCK_MODE) {
     return appClient.teammanager.UpdateAdminOrganization({
       id,
@@ -1754,7 +1761,7 @@ export async function submitOrganizationApplication(
 export async function convertAdminTeamToOrg(
   teamId: string,
   authorization: string,
-): Promise<teammanager.Team> {
+): Promise<teammanager.AdminOrganizationDetail> {
   if (!MOCK_MODE) {
     return appClient.teammanager.ConvertTeamToOrg({
       teamId,
@@ -1762,9 +1769,7 @@ export async function convertAdminTeamToOrg(
     })
   }
 
-  const team = mockTeamsList.find((t) => t.id === teamId)
-  if (!team) throw new Error('Mock team not found')
-  return team
+  throw new Error('Not implemented in mock mode')
 }
 
 export async function submitTeamApplication(
@@ -2048,7 +2053,7 @@ export async function recomputeEventPoints(
 }
 
 export async function createAdminTeam(
-  params: { name: string; logo?: string | null },
+  params: { name: string; logo?: string | null; primaryOrganizationId?: string | null },
   authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
@@ -2056,6 +2061,7 @@ export async function createAdminTeam(
       Authorization: authorization,
       name: params.name,
       logo: params.logo ?? null,
+      primaryOrganizationId: params.primaryOrganizationId ?? null,
     } as unknown as teammanager.CreateTeamRequest)
   }
 

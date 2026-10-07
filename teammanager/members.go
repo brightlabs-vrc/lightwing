@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"encore.dev/beta/errs"
 	"encore.app/auth"
@@ -36,14 +37,34 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 			if m.Role.Valid && m.Role.String != "" {
 				role = m.Role.String
 			}
+			mName := displayName(m.Name, m.VrchatUsername)
+			if search != "" {
+				sLower := strings.ToLower(search)
+				matchName := strings.Contains(strings.ToLower(mName), sLower)
+				matchSlug := slug != nil && strings.Contains(strings.ToLower(*slug), sLower)
+				if !matchName && !matchSlug {
+					continue
+				}
+			}
 			members = append(members, MemberListItem{
 				UserID: m.UserId,
-				Name:   displayName(m.Name, m.VrchatUsername),
+				Name:   mName,
 				Slug:   slug,
 				Role:   role,
 			})
 		}
-		return &ListTeamMembersResponse{Members: members, Total: len(members)}, nil
+		total := len(members)
+		if offset > 0 {
+			if offset >= len(members) {
+				members = []MemberListItem{}
+			} else {
+				members = members[offset:]
+			}
+		}
+		if limit > 0 && len(members) > limit {
+			members = members[:limit]
+		}
+		return &ListTeamMembersResponse{Members: members, Total: total}, nil
 	}
 
 	// Fallback to org members
@@ -207,7 +228,25 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 	}
 	invalidateTeamCache(ctx, id)
 	_ = auth.InvalidateMemberRole(ctx, id, userID)
-	return loadTeam(ctx, id)
+
+	if loaded, err := loadTeam(ctx, id); err == nil {
+		return loaded, nil
+	}
+	orgDetail, orgErr := getAdminOrganization(ctx, id)
+	if orgErr == nil {
+		return &Team{
+			ID:                          orgDetail.ID,
+			Name:                        orgDetail.Name,
+			Slug:                        orgDetail.Slug,
+			Logo:                        orgDetail.Logo,
+			Status:                      orgDetail.Status,
+			PrimaryOrganizationID:       orgDetail.ID,
+			Organizations:               []LinkedOrganization{},
+			AdministratorSlotsRemaining: orgDetail.AdministratorSlotsRemaining,
+			Members:                     orgDetail.Members,
+		}, nil
+	}
+	return nil, orgErr
 }
 
 // --- updateTeamMemberRole (mirrors updateTeamMemberRole) ---
@@ -271,7 +310,25 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 	}
 	invalidateTeamCache(ctx, id)
 	_ = auth.InvalidateMemberRole(ctx, id, userID)
-	return loadTeam(ctx, id)
+
+	if loaded, err := loadTeam(ctx, id); err == nil {
+		return loaded, nil
+	}
+	orgDetail, orgErr := getAdminOrganization(ctx, id)
+	if orgErr == nil {
+		return &Team{
+			ID:                          orgDetail.ID,
+			Name:                        orgDetail.Name,
+			Slug:                        orgDetail.Slug,
+			Logo:                        orgDetail.Logo,
+			Status:                      orgDetail.Status,
+			PrimaryOrganizationID:       orgDetail.ID,
+			Organizations:               []LinkedOrganization{},
+			AdministratorSlotsRemaining: orgDetail.AdministratorSlotsRemaining,
+			Members:                     orgDetail.Members,
+		}, nil
+	}
+	return nil, orgErr
 }
 
 // --- removeTeamMember (mirrors removeTeamMember) ---
@@ -326,7 +383,25 @@ func removeTeamMember(ctx context.Context, authorization, id, userID string) (*T
 	}
 	invalidateTeamCache(ctx, id)
 	_ = auth.InvalidateMemberRole(ctx, id, userID)
-	return loadTeam(ctx, id)
+
+	if loaded, err := loadTeam(ctx, id); err == nil {
+		return loaded, nil
+	}
+	orgDetail, orgErr := getAdminOrganization(ctx, id)
+	if orgErr == nil {
+		return &Team{
+			ID:                          orgDetail.ID,
+			Name:                        orgDetail.Name,
+			Slug:                        orgDetail.Slug,
+			Logo:                        orgDetail.Logo,
+			Status:                      orgDetail.Status,
+			PrimaryOrganizationID:       orgDetail.ID,
+			Organizations:               []LinkedOrganization{},
+			AdministratorSlotsRemaining: orgDetail.AdministratorSlotsRemaining,
+			Members:                     orgDetail.Members,
+		}, nil
+	}
+	return nil, orgErr
 }
 
 // --- HTTP endpoints ---

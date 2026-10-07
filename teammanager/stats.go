@@ -67,7 +67,34 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 		return nil, err
 	}
 	invalidateTeamCache(ctx, id)
-	return loadTeam(ctx, id)
+	if loaded, err := loadTeam(ctx, id); err == nil {
+		return loaded, nil
+	}
+	orgDetail, orgErr := getAdminOrganization(ctx, id)
+	if orgErr == nil {
+		var stats TeamStats
+		if row, err := q().GetOrgByID(ctx, id); err == nil {
+			stats = TeamStats{
+				RankingAverage:        nullFloatToPtr(row.RankingAverage),
+				PointsAverage:         nullFloatToPtr(row.PointsAverage),
+				SeasonRank:            nullInt32ToPtr(row.SeasonRank),
+				AveragePointsPerEvent: nullFloatToPtr(row.AveragePointsPerEvent),
+			}
+		}
+		return &Team{
+			ID:                          orgDetail.ID,
+			Name:                        orgDetail.Name,
+			Slug:                        orgDetail.Slug,
+			Logo:                        orgDetail.Logo,
+			Status:                      orgDetail.Status,
+			PrimaryOrganizationID:       orgDetail.ID,
+			Organizations:               []LinkedOrganization{},
+			Stats:                       stats,
+			AdministratorSlotsRemaining: orgDetail.AdministratorSlotsRemaining,
+			Members:                     orgDetail.Members,
+		}, nil
+	}
+	return nil, orgErr
 }
 
 // --- HTTP endpoint (thin wrapper over the core above) ---
