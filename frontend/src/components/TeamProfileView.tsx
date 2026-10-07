@@ -38,7 +38,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
     (org) => org.id !== team.id
   )
 
-  const isOrg = !team.primaryOrganizationId || team.primaryOrganizationId === team.id
+  const isOrg = team.isOrganization ?? (!team.primaryOrganizationId || team.primaryOrganizationId === team.id)
 
   return (
     <PixelContainer maxWidth="full" padding="md">
@@ -63,7 +63,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                   {team.name}
                 </h1>
                 <PixelBadge tone="purple">
-                  {isOrg ? 'ORGANIZATION' : 'TEAM ORGANIZATION'}
+                  {isOrg ? 'ORGANIZATION' : 'TEAM'}
                 </PixelBadge>
               </div>
               <div className="font-sans text-sm text-retro-muted font-semibold">
@@ -190,7 +190,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
             <div className="mt-4 font-sans text-sm leading-relaxed text-retro-text">
               <MarkdownView
                 content={team.description}
-                fallbackText="No description provided for this organization."
+                fallbackText={`No description provided for this ${isOrg ? 'organization' : 'team'}.`}
               />
             </div>
           </PixelCard>

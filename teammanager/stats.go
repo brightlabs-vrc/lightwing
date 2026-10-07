@@ -94,6 +94,7 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 			Logo:                        orgDetail.Logo,
 			Status:                      orgDetail.Status,
 			PrimaryOrganizationID:       orgDetail.ID,
+			IsOrganization:              true,
 			Organizations:               []LinkedOrganization{},
 			Stats:                       stats,
 			AdministratorSlotsRemaining: orgDetail.AdministratorSlotsRemaining,

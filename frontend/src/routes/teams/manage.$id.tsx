@@ -75,6 +75,10 @@ function ManageOrgPage() {
   const [activeTab, setActiveTab] = useState<TabType>('overview')
 
   const [team, setTeam] = useState<teammanager.Team | null>(null)
+  const isOrg = team
+    ? (team.isOrganization ?? (!team.primaryOrganizationId || team.primaryOrganizationId === team.id))
+    : true
+
   const [approvedOrgs, setApprovedOrgs] = useState<teammanager.LinkedOrganization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -209,14 +213,20 @@ function ManageOrgPage() {
   }, [teamId, authHeader])
 
   useEffect(() => {
+    if (!isOrg && activeTab !== 'overview') {
+      setActiveTab('overview')
+    }
+  }, [isOrg, activeTab])
+
+  useEffect(() => {
     if (activeTab === 'overview') {
       void fetchRoster()
-    } else if (activeTab === 'events') {
+    } else if (activeTab === 'events' && isOrg) {
       void fetchOrgEvents()
-    } else if (activeTab === 'approvals') {
+    } else if (activeTab === 'approvals' && isOrg) {
       void fetchApplications()
     }
-  }, [teamId, activeTab, memberPage, memberPageSize, memberSearch])
+  }, [teamId, activeTab, memberPage, memberPageSize, memberSearch, isOrg])
 
   async function handleUpdateTeam(evt: React.FormEvent) {
     evt.preventDefault()
@@ -471,11 +481,16 @@ function ManageOrgPage() {
     }
   }
 
-  const roleOptions = [
-    { value: 'member', label: 'Member' },
-    { value: 'eventAdmin', label: 'Event Admin' },
-    { value: 'administrator', label: 'Administrator' },
-  ]
+  const roleOptions = isOrg
+    ? [
+        { value: 'member', label: 'Member' },
+        { value: 'eventAdmin', label: 'Event Admin' },
+        { value: 'administrator', label: 'Administrator' },
+      ]
+    : [
+        { value: 'member', label: 'Member' },
+        { value: 'administrator', label: 'Administrator' },
+      ]
 
   const rosterColumns: PixelTableColumn<(typeof members)[0]>[] = [
     {
@@ -545,13 +560,11 @@ function ManageOrgPage() {
                 <PixelStack gap={1}>
                   <div className="flex items-center gap-3 flex-wrap">
                     <h1 className="text-2xl font-pixel text-retro-text font-bold">
-                      {team ? team.name.toUpperCase() : 'ORGANIZATION MANAGEMENT'}
+                      {team ? team.name.toUpperCase() : 'MANAGEMENT CONSOLE'}
                     </h1>
                     {team && (
                       <PixelBadge tone="purple">
-                        {!team.primaryOrganizationId || team.primaryOrganizationId === team.id
-                          ? 'ORGANIZATION'
-                          : 'TEAM'}
+                        {isOrg ? 'ORGANIZATION' : 'TEAM'}
                       </PixelBadge>
                     )}
                   </div>
@@ -601,28 +614,32 @@ function ManageOrgPage() {
                 >
                   OVERVIEW & ROSTER
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('events')}
-                  className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
-                    activeTab === 'events'
-                      ? 'border-retro-primary text-retro-primary bg-retro-bg'
-                      : 'border-transparent text-retro-muted hover:text-retro-text'
-                  }`}
-                >
-                  EVENTS & RACES
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('approvals')}
-                  className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
-                    activeTab === 'approvals'
-                      ? 'border-retro-primary text-retro-primary bg-retro-bg'
-                      : 'border-transparent text-retro-muted hover:text-retro-text'
-                  }`}
-                >
-                  TEAM APPROVALS {applications.length > 0 ? `(${applications.length})` : ''}
-                </button>
+                {isOrg && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('events')}
+                      className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                        activeTab === 'events'
+                          ? 'border-retro-primary text-retro-primary bg-retro-bg'
+                          : 'border-transparent text-retro-muted hover:text-retro-text'
+                      }`}
+                    >
+                      EVENTS & RACES
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('approvals')}
+                      className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                        activeTab === 'approvals'
+                          ? 'border-retro-primary text-retro-primary bg-retro-bg'
+                          : 'border-transparent text-retro-muted hover:text-retro-text'
+                      }`}
+                    >
+                      TEAM APPROVALS {applications.length > 0 ? `(${applications.length})` : ''}
+                    </button>
+                  </>
+                )}
               </div>
             </PixelStack>
           </PixelCard>
