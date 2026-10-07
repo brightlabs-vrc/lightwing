@@ -39,6 +39,7 @@ type TeamMemberSummary struct {
 	Name   string  `json:"name"`
 	Slug   *string `json:"slug"`
 	Role   string  `json:"role"`
+	Image  *string `json:"image,omitempty"`
 }
 
 // Team is a team with its members and aggregate statistics.
@@ -47,6 +48,7 @@ type Team struct {
 	Name                        string               `json:"name"`
 	Slug                        string               `json:"slug"`
 	Logo                        *string              `json:"logo"`
+	Description                 *string              `json:"description,omitempty"`
 	Status                      string               `json:"status"`
 	Organizations               []LinkedOrganization `json:"organizations"`
 	PrimaryOrganizationID       string               `json:"primaryOrganizationId"`
@@ -61,6 +63,7 @@ type TeamListItem struct {
 	Name                        string               `json:"name"`
 	Slug                        string               `json:"slug"`
 	Logo                        *string              `json:"logo"`
+	Description                 *string              `json:"description,omitempty"`
 	Status                      string               `json:"status"`
 	PrimaryOrganizationID       string               `json:"primaryOrganizationId"`
 	Organizations               []LinkedOrganization `json:"organizations"`
@@ -74,6 +77,7 @@ type MemberListItem struct {
 	Name   string  `json:"name"`
 	Slug   *string `json:"slug"`
 	Role   string  `json:"role"`
+	Image  *string `json:"image,omitempty"`
 }
 
 // --- Cache (mirrors teamCache in teams.ts) ---
@@ -123,7 +127,7 @@ func loadMemberRows(ctx context.Context, organizationID string) ([]sqlc.ListMemb
 // toOrg converts a GetOrgByID row to the shared Organization shape.
 func toOrg(r sqlc.GetOrgByIDRow) *sqlc.Organization {
 	return &sqlc.Organization{
-		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo,
+		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo, Description: r.Description,
 		RankingAverage: r.RankingAverage, PointsAverage: r.PointsAverage,
 		SeasonRank: r.SeasonRank, AveragePointsPerEvent: r.AveragePointsPerEvent,
 	}
@@ -132,7 +136,7 @@ func toOrg(r sqlc.GetOrgByIDRow) *sqlc.Organization {
 // toOrgBySlug converts a GetOrgBySlug row to the shared Organization shape.
 func toOrgBySlug(r sqlc.GetOrgBySlugRow) *sqlc.Organization {
 	return &sqlc.Organization{
-		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo,
+		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo, Description: r.Description,
 		RankingAverage: r.RankingAverage, PointsAverage: r.PointsAverage,
 		SeasonRank: r.SeasonRank, AveragePointsPerEvent: r.AveragePointsPerEvent,
 	}
@@ -152,11 +156,17 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 			s := m.Slug.String
 			slug = &s
 		}
+		var img *string
+		if m.Image.Valid && m.Image.String != "" {
+			i := m.Image.String
+			img = &i
+		}
 		summaries = append(summaries, TeamMemberSummary{
 			UserID: m.UserId,
 			Name:   displayName(m.Name, m.VrchatUsername),
 			Slug:   slug,
 			Role:   m.Role,
+			Image:  img,
 		})
 	}
 	slots := auth.AdministratorRoleLimit - adminCount
@@ -164,14 +174,19 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 		slots = 0
 	}
 	var logo *string
-	if org.Logo.Valid {
+	if org.Logo.Valid && org.Logo.String != "" {
 		logo = &org.Logo.String
+	}
+	var desc *string
+	if org.Description.Valid && org.Description.String != "" {
+		desc = &org.Description.String
 	}
 	return &Team{
 		ID:                          org.ID,
 		Name:                        org.Name,
 		Slug:                        org.Slug,
 		Logo:                        logo,
+		Description:                 desc,
 		Status:                      "APPROVED",
 		Organizations:               []LinkedOrganization{},
 		PrimaryOrganizationID:       org.ID,
@@ -299,6 +314,11 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 				s := m.Slug.String
 				slug = &s
 			}
+			var img *string
+			if m.Image.Valid && m.Image.String != "" {
+				i := m.Image.String
+				img = &i
+			}
 			role := "member"
 			if m.Role.Valid && m.Role.String != "" {
 				role = m.Role.String
@@ -308,6 +328,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 				Name:   displayName(m.Name, m.VrchatUsername),
 				Slug:   slug,
 				Role:   role,
+				Image:  img,
 			})
 		}
 
@@ -316,12 +337,18 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			l := teamRow.Logo.String
 			logo = &l
 		}
+		var desc *string
+		if teamRow.Description.Valid && teamRow.Description.String != "" {
+			d := teamRow.Description.String
+			desc = &d
+		}
 
 		t := &Team{
 			ID:                          teamRow.ID,
 			Name:                        teamRow.Name,
 			Slug:                        teamRow.Slug,
 			Logo:                        logo,
+			Description:                 desc,
 			Status:                      teamRow.Status,
 			Organizations:               orgs,
 			PrimaryOrganizationID:       primOrgID,
@@ -371,7 +398,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			slugRow, err = q().GetOrgBySlug(ctx, id)
 			if err == nil {
 				orgRow = sqlc.GetOrgByIDRow{
-					ID: slugRow.ID, Name: slugRow.Name, Slug: slugRow.Slug, Logo: slugRow.Logo,
+					ID: slugRow.ID, Name: slugRow.Name, Slug: slugRow.Slug, Logo: slugRow.Logo, Description: slugRow.Description,
 					OrgType: slugRow.OrgType, Status: slugRow.Status,
 					DiscordInvite: slugRow.DiscordInvite, VrchatGroupId: slugRow.VrchatGroupId,
 					SubmittedByUserId: slugRow.SubmittedByUserId, CreatedAt: slugRow.CreatedAt, UpdatedAt: slugRow.UpdatedAt,
@@ -387,7 +414,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 				return nil, mErr
 			}
 			orgShape := &sqlc.Organization{
-				ID: orgRow.ID, Name: orgRow.Name, Slug: orgRow.Slug, Logo: orgRow.Logo,
+				ID: orgRow.ID, Name: orgRow.Name, Slug: orgRow.Slug, Logo: orgRow.Logo, Description: orgRow.Description,
 			}
 			t := toTeam(orgShape, members)
 			// Organizations do not have ranking layer / team stats attached

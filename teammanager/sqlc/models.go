@@ -129,6 +129,7 @@ type Organization struct {
 	Name                  string
 	Slug                  string
 	Logo                  sql.NullString
+	Description           sql.NullString
 	Metadata              pqtype.NullRawMessage
 	CreatedAt             time.Time
 	UpdatedAt             sql.NullTime
@@ -222,6 +223,7 @@ type Team struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
+	Description       sql.NullString
 	Status            string
 	SubmittedByUserId sql.NullString
 	ReviewedByUserId  sql.NullString

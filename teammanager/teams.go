@@ -69,7 +69,7 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 		stubs = make([]sqlc.ListTeamRowsRow, 0, len(bySearch))
 		for _, s := range bySearch {
 			stubs = append(stubs, sqlc.ListTeamRowsRow{
-				ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: s.Logo, Status: s.Status,
+				ID: s.ID, Name: s.Name, Slug: s.Slug, Logo: s.Logo, Description: s.Description, Status: s.Status,
 			})
 		}
 	}
@@ -133,11 +133,17 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 			l := s.Logo.String
 			logo = &l
 		}
+		var desc *string
+		if s.Description.Valid && s.Description.String != "" {
+			d := s.Description.String
+			desc = &d
+		}
 		teams = append(teams, TeamListItem{
 			ID:                          s.ID,
 			Name:                        s.Name,
 			Slug:                        s.Slug,
 			Logo:                        logo,
+			Description:                 desc,
 			Status:                      s.Status,
 			PrimaryOrganizationID:       primOrgByTeam[s.ID],
 			Organizations:               orgsByTeam[s.ID],
@@ -150,7 +156,7 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 
 // --- createTeam (mirrors createTeam; site-admin gated) ---
 
-func createTeam(ctx context.Context, authorization, name string, logo *string, primaryOrganizationID *string) (*Team, error) {
+func createTeam(ctx context.Context, authorization, name string, logo, description, primaryOrganizationID *string) (*Team, error) {
 	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
 		return nil, err
@@ -168,15 +174,19 @@ func createTeam(ctx context.Context, authorization, name string, logo *string, p
 		}
 	}
 
-	var logoVal sql.NullString
-	if logo != nil {
+	var logoVal, descVal sql.NullString
+	if logo != nil && *logo != "" {
 		logoVal = sql.NullString{String: *logo, Valid: true}
+	}
+	if description != nil && *description != "" {
+		descVal = sql.NullString{String: *description, Valid: true}
 	}
 
 	id, err := q().CreateTeam(ctx, sqlc.CreateTeamParams{
 		Name:              name,
 		Slug:              slug,
 		Logo:              logoVal,
+		Description:       descVal,
 		Status:            "APPROVED",
 		SubmittedByUserId: sql.NullString{String: actor.UserID, Valid: true},
 	})
@@ -203,10 +213,12 @@ func createTeam(ctx context.Context, authorization, name string, logo *string, p
 // UpdateTeamParams carries optional metadata updates. A nil pointer leaves
 // the field unchanged; ClearLogo resets the logo to NULL.
 type UpdateTeamParams struct {
-	Name      *string
-	Slug      *string
-	Logo      *string
-	ClearLogo bool
+	Name             *string
+	Slug             *string
+	Logo             *string
+	ClearLogo        bool
+	Description      *string
+	ClearDescription bool
 }
 
 func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamParams) (*Team, error) {
@@ -252,20 +264,25 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 			}
 			nextSlug = *p.Slug
 		}
-		var name, logo sql.NullString
+		var name, logo, desc sql.NullString
 		if p.Name != nil {
 			name = sql.NullString{String: *p.Name, Valid: true}
 		}
 		if p.Logo != nil {
 			logo = sql.NullString{String: *p.Logo, Valid: true}
 		}
+		if p.Description != nil {
+			desc = sql.NullString{String: *p.Description, Valid: true}
+		}
 		err = q().UpdateTeam(ctx, sqlc.UpdateTeamParams{
-			Slug:      nextSlug,
-			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
-			Name:      name,
-			ClearLogo: p.ClearLogo,
-			Logo:      logo,
-			ID:        id,
+			Slug:             nextSlug,
+			UpdatedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:             name,
+			ClearDescription: p.ClearDescription,
+			Description:      desc,
+			ClearLogo:        p.ClearLogo,
+			Logo:             logo,
+			ID:               id,
 		})
 		if isUniqueViolation(err) {
 			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team slug is already in use"}
@@ -332,27 +349,34 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Admin
 	if errOrg == nil {
 		orgID = existingOrg.ID
 		_ = q().UpdateOrg(ctx, sqlc.UpdateOrgParams{
-			Slug:      targetSlug,
-			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
-			Name:      sql.NullString{String: teamRow.Name, Valid: true},
-			ClearLogo: !teamRow.Logo.Valid || teamRow.Logo.String == "",
-			Logo:      teamRow.Logo,
-			ID:        orgID,
+			Slug:             targetSlug,
+			UpdatedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:             sql.NullString{String: teamRow.Name, Valid: true},
+			ClearDescription: !teamRow.Description.Valid || teamRow.Description.String == "",
+			Description:      teamRow.Description,
+			ClearLogo:        !teamRow.Logo.Valid || teamRow.Logo.String == "",
+			Logo:             teamRow.Logo,
+			ID:               orgID,
 		})
 	} else if existingOrgBySlug, errSlug := q().GetOrgBySlug(ctx, targetSlug); errSlug == nil {
 		orgID = existingOrgBySlug.ID
 		_ = q().UpdateOrg(ctx, sqlc.UpdateOrgParams{
-			Slug:      targetSlug,
-			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
-			Name:      sql.NullString{String: teamRow.Name, Valid: true},
-			ClearLogo: !teamRow.Logo.Valid || teamRow.Logo.String == "",
-			Logo:      teamRow.Logo,
-			ID:        orgID,
+			Slug:             targetSlug,
+			UpdatedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:             sql.NullString{String: teamRow.Name, Valid: true},
+			ClearDescription: !teamRow.Description.Valid || teamRow.Description.String == "",
+			Description:      teamRow.Description,
+			ClearLogo:        !teamRow.Logo.Valid || teamRow.Logo.String == "",
+			Logo:             teamRow.Logo,
+			ID:               orgID,
 		})
 	} else {
-		var logoVal sql.NullString
+		var logoVal, descVal sql.NullString
 		if teamRow.Logo.Valid && teamRow.Logo.String != "" {
 			logoVal = teamRow.Logo
+		}
+		if teamRow.Description.Valid && teamRow.Description.String != "" {
+			descVal = teamRow.Description
 		}
 
 		newOrgID, err := q().CreateOrgWithID(ctx, sqlc.CreateOrgWithIDParams{
@@ -360,6 +384,7 @@ func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*Admin
 			Name:              teamRow.Name,
 			Slug:              targetSlug,
 			Logo:              logoVal,
+			Description:       descVal,
 			OrgType:           sql.NullString{String: "ORGANIZATION", Valid: true},
 			Status:            sql.NullString{String: "APPROVED", Valid: true},
 			DiscordInvite:     sql.NullString{String: "", Valid: false},
@@ -397,6 +422,7 @@ type AdminOrganizationItem struct {
 	Name                        string  `json:"name"`
 	Slug                        string  `json:"slug"`
 	Logo                        *string `json:"logo"`
+	Description                 *string `json:"description,omitempty"`
 	OrgType                     string  `json:"orgType"`
 	Status                      string  `json:"status"`
 	DiscordInvite               *string `json:"discordInvite,omitempty"`
@@ -413,6 +439,7 @@ type AdminOrganizationDetail struct {
 	Name                        string              `json:"name"`
 	Slug                        string              `json:"slug"`
 	Logo                        *string             `json:"logo"`
+	Description                 *string             `json:"description,omitempty"`
 	OrgType                     string              `json:"orgType"`
 	Status                      string              `json:"status"`
 	DiscordInvite               *string             `json:"discordInvite,omitempty"`
@@ -440,19 +467,22 @@ type CreateAdminOrganizationRequest struct {
 	Authorization string  `header:"Authorization"`
 	Name          string  `json:"name"`
 	Logo          *string `json:"logo,omitempty"`
+	Description   *string `json:"description,omitempty"`
 	DiscordInvite *string `json:"discordInvite,omitempty"`
 	VrchatGroupId *string `json:"vrchatGroupId,omitempty"`
 }
 
 type UpdateAdminOrganizationRequest struct {
-	ID            string  `json:"id"`
-	Authorization string  `header:"Authorization"`
-	Name          *string `json:"name,omitempty"`
-	Slug          *string `json:"slug,omitempty"`
-	Logo          *string `json:"logo,omitempty"`
-	ClearLogo     bool    `json:"clearLogo,omitempty"`
-	DiscordInvite *string `json:"discordInvite,omitempty"`
-	VrchatGroupId *string `json:"vrchatGroupId,omitempty"`
+	ID               string  `json:"id"`
+	Authorization    string  `header:"Authorization"`
+	Name             *string `json:"name,omitempty"`
+	Slug             *string `json:"slug,omitempty"`
+	Logo             *string `json:"logo,omitempty"`
+	ClearLogo        bool    `json:"clearLogo,omitempty"`
+	Description      *string `json:"description,omitempty"`
+	ClearDescription bool    `json:"clearDescription,omitempty"`
+	DiscordInvite    *string `json:"discordInvite,omitempty"`
+	VrchatGroupId    *string `json:"vrchatGroupId,omitempty"`
 }
 
 func listAdminOrganizations(ctx context.Context, search string, limit, offset int) (*ListAdminOrganizationsResponse, error) {
@@ -505,10 +535,14 @@ func listAdminOrganizations(ctx context.Context, search string, limit, offset in
 
 	items := make([]AdminOrganizationItem, 0, len(rows))
 	for _, r := range rows {
-		var logo, discord, vrchat, submitted *string
+		var logo, desc, discord, vrchat, submitted *string
 		if r.Logo.Valid && r.Logo.String != "" {
 			l := r.Logo.String
 			logo = &l
+		}
+		if r.Description.Valid && r.Description.String != "" {
+			d := r.Description.String
+			desc = &d
 		}
 		if r.DiscordInvite.Valid && r.DiscordInvite.String != "" {
 			d := r.DiscordInvite.String
@@ -548,6 +582,7 @@ func listAdminOrganizations(ctx context.Context, search string, limit, offset in
 			Name:                        r.Name,
 			Slug:                        r.Slug,
 			Logo:                        logo,
+			Description:                 desc,
 			OrgType:                     orgType,
 			Status:                      status,
 			DiscordInvite:               discord,
@@ -565,19 +600,19 @@ func listAdminOrganizations(ctx context.Context, search string, limit, offset in
 
 func getAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDetail, error) {
 	var orgID, name, slugStr string
-	var logoVal, discordVal, vrchatVal, submittedVal sql.NullString
+	var logoVal, descVal, discordVal, vrchatVal, submittedVal sql.NullString
 	var orgTypeVal, statusVal sql.NullString
 	var createdAtVal time.Time
 	var updatedAtVal sql.NullTime
 
 	if row, err := q().GetOrgByID(ctx, id); err == nil {
 		orgID, name, slugStr = row.ID, row.Name, row.Slug
-		logoVal, orgTypeVal, statusVal = row.Logo, row.OrgType, row.Status
+		logoVal, descVal, orgTypeVal, statusVal = row.Logo, row.Description, row.OrgType, row.Status
 		discordVal, vrchatVal, submittedVal = row.DiscordInvite, row.VrchatGroupId, row.SubmittedByUserId
 		createdAtVal, updatedAtVal = row.CreatedAt, row.UpdatedAt
 	} else if slugRow, errSlug := q().GetOrgBySlug(ctx, id); errSlug == nil {
 		orgID, name, slugStr = slugRow.ID, slugRow.Name, slugRow.Slug
-		logoVal, orgTypeVal, statusVal = slugRow.Logo, slugRow.OrgType, slugRow.Status
+		logoVal, descVal, orgTypeVal, statusVal = slugRow.Logo, slugRow.Description, slugRow.OrgType, slugRow.Status
 		discordVal, vrchatVal, submittedVal = slugRow.DiscordInvite, slugRow.VrchatGroupId, slugRow.SubmittedByUserId
 		createdAtVal, updatedAtVal = slugRow.CreatedAt, slugRow.UpdatedAt
 	} else {
@@ -600,11 +635,17 @@ func getAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDet
 			s := m.Slug.String
 			slug = &s
 		}
+		var img *string
+		if m.Image.Valid && m.Image.String != "" {
+			i := m.Image.String
+			img = &i
+		}
 		summaries = append(summaries, TeamMemberSummary{
 			UserID: m.UserId,
 			Name:   displayName(m.Name, m.VrchatUsername),
 			Slug:   slug,
 			Role:   m.Role,
+			Image:  img,
 		})
 	}
 
@@ -613,10 +654,14 @@ func getAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDet
 		slots = 0
 	}
 
-	var logo, discord, vrchat, submitted *string
+	var logo, desc, discord, vrchat, submitted *string
 	if logoVal.Valid && logoVal.String != "" {
 		l := logoVal.String
 		logo = &l
+	}
+	if descVal.Valid && descVal.String != "" {
+		d := descVal.String
+		desc = &d
 	}
 	if discordVal.Valid && discordVal.String != "" {
 		d := discordVal.String
@@ -650,6 +695,7 @@ func getAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDet
 		Name:                        name,
 		Slug:                        slugStr,
 		Logo:                        logo,
+		Description:                 desc,
 		OrgType:                     orgType,
 		Status:                      status,
 		DiscordInvite:               discord,
@@ -663,7 +709,7 @@ func getAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDet
 	}, nil
 }
 
-func createAdminOrganization(ctx context.Context, authorization, name string, logo, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
+func createAdminOrganization(ctx context.Context, authorization, name string, logo, description, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
 	actor, err := auth.ResolveActor(ctx, authorization)
 	if err != nil {
 		return nil, err
@@ -677,9 +723,12 @@ func createAdminOrganization(ctx context.Context, authorization, name string, lo
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization with this slug already exists"}
 	}
 
-	var logoVal, discordVal, vrchatVal sql.NullString
+	var logoVal, descVal, discordVal, vrchatVal sql.NullString
 	if logo != nil && *logo != "" {
 		logoVal = sql.NullString{String: *logo, Valid: true}
+	}
+	if description != nil && *description != "" {
+		descVal = sql.NullString{String: *description, Valid: true}
 	}
 	if discordInvite != nil && *discordInvite != "" {
 		discordVal = sql.NullString{String: *discordInvite, Valid: true}
@@ -692,6 +741,7 @@ func createAdminOrganization(ctx context.Context, authorization, name string, lo
 		Name:              name,
 		Slug:              slug,
 		Logo:              logoVal,
+		Description:       descVal,
 		OrgType:           sql.NullString{String: "ORGANIZATION", Valid: true},
 		Status:            sql.NullString{String: "APPROVED", Valid: true},
 		DiscordInvite:     discordVal,
@@ -755,12 +805,15 @@ func updateAdminOrganization(ctx context.Context, authorization, id string, p *U
 		nextSlug = *p.Slug
 	}
 
-	var name, logo, discord, vrchat sql.NullString
+	var name, logo, desc, discord, vrchat sql.NullString
 	if p.Name != nil {
 		name = sql.NullString{String: *p.Name, Valid: true}
 	}
 	if p.Logo != nil {
 		logo = sql.NullString{String: *p.Logo, Valid: true}
+	}
+	if p.Description != nil {
+		desc = sql.NullString{String: *p.Description, Valid: true}
 	}
 	if discordInvite != nil {
 		discord = sql.NullString{String: *discordInvite, Valid: true}
@@ -770,14 +823,16 @@ func updateAdminOrganization(ctx context.Context, authorization, id string, p *U
 	}
 
 	err = q().UpdateOrgDetails(ctx, sqlc.UpdateOrgDetailsParams{
-		Slug:          nextSlug,
-		UpdatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
-		Name:          name,
-		ClearLogo:     p.ClearLogo,
-		Logo:          logo,
-		DiscordInvite: discord,
-		VrchatGroupId: vrchat,
-		ID:            existingOrgID,
+		Slug:             nextSlug,
+		UpdatedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		Name:             name,
+		ClearDescription: p.ClearDescription,
+		Description:      desc,
+		ClearLogo:        p.ClearLogo,
+		Logo:             logo,
+		DiscordInvite:    discord,
+		VrchatGroupId:    vrchat,
+		ID:               existingOrgID,
 	})
 	if isUniqueViolation(err) {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization slug is already in use"}
@@ -789,12 +844,14 @@ func updateAdminOrganization(ctx context.Context, authorization, id string, p *U
 	// Also update team if record exists in team table
 	if _, errTeam := q().GetTeamByID(ctx, existingOrgID); errTeam == nil {
 		_ = q().UpdateTeam(ctx, sqlc.UpdateTeamParams{
-			Slug:      nextSlug,
-			UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
-			Name:      name,
-			ClearLogo: p.ClearLogo,
-			Logo:      logo,
-			ID:        existingOrgID,
+			Slug:             nextSlug,
+			UpdatedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:             name,
+			ClearDescription: p.ClearDescription,
+			Description:      desc,
+			ClearLogo:        p.ClearLogo,
+			Logo:             logo,
+			ID:               existingOrgID,
 		})
 	}
 
@@ -814,13 +871,14 @@ func (s *Service) GetAdminOrganization(ctx context.Context, id string) (*AdminOr
 
 //encore:api public method=POST path=/api/admin/organizations
 func (s *Service) CreateAdminOrganization(ctx context.Context, p *CreateAdminOrganizationRequest) (*AdminOrganizationDetail, error) {
-	return createAdminOrganization(ctx, p.Authorization, p.Name, p.Logo, p.DiscordInvite, p.VrchatGroupId)
+	return createAdminOrganization(ctx, p.Authorization, p.Name, p.Logo, p.Description, p.DiscordInvite, p.VrchatGroupId)
 }
 
 //encore:api public method=PATCH path=/api/admin/organizations
 func (s *Service) UpdateAdminOrganization(ctx context.Context, p *UpdateAdminOrganizationRequest) (*AdminOrganizationDetail, error) {
 	return updateAdminOrganization(ctx, p.Authorization, p.ID, &UpdateTeamParams{
 		Name: p.Name, Slug: p.Slug, Logo: p.Logo, ClearLogo: p.ClearLogo,
+		Description: p.Description, ClearDescription: p.ClearDescription,
 	}, p.DiscordInvite, p.VrchatGroupId)
 }
 
@@ -865,29 +923,33 @@ type CreateTeamRequest struct {
 	Authorization         string  `header:"Authorization"`
 	Name                  string  `json:"name"`
 	Logo                  *string `json:"logo,omitempty"`
+	Description           *string `json:"description,omitempty"`
 	PrimaryOrganizationID *string `json:"primaryOrganizationId,omitempty"`
 }
 
 //encore:api public method=POST path=/api/teams
 func (s *Service) CreateTeam(ctx context.Context, p *CreateTeamRequest) (*Team, error) {
-	return createTeam(ctx, p.Authorization, p.Name, p.Logo, p.PrimaryOrganizationID)
+	return createTeam(ctx, p.Authorization, p.Name, p.Logo, p.Description, p.PrimaryOrganizationID)
 }
 
 // UpdateTeamRequest carries the target id, auth header, and editable fields.
 // The id travels in the body because this Encore version only accepts scalar
 // params alongside path params.
 type UpdateTeamRequest struct {
-	ID            string  `json:"id"`
-	Authorization string  `header:"Authorization"`
-	Name          *string `json:"name,omitempty"`
-	Slug          *string `json:"slug,omitempty"`
-	Logo          *string `json:"logo,omitempty"`
-	ClearLogo     bool    `json:"clearLogo,omitempty"`
+	ID               string  `json:"id"`
+	Authorization    string  `header:"Authorization"`
+	Name             *string `json:"name,omitempty"`
+	Slug             *string `json:"slug,omitempty"`
+	Logo             *string `json:"logo,omitempty"`
+	ClearLogo        bool    `json:"clearLogo,omitempty"`
+	Description      *string `json:"description,omitempty"`
+	ClearDescription bool    `json:"clearDescription,omitempty"`
 }
 
 //encore:api public method=PATCH path=/api/teams
 func (s *Service) UpdateTeam(ctx context.Context, p *UpdateTeamRequest) (*Team, error) {
 	return updateTeam(ctx, p.Authorization, p.ID, &UpdateTeamParams{
 		Name: p.Name, Slug: p.Slug, Logo: p.Logo, ClearLogo: p.ClearLogo,
+		Description: p.Description, ClearDescription: p.ClearDescription,
 	})
 }
