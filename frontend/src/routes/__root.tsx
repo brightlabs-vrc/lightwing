@@ -109,10 +109,22 @@ function RootLayout() {
   const { session, loading, signOutUser } = useAuth()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const isAdminArea = pathname.startsWith('/admin')
+  const isManagementArea = pathname.startsWith('/teams')
   const isAuthArea = pathname === '/auth'
   const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
 
   if (isAdminArea) {
+    return (
+      <>
+        <Outlet />
+        <Suspense>
+          <TanStackRouterDevtools position='bottom-right' />
+        </Suspense>
+      </>
+    )
+  }
+
+  if (isManagementArea) {
     return (
       <>
         <Outlet />

@@ -42,6 +42,7 @@ import {
   type PixelTableColumn,
   useToast,
 } from '@pxlkit/ui-kit'
+import { ManagementLayout } from './-ManagementLayout'
 
 export const Route = createFileRoute('/teams/manage/$id')({
   beforeLoad: async ({ location }) => {
@@ -546,64 +547,7 @@ function ManageOrgPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-retro-bg text-retro-text font-sans">
-      {/* Top Standalone Variant Header with Organization Switcher Dropdown */}
-      <header className="border-b-2 border-retro-border-strong bg-retro-surface">
-        <PixelContainer maxWidth="full" padding="sm">
-          <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
-            <PixelStack direction="row" gap={4} align="center">
-              <Link to="/" className="flex items-center gap-2">
-                <img src="/favicon.png" alt="Lightwing" className="w-6 h-6" />
-                <span className="font-pixel text-sm font-bold text-retro-text tracking-wide">
-                  MANAGEMENT CONSOLE
-                </span>
-              </Link>
-
-              {/* Organization Switcher Dropdown */}
-              <div className="flex items-center gap-2 pl-4 border-l-2 border-retro-border">
-                <span className="font-pixel text-xs text-retro-muted font-bold">ORG:</span>
-                <select
-                  value={teamId}
-                  onChange={(e) => {
-                    const targetId = e.target.value
-                    if (targetId && targetId !== teamId) {
-                      void navigate({ to: '/teams/manage/$id', params: { id: targetId } })
-                    }
-                  }}
-                  className="px-3 py-1 bg-retro-bg border-2 border-retro-border rounded font-pixel text-xs text-retro-primary font-bold focus:outline-none focus:border-retro-primary cursor-pointer"
-                >
-                  {userManagedOrgs.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name.toUpperCase()} (@{org.slug})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </PixelStack>
-
-            <PixelStack direction="row" gap={2} align="center" wrap>
-              <PixelButton asChild variant="ghost" tone="neutral" size="sm">
-                <Link to="/">PUBLIC SITE</Link>
-              </PixelButton>
-              {session?.user?.siteRole === 'SITE_ADMIN' && (
-                <PixelButton asChild variant="soft" tone="gold" size="sm">
-                  <Link to="/admin">ADMIN PANEL</Link>
-                </PixelButton>
-              )}
-              <PixelButton
-                variant="ghost"
-                tone="red"
-                size="sm"
-                onClick={() => void signOutUser('/auth')}
-              >
-                SIGN OUT
-              </PixelButton>
-            </PixelStack>
-          </PixelStack>
-        </PixelContainer>
-      </header>
-
-      {/* Main Content Area */}
+    <ManagementLayout>
       <PixelContainer maxWidth="full" padding="md">
         <PixelStack gap={6}>
           {/* Header Card & Navigation Tabs */}
@@ -1276,6 +1220,6 @@ function ManageOrgPage() {
           )}
         </PixelStack>
       </PixelContainer>
-    </div>
+    </ManagementLayout>
   )
 }
