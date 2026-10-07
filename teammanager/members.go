@@ -241,6 +241,7 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 			Logo:                        orgDetail.Logo,
 			Status:                      orgDetail.Status,
 			PrimaryOrganizationID:       orgDetail.ID,
+			IsOrganization:              true,
 			Organizations:               []LinkedOrganization{},
 			AdministratorSlotsRemaining: orgDetail.AdministratorSlotsRemaining,
 			Members:                     orgDetail.Members,

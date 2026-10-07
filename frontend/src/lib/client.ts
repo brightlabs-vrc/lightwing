@@ -2204,6 +2204,7 @@ export namespace teammanager {
         description?: string | null
         status?: string
         primaryOrganizationId?: string
+        isOrganization?: boolean
         organizations?: LinkedOrganization[]
         stats: TeamStats
         administratorSlotsRemaining: number

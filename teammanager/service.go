@@ -52,6 +52,7 @@ type Team struct {
 	Status                      string               `json:"status"`
 	Organizations               []LinkedOrganization `json:"organizations"`
 	PrimaryOrganizationID       string               `json:"primaryOrganizationId"`
+	IsOrganization              bool                 `json:"isOrganization"`
 	Stats                       TeamStats            `json:"stats"`
 	AdministratorSlotsRemaining int                  `json:"administratorSlotsRemaining"`
 	Members                     []TeamMemberSummary  `json:"members"`
@@ -190,6 +191,7 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 		Status:                      "APPROVED",
 		Organizations:               []LinkedOrganization{},
 		PrimaryOrganizationID:       org.ID,
+		IsOrganization:              true,
 		Stats:                       TeamStats{
 			RankingAverage:        nullFloatToPtr(org.RankingAverage),
 			PointsAverage:         nullFloatToPtr(org.PointsAverage),
@@ -385,6 +387,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			Status:                      teamRow.Status,
 			Organizations:               orgs,
 			PrimaryOrganizationID:       primOrgID,
+			IsOrganization:              false,
 			Stats:                       TeamStats{},
 			AdministratorSlotsRemaining: 0,
 			Members:                     summaries,
