@@ -800,6 +800,11 @@ export async function getPublicTeamProfile(teamOrSlug: string): Promise<teammana
     name: 'UMA Racing Society',
     slug: 'uma-racing-society',
     logo: 'https://placehold.co/120x120/2563eb/ffffff?text=UMA',
+    description: `Let's think with horses! Bright Labs is a group focusing more on Uma Musume/Keiba-style games. We're a group of artists and developers who loves the franchise who makes worlds!
+
+### Socials
+- [GitHub](https://github.com)
+- [VRChat](https://vrchat.com)`,
     administratorSlotsRemaining: 3,
     stats: {
       rankingAverage: 1.5,
