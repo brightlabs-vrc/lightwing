@@ -503,7 +503,7 @@ function ManageTeamPage() {
         {isTeamModalOpen && (
           <PixelModal
             open={isTeamModalOpen}
-            onOpenChange={setIsTeamModalOpen}
+            onClose={() => setIsTeamModalOpen(false)}
             title="EDIT TEAM METADATA"
           >
             <form onSubmit={handleUpdateTeam} className="space-y-4">
@@ -545,7 +545,7 @@ function ManageTeamPage() {
         {isMemberModalOpen && (
           <PixelModal
             open={isMemberModalOpen}
-            onOpenChange={setIsMemberModalOpen}
+            onClose={() => setIsMemberModalOpen(false)}
             title="ADD TEAM COMPETITOR"
           >
             <form onSubmit={handleAddMember} className="space-y-4">
@@ -587,7 +587,7 @@ function ManageTeamPage() {
         {isApplyOrgModalOpen && (
           <PixelModal
             open={isApplyOrgModalOpen}
-            onOpenChange={setIsApplyOrgModalOpen}
+            onClose={() => setIsApplyOrgModalOpen(false)}
             title="APPLY TEAM TO ORGANIZATION"
           >
             <form onSubmit={handleApplyToOrg} className="space-y-4">
@@ -631,7 +631,7 @@ function ManageTeamPage() {
         {isLinkOrgModalOpen && (
           <PixelModal
             open={isLinkOrgModalOpen}
-            onOpenChange={setIsLinkOrgModalOpen}
+            onClose={() => setIsLinkOrgModalOpen(false)}
             title="LINK SECONDARY ORGANIZATION"
           >
             <form onSubmit={handleLinkSecondaryOrg} className="space-y-4">

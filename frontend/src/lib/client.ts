@@ -2199,6 +2199,7 @@ export namespace teammanager {
         name: string
         slug: string
         logo: string
+        description?: string | null
         status?: string
         primaryOrganizationId?: string
         organizations?: LinkedOrganization[]
@@ -2229,6 +2230,7 @@ export namespace teammanager {
         userId: string
         name: string
         slug?: string | null
+        image?: string | null
         role: string
     }
 
