@@ -441,12 +441,6 @@ func submitTeamApplication(ctx context.Context, p *SubmitTeamApplicationRequest)
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "primary organization ID is required"}
 	}
 
-	// Caller must be administrator of the primary org
-	_, _, err = auth.RequirePermission(ctx, p.Authorization, p.PrimaryOrganizationID, auth.ResourceOrganization, auth.ActionUpdate)
-	if err != nil {
-		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "must be an administrator of the primary organization"}
-	}
-
 	// Verify primary org exists and is APPROVED
 	primOrg, err := q().GetOrgByID(ctx, p.PrimaryOrganizationID)
 	if errors.Is(err, sql.ErrNoRows) {
