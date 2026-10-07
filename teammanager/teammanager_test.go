@@ -333,6 +333,29 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 	})
 
+	t.Run("Non-admin user can submit team application to approved org", func(t *testing.T) {
+		nonAdminUser := nextTeamID("non-admin-user")
+		insertTestUser(t, ctx, nonAdminUser, "Non Admin User", "USER")
+		nonAdminToken := insertTestSession(t, ctx, nonAdminUser)
+
+		orgID := createOrgWithMembers(t, ctx, nextTeamID("org-other"), "Other Org", nextTeamID("other-org-slug"), []memberSpec{
+			{userID: siteAdmin, role: "administrator", name: "Org Admin"},
+		})
+		_, _ = db.Exec(ctx, `UPDATE "organization" SET status = 'APPROVED' WHERE id = $1`, orgID)
+
+		app, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
+			Authorization:         bearer(nonAdminToken),
+			Name:                  "Community Speedsters",
+			PrimaryOrganizationID: orgID,
+		})
+		if err != nil {
+			t.Fatalf("submitTeamApplication for non-admin user failed: %v", err)
+		}
+		if app.Status != "PENDING" || app.PrimaryOrganization.ID != orgID {
+			t.Errorf("app = %+v, want PENDING linked to %s", app, orgID)
+		}
+	})
+
 	t.Run("ConvertTeamToOrg and existing team application flow", func(t *testing.T) {
 		siteAdminUser := nextTeamID("site-admin-cvt")
 		insertTestUser(t, ctx, siteAdminUser, "Convert Site Admin", "SITE_ADMIN")
@@ -392,30 +415,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 			t.Errorf("expected migrated roster members in organization, got 0")
 		}
 
-	t.Run("Non-admin user can submit team application to approved org", func(t *testing.T) {
-		nonAdminUser := nextTeamID("non-admin-user")
-		insertTestUser(t, ctx, nonAdminUser, "Non Admin User", "USER")
-		nonAdminToken := insertTestSession(t, ctx, nonAdminUser)
-
-		orgID := createOrgWithMembers(t, ctx, nextTeamID("org-other"), "Other Org", nextTeamID("other-org-slug"), []memberSpec{
-			{userID: siteAdmin, role: "administrator", name: "Org Admin"},
-		})
-		_, _ = db.Exec(ctx, `UPDATE "organization" SET status = 'APPROVED' WHERE id = $1`, orgID)
-
-		app, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
-			Authorization:         bearer(nonAdminToken),
-			Name:                  "Community Speedsters",
-			PrimaryOrganizationID: orgID,
-		})
-		if err != nil {
-			t.Fatalf("submitTeamApplication for non-admin user failed: %v", err)
-		}
-		if app.Status != "PENDING" || app.PrimaryOrganization.ID != orgID {
-			t.Errorf("app = %+v, want PENDING linked to %s", app, orgID)
-		}
-	})
-
-	t.Run("Existing team applies to join target organization", func(t *testing.T) {
+		// Existing team applies to join target organization (using a newly created team)
 		secondTeam, err := createTeam(ctx, bearer(siteAdminTok), "Second Velocity Team", nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam secondTeam failed: %v", err)
