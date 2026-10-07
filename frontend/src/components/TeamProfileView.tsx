@@ -38,7 +38,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
     (org) => org.id !== team.id
   )
 
-  const isStandaloneOrg = affiliatedOrganizations.length === 0 || team.primaryOrganizationId === team.id
+  const isOrg = !team.primaryOrganizationId || team.primaryOrganizationId === team.id
 
   return (
     <PixelContainer maxWidth="full" padding="md">
@@ -63,7 +63,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                   {team.name}
                 </h1>
                 <PixelBadge tone="purple">
-                  {isStandaloneOrg ? 'ORGANIZATION' : 'TEAM ORGANIZATION'}
+                  {isOrg ? 'ORGANIZATION' : 'TEAM ORGANIZATION'}
                 </PixelBadge>
               </div>
               <div className="font-sans text-sm text-retro-muted font-semibold">
@@ -75,7 +75,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
           {isTeamAdmin && (
             <PixelButton asChild variant="solid" tone="purple" size="sm">
               <Link to="/teams/manage/$id" params={{ id: team.id }}>
-                {isStandaloneOrg ? 'MANAGE ORG' : 'MANAGE TEAM'}
+                {isOrg ? 'MANAGE ORG' : 'MANAGE TEAM'}
               </Link>
             </PixelButton>
           )}
@@ -95,7 +95,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
             />
             <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-4 gap-3 mt-4">
               {team.members && team.members.length > 0 ? (
-                team.members.map((m) => (
+                team.members.slice(0, 25).map((m) => (
                   <Link
                     key={m.userId}
                     to="/$user"
@@ -103,17 +103,14 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                     title={`${m.name} (@${m.slug || m.userId})`}
                     className="block group relative"
                   >
-                    {m.image ? (
-                      <img
-                        src={m.image}
-                        alt={m.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-retro-border group-hover:border-retro-primary transition-all shadow-sm"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-xs font-bold flex items-center justify-center group-hover:border-retro-primary transition-all shadow-sm">
-                        {m.name.slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
+                    <img
+                      src={m.image || '/fallback_avatar.jpg'}
+                      alt={m.name}
+                      onError={(e) => {
+                        e.currentTarget.src = '/fallback_avatar.jpg'
+                      }}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-retro-border group-hover:border-retro-primary transition-all shadow-sm"
+                    />
                   </Link>
                 ))
               ) : (
@@ -127,7 +124,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
           {/* Staff / Member Directory List */}
           <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
             <PixelSectionHeader
-              title="STAFF & MEMBERS"
+              title={isOrg ? 'STAFF' : 'STAFF & MEMBERS'}
               titleTone="purple"
               size="sm"
             />
@@ -144,17 +141,14 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                         params={{ user: m.slug || m.userId }}
                         className="shrink-0"
                       >
-                        {m.image ? (
-                          <img
-                            src={m.image}
-                            alt={m.name}
-                            className="w-10 h-10 rounded-full object-cover border border-retro-border"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full border border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-xs font-bold flex items-center justify-center">
-                            {m.name.slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
+                        <img
+                          src={m.image || '/fallback_avatar.jpg'}
+                          alt={m.name}
+                          onError={(e) => {
+                            e.currentTarget.src = '/fallback_avatar.jpg'
+                          }}
+                          className="w-10 h-10 rounded-full object-cover border border-retro-border"
+                        />
                       </Link>
                       <div className="flex flex-col min-w-0">
                         <UserLink
@@ -254,7 +248,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
           )}
 
           {/* Team Aggregate Statistics - Excluded for governing bodies / standalone organizations */}
-          {!isStandaloneOrg && (
+          {!isOrg && (
             <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
               <PixelSectionHeader
                 title="TEAM STATISTICS"

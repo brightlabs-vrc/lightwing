@@ -343,6 +343,39 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			desc = &d
 		}
 
+		// Add staff from associated organizations to team members if not already present
+		existingUserIDs := make(map[string]bool)
+		for _, m := range summaries {
+			existingUserIDs[m.UserID] = true
+		}
+		for _, org := range orgs {
+			orgStaff, sErr := loadMemberRows(ctx, org.ID)
+			if sErr == nil {
+				for _, m := range orgStaff {
+					if !existingUserIDs[m.UserId] {
+						existingUserIDs[m.UserId] = true
+						var slug *string
+						if m.Slug.Valid && m.Slug.String != "" {
+							s := m.Slug.String
+							slug = &s
+						}
+						var img *string
+						if m.Image.Valid && m.Image.String != "" {
+							i := m.Image.String
+							img = &i
+						}
+						summaries = append(summaries, TeamMemberSummary{
+							UserID: m.UserId,
+							Name:   displayName(m.Name, m.VrchatUsername),
+							Slug:   slug,
+							Role:   m.Role,
+							Image:  img,
+						})
+					}
+				}
+			}
+		}
+
 		t := &Team{
 			ID:                          teamRow.ID,
 			Name:                        teamRow.Name,
@@ -419,6 +452,49 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			t := toTeam(orgShape, members)
 			// Organizations do not have ranking layer / team stats attached
 			t.Stats = TeamStats{}
+
+			// Aggregate members from all associated teams under this organization
+			teamsForOrg, tErr := q().ListTeamsForOrg(ctx, orgRow.ID)
+			if tErr == nil && len(teamsForOrg) > 0 {
+				teamIDs := make([]string, len(teamsForOrg))
+				for i, team := range teamsForOrg {
+					teamIDs[i] = team.ID
+				}
+				rosterRows, rErr := q().ListRosterForTeamsBatch(ctx, teamIDs)
+				if rErr == nil {
+					existingUserIDs := make(map[string]bool)
+					for _, m := range t.Members {
+						existingUserIDs[m.UserID] = true
+					}
+					for _, r := range rosterRows {
+						if !existingUserIDs[r.UserId] {
+							existingUserIDs[r.UserId] = true
+							var slug *string
+							if r.Slug.Valid && r.Slug.String != "" {
+								s := r.Slug.String
+								slug = &s
+							}
+							var img *string
+							if r.Image.Valid && r.Image.String != "" {
+								i := r.Image.String
+								img = &i
+							}
+							role := "member"
+							if r.Role.Valid && r.Role.String != "" {
+								role = r.Role.String
+							}
+							t.Members = append(t.Members, TeamMemberSummary{
+								UserID: r.UserId,
+								Name:   displayName(r.Name, r.VrchatUsername),
+								Slug:   slug,
+								Role:   role,
+								Image:  img,
+							})
+						}
+					}
+				}
+			}
+
 			return t, nil
 		}
 	}

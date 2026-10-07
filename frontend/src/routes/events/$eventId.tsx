@@ -242,12 +242,6 @@ function EventDetailPage() {
             </PixelStack>
           </PixelStack>
 
-          {event.description && (
-            <div className="text-sm text-retro-text">
-              <MarkdownView content={event.description} />
-            </div>
-          )}
-
           <PixelStack direction="row" gap={4} wrap>
             <PixelBadge tone="neutral">
               SCORING TYPE: {SCORING_LABELS[event.scoringType] ?? 'UNKNOWN'}
@@ -298,7 +292,7 @@ function EventDetailPage() {
       </PixelCard>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        {/* Participants Panel */}
+        {/* Left Column: Participants Panel */}
         <div>
           <PixelSectionHeader
             title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
@@ -314,35 +308,48 @@ function EventDetailPage() {
           </div>
         </div>
 
-        {/* Schedule Panel */}
-        {event.schedules && event.schedules.length > 0 && (
-          <div>
-            <PixelSectionHeader title="SCHEDULE" size="sm" spacing="tight" />
-            <PixelCard className="">
-              <PixelStack gap={4}>
-                {event.schedules.map((schedule) => (
-                  <PixelStack
-                    key={schedule.id}
-                    gap={2}
-                    className="border-b-2 border-retro-border last:border-b-0 pb-3 last:pb-0"
-                  >
-                    <div className="font-pixel text-xs text-retro-primary">
-                      {schedule.title || 'UNTITLED'}
-                    </div>
-                    <div className="text-xs text-retro-muted font-sans">
-                      {new Date(schedule.startsAt).toLocaleString()}
-                      {schedule.location && (
-                        <span className="block mt-1 font-pixel text-[11px] text-retro-text bg-retro-surface px-2 py-0.5 border border-retro-border pxl-corner-sm inline-block">
-                          📍 {schedule.location}
-                        </span>
-                      )}
-                    </div>
-                  </PixelStack>
-                ))}
-              </PixelStack>
-            </PixelCard>
-          </div>
-        )}
+        {/* Right Column: Event Description & Schedule Panel */}
+        <div className="flex flex-col gap-6">
+          {event.description && (
+            <div>
+              <PixelSectionHeader title="ABOUT EVENT" size="sm" spacing="tight" />
+              <PixelCard>
+                <div className="text-sm text-retro-text leading-relaxed font-sans">
+                  <MarkdownView content={event.description} />
+                </div>
+              </PixelCard>
+            </div>
+          )}
+
+          {event.schedules && event.schedules.length > 0 && (
+            <div>
+              <PixelSectionHeader title="SCHEDULE" size="sm" spacing="tight" />
+              <PixelCard>
+                <PixelStack gap={4}>
+                  {event.schedules.map((schedule) => (
+                    <PixelStack
+                      key={schedule.id}
+                      gap={2}
+                      className="border-b-2 border-retro-border last:border-b-0 pb-3 last:pb-0"
+                    >
+                      <div className="font-pixel text-xs text-retro-primary">
+                        {schedule.title || 'UNTITLED'}
+                      </div>
+                      <div className="text-xs text-retro-muted font-sans">
+                        {new Date(schedule.startsAt).toLocaleString()}
+                        {schedule.location && (
+                          <span className="block mt-1 font-pixel text-[11px] text-retro-text bg-retro-surface px-2 py-0.5 border border-retro-border pxl-corner-sm inline-block">
+                            📍 {schedule.location}
+                          </span>
+                        )}
+                      </div>
+                    </PixelStack>
+                  ))}
+                </PixelStack>
+              </PixelCard>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Standings (Points) */}
