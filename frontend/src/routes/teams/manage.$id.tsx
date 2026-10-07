@@ -24,6 +24,8 @@ import {
   listAdminDatasets,
   createAdminDataset,
   updateAdminDatasetStatus,
+  createRaceEvent,
+  addEventMember,
 } from '../../lib/admin-api'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
 import { Pagination } from '../../components/Pagination'
@@ -1424,13 +1426,26 @@ function OrgEventDetailView({
 
   async function onCreateRaceSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!authHeader) return
+    if (!authHeader || !raceName) return
     try {
-      await handleCreateRace(e)
+      await createRaceEvent(
+        eventId,
+        {
+          name: raceName,
+          trackType: raceTrackType,
+          location: raceLocation,
+          distanceMeters: raceDistance,
+          classRestriction: null,
+          grade: raceGrade || 'OP',
+        },
+        authHeader,
+      )
+      await detail.reloadCurrentEvent()
       setShowCreateRaceModal(false)
       setRaceName('')
       setRaceLocation('')
       setRaceGrade('')
+      toast({ tone: 'green', title: `Successfully created race event "${raceName}".` })
     } catch (err) {
       toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to create race' })
     }
@@ -1716,9 +1731,15 @@ function OrgEventDetailView({
                 size="sm"
                 disabled={!addMemberUserId}
                 onClick={async () => {
-                  if (!addMemberUserId) return
-                  await handleAddMember(addMemberUserId)
-                  setAddMemberUserId('')
+                  if (!addMemberUserId || !authHeader) return
+                  try {
+                    await addEventMember(eventId, addMemberUserId, authHeader)
+                    await detail.reloadCurrentEvent()
+                    setAddMemberUserId('')
+                    toast({ tone: 'green', title: 'Member enrolled in event.' })
+                  } catch (err) {
+                    toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to enroll member' })
+                  }
                 }}
               >
                 + ENROLL MEMBER
@@ -1855,7 +1876,7 @@ function OrgEventDetailView({
                         disabled={!addRaceMemberUserId}
                         onClick={async () => {
                           if (!addRaceMemberUserId) return
-                          await handleAddRaceMember(addRaceMemberUserId)
+                          await handleAddRaceMember(selectedRace.id, addRaceMemberUserId)
                           setAddRaceMemberUserId('')
                         }}
                       >
@@ -1872,7 +1893,7 @@ function OrgEventDetailView({
                   isRaceNotStarted={selectedRace.startsAt === null}
                   loadingResults={loadingResults}
                   memberCount={selectedEvent.granularParticipation ? (selectedRace.members?.length || 0) : selectedEvent.members.length}
-                  rows={derivedStates.rows}
+                  rows={derivedStates}
                   changeSummary={changeSummary}
                   savingBatch={savingBatch}
                   onInferTimes={() => void handleInferFinishTimes()}

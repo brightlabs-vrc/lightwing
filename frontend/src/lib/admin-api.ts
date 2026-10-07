@@ -2092,6 +2092,7 @@ export async function createAdminDataset(
     source,
     rows,
     status,
+    importedAt: '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -2117,6 +2118,7 @@ export async function updateAdminDatasetStatus(
     source: 'Mock Source',
     rows: 10,
     status,
+    importedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
