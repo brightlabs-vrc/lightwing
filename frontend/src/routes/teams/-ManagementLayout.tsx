@@ -7,6 +7,7 @@ import {
   PixelStack,
   PixelButton,
 } from '@pxlkit/ui-kit'
+import { UserHeaderDropdown } from '../../components/UserHeaderDropdown'
 
 interface ManagementLayoutProps {
   children: React.ReactNode
@@ -48,9 +49,9 @@ export function ManagementLayout({ children }: ManagementLayoutProps) {
 
   return (
     <div className="min-h-screen bg-retro-bg text-retro-text font-sans">
-      <header className="border-b-2 border-retro-border-strong bg-retro-surface">
-        <PixelContainer maxWidth="full" padding="sm">
-          <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
+      <header className="border-b-2 border-retro-border-strong bg-retro-surface py-0.5">
+        <PixelContainer maxWidth="full" padding="none" className="site-header-container px-4">
+          <PixelStack direction="row" gap={3} align="center" justify="between" wrap className="site-header-inner">
             <PixelStack direction="row" gap={4} align="center">
               <Link to="/" className="flex items-center gap-2">
                 <img src="/favicon.png" alt="Lightwing" className="w-6 h-6" />
@@ -96,14 +97,12 @@ export function ManagementLayout({ children }: ManagementLayoutProps) {
                   <Link to="/admin">ADMIN PANEL</Link>
                 </PixelButton>
               )}
-              <PixelButton
-                variant="ghost"
-                tone="red"
-                size="sm"
-                onClick={() => void signOutUser('/auth')}
-              >
-                SIGN OUT
-              </PixelButton>
+              {session && (
+                <UserHeaderDropdown
+                  session={session}
+                  signOutUser={signOutUser}
+                />
+              )}
             </PixelStack>
           </PixelStack>
         </PixelContainer>

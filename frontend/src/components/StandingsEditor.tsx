@@ -369,21 +369,21 @@ function StandingsTable({
         )}
 
         <div className="overflow-x-auto w-full border border-retro-border rounded bg-retro-bg">
-          <table className="w-full text-left font-sans text-xs border-collapse min-w-[1000px]">
+          <table className="w-full text-left font-sans text-xs border-collapse min-w-[1175px] table-fixed">
             <thead>
               <tr className="bg-retro-surface border-b border-retro-border font-pixel text-[11px] text-retro-muted uppercase">
-                <th className="p-3 w-[160px]">Competitor Name</th>
-                <th className="p-3 w-[120px]">User ID</th>
-                <th className="p-3 w-[80px]">Draw</th>
-                <th className="p-3 w-[80px]">Position</th>
-                <th className="p-3 w-[80px]">Points</th>
-                <th className="p-3 w-[100px]">Finish Time</th>
-                <th className="p-3 w-[85px]">Behind</th>
-                <th className="p-3 w-[100px]">Passing Order</th>
-                <th className="p-3 w-[85px]">Final 3F</th>
-                <th className="p-3 w-[130px]">Penalty</th>
-                <th className="p-3 w-[140px]">Status</th>
-                <th className="p-3 w-[130px]">Staged Actions</th>
+                <th className="px-2.5 py-2 align-middle w-[150px]">Competitor Name</th>
+                <th className="px-2.5 py-2 align-middle w-[130px]">User ID</th>
+                <th className="px-2.5 py-2 align-middle w-[65px]">Draw</th>
+                <th className="px-2.5 py-2 align-middle w-[75px]">Position</th>
+                <th className="px-2.5 py-2 align-middle w-[65px]">Points</th>
+                <th className="px-2.5 py-2 align-middle w-[95px]">Finish Time</th>
+                <th className="px-2.5 py-2 align-middle w-[75px]">Behind</th>
+                <th className="px-2.5 py-2 align-middle w-[95px]">Passing Order</th>
+                <th className="px-2.5 py-2 align-middle w-[75px]">Final 3F</th>
+                <th className="px-2.5 py-2 align-middle w-[110px]">Penalty</th>
+                <th className="px-2.5 py-2 align-middle w-[130px]">Status</th>
+                <th className="px-2.5 py-2 align-middle w-[110px]">Staged Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -405,7 +405,7 @@ function StandingsTable({
                         : 'hover:bg-retro-surface/50'
                     }`}
                   >
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <div
                         className="cursor-pointer truncate font-medium text-retro-text"
                         onClick={() => !isDeleted && setPenaltyTarget({ userId: member.userId, name: member.name, currentStatus: edit.resultStatus })}
@@ -414,29 +414,29 @@ function StandingsTable({
                         <UserLink userId={member.userId} name={member.name} />
                       </div>
                     </td>
-                    <td className="p-2">
-                      <code className="text-xs text-retro-muted truncate block">{member.userId}</code>
+                    <td className="px-2.5 py-1.5 align-middle">
+                      <code className="text-xs text-retro-muted truncate block" title={member.userId}>{member.userId}</code>
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <input
                         type="number"
                         placeholder="Draw"
                         value={edit.gateNumber}
                         onChange={(e) => onResultChange(member.userId, 'gateNumber', e.target.value)}
-                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary"
+                        className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text text-center focus:outline-none focus:border-retro-primary standings-input-no-spinner"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <input
                         type="number"
                         placeholder="None"
                         disabled={isDeleted || isRaceNotStarted}
                         value={edit.position}
                         onChange={(e) => onResultChange(member.userId, 'position', e.target.value)}
-                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                        className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text text-center focus:outline-none focus:border-retro-primary disabled:opacity-50 standings-input-no-spinner"
                       />
                     </td>
-                    <td className="p-2 text-center">
+                    <td className="px-2.5 py-1.5 align-middle text-center">
                       {scoringType === 1 ? (
                         <div className="font-bold text-retro-primary text-xs">
                           {getPreviewPoints(edit.position, edit.resultStatus)} pts
@@ -448,63 +448,63 @@ function StandingsTable({
                           disabled={isDeleted || isRaceNotStarted}
                           value={edit.points}
                           onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
-                          className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                          className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text text-center focus:outline-none focus:border-retro-primary disabled:opacity-50 standings-input-no-spinner"
                         />
                       )}
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <input
                         type="text"
                         placeholder="1:32.1"
                         disabled={isDeleted || isRaceNotStarted}
                         value={edit.finishTime}
                         onChange={(e) => onResultChange(member.userId, 'finishTime', e.target.value)}
-                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                        className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <input
                         type="text"
                         placeholder="nose"
                         disabled={isDeleted || isRaceNotStarted}
                         value={edit.margin}
                         onChange={(e) => onResultChange(member.userId, 'margin', e.target.value)}
-                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                        className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text text-center focus:outline-none focus:border-retro-primary disabled:opacity-50"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <input
                         type="text"
                         placeholder="3-2-1"
                         disabled={isDeleted || isRaceNotStarted}
                         value={edit.passingOrder}
                         onChange={(e) => onResultChange(member.userId, 'passingOrder', e.target.value)}
-                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                        className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text text-center focus:outline-none focus:border-retro-primary disabled:opacity-50"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <input
                         type="text"
                         placeholder="34.5"
                         disabled={isDeleted || isRaceNotStarted}
                         value={edit.final3F}
                         onChange={(e) => onResultChange(member.userId, 'final3F', e.target.value)}
-                        className="w-full px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text focus:outline-none focus:border-retro-primary disabled:opacity-50"
+                        className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text text-center focus:outline-none focus:border-retro-primary disabled:opacity-50"
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       <PixelButton
                         variant="ghost"
                         tone={edit.resultStatus ? 'pink' : 'neutral'}
                         size="sm"
                         disabled={isDeleted}
                         onClick={() => setPenaltyTarget({ userId: member.userId, name: member.name, currentStatus: edit.resultStatus })}
-                        className="w-full"
+                        className="w-full text-center"
                       >
                         {edit.resultStatus ? edit.resultStatus : 'PENALTY'}
                       </PixelButton>
                     </td>
-                    <td className="p-2">
+                    <td className="px-2.5 py-1.5 align-middle">
                       {isDeleted ? (
                         <PixelBadge tone="pink">PENDING DELETION</PixelBadge>
                       ) : isModified ? (
@@ -519,8 +519,8 @@ function StandingsTable({
                         <PixelBadge tone="neutral">UNRECORDED</PixelBadge>
                       )}
                     </td>
-                    <td className="p-2">
-                      <div className="flex gap-1">
+                    <td className="px-2.5 py-1.5 align-middle">
+                      <div className="flex gap-1 items-center">
                         {isDeleted ? (
                           <PixelButton variant="ghost" tone="green" size="sm" onClick={() => onTogglePendingDeletion(member.userId)}>
                             RESTORE

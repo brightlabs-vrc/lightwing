@@ -14,12 +14,12 @@ th {
 }
 
 .site-header-container {
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
 }
 
 .site-header-inner {
-  min-height: 2.75rem;
+  min-height: 2rem;
 }
 
 .site-brand {
