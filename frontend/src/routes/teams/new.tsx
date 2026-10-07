@@ -15,6 +15,7 @@ import {
   PixelAlert,
   PixelInput,
 } from '@pxlkit/ui-kit'
+import { ManagementLayout } from './-ManagementLayout'
 
 export const Route = createFileRoute('/teams/new')({
   beforeLoad: async ({ location }) => {
@@ -214,17 +215,18 @@ function NewTeamWizardPage() {
   }
 
   return (
-    <PixelContainer maxWidth="md" padding="md">
-      <PixelSectionHeader
-        title="APPLICATION WIZARD"
-        titleTone="purple"
-        size="lg"
-        className="mb-6"
-      />
+    <ManagementLayout>
+      <PixelContainer maxWidth="md" padding="md">
+        <PixelSectionHeader
+          title="APPLICATION WIZARD"
+          titleTone="purple"
+          size="lg"
+          className="mb-6"
+        />
 
-      <PixelCard className="bg-retro-surface">
-        <PixelStack gap={6}>
-          {error && <PixelAlert tone="red" message={error} />}
+        <PixelCard className="bg-retro-surface">
+          <PixelStack gap={6}>
+            {error && <PixelAlert tone="red" message={error} />}
 
           {/* STEP 1: TYPE SELECTION */}
           {step === 1 && (
@@ -757,5 +759,6 @@ function NewTeamWizardPage() {
         </PixelStack>
       </PixelCard>
     </PixelContainer>
-  )
+  </ManagementLayout>
+)
 }
