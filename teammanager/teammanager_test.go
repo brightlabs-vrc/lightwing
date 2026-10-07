@@ -346,7 +346,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 
 		// Create a team via createTeam
 		teamName := "Velocity Racing"
-		newTeam, err := createTeam(ctx, bearer(siteAdminTok), teamName, nil, nil)
+		newTeam, err := createTeam(ctx, bearer(siteAdminTok), teamName, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -393,7 +393,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// Existing team applies to join target organization (using a newly created team)
-		secondTeam, err := createTeam(ctx, bearer(siteAdminTok), "Second Velocity Team", nil, nil)
+		secondTeam, err := createTeam(ctx, bearer(siteAdminTok), "Second Velocity Team", nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam secondTeam failed: %v", err)
 		}
@@ -421,7 +421,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		siteAdminTok := insertTestSession(t, ctx, siteAdminUser)
 
 		// 1. Create a team and convert by team slug
-		newTeam, err := createTeam(ctx, bearer(siteAdminTok), "Slug Team Test", nil, nil)
+		newTeam, err := createTeam(ctx, bearer(siteAdminTok), "Slug Team Test", nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -483,7 +483,7 @@ func TestUpdateTeamStats(t *testing.T) {
 		siteAdminUser := nextTeamID("site-admin-stats")
 		insertTestUser(t, ctx, siteAdminUser, "Stats Site Admin", "SITE_ADMIN")
 		siteToken := insertTestSession(t, ctx, siteAdminUser)
-		compTeam, err := createTeam(ctx, bearer(siteToken), teamName, nil, &orgID)
+		compTeam, err := createTeam(ctx, bearer(siteToken), teamName, nil, nil, &orgID)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -548,7 +548,7 @@ func TestCreateTeam(t *testing.T) {
 		token := insertTestSession(t, ctx, siteAdmin)
 
 		name := fmt.Sprintf("Alpha Racing Syndicate %d", teamTestSeq.Add(1))
-		team, err := createTeam(ctx, bearer(token), name, nil, nil)
+		team, err := createTeam(ctx, bearer(token), name, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -582,7 +582,7 @@ func TestCreateTeam(t *testing.T) {
 		regular := nextTeamID("regular-user-create-team")
 		insertTestUser(t, ctx, regular, "Regular User", "USER")
 		token := insertTestSession(t, ctx, regular)
-		if _, err := createTeam(ctx, bearer(token), "Forbidden Team", nil, nil); err == nil {
+		if _, err := createTeam(ctx, bearer(token), "Forbidden Team", nil, nil, nil); err == nil {
 			t.Fatal("expected permission error")
 		} else if errs.Code(err) != errs.PermissionDenied {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
@@ -594,10 +594,10 @@ func TestCreateTeam(t *testing.T) {
 		insertTestUser(t, ctx, siteAdmin, "Collision Site Admin", "SITE_ADMIN")
 		token := insertTestSession(t, ctx, siteAdmin)
 		name := fmt.Sprintf("Collision Team %d", teamTestSeq.Add(1))
-		if _, err := createTeam(ctx, bearer(token), name, nil, nil); err != nil {
+		if _, err := createTeam(ctx, bearer(token), name, nil, nil, nil); err != nil {
 			t.Fatalf("first createTeam failed: %v", err)
 		}
-		if _, err := createTeam(ctx, bearer(token), name, nil, nil); err == nil {
+		if _, err := createTeam(ctx, bearer(token), name, nil, nil, nil); err == nil {
 			t.Fatal("expected already_exists error")
 		} else if errs.Code(err) != errs.AlreadyExists {
 			t.Errorf("code = %v, want already_exists", errs.Code(err))

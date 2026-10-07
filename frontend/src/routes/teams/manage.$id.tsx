@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { requireAuth } from '../../lib/auth-guard'
@@ -14,11 +14,24 @@ import {
   listApprovedOrganizations,
   submitTeamApplication,
 } from '../../lib/admin-api'
-import { AlertBanner } from '../../components/AlertBanner'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
 import { Pagination } from '../../components/Pagination'
 import { UserLink } from '../../components/UserLink'
 import type { teammanager } from '../../lib/client'
+import {
+  PixelContainer,
+  PixelStack,
+  PixelCard,
+  PixelButton,
+  PixelBadge,
+  PixelSectionHeader,
+  PixelAlert,
+  PixelInput,
+  PixelModal,
+  PixelTable,
+  type PixelTableColumn,
+  useToast,
+} from '@pxlkit/ui-kit'
 
 export const Route = createFileRoute('/teams/manage/$id')({
   beforeLoad: async ({ location }) => {
@@ -30,7 +43,7 @@ export const Route = createFileRoute('/teams/manage/$id')({
 function ManageTeamPage() {
   const { id: teamId } = Route.useParams()
   const { session } = useAuth()
-  const navigate = useNavigate()
+  const { toast } = useToast()
 
   const [team, setTeam] = useState<teammanager.Team | null>(null)
   const [approvedOrgs, setApprovedOrgs] = useState<teammanager.LinkedOrganization[]>([])
@@ -138,6 +151,7 @@ function ManageTeamPage() {
       setTeam(updated)
       setIsTeamModalOpen(false)
       setSuccess('Team metadata updated successfully.')
+      toast({ tone: 'green', title: 'Team metadata updated successfully.' })
     } catch (cause) {
       setTeamError(cause instanceof Error ? cause.message : 'Failed to update team parameters')
     } finally {
@@ -167,6 +181,7 @@ function ManageTeamPage() {
       setTeam(updated)
       setIsMemberModalOpen(false)
       setSuccess('Member added to team successfully.')
+      toast({ tone: 'green', title: 'Member added to team successfully.' })
       void fetchRoster()
     } catch (cause) {
       setMemberError(cause instanceof Error ? cause.message : 'Failed to add team member')
@@ -185,6 +200,7 @@ function ManageTeamPage() {
       const updated = await removeAdminTeamMember(teamId, memberUserId, authHeader)
       setTeam(updated)
       setSuccess('Member removed from team successfully.')
+      toast({ tone: 'green', title: 'Member removed from team.' })
       void fetchRoster()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to remove member')
@@ -200,6 +216,7 @@ function ManageTeamPage() {
       const updated = await updateAdminTeamMemberRole(teamId, memberUserId, newRole, authHeader)
       setTeam(updated)
       setSuccess(`Member role updated to ${newRole} successfully.`)
+      toast({ tone: 'green', title: `Member role updated to ${newRole}.` })
       void fetchRoster()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to change member role')
@@ -217,6 +234,7 @@ function ManageTeamPage() {
       setTeam(updated)
       setIsLinkOrgModalOpen(false)
       setSuccess('Secondary organization linked successfully.')
+      toast({ tone: 'green', title: 'Secondary organization linked successfully.' })
     } catch (cause) {
       setLinkError(cause instanceof Error ? cause.message : 'Failed to link secondary organization')
     } finally {
@@ -234,6 +252,7 @@ function ManageTeamPage() {
       const updated = await unlinkSecondaryOrganization(teamId, orgId, authHeader)
       setTeam(updated)
       setSuccess('Secondary organization unlinked successfully.')
+      toast({ tone: 'green', title: 'Secondary organization unlinked.' })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to unlink secondary organization')
     }
@@ -257,6 +276,7 @@ function ManageTeamPage() {
       )
       setIsApplyOrgModalOpen(false)
       setSuccess('Application to join organization submitted successfully. Awaiting administrative review.')
+      toast({ tone: 'green', title: 'Application to join organization submitted.' })
       void loadTeamData()
     } catch (cause) {
       setApplyError(cause instanceof Error ? cause.message : 'Failed to submit organization application')
@@ -270,337 +290,389 @@ function ManageTeamPage() {
     { value: 'administrator', label: 'Administrator' },
   ]
 
+  const rosterColumns: PixelTableColumn<(typeof members)[0]>[] = [
+    {
+      key: 'userId',
+      header: 'COMPETITOR',
+      width: '40%',
+      render: (m) => (
+        <div>
+          <UserLink userId={m.userId} name={m.name} slug={m.slug} />
+          {m.slug && <span className="block text-xs text-retro-muted">@{m.slug}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'role',
+      header: 'ROLE',
+      width: '20%',
+      render: (m) => (
+        <PixelBadge tone={m.role === 'administrator' ? 'purple' : 'neutral'}>
+          {m.role}
+        </PixelBadge>
+      ),
+    },
+    {
+      key: 'changeRole',
+      header: 'CHANGE ROLE',
+      width: '25%',
+      render: (m) => (
+        <select
+          value={m.role}
+          onChange={(e) => handleChangeRole(m.userId, e.target.value)}
+          className="px-2 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text"
+        >
+          {roleOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'ACTION',
+      width: '15%',
+      render: (m) => (
+        <PixelButton
+          variant="ghost"
+          tone="red"
+          size="sm"
+          onClick={() => handleRemoveMember(m.userId)}
+        >
+          REMOVE
+        </PixelButton>
+      ),
+    },
+  ]
+
   return (
-    <div className="slds-scope p-6 bg-slate-100 min-h-screen" style={{ padding: '2rem 1rem', background: '#f3f2f1', minHeight: '100vh' }}>
-      <div className="max-w-6xl mx-auto" style={{ maxWidth: '72rem', margin: '0 auto' }}>
-        {/* Page Header */}
-        <div className="slds-page-header slds-m-bottom_medium" style={{ borderRadius: '6px', border: '1px solid #dddbda', background: '#fff', padding: '1.25rem' }}>
-          <div className="slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h1 className="slds-text-heading_large font-bold text-slate-900" style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-                {team ? `Manage Team: ${team.name}` : 'Team Management'}
+    <PixelContainer maxWidth="full" padding="md">
+      <PixelStack gap={6}>
+        {/* Header Card */}
+        <PixelCard className="bg-retro-surface">
+          <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
+            <PixelStack gap={1}>
+              <h1 className="text-2xl font-pixel text-retro-text font-bold">
+                {team ? `MANAGE TEAM: ${team.name.toUpperCase()}` : 'TEAM MANAGEMENT'}
               </h1>
               {team && (
-                <p className="slds-text-body_small text-slate-500" style={{ color: '#514f4d', marginTop: '4px' }}>
-                  Slug: @{team.slug} | Primary Org ID: {team.primaryOrganizationId}
-                </p>
+                <div className="text-xs font-pixel text-retro-muted">
+                  SLUG: @{team.slug} | PRIMARY ORG ID: {team.primaryOrganizationId}
+                </div>
               )}
-            </div>
+            </PixelStack>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
+            <PixelStack direction="row" gap={2} wrap>
+              <PixelButton
+                variant="ghost"
+                tone="neutral"
+                size="sm"
                 onClick={() => { setApplyError(null); setIsApplyOrgModalOpen(true); }}
-                className="slds-button slds-button_neutral"
               >
-                Apply to Organization
-              </button>
-              <button
-                type="button"
+                APPLY TO ORG
+              </PixelButton>
+              <PixelButton
+                variant="ghost"
+                tone="neutral"
+                size="sm"
                 onClick={() => { setTeamError(null); setIsTeamModalOpen(true); }}
-                className="slds-button slds-button_neutral"
               >
-                Edit Metadata
-              </button>
-              <button
-                type="button"
+                EDIT METADATA
+              </PixelButton>
+              <PixelButton
+                variant="solid"
+                tone="purple"
+                size="sm"
                 onClick={() => { setMemberError(null); setIsMemberModalOpen(true); }}
-                className="slds-button slds-button_brand"
               >
-                Add Competitor
-              </button>
-            </div>
-          </div>
-        </div>
+                + ADD COMPETITOR
+              </PixelButton>
+            </PixelStack>
+          </PixelStack>
+        </PixelCard>
 
-        {error && (
-          <div className="slds-m-bottom_medium">
-            <AlertBanner variant="error">{error}</AlertBanner>
-          </div>
-        )}
-        {success && (
-          <div className="slds-m-bottom_medium">
-            <AlertBanner variant="success">{success}</AlertBanner>
-          </div>
-        )}
+        {error && <PixelAlert tone="red" message={error} />}
+        {success && <PixelAlert tone="green" message={success} />}
 
         {loading ? (
-          <p className="text-slate-500">Loading team details...</p>
+          <div className="font-pixel text-xs text-retro-muted">LOADING TEAM DETAILS...</div>
         ) : team ? (
-          <div className="slds-grid slds-wrap slds-gutters" style={{ display: 'flex', gap: '16px' }}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column: Linked Organizations */}
-            <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: '1 1 300px' }}>
-              <article className="slds-card" style={{ border: '1px solid #dddbda', borderRadius: '6px', background: '#fff', padding: '1.25rem' }}>
-                <div className="slds-grid slds-grid_align-spread slds-m-bottom_medium" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 className="slds-text-heading_small font-bold" style={{ fontWeight: 'bold' }}>
-                    Linked Organizations
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => { setLinkError(null); setIsLinkOrgModalOpen(true); }}
-                    className="slds-button slds-button_neutral"
-                    style={{ fontSize: '11px', padding: '2px 8px' }}
-                  >
-                    + Link Org
-                  </button>
-                </div>
+            <div className="lg:col-span-1">
+              <PixelCard className="bg-retro-surface">
+                <PixelStack gap={4}>
+                  <PixelStack direction="row" align="center" justify="between">
+                    <PixelSectionHeader title="LINKED ORGANIZATIONS" size="sm" />
+                    <PixelButton
+                      variant="ghost"
+                      tone="purple"
+                      size="sm"
+                      onClick={() => { setLinkError(null); setIsLinkOrgModalOpen(true); }}
+                    >
+                      + LINK ORG
+                    </PixelButton>
+                  </PixelStack>
 
-                <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {(team.organizations || []).filter((org) => org.id !== team.id).map((org) => (
-                    <li key={org.id} className="slds-item slds-p-vertical_small" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f2f1' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span className="font-bold text-slate-900" style={{ fontWeight: 'bold' }}>{org.name}</span>
-                          {org.isPrimary && (
-                            <span className="slds-badge slds-theme_success" style={{ fontSize: '10px', padding: '2px 6px', background: '#2e7d32', color: '#fff', borderRadius: '3px' }}>
-                              Primary
-                            </span>
+                  <div className="flex flex-col gap-2">
+                    {(team.organizations || [])
+                      .filter((org) => org.id !== team.id)
+                      .map((org) => (
+                        <div
+                          key={org.id}
+                          className="flex justify-between items-center p-3 rounded bg-retro-bg border border-retro-border"
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-pixel text-xs text-retro-text font-bold truncate">
+                                {org.name}
+                              </span>
+                              {org.isPrimary && <PixelBadge tone="green">PRIMARY</PixelBadge>}
+                            </div>
+                            <span className="text-xs font-sans text-retro-muted">@{org.slug}</span>
+                          </div>
+
+                          {!org.isPrimary && (
+                            <PixelButton
+                              variant="ghost"
+                              tone="red"
+                              size="sm"
+                              onClick={() => handleUnlinkSecondaryOrg(org.id)}
+                            >
+                              UNLINK
+                            </PixelButton>
                           )}
                         </div>
-                        <span className="text-xs text-slate-500" style={{ fontSize: '11px', color: '#64748b' }}>@{org.slug}</span>
-                      </div>
-
-                      {!org.isPrimary && (
-                        <button
-                          type="button"
-                          onClick={() => handleUnlinkSecondaryOrg(org.id)}
-                          className="slds-button slds-button_destructive"
-                          style={{ fontSize: '11px', padding: '2px 8px' }}
-                        >
-                          Unlink
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                  {(team.organizations || []).filter((org) => org.id !== team.id).length === 0 && (
-                    <li className="slds-item text-xs text-slate-500" style={{ padding: '8px 0', fontSize: '12px', color: '#64748b' }}>
-                      No external parent organizations linked.
-                    </li>
-                  )}
-                </ul>
-              </article>
+                      ))}
+                    {(team.organizations || []).filter((org) => org.id !== team.id).length === 0 && (
+                      <span className="font-pixel text-xs text-retro-muted">
+                        NO EXTERNAL PARENT ORGANIZATIONS LINKED.
+                      </span>
+                    )}
+                  </div>
+                </PixelStack>
+              </PixelCard>
             </div>
 
-            {/* Right Column: Team Roster Table */}
-            <div className="slds-col slds-size_1-of-1 slds-medium-size_2-of-3" style={{ flex: '2 1 500px' }}>
-              <article className="slds-card" style={{ border: '1px solid #dddbda', borderRadius: '6px', background: '#fff', padding: '1.25rem' }}>
-                <div className="slds-grid slds-grid_align-spread slds-m-bottom_medium" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 className="slds-text-heading_small font-bold" style={{ fontWeight: 'bold' }}>
-                    Team Roster ({totalMembers})
-                  </h2>
-
-                  <input
-                    type="text"
-                    placeholder="Search roster..."
-                    value={memberSearch}
-                    onChange={(e) => { setMemberSearch(e.target.value); setMemberPage(1); }}
-                    className="slds-input"
-                    style={{ padding: '4px 8px', fontSize: '12px', border: '1px solid #dddbda', borderRadius: '4px', maxWidth: '200px' }}
-                  />
-                </div>
-
-                {members.length > 0 ? (
-                  <>
-                    <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                      <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ width: '100%', tableLayout: 'fixed' }}>
-                        <thead>
-                          <tr style={{ background: '#f3f2f1' }}>
-                            <th style={{ width: '40%' }}>Competitor</th>
-                            <th style={{ width: '25%' }}>Role</th>
-                            <th style={{ width: '20%' }}>Change Role</th>
-                            <th style={{ width: '15%' }}>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {members.map((member) => (
-                            <tr key={member.userId}>
-                              <td>
-                                <UserLink userId={member.userId} name={member.name} />
-                                {member.slug && (
-                                  <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>@{member.slug}</span>
-                                )}
-                              </td>
-                              <td>
-                                <span className={`slds-badge ${member.role === 'administrator' ? 'slds-theme_success' : 'slds-theme_light'}`}>
-                                  {member.role}
-                                </span>
-                              </td>
-                              <td>
-                                <select
-                                  value={member.role}
-                                  onChange={(e) => handleChangeRole(member.userId, e.target.value)}
-                                  className="slds-select"
-                                  style={{ padding: '2px 6px', fontSize: '12px' }}
-                                >
-                                  {roleOptions.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveMember(member.userId)}
-                                  className="slds-button slds-button_destructive"
-                                  style={{ fontSize: '11px', padding: '2px 8px' }}
-                                >
-                                  Remove
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <Pagination
-                      page={memberPage}
-                      pageSize={memberPageSize}
-                      total={totalMembers}
-                      onPageChange={setMemberPage}
-                      onPageSizeChange={setMemberPageSize}
+            {/* Right Column: Team Roster */}
+            <div className="lg:col-span-2">
+              <PixelCard className="bg-retro-surface">
+                <PixelStack gap={4}>
+                  <PixelStack direction="row" align="center" justify="between" wrap>
+                    <PixelSectionHeader title={`ROSTER (${totalMembers})`} size="sm" />
+                    <input
+                      type="text"
+                      placeholder="Search roster..."
+                      value={memberSearch}
+                      onChange={(e) => { setMemberSearch(e.target.value); setMemberPage(1); }}
+                      className="px-3 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text focus:outline-none focus:border-retro-primary w-48"
                     />
-                  </>
-                ) : (
-                  <p className="text-slate-500 text-sm">No roster members found.</p>
-                )}
-              </article>
+                  </PixelStack>
+
+                  {members.length > 0 ? (
+                    <>
+                      <div className="public-table">
+                        <PixelTable
+                          columns={rosterColumns}
+                          data={members}
+                          emptyState={<span className="font-pixel text-xs text-retro-muted">NO ROSTER MEMBERS FOUND</span>}
+                        />
+                      </div>
+
+                      <Pagination
+                        page={memberPage}
+                        pageSize={memberPageSize}
+                        total={totalMembers}
+                        onPageChange={setMemberPage}
+                        onPageSizeChange={setMemberPageSize}
+                        variant="pixel"
+                      />
+                    </>
+                  ) : (
+                    <span className="font-pixel text-xs text-retro-muted">NO ROSTER MEMBERS FOUND</span>
+                  )}
+                </PixelStack>
+              </PixelCard>
             </div>
           </div>
         ) : null}
-      </div>
 
-      {/* EDIT TEAM METADATA MODAL */}
-      {isTeamModalOpen && (
-        <section role="dialog" tabIndex={-1} className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-          <div className="slds-modal__container" style={{ maxWidth: '36rem', width: '90%' }}>
-            <header className="slds-modal__header">
-              <button onClick={() => setIsTeamModalOpen(false)} className="slds-button slds-modal__close">✕</button>
-              <h2 className="slds-modal__title font-bold">Edit Team Metadata</h2>
-            </header>
-            <form onSubmit={handleUpdateTeam}>
-              <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                {teamError && <AlertBanner variant="error">{teamError}</AlertBanner>}
-                <div className="slds-form-element slds-m-bottom_medium">
-                  <label className="slds-form-element__label font-bold">Team Name</label>
-                  <input type="text" required value={teamName} onChange={(e) => setTeamName(e.target.value)} className="slds-input" />
-                </div>
-                <div className="slds-form-element slds-m-bottom_medium">
-                  <label className="slds-form-element__label font-bold">Team Slug</label>
-                  <input type="text" required value={teamSlug} onChange={(e) => setTeamSlug(e.target.value)} className="slds-input" />
-                </div>
-                <div className="slds-form-element">
-                  <label className="slds-form-element__label font-bold">Logo URL</label>
-                  <input type="url" value={teamLogo} onChange={(e) => setTeamLogo(e.target.value)} className="slds-input" />
-                </div>
+        {/* EDIT TEAM METADATA MODAL */}
+        {isTeamModalOpen && (
+          <PixelModal
+            open={isTeamModalOpen}
+            onClose={() => setIsTeamModalOpen(false)}
+            title="EDIT TEAM METADATA"
+          >
+            <form onSubmit={handleUpdateTeam} className="space-y-4">
+              {teamError && <PixelAlert tone="red" message={teamError} />}
+
+              <PixelInput
+                label="TEAM NAME"
+                required
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+              />
+
+              <PixelInput
+                label="TEAM SLUG"
+                required
+                value={teamSlug}
+                onChange={(e) => setTeamSlug(e.target.value)}
+              />
+
+              <PixelInput
+                label="LOGO URL"
+                value={teamLogo}
+                onChange={(e) => setTeamLogo(e.target.value)}
+              />
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+                <PixelButton variant="ghost" tone="neutral" onClick={() => setIsTeamModalOpen(false)}>
+                  CANCEL
+                </PixelButton>
+                <PixelButton variant="solid" tone="purple" type="submit" loading={updatingTeam}>
+                  SAVE CHANGES
+                </PixelButton>
               </div>
-              <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" onClick={() => setIsTeamModalOpen(false)} className="slds-button slds-button_neutral">Cancel</button>
-                <button type="submit" disabled={updatingTeam} className="slds-button slds-button_brand">{updatingTeam ? 'Saving...' : 'Save Changes'}</button>
-              </footer>
             </form>
-          </div>
-        </section>
-      )}
+          </PixelModal>
+        )}
 
-      {/* ADD MEMBER MODAL */}
-      {isMemberModalOpen && (
-        <section role="dialog" tabIndex={-1} className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-          <div className="slds-modal__container" style={{ maxWidth: '36rem', width: '90%' }}>
-            <header className="slds-modal__header">
-              <button onClick={() => setIsMemberModalOpen(false)} className="slds-button slds-modal__close">✕</button>
-              <h2 className="slds-modal__title font-bold">Add Team Competitor</h2>
-            </header>
-            <form onSubmit={handleAddMember}>
-              <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                {memberError && <AlertBanner variant="error">{memberError}</AlertBanner>}
-                <div className="slds-form-element slds-m-bottom_medium">
-                  <label className="slds-form-element__label font-bold">Select User</label>
-                  <UserSearchCombobox value={selectedUserId} onChange={setSelectedUserId} />
-                </div>
-                <div className="slds-form-element">
-                  <label className="slds-form-element__label font-bold">Initial Role</label>
-                  <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="slds-select">
-                    {roleOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-                  </select>
-                </div>
+        {/* ADD MEMBER MODAL */}
+        {isMemberModalOpen && (
+          <PixelModal
+            open={isMemberModalOpen}
+            onClose={() => setIsMemberModalOpen(false)}
+            title="ADD TEAM COMPETITOR"
+          >
+            <form onSubmit={handleAddMember} className="space-y-4">
+              {memberError && <PixelAlert tone="red" message={memberError} />}
+
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">SELECT USER</label>
+                <UserSearchCombobox value={selectedUserId} onChange={setSelectedUserId} />
               </div>
-              <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" onClick={() => setIsMemberModalOpen(false)} className="slds-button slds-button_neutral">Cancel</button>
-                <button type="submit" disabled={addingMember} className="slds-button slds-button_brand">{addingMember ? 'Adding...' : 'Add Competitor'}</button>
-              </footer>
-            </form>
-          </div>
-        </section>
-      )}
 
-      {/* APPLY TO ORGANIZATION MODAL */}
-      {isApplyOrgModalOpen && (
-        <section role="dialog" tabIndex={-1} className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-          <div className="slds-modal__container" style={{ maxWidth: '36rem', width: '90%' }}>
-            <header className="slds-modal__header">
-              <button onClick={() => setIsApplyOrgModalOpen(false)} className="slds-button slds-modal__close">✕</button>
-              <h2 className="slds-modal__title font-bold">Apply Team to Organization</h2>
-            </header>
-            <form onSubmit={handleApplyToOrg}>
-              <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                {applyError && <AlertBanner variant="error">{applyError}</AlertBanner>}
-                <div className="slds-form-element">
-                  <label className="slds-form-element__label font-bold">Target Organization</label>
-                  <select value={applyTargetOrgId} onChange={(e) => setApplyTargetOrgId(e.target.value)} className="slds-select" required>
-                    <option value="">-- Choose Target Organization --</option>
-                    {approvedOrgs.map((o) => (
-                      <option key={o.id} value={o.id}>{o.name} (@{o.slug})</option>
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">INITIAL ROLE</label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text focus:border-retro-primary focus:outline-none"
+                >
+                  {roleOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+                <PixelButton variant="ghost" tone="neutral" onClick={() => setIsMemberModalOpen(false)}>
+                  CANCEL
+                </PixelButton>
+                <PixelButton variant="solid" tone="purple" type="submit" loading={addingMember}>
+                  ADD COMPETITOR
+                </PixelButton>
+              </div>
+            </form>
+          </PixelModal>
+        )}
+
+        {/* APPLY TO ORGANIZATION MODAL */}
+        {isApplyOrgModalOpen && (
+          <PixelModal
+            open={isApplyOrgModalOpen}
+            onClose={() => setIsApplyOrgModalOpen(false)}
+            title="APPLY TEAM TO ORGANIZATION"
+          >
+            <form onSubmit={handleApplyToOrg} className="space-y-4">
+              {applyError && <PixelAlert tone="red" message={applyError} />}
+
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">
+                  TARGET ORGANIZATION
+                </label>
+                <select
+                  value={applyTargetOrgId}
+                  onChange={(e) => setApplyTargetOrgId(e.target.value)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text focus:border-retro-primary focus:outline-none"
+                  required
+                >
+                  <option value="">-- Choose Target Organization --</option>
+                  {approvedOrgs.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name} (@{o.slug})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs font-sans text-retro-muted mt-1">
+                  Submitting will send an application for this team to join the selected organization, subject to review by system administrators.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+                <PixelButton variant="ghost" tone="neutral" onClick={() => setIsApplyOrgModalOpen(false)}>
+                  CANCEL
+                </PixelButton>
+                <PixelButton variant="solid" tone="purple" type="submit" loading={applyingOrg}>
+                  SUBMIT APPLICATION
+                </PixelButton>
+              </div>
+            </form>
+          </PixelModal>
+        )}
+
+        {/* LINK SECONDARY ORG MODAL */}
+        {isLinkOrgModalOpen && (
+          <PixelModal
+            open={isLinkOrgModalOpen}
+            onClose={() => setIsLinkOrgModalOpen(false)}
+            title="LINK SECONDARY ORGANIZATION"
+          >
+            <form onSubmit={handleLinkSecondaryOrg} className="space-y-4">
+              {linkError && <PixelAlert tone="red" message={linkError} />}
+
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">
+                  TARGET ORGANIZATION
+                </label>
+                <select
+                  value={targetOrgId}
+                  onChange={(e) => setTargetOrgId(e.target.value)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text focus:border-retro-primary focus:outline-none"
+                  required
+                >
+                  <option value="">-- Choose Organization --</option>
+                  {approvedOrgs
+                    .filter((o) => !(team?.organizations || []).some((linked) => linked.id === o.id))
+                    .map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name} ({o.slug})
+                      </option>
                     ))}
-                  </select>
-                  <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', marginTop: '4px' }}>
-                    Submitting will send an application for this team to join the selected organization, subject to review by system administrators.
-                  </p>
-                </div>
+                </select>
+                <p className="text-xs font-sans text-retro-muted mt-1">
+                  Note: You must hold administrator permissions on both the primary organization AND the target organization.
+                </p>
               </div>
-              <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" onClick={() => setIsApplyOrgModalOpen(false)} className="slds-button slds-button_neutral">Cancel</button>
-                <button type="submit" disabled={applyingOrg} className="slds-button slds-button_brand">{applyingOrg ? 'Submitting...' : 'Submit Application'}</button>
-              </footer>
-            </form>
-          </div>
-        </section>
-      )}
 
-      {/* LINK SECONDARY ORG MODAL */}
-      {isLinkOrgModalOpen && (
-        <section role="dialog" tabIndex={-1} className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-          <div className="slds-modal__container" style={{ maxWidth: '36rem', width: '90%' }}>
-            <header className="slds-modal__header">
-              <button onClick={() => setIsLinkOrgModalOpen(false)} className="slds-button slds-modal__close">✕</button>
-              <h2 className="slds-modal__title font-bold">Link Secondary Organization</h2>
-            </header>
-            <form onSubmit={handleLinkSecondaryOrg}>
-              <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                {linkError && <AlertBanner variant="error">{linkError}</AlertBanner>}
-                <div className="slds-form-element">
-                  <label className="slds-form-element__label font-bold">Target Organization</label>
-                  <select value={targetOrgId} onChange={(e) => setTargetOrgId(e.target.value)} className="slds-select" required>
-                    <option value="">-- Choose Organization --</option>
-                    {approvedOrgs
-                      .filter((o) => !(team?.organizations || []).some((linked) => linked.id === o.id))
-                      .map((o) => (
-                        <option key={o.id} value={o.id}>{o.name} ({o.slug})</option>
-                      ))}
-                  </select>
-                  <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', marginTop: '4px' }}>
-                    Note: You must hold administrator permissions on both the primary organization AND the target organization.
-                  </p>
-                </div>
+              <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+                <PixelButton variant="ghost" tone="neutral" onClick={() => setIsLinkOrgModalOpen(false)}>
+                  CANCEL
+                </PixelButton>
+                <PixelButton variant="solid" tone="purple" type="submit" loading={linkingOrg}>
+                  LINK ORGANIZATION
+                </PixelButton>
               </div>
-              <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" onClick={() => setIsLinkOrgModalOpen(false)} className="slds-button slds-button_neutral">Cancel</button>
-                <button type="submit" disabled={linkingOrg} className="slds-button slds-button_brand">{linkingOrg ? 'Linking...' : 'Link Organization'}</button>
-              </footer>
             </form>
-          </div>
-        </section>
-      )}
-    </div>
+          </PixelModal>
+        )}
+      </PixelStack>
+    </PixelContainer>
   )
 }

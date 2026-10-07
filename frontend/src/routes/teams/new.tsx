@@ -2,10 +2,19 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { requireAuth } from '../../lib/auth-guard'
-import { AlertBanner } from '../../components/AlertBanner'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
 import { submitOrganizationApplication, submitTeamApplication, listApprovedOrganizations, listAdminTeams } from '../../lib/admin-api'
 import type { teammanager } from '../../lib/client'
+import {
+  PixelContainer,
+  PixelStack,
+  PixelCard,
+  PixelButton,
+  PixelBadge,
+  PixelSectionHeader,
+  PixelAlert,
+  PixelInput,
+} from '@pxlkit/ui-kit'
 
 export const Route = createFileRoute('/teams/new')({
   beforeLoad: async ({ location }) => {
@@ -181,649 +190,572 @@ function NewTeamWizardPage() {
 
   if (submittedSuccess) {
     return (
-      <div className="slds-scope p-6 bg-slate-100 min-h-screen" style={{ padding: '2rem' }}>
-        <div className="slds-box bg-white max-w-xl mx-auto slds-p-around_large" style={{ background: '#fff', maxWidth: '36rem', margin: '3rem auto', padding: '2rem', borderRadius: '8px', border: '1px solid #dddbda' }}>
-          <div className="slds-text-align_center">
-            <span className="slds-icon_container slds-icon-utility-success" style={{ fontSize: '3rem', color: '#2e7d32' }}>
-              ✅
-            </span>
-            <h2 className="slds-text-heading_medium font-bold text-slate-900 slds-m-top_medium" style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-              Application Submitted!
+      <PixelContainer maxWidth="md" padding="md">
+        <PixelCard className="text-center py-8">
+          <PixelStack gap={4} align="center">
+            <span className="text-4xl">✅</span>
+            <h2 className="text-xl font-pixel text-retro-text tracking-wide font-bold">
+              APPLICATION SUBMITTED!
             </h2>
-            <p className="slds-text-body_regular text-slate-600 slds-m-top_small" style={{ color: '#514f4d', fontSize: '0.95rem' }}>
+            <p className="text-sm font-sans text-retro-muted max-w-md">
               Your application for <strong>{appType === 'EXISTING_TEAM' ? userTeams.find((t) => t.id === selectedExistingTeamId)?.name || 'Team' : name}</strong> ({appType}) has been recorded. Administrators will review your submission shortly.
             </p>
-            <div className="slds-m-top_large" style={{ marginTop: '1.5rem' }}>
-              <button
-                type="button"
-                onClick={() => navigate({ to: '/' })}
-                className="slds-button slds-button_brand"
-                style={{ padding: '8px 24px' }}
-              >
-                Return to Home
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+            <PixelButton
+              variant="solid"
+              tone="purple"
+              onClick={() => navigate({ to: '/' })}
+            >
+              RETURN HOME
+            </PixelButton>
+          </PixelStack>
+        </PixelCard>
+      </PixelContainer>
     )
   }
 
   return (
-    <div className="slds-scope p-6 bg-slate-100 min-h-screen" style={{ padding: '2rem 1rem', background: '#f3f2f1', minHeight: '100vh' }}>
-      <div className="max-w-3xl mx-auto bg-white rounded shadow-sm border p-6" style={{ maxWidth: '48rem', margin: '0 auto', background: '#fff', borderRadius: '8px', border: '1px solid #dddbda', padding: '2rem' }}>
-        <h1 className="slds-text-heading_large font-bold text-slate-900 slds-m-bottom_medium" style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>
-          Application Wizard
-        </h1>
+    <PixelContainer maxWidth="md" padding="md">
+      <PixelSectionHeader
+        title="APPLICATION WIZARD"
+        titleTone="purple"
+        size="lg"
+        className="mb-6"
+      />
 
-        {error && (
-          <div className="slds-m-bottom_medium">
-            <AlertBanner variant="error">{error}</AlertBanner>
-          </div>
-        )}
+      <PixelCard className="bg-retro-surface">
+        <PixelStack gap={6}>
+          {error && <PixelAlert tone="red" message={error} />}
 
-        {/* STEP 1: TYPE SELECTION */}
-        {step === 1 && (
-          <div>
-            <p className="slds-text-body_regular text-slate-600 slds-m-bottom_medium" style={{ color: '#514f4d' }}>
-              Select the entity type you wish to register:
-            </p>
+          {/* STEP 1: TYPE SELECTION */}
+          {step === 1 && (
+            <PixelStack gap={4}>
+              <p className="text-sm font-sans text-retro-muted font-semibold">
+                Select the entity type you wish to register:
+              </p>
 
-            <div className="slds-grid slds-wrap slds-gutters" style={{ display: 'flex', gap: '16px' }}>
-              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
-                <article
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div
                   onClick={() => { setAppType('ORGANIZATION'); setStep(2); }}
-                  className={`slds-card slds-card_boundary ${appType === 'ORGANIZATION' ? 'border-blue-600 bg-blue-50' : ''}`}
-                  style={{ cursor: 'pointer', padding: '1.5rem', border: appType === 'ORGANIZATION' ? '2px solid #0176d3' : '1px solid #dddbda', borderRadius: '6px', height: '100%' }}
+                  className={`p-4 rounded border-2 cursor-pointer transition-all ${
+                    appType === 'ORGANIZATION'
+                      ? 'border-retro-primary bg-retro-primary/10'
+                      : 'border-retro-border bg-retro-bg hover:border-retro-primary/50'
+                  }`}
                 >
-                  <div className="slds-media slds-media_center">
-                    <span style={{ fontSize: '2rem', marginRight: '1rem' }}>🏢</span>
-                    <div className="slds-media__body">
-                      <h2 className="slds-text-heading_small font-bold" style={{ fontWeight: 'bold' }}>New Organization</h2>
-                      <p className="slds-text-body_small text-slate-500" style={{ fontSize: '12px', color: '#514f4d' }}>
-                        Register an overarching esports organization / league group with staff roster.
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              </div>
+                  <PixelStack gap={2}>
+                    <span className="text-3xl">🏢</span>
+                    <h2 className="font-pixel text-sm text-retro-text font-bold">
+                      NEW ORGANIZATION
+                    </h2>
+                    <p className="font-sans text-xs text-retro-muted">
+                      Register an overarching esports organization / league group with staff roster.
+                    </p>
+                  </PixelStack>
+                </div>
 
-              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
-                <article
+                <div
                   onClick={() => { setAppType('TEAM'); setStep(2); }}
-                  className={`slds-card slds-card_boundary ${appType === 'TEAM' ? 'border-blue-600 bg-blue-50' : ''}`}
-                  style={{ cursor: 'pointer', padding: '1.5rem', border: appType === 'TEAM' ? '2px solid #0176d3' : '1px solid #dddbda', borderRadius: '6px', height: '100%' }}
+                  className={`p-4 rounded border-2 cursor-pointer transition-all ${
+                    appType === 'TEAM'
+                      ? 'border-retro-primary bg-retro-primary/10'
+                      : 'border-retro-border bg-retro-bg hover:border-retro-primary/50'
+                  }`}
                 >
-                  <div className="slds-media slds-media_center">
-                    <span style={{ fontSize: '2rem', marginRight: '1rem' }}>🏁</span>
-                    <div className="slds-media__body">
-                      <h2 className="slds-text-heading_small font-bold" style={{ fontWeight: 'bold' }}>New Competitive Team</h2>
-                      <p className="slds-text-body_small text-slate-500" style={{ fontSize: '12px', color: '#514f4d' }}>
-                        Register a new competitive racing team operating under an approved organization.
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              </div>
+                  <PixelStack gap={2}>
+                    <span className="text-3xl">🏁</span>
+                    <h2 className="font-pixel text-sm text-retro-text font-bold">
+                      NEW COMPETITIVE TEAM
+                    </h2>
+                    <p className="font-sans text-xs text-retro-muted">
+                      Register a new competitive racing team operating under an approved organization.
+                    </p>
+                  </PixelStack>
+                </div>
 
-              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
-                <article
+                <div
                   onClick={() => { setAppType('EXISTING_TEAM'); setStep(2); }}
-                  className={`slds-card slds-card_boundary ${appType === 'EXISTING_TEAM' ? 'border-blue-600 bg-blue-50' : ''}`}
-                  style={{ cursor: 'pointer', padding: '1.5rem', border: appType === 'EXISTING_TEAM' ? '2px solid #0176d3' : '1px solid #dddbda', borderRadius: '6px', height: '100%' }}
+                  className={`p-4 rounded border-2 cursor-pointer transition-all ${
+                    appType === 'EXISTING_TEAM'
+                      ? 'border-retro-primary bg-retro-primary/10'
+                      : 'border-retro-border bg-retro-bg hover:border-retro-primary/50'
+                  }`}
                 >
-                  <div className="slds-media slds-media_center">
-                    <span style={{ fontSize: '2rem', marginRight: '1rem' }}>🏎️</span>
-                    <div className="slds-media__body">
-                      <h2 className="slds-text-heading_small font-bold" style={{ fontWeight: 'bold' }}>Existing Team Application</h2>
-                      <p className="slds-text-body_small text-slate-500" style={{ fontSize: '12px', color: '#514f4d' }}>
-                        Apply for a pre-existing team to join an approved organization.
-                      </p>
-                    </div>
-                  </div>
-                </article>
+                  <PixelStack gap={2}>
+                    <span className="text-3xl">🏎️</span>
+                    <h2 className="font-pixel text-sm text-retro-text font-bold">
+                      EXISTING TEAM APP
+                    </h2>
+                    <p className="font-sans text-xs text-retro-muted">
+                      Apply for a pre-existing team to join an approved organization.
+                    </p>
+                  </PixelStack>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </PixelStack>
+          )}
 
-        {/* STEP 2: DETAILS OR EXISTING TEAM SELECTION */}
-        {step === 2 && (
-          <div>
-            {appType === 'EXISTING_TEAM' ? (
-              <>
-                <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Existing Team Organization Application
-                </h2>
-                <p className="slds-text-body_small text-slate-500 slds-m-bottom_medium" style={{ color: '#514f4d' }}>
-                  Select your pre-existing team and the target organization you wish to join.
-                </p>
+          {/* STEP 2: DETAILS OR EXISTING TEAM SELECTION */}
+          {step === 2 && (
+            <PixelStack gap={4}>
+              {appType === 'EXISTING_TEAM' ? (
+                <>
+                  <PixelSectionHeader title="EXISTING TEAM APPLICATION" size="sm" />
+                  <p className="text-xs font-sans text-retro-muted">
+                    Select your pre-existing team and the target organization you wish to join.
+                  </p>
 
-                <div className="slds-form slds-form_stacked">
-                  <div className="slds-form-element slds-m-bottom_medium">
-                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                      Select Existing Team <span className="text-red-500">*</span>
-                    </label>
-                    {userTeams.length === 0 ? (
-                      <p className="text-slate-500 text-sm">No existing teams found.</p>
-                    ) : (
+                  <PixelStack gap={4}>
+                    <div>
+                      <label className="block font-pixel text-xs text-retro-text mb-1">
+                        SELECT EXISTING TEAM <span className="text-red-500">*</span>
+                      </label>
+                      {userTeams.length === 0 ? (
+                        <p className="text-xs text-retro-muted font-sans">No existing teams found.</p>
+                      ) : (
+                        <select
+                          value={selectedExistingTeamId}
+                          onChange={(e) => setSelectedExistingTeamId(e.target.value)}
+                          className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text focus:border-retro-primary focus:outline-none"
+                        >
+                          <option value="">-- Choose Existing Team --</option>
+                          {userTeams.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.slug})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block font-pixel text-xs text-retro-text mb-1">
+                        TARGET ORGANIZATION <span className="text-red-500">*</span>
+                      </label>
                       <select
-                        value={selectedExistingTeamId}
-                        onChange={(e) => setSelectedExistingTeamId(e.target.value)}
-                        className="slds-select"
-                        style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                        value={primaryOrgId}
+                        onChange={(e) => setPrimaryOrgId(e.target.value)}
+                        className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text focus:border-retro-primary focus:outline-none"
                       >
-                        <option value="">-- Choose Existing Team --</option>
-                        {userTeams.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} ({t.slug})
+                        <option value="">-- Select Target Organization --</option>
+                        {approvedOrgs.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name} ({o.slug})
                           </option>
                         ))}
                       </select>
-                    )}
-                  </div>
+                    </div>
+                  </PixelStack>
 
-                  <div className="slds-form-element slds-m-bottom_medium">
-                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                      Target Organization <span className="text-red-500">*</span>
-                    </label>
+                  <div className="flex justify-between pt-4 border-t border-retro-border">
+                    <PixelButton variant="ghost" tone="neutral" onClick={() => setStep(1)}>
+                      &lt; BACK
+                    </PixelButton>
+                    <PixelButton
+                      variant="solid"
+                      tone="purple"
+                      onClick={() => {
+                        if (!selectedExistingTeamId) {
+                          setError('Please select an existing team.')
+                          return
+                        }
+                        if (!primaryOrgId) {
+                          setError('Please select a target organization.')
+                          return
+                        }
+                        setError(null)
+                        setStep(3)
+                      }}
+                    >
+                      NEXT &gt;
+                    </PixelButton>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <PixelSectionHeader
+                    title={appType === 'ORGANIZATION' ? 'ORGANIZATION DETAILS' : 'TEAM DETAILS'}
+                    size="sm"
+                  />
+
+                  <PixelStack gap={4}>
+                    <PixelInput
+                      label="NAME *"
+                      placeholder={appType === 'ORGANIZATION' ? 'e.g. Apex Esports Global' : 'e.g. Apex Racing Syndicate'}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+
+                    <PixelInput
+                      label="CUSTOM SLUG (OPTIONAL)"
+                      placeholder="e.g. apex-esports"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                    />
+
+                    <PixelInput
+                      label="LOGO IMAGE URL (OPTIONAL)"
+                      placeholder="https://example.com/logo.png"
+                      value={logo}
+                      onChange={(e) => setLogo(e.target.value)}
+                    />
+
+                    {appType === 'ORGANIZATION' && (
+                      <>
+                        <PixelInput
+                          label="DISCORD INVITE URL *"
+                          placeholder="https://discord.gg/yourserver"
+                          value={discordInvite}
+                          onChange={(e) => setDiscordInvite(e.target.value)}
+                        />
+
+                        <PixelInput
+                          label="VRCHAT GROUP ID *"
+                          placeholder="e.g. grp_12345"
+                          value={vrchatGroupId}
+                          onChange={(e) => setVrchatGroupId(e.target.value)}
+                        />
+                      </>
+                    )}
+                  </PixelStack>
+
+                  <div className="flex justify-between pt-4 border-t border-retro-border">
+                    <PixelButton variant="ghost" tone="neutral" onClick={() => setStep(1)}>
+                      &lt; BACK
+                    </PixelButton>
+                    <PixelButton
+                      variant="solid"
+                      tone="purple"
+                      onClick={() => {
+                        if (!name.trim()) {
+                          setError('Name is required.')
+                          return
+                        }
+                        if (appType === 'ORGANIZATION' && (!discordInvite.trim() || !vrchatGroupId.trim())) {
+                          setError('Discord Invite and VRChat Group ID are required.')
+                          return
+                        }
+                        setError(null)
+                        setStep(3)
+                      }}
+                    >
+                      NEXT &gt;
+                    </PixelButton>
+                  </div>
+                </>
+              )}
+            </PixelStack>
+          )}
+
+          {/* STEP 3 (ORGANIZATION): STAFF ROSTER */}
+          {step === 3 && appType === 'ORGANIZATION' && (
+            <PixelStack gap={4}>
+              <PixelSectionHeader title="PRELIMINARY STAFF ROSTER" size="sm" />
+              <p className="text-xs font-sans text-retro-muted">
+                You are automatically set as the primary administrator. You may add up to 2 additional staff administrators (cap of 3 total).
+              </p>
+
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">
+                  ADD STAFF ADMINISTRATOR
+                </label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <UserSearchCombobox
+                      value={newOrgMemberId}
+                      onChange={setNewOrgMemberId}
+                    />
+                  </div>
+                  <PixelButton
+                    variant="soft"
+                    tone="purple"
+                    onClick={() => handleAddOrgRosterMember(newOrgMemberId)}
+                  >
+                    ADD
+                  </PixelButton>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-pixel text-xs text-retro-text mb-2">CURRENT STAFF ROSTER:</h3>
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center p-2 rounded bg-retro-bg border border-retro-border">
+                    <span className="font-sans text-sm text-retro-text">
+                      {session?.user.vrchatUsername ?? session?.user.name} <strong>(Creator / Admin)</strong>
+                    </span>
+                    <PixelBadge tone="green">PRIMARY ADMIN</PixelBadge>
+                  </div>
+                  {orgRoster.map((uid) => (
+                    <div key={uid} className="flex justify-between items-center p-2 rounded bg-retro-bg border border-retro-border">
+                      <span className="font-sans text-sm text-retro-text">User ID: {uid}</span>
+                      <PixelButton
+                        variant="ghost"
+                        tone="red"
+                        size="sm"
+                        onClick={() => handleRemoveOrgRosterMember(uid)}
+                      >
+                        REMOVE
+                      </PixelButton>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-retro-border">
+                <PixelButton variant="ghost" tone="neutral" onClick={() => setStep(2)}>
+                  &lt; BACK
+                </PixelButton>
+                <PixelButton variant="solid" tone="purple" onClick={() => setStep(4)}>
+                  REVIEW & SUBMIT &gt;
+                </PixelButton>
+              </div>
+            </PixelStack>
+          )}
+
+          {/* STEP 3 (TEAM): ORGANIZATIONS */}
+          {step === 3 && appType === 'TEAM' && (
+            <PixelStack gap={4}>
+              <PixelSectionHeader title="ORGANIZATION AFFILIATION" size="sm" />
+
+              <PixelStack gap={4}>
+                <div>
+                  <label className="block font-pixel text-xs text-retro-text mb-1">
+                    PRIMARY ORGANIZATION <span className="text-red-500">*</span>
+                  </label>
+                  {loadingOrgs ? (
+                    <p className="text-xs font-sans text-retro-muted">Loading approved organizations...</p>
+                  ) : (
                     <select
                       value={primaryOrgId}
                       onChange={(e) => setPrimaryOrgId(e.target.value)}
-                      className="slds-select"
-                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+                      className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text focus:border-retro-primary focus:outline-none"
                     >
-                      <option value="">-- Select Target Organization --</option>
+                      <option value="">-- Select Primary Organization --</option>
                       {approvedOrgs.map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.name} ({o.slug})
                         </option>
                       ))}
                     </select>
-                  </div>
-                </div>
-
-                <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    &larr; Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedExistingTeamId) {
-                        setError('Please select an existing team.')
-                        return
-                      }
-                      if (!primaryOrgId) {
-                        setError('Please select a target organization.')
-                        return
-                      }
-                      setError(null)
-                      setStep(3)
-                    }}
-                    className="slds-button slds-button_brand"
-                  >
-                    Next &rarr;
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  {appType === 'ORGANIZATION' ? 'Organization Details' : 'Team Details'}
-                </h2>
-
-                <div className="slds-form slds-form_stacked">
-                  <div className="slds-form-element slds-m-bottom_medium">
-                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                      Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder={appType === 'ORGANIZATION' ? 'e.g. Apex Esports Global' : 'e.g. Apex Racing Syndicate'}
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="slds-input"
-                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                    />
-                  </div>
-
-                  <div className="slds-form-element slds-m-bottom_medium">
-                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Custom Slug (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. apex-esports"
-                      value={slug}
-                      onChange={(e) => setSlug(e.target.value)}
-                      className="slds-input"
-                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                    />
-                  </div>
-
-                  <div className="slds-form-element slds-m-bottom_medium">
-                    <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Logo Image URL (Optional)</label>
-                    <input
-                      type="url"
-                      placeholder="https://example.com/logo.png"
-                      value={logo}
-                      onChange={(e) => setLogo(e.target.value)}
-                      className="slds-input"
-                      style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                    />
-                  </div>
-
-                  {appType === 'ORGANIZATION' && (
-                    <>
-                      <div className="slds-form-element slds-m-bottom_medium">
-                        <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                          Discord Invite URL <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="url"
-                          required
-                          placeholder="https://discord.gg/yourserver"
-                          value={discordInvite}
-                          onChange={(e) => setDiscordInvite(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                        />
-                      </div>
-
-                      <div className="slds-form-element slds-m-bottom_medium">
-                        <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                          VRChat Group ID <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. grp_12345"
-                          value={vrchatGroupId}
-                          onChange={(e) => setVrchatGroupId(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                        />
-                      </div>
-                    </>
                   )}
+                  <p className="text-[11px] font-sans text-retro-muted mt-1">
+                    You must be an administrator of the primary organization to submit team requests.
+                  </p>
                 </div>
 
-                <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    &larr; Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!name.trim()) {
-                        setError('Name is required.')
-                        return
-                      }
-                      if (appType === 'ORGANIZATION' && (!discordInvite.trim() || !vrchatGroupId.trim())) {
-                        setError('Discord Invite and VRChat Group ID are required.')
-                        return
-                      }
-                      setError(null)
-                      setStep(3)
-                    }}
-                    className="slds-button slds-button_brand"
-                  >
-                    Next &rarr;
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* STEP 3 (ORGANIZATION): STAFF ROSTER */}
-        {step === 3 && appType === 'ORGANIZATION' && (
-          <div>
-            <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-              Preliminary Staff Roster
-            </h2>
-            <p className="slds-text-body_small text-slate-500 slds-m-bottom_medium" style={{ color: '#514f4d' }}>
-              You are automatically set as the primary administrator. You may add up to 2 additional staff administrators (cap of 3 total).
-            </p>
-
-            <div className="slds-form-element slds-m-bottom_medium">
-              <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Add Staff Administrator</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1 }}>
-                  <UserSearchCombobox
-                    value={newOrgMemberId}
-                    onChange={setNewOrgMemberId}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleAddOrgRosterMember(newOrgMemberId)}
-                  className="slds-button slds-button_neutral"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-
-            <div className="slds-m-top_medium">
-              <h3 className="slds-text-body_regular font-bold slds-m-bottom_x-small" style={{ fontWeight: 'bold' }}>Current Staff Roster:</h3>
-              <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                <li className="slds-item slds-p-vertical_x-small" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{session?.user.vrchatUsername ?? session?.user.name} <strong>(Creator / Admin)</strong></span>
-                  <span className="slds-badge slds-theme_success" style={{ fontSize: '10px' }}>Primary Admin</span>
-                </li>
-                {orgRoster.map((uid) => (
-                  <li key={uid} className="slds-item slds-p-vertical_x-small" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>User ID: {uid}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveOrgRosterMember(uid)}
-                      className="slds-button slds-button_destructive"
-                      style={{ fontSize: '11px', padding: '2px 8px' }}
+                <div>
+                  <label className="block font-pixel text-xs text-retro-text mb-1">
+                    SECONDARY ORGANIZATIONS ("ALSO OPERATES IN...")
+                  </label>
+                  <PixelStack gap={2}>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSecondaryOrgIds([...secondaryOrgIds, e.target.value])
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text focus:border-retro-primary focus:outline-none"
                     >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                      <option value="">-- Add Secondary Organization --</option>
+                      {approvedOrgs
+                        .filter((o) => o.id !== primaryOrgId && !secondaryOrgIds.includes(o.id))
+                        .map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name} ({o.slug})
+                          </option>
+                        ))}
+                    </select>
 
-            <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="slds-button slds-button_neutral"
-              >
-                &larr; Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(4)}
-                className="slds-button slds-button_brand"
-              >
-                Review & Submit &rarr;
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3 (TEAM): ORGANIZATIONS */}
-        {step === 3 && appType === 'TEAM' && (
-          <div>
-            <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-              Organization Affiliation
-            </h2>
-
-            <div className="slds-form slds-form_stacked">
-              <div className="slds-form-element slds-m-bottom_medium">
-                <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                  Primary Organization <span className="text-red-500">*</span>
-                </label>
-                {loadingOrgs ? (
-                  <p className="text-slate-500">Loading approved organizations...</p>
-                ) : (
-                  <select
-                    value={primaryOrgId}
-                    onChange={(e) => setPrimaryOrgId(e.target.value)}
-                    className="slds-select"
-                    style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                  >
-                    <option value="">-- Select Primary Organization --</option>
-                    {approvedOrgs.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name} ({o.slug})
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', marginTop: '4px' }}>
-                  You must be an administrator of the primary organization to submit team requests.
-                </p>
-              </div>
-
-              <div className="slds-form-element slds-m-bottom_medium">
-                <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>
-                  Secondary Organizations ("Also operates in...")
-                </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        setSecondaryOrgIds([...secondaryOrgIds, e.target.value])
-                      }
-                    }}
-                    className="slds-select"
-                    style={{ padding: '8px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                  >
-                    <option value="">-- Add Secondary Organization --</option>
-                    {approvedOrgs
-                      .filter((o) => o.id !== primaryOrgId && !secondaryOrgIds.includes(o.id))
-                      .map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name} ({o.slug})
-                        </option>
-                      ))}
-                  </select>
-
-                  {secondaryOrgIds.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                      {secondaryOrgIds.map((secId) => {
-                        const org = approvedOrgs.find((o) => o.id === secId)
-                        return (
-                          <div
-                            key={secId}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              padding: '8px 12px',
-                              background: '#f8fafc',
-                              border: '1px solid #dddbda',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            <span style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                              {org ? `${org.name} (${org.slug})` : secId}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setSecondaryOrgIds(secondaryOrgIds.filter((id) => id !== secId))}
-                              className="slds-button slds-button_destructive"
-                              style={{ fontSize: '11px', padding: '2px 8px' }}
+                    {secondaryOrgIds.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        {secondaryOrgIds.map((secId) => {
+                          const org = approvedOrgs.find((o) => o.id === secId)
+                          return (
+                            <div
+                              key={secId}
+                              className="flex justify-between items-center p-2 rounded bg-retro-bg border border-retro-border"
                             >
-                              Remove
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="slds-button slds-button_neutral"
-              >
-                &larr; Back
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!primaryOrgId) {
-                    setError('Primary Organization selection is required.')
-                    return
-                  }
-                  setError(null)
-                  setStep(4)
-                }}
-                className="slds-button slds-button_brand"
-              >
-                Next &rarr;
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4 (TEAM): ROSTER */}
-        {step === 4 && appType === 'TEAM' && (
-          <div>
-            <h2 className="slds-text-heading_medium font-bold slds-m-bottom_small" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-              Preliminary Team Roster
-            </h2>
-
-            <div className="slds-form-element slds-m-bottom_medium">
-              <label className="slds-form-element__label font-bold" style={{ fontWeight: 'bold' }}>Add Team Competitor</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1 }}>
-                  <UserSearchCombobox
-                    value={newTeamMemberId}
-                    onChange={setNewTeamMemberId}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleAddTeamRosterMember(newTeamMemberId)}
-                  className="slds-button slds-button_neutral"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-
-            <div className="slds-m-top_medium">
-              <h3 className="slds-text-body_regular font-bold slds-m-bottom_x-small" style={{ fontWeight: 'bold' }}>Team Members:</h3>
-              {teamRoster.length === 0 ? (
-                <p className="text-slate-500 text-sm">No initial team members added yet.</p>
-              ) : (
-                <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {teamRoster.map((uid) => (
-                    <li key={uid} className="slds-item slds-p-vertical_x-small" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>User ID: {uid}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTeamRosterMember(uid)}
-                        className="slds-button slds-button_destructive"
-                        style={{ fontSize: '11px', padding: '2px 8px' }}
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                className="slds-button slds-button_neutral"
-              >
-                &larr; Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(5)}
-                className="slds-button slds-button_brand"
-              >
-                Review & Submit &rarr;
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* REVIEW & SUBMIT STEP */}
-        {((step === 4 && appType === 'ORGANIZATION') ||
-          (step === 5 && appType === 'TEAM') ||
-          (step === 3 && appType === 'EXISTING_TEAM')) && (
-          <div>
-            <h2 className="slds-text-heading_medium font-bold slds-m-bottom_medium" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-              Review Your Application
-            </h2>
-
-            <div className="slds-box bg-slate-50 slds-m-bottom_medium" style={{ background: '#f8fafc', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-              <p><strong>Type:</strong> {appType === 'EXISTING_TEAM' ? 'EXISTING TEAM APPLICATION' : appType}</p>
-
-              {appType === 'EXISTING_TEAM' ? (
-                <>
-                  <p>
-                    <strong>Team:</strong>{' '}
-                    {userTeams.find((t) => t.id === selectedExistingTeamId)?.name || selectedExistingTeamId}
-                    {userTeams.find((t) => t.id === selectedExistingTeamId)?.slug && (
-                      <span> (@{userTeams.find((t) => t.id === selectedExistingTeamId)?.slug})</span>
+                              <span className="font-sans text-sm text-retro-text font-bold">
+                                {org ? `${org.name} (${org.slug})` : secId}
+                              </span>
+                              <PixelButton
+                                variant="ghost"
+                                tone="red"
+                                size="sm"
+                                onClick={() => setSecondaryOrgIds(secondaryOrgIds.filter((id) => id !== secId))}
+                              >
+                                REMOVE
+                              </PixelButton>
+                            </div>
+                          )
+                        })}
+                      </div>
                     )}
-                  </p>
-                  <p>
-                    <strong>Target Organization:</strong>{' '}
-                    {approvedOrgs.find((o) => o.id === primaryOrgId)?.name || primaryOrgId}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p><strong>Name:</strong> {name}</p>
-                  {slug && <p><strong>Slug:</strong> {slug}</p>}
+                  </PixelStack>
+                </div>
+              </PixelStack>
 
-                  {appType === 'ORGANIZATION' && (
-                    <>
-                      <p><strong>Discord Invite:</strong> {discordInvite}</p>
-                      <p><strong>VRChat Group ID:</strong> {vrchatGroupId}</p>
-                    </>
-                  )}
+              <div className="flex justify-between pt-4 border-t border-retro-border">
+                <PixelButton variant="ghost" tone="neutral" onClick={() => setStep(2)}>
+                  &lt; BACK
+                </PixelButton>
+                <PixelButton
+                  variant="solid"
+                  tone="purple"
+                  onClick={() => {
+                    if (!primaryOrgId) {
+                      setError('Primary Organization selection is required.')
+                      return
+                    }
+                    setError(null)
+                    setStep(4)
+                  }}
+                >
+                  NEXT &gt;
+                </PixelButton>
+              </div>
+            </PixelStack>
+          )}
 
-                  {appType === 'TEAM' && (
-                    <>
-                      <p>
-                        <strong>Primary Organization:</strong>{' '}
-                        {approvedOrgs.find((o) => o.id === primaryOrgId)?.name || primaryOrgId}
-                      </p>
-                      {secondaryOrgIds.length > 0 && (
-                        <p>
-                          <strong>Secondary Organizations:</strong>{' '}
-                          {secondaryOrgIds
-                            .map((secId) => approvedOrgs.find((o) => o.id === secId)?.name || secId)
-                            .join(', ')}
-                        </p>
+          {/* STEP 4 (TEAM): ROSTER */}
+          {step === 4 && appType === 'TEAM' && (
+            <PixelStack gap={4}>
+              <PixelSectionHeader title="PRELIMINARY TEAM ROSTER" size="sm" />
+
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">
+                  ADD TEAM COMPETITOR
+                </label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <UserSearchCombobox
+                      value={newTeamMemberId}
+                      onChange={setNewTeamMemberId}
+                    />
+                  </div>
+                  <PixelButton
+                    variant="soft"
+                    tone="purple"
+                    onClick={() => handleAddTeamRosterMember(newTeamMemberId)}
+                  >
+                    ADD
+                  </PixelButton>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-pixel text-xs text-retro-text mb-2">TEAM MEMBERS:</h3>
+                {teamRoster.length === 0 ? (
+                  <p className="text-xs font-sans text-retro-muted">No initial team members added yet.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {teamRoster.map((uid) => (
+                      <div key={uid} className="flex justify-between items-center p-2 rounded bg-retro-bg border border-retro-border">
+                        <span className="font-sans text-sm text-retro-text">User ID: {uid}</span>
+                        <PixelButton
+                          variant="ghost"
+                          tone="red"
+                          size="sm"
+                          onClick={() => handleRemoveTeamRosterMember(uid)}
+                        >
+                          REMOVE
+                        </PixelButton>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-retro-border">
+                <PixelButton variant="ghost" tone="neutral" onClick={() => setStep(3)}>
+                  &lt; BACK
+                </PixelButton>
+                <PixelButton variant="solid" tone="purple" onClick={() => setStep(5)}>
+                  REVIEW & SUBMIT &gt;
+                </PixelButton>
+              </div>
+            </PixelStack>
+          )}
+
+          {/* REVIEW & SUBMIT STEP */}
+          {((step === 4 && appType === 'ORGANIZATION') ||
+            (step === 5 && appType === 'TEAM') ||
+            (step === 3 && appType === 'EXISTING_TEAM')) && (
+            <PixelStack gap={4}>
+              <PixelSectionHeader title="REVIEW YOUR APPLICATION" size="sm" />
+
+              <div className="p-4 rounded bg-retro-bg border-2 border-retro-border text-sm font-sans text-retro-text space-y-2">
+                <p><strong>TYPE:</strong> {appType === 'EXISTING_TEAM' ? 'EXISTING TEAM APPLICATION' : appType}</p>
+
+                {appType === 'EXISTING_TEAM' ? (
+                  <>
+                    <p>
+                      <strong>TEAM:</strong>{' '}
+                      {userTeams.find((t) => t.id === selectedExistingTeamId)?.name || selectedExistingTeamId}
+                      {userTeams.find((t) => t.id === selectedExistingTeamId)?.slug && (
+                        <span> (@{userTeams.find((t) => t.id === selectedExistingTeamId)?.slug})</span>
                       )}
-                    </>
-                  )}
-                </>
-              )}
-            </div>
+                    </p>
+                    <p>
+                      <strong>TARGET ORGANIZATION:</strong>{' '}
+                      {approvedOrgs.find((o) => o.id === primaryOrgId)?.name || primaryOrgId}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>NAME:</strong> {name}</p>
+                    {slug && <p><strong>SLUG:</strong> {slug}</p>}
 
-            <div className="slds-m-top_large" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button
-                type="button"
-                onClick={() => setStep(step - 1)}
-                className="slds-button slds-button_neutral"
-                disabled={submitting}
-              >
-                &larr; Back
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSubmit()}
-                className="slds-button slds-button_brand"
-                disabled={submitting}
-              >
-                {submitting ? 'Submitting Application...' : 'Confirm & Submit Application'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+                    {appType === 'ORGANIZATION' && (
+                      <>
+                        <p><strong>DISCORD INVITE:</strong> {discordInvite}</p>
+                        <p><strong>VRCHAT GROUP ID:</strong> {vrchatGroupId}</p>
+                      </>
+                    )}
+
+                    {appType === 'TEAM' && (
+                      <>
+                        <p>
+                          <strong>PRIMARY ORGANIZATION:</strong>{' '}
+                          {approvedOrgs.find((o) => o.id === primaryOrgId)?.name || primaryOrgId}
+                        </p>
+                        {secondaryOrgIds.length > 0 && (
+                          <p>
+                            <strong>SECONDARY ORGANIZATIONS:</strong>{' '}
+                            {secondaryOrgIds
+                              .map((secId) => approvedOrgs.find((o) => o.id === secId)?.name || secId)
+                              .join(', ')}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-retro-border">
+                <PixelButton
+                  variant="ghost"
+                  tone="neutral"
+                  disabled={submitting}
+                  onClick={() => setStep(step - 1)}
+                >
+                  &lt; BACK
+                </PixelButton>
+                <PixelButton
+                  variant="solid"
+                  tone="purple"
+                  loading={submitting}
+                  disabled={submitting}
+                  onClick={() => void handleSubmit()}
+                >
+                  {submitting ? 'SUBMITTING...' : 'CONFIRM & SUBMIT APPLICATION'}
+                </PixelButton>
+              </div>
+            </PixelStack>
+          )}
+        </PixelStack>
+      </PixelCard>
+    </PixelContainer>
   )
 }

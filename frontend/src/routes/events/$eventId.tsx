@@ -3,6 +3,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import { formatLocalDateTime } from '../../lib/datetime'
+import { MarkdownView } from '../../components/MarkdownView'
 import {
   PixelContainer,
   PixelStack,
@@ -242,7 +243,9 @@ function EventDetailPage() {
           </PixelStack>
 
           {event.description && (
-            <p className="text-retro-text font-sans leading-relaxed text-sm">{event.description}</p>
+            <div className="text-sm text-retro-text">
+              <MarkdownView content={event.description} />
+            </div>
           )}
 
           <PixelStack direction="row" gap={4} wrap>

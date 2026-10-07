@@ -1,11 +1,11 @@
 -- Organization lookups and CRUD
 
 -- name: GetOrgByID :one
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
 FROM "organization" WHERE id = $1;
 
 -- name: GetOrgBySlug :one
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
 FROM "organization" WHERE slug = $1;
 
 -- name: OrgIDBySlug :one
@@ -18,12 +18,12 @@ SELECT id FROM "organization" WHERE id = $1;
 SELECT slug FROM "organization" WHERE id = $1;
 
 -- name: CreateOrg :one
-INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
-VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, $9) RETURNING id;
+INSERT INTO "organization" (id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
+VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10) RETURNING id;
 
 -- name: CreateOrgWithID :one
-INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10) RETURNING id;
+INSERT INTO "organization" (id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, $11) RETURNING id;
 
 -- name: TouchOrg :exec
 UPDATE "organization" SET "updatedAt" = $1 WHERE id = $2;
@@ -33,6 +33,7 @@ UPDATE "organization"
 SET "slug" = sqlc.arg('slug'),
     "updatedAt" = sqlc.arg('updated_at'),
     "name" = COALESCE(sqlc.narg('name'), "name"),
+    "description" = CASE WHEN sqlc.arg('clear_description')::boolean THEN NULL ELSE COALESCE(sqlc.narg('description'), "description") END,
     "logo" = CASE WHEN sqlc.arg('clear_logo')::boolean THEN NULL ELSE COALESCE(sqlc.narg('logo'), "logo") END
 WHERE id = sqlc.arg('id');
 
@@ -42,13 +43,13 @@ SET status = $1, "updatedAt" = CURRENT_TIMESTAMP
 WHERE id = $2;
 
 -- name: ListApprovedOrgs :many
-SELECT id, name, slug, logo, "orgType", status
+SELECT id, name, slug, logo, description, "orgType", status
 FROM "organization"
 WHERE status = 'APPROVED'
 ORDER BY name ASC;
 
 -- name: ListPendingOrgs :many
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
 FROM "organization"
 WHERE status = 'PENDING'
 ORDER BY "createdAt" ASC;
@@ -63,21 +64,21 @@ SELECT COUNT(*) FROM "team"
 WHERE status = 'APPROVED' AND (name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%');
 
 -- name: ListTeamRows :many
-SELECT id, name, slug, logo, status FROM "team"
+SELECT id, name, slug, logo, description, status FROM "team"
 WHERE status = 'APPROVED'
 ORDER BY name ASC LIMIT NULLIF($1::int, 0) OFFSET $2;
 
 -- name: ListTeamRowsBySearch :many
-SELECT id, name, slug, logo, status FROM "team"
+SELECT id, name, slug, logo, description, status FROM "team"
 WHERE status = 'APPROVED' AND (name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%')
 ORDER BY name ASC LIMIT NULLIF($2::int, 0) OFFSET $3;
 
 -- name: GetTeamByID :one
-SELECT id, name, slug, logo, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
 FROM "team" WHERE id = $1;
 
 -- name: GetTeamBySlug :one
-SELECT id, name, slug, logo, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
 FROM "team" WHERE slug = $1;
 
 -- name: TeamIDBySlug :one
@@ -87,14 +88,15 @@ SELECT id FROM "team" WHERE slug = $1;
 SELECT slug FROM "team" WHERE id = $1;
 
 -- name: CreateTeam :one
-INSERT INTO "team" (id, name, slug, logo, status, "submittedByUserId", "createdAt", "updatedAt")
-VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id;
+INSERT INTO "team" (id, name, slug, logo, description, status, "submittedByUserId", "createdAt", "updatedAt")
+VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id;
 
 -- name: UpdateTeam :exec
 UPDATE "team"
 SET "slug" = sqlc.arg('slug'),
     "updatedAt" = sqlc.arg('updated_at'),
     "name" = COALESCE(sqlc.narg('name'), "name"),
+    "description" = CASE WHEN sqlc.arg('clear_description')::boolean THEN NULL ELSE COALESCE(sqlc.narg('description'), "description") END,
     "logo" = CASE WHEN sqlc.arg('clear_logo')::boolean THEN NULL ELSE COALESCE(sqlc.narg('logo'), "logo") END
 WHERE id = sqlc.arg('id');
 
@@ -107,7 +109,7 @@ SET status = sqlc.arg('status'),
 WHERE id = sqlc.arg('id');
 
 -- name: ListPendingTeams :many
-SELECT id, name, slug, logo, status, "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, status, "submittedByUserId", "createdAt", "updatedAt"
 FROM "team"
 WHERE status = 'PENDING'
 ORDER BY "createdAt" ASC;
@@ -139,6 +141,7 @@ UPDATE "organization"
 SET "slug" = sqlc.arg('slug'),
     "updatedAt" = sqlc.arg('updated_at'),
     "name" = COALESCE(sqlc.narg('name'), "name"),
+    "description" = CASE WHEN sqlc.arg('clear_description')::boolean THEN NULL ELSE COALESCE(sqlc.narg('description'), "description") END,
     "logo" = CASE WHEN sqlc.arg('clear_logo')::boolean THEN NULL ELSE COALESCE(sqlc.narg('logo'), "logo") END,
     "discordInvite" = COALESCE(sqlc.narg('discord_invite'), "discordInvite"),
     "vrchatGroupId" = COALESCE(sqlc.narg('vrchat_group_id'), "vrchatGroupId")
@@ -152,40 +155,40 @@ SELECT COUNT(*) FROM "organization"
 WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%';
 
 -- name: ListAdminOrgs :many
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
 FROM "organization"
 ORDER BY name ASC
 LIMIT NULLIF($1::int, 0) OFFSET $2;
 
 -- name: ListAdminOrgsBySearch :many
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
 FROM "organization"
 WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%'
 ORDER BY name ASC
 LIMIT NULLIF($2::int, 0) OFFSET $3;
 
 -- name: GetPrimaryOrgForTeam :one
-SELECT o.id, o.name, o.slug, o.logo, o."orgType", o.status
+SELECT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status
 FROM "organization" o
 JOIN "teamOrganization" tor ON o.id = tor."organizationId"
 WHERE tor."teamId" = $1 AND tor."isPrimary" = true;
 
 -- name: ListOrgsForTeam :many
-SELECT o.id, o.name, o.slug, o.logo, o."orgType", o.status, tor."isPrimary"
+SELECT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, tor."isPrimary"
 FROM "organization" o
 JOIN "teamOrganization" tor ON o.id = tor."organizationId"
 WHERE tor."teamId" = $1
 ORDER BY tor."isPrimary" DESC, o.name ASC;
 
 -- name: ListOrgsForTeamsBatch :many
-SELECT tor."teamId", o.id, o.name, o.slug, o.logo, o."orgType", o.status, tor."isPrimary"
+SELECT tor."teamId", o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, tor."isPrimary"
 FROM "organization" o
 JOIN "teamOrganization" tor ON o.id = tor."organizationId"
 WHERE tor."teamId" = ANY($1::text[])
 ORDER BY tor."isPrimary" DESC, o.name ASC;
 
 -- name: ListTeamsForOrg :many
-SELECT t.id, t.name, t.slug, t.logo, t.status, tor."isPrimary"
+SELECT t.id, t.name, t.slug, t.logo, t.description, t.status, tor."isPrimary"
 FROM "team" t
 JOIN "teamOrganization" tor ON t.id = tor."teamId"
 WHERE tor."organizationId" = $1
@@ -202,7 +205,7 @@ SELECT COUNT(*), COUNT(*) FILTER (WHERE role = $2)
 FROM "member" WHERE "organizationId" = $1;
 
 -- name: ListMemberRows :many
-SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
+SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "member" m JOIN "user" u ON u.id = m."userId"
 WHERE m."organizationId" = $1 ORDER BY m."createdAt" ASC;
 
@@ -216,13 +219,13 @@ WHERE m."organizationId" = $1
   AND (u.name ILIKE '%' || $2::text || '%' OR u."vrchatUsername" ILIKE '%' || $2::text || '%' OR u.slug ILIKE '%' || $2::text || '%');
 
 -- name: ListTeamMemberRows :many
-SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
+SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "member" m JOIN "user" u ON u.id = m."userId"
 WHERE m."organizationId" = $1 ORDER BY m."createdAt" ASC
 LIMIT NULLIF($2::int, 0) OFFSET $3;
 
 -- name: ListTeamMemberRowsBySearch :many
-SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
+SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "member" m JOIN "user" u ON u.id = m."userId"
 WHERE m."organizationId" = $1
   AND (u.name ILIKE '%' || $2::text || '%' OR u."vrchatUsername" ILIKE '%' || $2::text || '%' OR u.slug ILIKE '%' || $2::text || '%')
@@ -270,12 +273,12 @@ DELETE FROM "teamMember" WHERE "teamId" = $1 AND "userId" = $2;
 UPDATE "teamMember" SET role = $1 WHERE "teamId" = $2 AND "userId" = $3;
 
 -- name: ListRosterForTeam :many
-SELECT tm."userId", tm.role, u.name, u."vrchatUsername", u.slug
+SELECT tm."userId", tm.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "teamMember" tm JOIN "user" u ON u.id = tm."userId"
 WHERE tm."teamId" = $1 ORDER BY tm."createdAt" ASC;
 
 -- name: ListRosterForTeamsBatch :many
-SELECT tm."teamId", tm."userId", tm.role, u.name, u."vrchatUsername", u.slug
+SELECT tm."teamId", tm."userId", tm.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "teamMember" tm JOIN "user" u ON u.id = tm."userId"
 WHERE tm."teamId" = ANY($1::text[]) ORDER BY tm."createdAt" ASC;
 

@@ -178,14 +178,15 @@ func (q *Queries) CountTeamsBySearch(ctx context.Context, dollar_1 string) (int6
 }
 
 const createOrg = `-- name: CreateOrg :one
-INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
-VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, $9) RETURNING id
+INSERT INTO "organization" (id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
+VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10) RETURNING id
 `
 
 type CreateOrgParams struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
+	Description       sql.NullString
 	OrgType           sql.NullString
 	Status            sql.NullString
 	DiscordInvite     sql.NullString
@@ -199,6 +200,7 @@ func (q *Queries) CreateOrg(ctx context.Context, arg CreateOrgParams) (string, e
 		arg.Name,
 		arg.Slug,
 		arg.Logo,
+		arg.Description,
 		arg.OrgType,
 		arg.Status,
 		arg.DiscordInvite,
@@ -212,8 +214,8 @@ func (q *Queries) CreateOrg(ctx context.Context, arg CreateOrgParams) (string, e
 }
 
 const createOrgWithID = `-- name: CreateOrgWithID :one
-INSERT INTO "organization" (id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, $10) RETURNING id
+INSERT INTO "organization" (id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, $11) RETURNING id
 `
 
 type CreateOrgWithIDParams struct {
@@ -221,6 +223,7 @@ type CreateOrgWithIDParams struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
+	Description       sql.NullString
 	OrgType           sql.NullString
 	Status            sql.NullString
 	DiscordInvite     sql.NullString
@@ -235,6 +238,7 @@ func (q *Queries) CreateOrgWithID(ctx context.Context, arg CreateOrgWithIDParams
 		arg.Name,
 		arg.Slug,
 		arg.Logo,
+		arg.Description,
 		arg.OrgType,
 		arg.Status,
 		arg.DiscordInvite,
@@ -248,14 +252,15 @@ func (q *Queries) CreateOrgWithID(ctx context.Context, arg CreateOrgWithIDParams
 }
 
 const createTeam = `-- name: CreateTeam :one
-INSERT INTO "team" (id, name, slug, logo, status, "submittedByUserId", "createdAt", "updatedAt")
-VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+INSERT INTO "team" (id, name, slug, logo, description, status, "submittedByUserId", "createdAt", "updatedAt")
+VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 `
 
 type CreateTeamParams struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
+	Description       sql.NullString
 	Status            string
 	SubmittedByUserId sql.NullString
 }
@@ -265,6 +270,7 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (string,
 		arg.Name,
 		arg.Slug,
 		arg.Logo,
+		arg.Description,
 		arg.Status,
 		arg.SubmittedByUserId,
 	)
@@ -351,21 +357,24 @@ UPDATE "organization"
 SET "slug" = $1,
     "updatedAt" = $2,
     "name" = COALESCE($3, "name"),
-    "logo" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "logo") END,
-    "discordInvite" = COALESCE($6, "discordInvite"),
-    "vrchatGroupId" = COALESCE($7, "vrchatGroupId")
-WHERE id = $8
+    "description" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "description") END,
+    "logo" = CASE WHEN $6::boolean THEN NULL ELSE COALESCE($7, "logo") END,
+    "discordInvite" = COALESCE($8, "discordInvite"),
+    "vrchatGroupId" = COALESCE($9, "vrchatGroupId")
+WHERE id = $10
 `
 
 type UpdateOrgDetailsParams struct {
-	Slug          string
-	UpdatedAt     sql.NullTime
-	Name          sql.NullString
-	ClearLogo     bool
-	Logo          sql.NullString
-	DiscordInvite sql.NullString
-	VrchatGroupId sql.NullString
-	ID            string
+	Slug             string
+	UpdatedAt        sql.NullTime
+	Name             sql.NullString
+	ClearDescription bool
+	Description      sql.NullString
+	ClearLogo        bool
+	Logo             sql.NullString
+	DiscordInvite    sql.NullString
+	VrchatGroupId    sql.NullString
+	ID               string
 }
 
 func (q *Queries) UpdateOrgDetails(ctx context.Context, arg UpdateOrgDetailsParams) error {
@@ -373,6 +382,8 @@ func (q *Queries) UpdateOrgDetails(ctx context.Context, arg UpdateOrgDetailsPara
 		arg.Slug,
 		arg.UpdatedAt,
 		arg.Name,
+		arg.ClearDescription,
+		arg.Description,
 		arg.ClearLogo,
 		arg.Logo,
 		arg.DiscordInvite,
@@ -410,6 +421,7 @@ type AdminOrgRow struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
+	Description       sql.NullString
 	OrgType           sql.NullString
 	Status            sql.NullString
 	DiscordInvite     sql.NullString
@@ -420,7 +432,7 @@ type AdminOrgRow struct {
 }
 
 const listAdminOrgs = `-- name: ListAdminOrgs :many
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
 FROM "organization"
 ORDER BY name ASC
 LIMIT NULLIF($1::int, 0) OFFSET $2
@@ -445,6 +457,7 @@ func (q *Queries) ListAdminOrgs(ctx context.Context, arg ListAdminOrgsParams) ([
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.OrgType,
 			&i.Status,
 			&i.DiscordInvite,
@@ -464,7 +477,7 @@ func (q *Queries) ListAdminOrgs(ctx context.Context, arg ListAdminOrgsParams) ([
 }
 
 const listAdminOrgsBySearch = `-- name: ListAdminOrgsBySearch :many
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
 FROM "organization"
 WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%'
 ORDER BY name ASC
@@ -491,6 +504,7 @@ func (q *Queries) ListAdminOrgsBySearch(ctx context.Context, arg ListAdminOrgsBy
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.OrgType,
 			&i.Status,
 			&i.DiscordInvite,
@@ -511,7 +525,7 @@ func (q *Queries) ListAdminOrgsBySearch(ctx context.Context, arg ListAdminOrgsBy
 
 const getOrgByID = `-- name: GetOrgByID :one
 
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
 FROM "organization" WHERE id = $1
 `
 
@@ -520,6 +534,7 @@ type GetOrgByIDRow struct {
 	Name                  string
 	Slug                  string
 	Logo                  sql.NullString
+	Description           sql.NullString
 	OrgType               sql.NullString
 	Status                sql.NullString
 	DiscordInvite         sql.NullString
@@ -542,6 +557,7 @@ func (q *Queries) GetOrgByID(ctx context.Context, id string) (GetOrgByIDRow, err
 		&i.Name,
 		&i.Slug,
 		&i.Logo,
+		&i.Description,
 		&i.OrgType,
 		&i.Status,
 		&i.DiscordInvite,
@@ -558,7 +574,7 @@ func (q *Queries) GetOrgByID(ctx context.Context, id string) (GetOrgByIDRow, err
 }
 
 const getOrgBySlug = `-- name: GetOrgBySlug :one
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
 FROM "organization" WHERE slug = $1
 `
 
@@ -567,6 +583,7 @@ type GetOrgBySlugRow struct {
 	Name                  string
 	Slug                  string
 	Logo                  sql.NullString
+	Description           sql.NullString
 	OrgType               sql.NullString
 	Status                sql.NullString
 	DiscordInvite         sql.NullString
@@ -588,6 +605,7 @@ func (q *Queries) GetOrgBySlug(ctx context.Context, slug string) (GetOrgBySlugRo
 		&i.Name,
 		&i.Slug,
 		&i.Logo,
+		&i.Description,
 		&i.OrgType,
 		&i.Status,
 		&i.DiscordInvite,
@@ -604,19 +622,20 @@ func (q *Queries) GetOrgBySlug(ctx context.Context, slug string) (GetOrgBySlugRo
 }
 
 const getPrimaryOrgForTeam = `-- name: GetPrimaryOrgForTeam :one
-SELECT o.id, o.name, o.slug, o.logo, o."orgType", o.status
+SELECT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status
 FROM "organization" o
 JOIN "teamOrganization" tor ON o.id = tor."organizationId"
 WHERE tor."teamId" = $1 AND tor."isPrimary" = true
 `
 
 type GetPrimaryOrgForTeamRow struct {
-	ID      string
-	Name    string
-	Slug    string
-	Logo    sql.NullString
-	OrgType sql.NullString
-	Status  sql.NullString
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	OrgType     sql.NullString
+	Status      sql.NullString
 }
 
 func (q *Queries) GetPrimaryOrgForTeam(ctx context.Context, teamid string) (GetPrimaryOrgForTeamRow, error) {
@@ -627,6 +646,7 @@ func (q *Queries) GetPrimaryOrgForTeam(ctx context.Context, teamid string) (GetP
 		&i.Name,
 		&i.Slug,
 		&i.Logo,
+		&i.Description,
 		&i.OrgType,
 		&i.Status,
 	)
@@ -634,7 +654,7 @@ func (q *Queries) GetPrimaryOrgForTeam(ctx context.Context, teamid string) (GetP
 }
 
 const getTeamByID = `-- name: GetTeamByID :one
-SELECT id, name, slug, logo, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
 FROM "team" WHERE id = $1
 `
 
@@ -646,6 +666,7 @@ func (q *Queries) GetTeamByID(ctx context.Context, id string) (Team, error) {
 		&i.Name,
 		&i.Slug,
 		&i.Logo,
+		&i.Description,
 		&i.Status,
 		&i.SubmittedByUserId,
 		&i.ReviewedByUserId,
@@ -657,7 +678,7 @@ func (q *Queries) GetTeamByID(ctx context.Context, id string) (Team, error) {
 }
 
 const getTeamBySlug = `-- name: GetTeamBySlug :one
-SELECT id, name, slug, logo, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, status, "submittedByUserId", "reviewedByUserId", "reviewedAt", "createdAt", "updatedAt"
 FROM "team" WHERE slug = $1
 `
 
@@ -669,6 +690,7 @@ func (q *Queries) GetTeamBySlug(ctx context.Context, slug string) (Team, error) 
 		&i.Name,
 		&i.Slug,
 		&i.Logo,
+		&i.Description,
 		&i.Status,
 		&i.SubmittedByUserId,
 		&i.ReviewedByUserId,
@@ -732,19 +754,20 @@ func (q *Queries) InsertTeamOrganization(ctx context.Context, arg InsertTeamOrga
 }
 
 const listApprovedOrgs = `-- name: ListApprovedOrgs :many
-SELECT id, name, slug, logo, "orgType", status
+SELECT id, name, slug, logo, description, "orgType", status
 FROM "organization"
 WHERE status = 'APPROVED'
 ORDER BY name ASC
 `
 
 type ListApprovedOrgsRow struct {
-	ID      string
-	Name    string
-	Slug    string
-	Logo    sql.NullString
-	OrgType sql.NullString
-	Status  sql.NullString
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	OrgType     sql.NullString
+	Status      sql.NullString
 }
 
 func (q *Queries) ListApprovedOrgs(ctx context.Context) ([]ListApprovedOrgsRow, error) {
@@ -761,6 +784,7 @@ func (q *Queries) ListApprovedOrgs(ctx context.Context) ([]ListApprovedOrgsRow, 
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.OrgType,
 			&i.Status,
 		); err != nil {
@@ -778,7 +802,7 @@ func (q *Queries) ListApprovedOrgs(ctx context.Context) ([]ListApprovedOrgsRow, 
 }
 
 const listMemberRows = `-- name: ListMemberRows :many
-SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
+SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "member" m JOIN "user" u ON u.id = m."userId"
 WHERE m."organizationId" = $1 ORDER BY m."createdAt" ASC
 `
@@ -789,6 +813,7 @@ type ListMemberRowsRow struct {
 	Name           string
 	VrchatUsername sql.NullString
 	Slug           sql.NullString
+	Image          sql.NullString
 }
 
 func (q *Queries) ListMemberRows(ctx context.Context, organizationid string) ([]ListMemberRowsRow, error) {
@@ -806,6 +831,7 @@ func (q *Queries) ListMemberRows(ctx context.Context, organizationid string) ([]
 			&i.Name,
 			&i.VrchatUsername,
 			&i.Slug,
+			&i.Image,
 		); err != nil {
 			return nil, err
 		}
@@ -821,7 +847,7 @@ func (q *Queries) ListMemberRows(ctx context.Context, organizationid string) ([]
 }
 
 const listOrgsForTeam = `-- name: ListOrgsForTeam :many
-SELECT o.id, o.name, o.slug, o.logo, o."orgType", o.status, tor."isPrimary"
+SELECT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, tor."isPrimary"
 FROM "organization" o
 JOIN "teamOrganization" tor ON o.id = tor."organizationId"
 WHERE tor."teamId" = $1
@@ -829,13 +855,14 @@ ORDER BY tor."isPrimary" DESC, o.name ASC
 `
 
 type ListOrgsForTeamRow struct {
-	ID        string
-	Name      string
-	Slug      string
-	Logo      sql.NullString
-	OrgType   sql.NullString
-	Status    sql.NullString
-	IsPrimary bool
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	OrgType     sql.NullString
+	Status      sql.NullString
+	IsPrimary   bool
 }
 
 func (q *Queries) ListOrgsForTeam(ctx context.Context, teamid string) ([]ListOrgsForTeamRow, error) {
@@ -852,6 +879,7 @@ func (q *Queries) ListOrgsForTeam(ctx context.Context, teamid string) ([]ListOrg
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.OrgType,
 			&i.Status,
 			&i.IsPrimary,
@@ -870,7 +898,7 @@ func (q *Queries) ListOrgsForTeam(ctx context.Context, teamid string) ([]ListOrg
 }
 
 const listOrgsForTeamsBatch = `-- name: ListOrgsForTeamsBatch :many
-SELECT tor."teamId", o.id, o.name, o.slug, o.logo, o."orgType", o.status, tor."isPrimary"
+SELECT tor."teamId", o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, tor."isPrimary"
 FROM "organization" o
 JOIN "teamOrganization" tor ON o.id = tor."organizationId"
 WHERE tor."teamId" = ANY($1::text[])
@@ -878,14 +906,15 @@ ORDER BY tor."isPrimary" DESC, o.name ASC
 `
 
 type ListOrgsForTeamsBatchRow struct {
-	TeamId    string
-	ID        string
-	Name      string
-	Slug      string
-	Logo      sql.NullString
-	OrgType   sql.NullString
-	Status    sql.NullString
-	IsPrimary bool
+	TeamId      string
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	OrgType     sql.NullString
+	Status      sql.NullString
+	IsPrimary   bool
 }
 
 func (q *Queries) ListOrgsForTeamsBatch(ctx context.Context, dollar_1 []string) ([]ListOrgsForTeamsBatchRow, error) {
@@ -903,6 +932,7 @@ func (q *Queries) ListOrgsForTeamsBatch(ctx context.Context, dollar_1 []string) 
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.OrgType,
 			&i.Status,
 			&i.IsPrimary,
@@ -921,7 +951,7 @@ func (q *Queries) ListOrgsForTeamsBatch(ctx context.Context, dollar_1 []string) 
 }
 
 const listPendingOrgs = `-- name: ListPendingOrgs :many
-SELECT id, name, slug, logo, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
 FROM "organization"
 WHERE status = 'PENDING'
 ORDER BY "createdAt" ASC
@@ -932,6 +962,7 @@ type ListPendingOrgsRow struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
+	Description       sql.NullString
 	OrgType           sql.NullString
 	Status            sql.NullString
 	DiscordInvite     sql.NullString
@@ -955,6 +986,7 @@ func (q *Queries) ListPendingOrgs(ctx context.Context) ([]ListPendingOrgsRow, er
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.OrgType,
 			&i.Status,
 			&i.DiscordInvite,
@@ -977,7 +1009,7 @@ func (q *Queries) ListPendingOrgs(ctx context.Context) ([]ListPendingOrgsRow, er
 }
 
 const listPendingTeams = `-- name: ListPendingTeams :many
-SELECT id, name, slug, logo, status, "submittedByUserId", "createdAt", "updatedAt"
+SELECT id, name, slug, logo, description, status, "submittedByUserId", "createdAt", "updatedAt"
 FROM "team"
 WHERE status = 'PENDING'
 ORDER BY "createdAt" ASC
@@ -988,6 +1020,7 @@ type ListPendingTeamsRow struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
+	Description       sql.NullString
 	Status            string
 	SubmittedByUserId sql.NullString
 	CreatedAt         time.Time
@@ -1008,6 +1041,7 @@ func (q *Queries) ListPendingTeams(ctx context.Context) ([]ListPendingTeamsRow, 
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.Status,
 			&i.SubmittedByUserId,
 			&i.CreatedAt,
@@ -1027,7 +1061,7 @@ func (q *Queries) ListPendingTeams(ctx context.Context) ([]ListPendingTeamsRow, 
 }
 
 const listRosterForTeam = `-- name: ListRosterForTeam :many
-SELECT tm."userId", tm.role, u.name, u."vrchatUsername", u.slug
+SELECT tm."userId", tm.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "teamMember" tm JOIN "user" u ON u.id = tm."userId"
 WHERE tm."teamId" = $1 ORDER BY tm."createdAt" ASC
 `
@@ -1038,6 +1072,7 @@ type ListRosterForTeamRow struct {
 	Name           string
 	VrchatUsername sql.NullString
 	Slug           sql.NullString
+	Image          sql.NullString
 }
 
 func (q *Queries) ListRosterForTeam(ctx context.Context, teamid string) ([]ListRosterForTeamRow, error) {
@@ -1055,6 +1090,7 @@ func (q *Queries) ListRosterForTeam(ctx context.Context, teamid string) ([]ListR
 			&i.Name,
 			&i.VrchatUsername,
 			&i.Slug,
+			&i.Image,
 		); err != nil {
 			return nil, err
 		}
@@ -1070,7 +1106,7 @@ func (q *Queries) ListRosterForTeam(ctx context.Context, teamid string) ([]ListR
 }
 
 const listRosterForTeamsBatch = `-- name: ListRosterForTeamsBatch :many
-SELECT tm."teamId", tm."userId", tm.role, u.name, u."vrchatUsername", u.slug
+SELECT tm."teamId", tm."userId", tm.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "teamMember" tm JOIN "user" u ON u.id = tm."userId"
 WHERE tm."teamId" = ANY($1::text[]) ORDER BY tm."createdAt" ASC
 `
@@ -1082,6 +1118,7 @@ type ListRosterForTeamsBatchRow struct {
 	Name           string
 	VrchatUsername sql.NullString
 	Slug           sql.NullString
+	Image          sql.NullString
 }
 
 func (q *Queries) ListRosterForTeamsBatch(ctx context.Context, dollar_1 []string) ([]ListRosterForTeamsBatchRow, error) {
@@ -1100,6 +1137,7 @@ func (q *Queries) ListRosterForTeamsBatch(ctx context.Context, dollar_1 []string
 			&i.Name,
 			&i.VrchatUsername,
 			&i.Slug,
+			&i.Image,
 		); err != nil {
 			return nil, err
 		}
@@ -1115,7 +1153,7 @@ func (q *Queries) ListRosterForTeamsBatch(ctx context.Context, dollar_1 []string
 }
 
 const listTeamMemberRows = `-- name: ListTeamMemberRows :many
-SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
+SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "member" m JOIN "user" u ON u.id = m."userId"
 WHERE m."organizationId" = $1 ORDER BY m."createdAt" ASC
 LIMIT NULLIF($2::int, 0) OFFSET $3
@@ -1133,6 +1171,7 @@ type ListTeamMemberRowsRow struct {
 	Name           string
 	VrchatUsername sql.NullString
 	Slug           sql.NullString
+	Image          sql.NullString
 }
 
 func (q *Queries) ListTeamMemberRows(ctx context.Context, arg ListTeamMemberRowsParams) ([]ListTeamMemberRowsRow, error) {
@@ -1150,6 +1189,7 @@ func (q *Queries) ListTeamMemberRows(ctx context.Context, arg ListTeamMemberRows
 			&i.Name,
 			&i.VrchatUsername,
 			&i.Slug,
+			&i.Image,
 		); err != nil {
 			return nil, err
 		}
@@ -1165,7 +1205,7 @@ func (q *Queries) ListTeamMemberRows(ctx context.Context, arg ListTeamMemberRows
 }
 
 const listTeamMemberRowsBySearch = `-- name: ListTeamMemberRowsBySearch :many
-SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug
+SELECT m."userId", m.role, u.name, u."vrchatUsername", u.slug, u.image
 FROM "member" m JOIN "user" u ON u.id = m."userId"
 WHERE m."organizationId" = $1
   AND (u.name ILIKE '%' || $2::text || '%' OR u."vrchatUsername" ILIKE '%' || $2::text || '%' OR u.slug ILIKE '%' || $2::text || '%')
@@ -1186,6 +1226,7 @@ type ListTeamMemberRowsBySearchRow struct {
 	Name           string
 	VrchatUsername sql.NullString
 	Slug           sql.NullString
+	Image          sql.NullString
 }
 
 func (q *Queries) ListTeamMemberRowsBySearch(ctx context.Context, arg ListTeamMemberRowsBySearchParams) ([]ListTeamMemberRowsBySearchRow, error) {
@@ -1208,6 +1249,7 @@ func (q *Queries) ListTeamMemberRowsBySearch(ctx context.Context, arg ListTeamMe
 			&i.Name,
 			&i.VrchatUsername,
 			&i.Slug,
+			&i.Image,
 		); err != nil {
 			return nil, err
 		}
@@ -1223,7 +1265,7 @@ func (q *Queries) ListTeamMemberRowsBySearch(ctx context.Context, arg ListTeamMe
 }
 
 const listTeamRows = `-- name: ListTeamRows :many
-SELECT id, name, slug, logo, status FROM "team"
+SELECT id, name, slug, logo, description, status FROM "team"
 WHERE status = 'APPROVED'
 ORDER BY name ASC LIMIT NULLIF($1::int, 0) OFFSET $2
 `
@@ -1234,11 +1276,12 @@ type ListTeamRowsParams struct {
 }
 
 type ListTeamRowsRow struct {
-	ID     string
-	Name   string
-	Slug   string
-	Logo   sql.NullString
-	Status string
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	Status      string
 }
 
 func (q *Queries) ListTeamRows(ctx context.Context, arg ListTeamRowsParams) ([]ListTeamRowsRow, error) {
@@ -1255,6 +1298,7 @@ func (q *Queries) ListTeamRows(ctx context.Context, arg ListTeamRowsParams) ([]L
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.Status,
 		); err != nil {
 			return nil, err
@@ -1271,7 +1315,7 @@ func (q *Queries) ListTeamRows(ctx context.Context, arg ListTeamRowsParams) ([]L
 }
 
 const listTeamRowsBySearch = `-- name: ListTeamRowsBySearch :many
-SELECT id, name, slug, logo, status FROM "team"
+SELECT id, name, slug, logo, description, status FROM "team"
 WHERE status = 'APPROVED' AND (name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%')
 ORDER BY name ASC LIMIT NULLIF($2::int, 0) OFFSET $3
 `
@@ -1283,11 +1327,12 @@ type ListTeamRowsBySearchParams struct {
 }
 
 type ListTeamRowsBySearchRow struct {
-	ID     string
-	Name   string
-	Slug   string
-	Logo   sql.NullString
-	Status string
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	Status      string
 }
 
 func (q *Queries) ListTeamRowsBySearch(ctx context.Context, arg ListTeamRowsBySearchParams) ([]ListTeamRowsBySearchRow, error) {
@@ -1304,6 +1349,7 @@ func (q *Queries) ListTeamRowsBySearch(ctx context.Context, arg ListTeamRowsBySe
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.Status,
 		); err != nil {
 			return nil, err
@@ -1320,7 +1366,7 @@ func (q *Queries) ListTeamRowsBySearch(ctx context.Context, arg ListTeamRowsBySe
 }
 
 const listTeamsForOrg = `-- name: ListTeamsForOrg :many
-SELECT t.id, t.name, t.slug, t.logo, t.status, tor."isPrimary"
+SELECT t.id, t.name, t.slug, t.logo, t.description, t.status, tor."isPrimary"
 FROM "team" t
 JOIN "teamOrganization" tor ON t.id = tor."teamId"
 WHERE tor."organizationId" = $1
@@ -1328,12 +1374,13 @@ ORDER BY t.name ASC
 `
 
 type ListTeamsForOrgRow struct {
-	ID        string
-	Name      string
-	Slug      string
-	Logo      sql.NullString
-	Status    string
-	IsPrimary bool
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	Status      string
+	IsPrimary   bool
 }
 
 func (q *Queries) ListTeamsForOrg(ctx context.Context, organizationid string) ([]ListTeamsForOrgRow, error) {
@@ -1350,6 +1397,7 @@ func (q *Queries) ListTeamsForOrg(ctx context.Context, organizationid string) ([
 			&i.Name,
 			&i.Slug,
 			&i.Logo,
+			&i.Description,
 			&i.Status,
 			&i.IsPrimary,
 		); err != nil {
@@ -1486,17 +1534,20 @@ UPDATE "organization"
 SET "slug" = $1,
     "updatedAt" = $2,
     "name" = COALESCE($3, "name"),
-    "logo" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "logo") END
-WHERE id = $6
+    "description" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "description") END,
+    "logo" = CASE WHEN $6::boolean THEN NULL ELSE COALESCE($7, "logo") END
+WHERE id = $8
 `
 
 type UpdateOrgParams struct {
-	Slug      string
-	UpdatedAt sql.NullTime
-	Name      sql.NullString
-	ClearLogo bool
-	Logo      sql.NullString
-	ID        string
+	Slug             string
+	UpdatedAt        sql.NullTime
+	Name             sql.NullString
+	ClearDescription bool
+	Description      sql.NullString
+	ClearLogo        bool
+	Logo             sql.NullString
+	ID               string
 }
 
 func (q *Queries) UpdateOrg(ctx context.Context, arg UpdateOrgParams) error {
@@ -1504,6 +1555,8 @@ func (q *Queries) UpdateOrg(ctx context.Context, arg UpdateOrgParams) error {
 		arg.Slug,
 		arg.UpdatedAt,
 		arg.Name,
+		arg.ClearDescription,
+		arg.Description,
 		arg.ClearLogo,
 		arg.Logo,
 		arg.ID,
@@ -1532,17 +1585,20 @@ UPDATE "team"
 SET "slug" = $1,
     "updatedAt" = $2,
     "name" = COALESCE($3, "name"),
-    "logo" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "logo") END
-WHERE id = $6
+    "description" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "description") END,
+    "logo" = CASE WHEN $6::boolean THEN NULL ELSE COALESCE($7, "logo") END
+WHERE id = $8
 `
 
 type UpdateTeamParams struct {
-	Slug      string
-	UpdatedAt sql.NullTime
-	Name      sql.NullString
-	ClearLogo bool
-	Logo      sql.NullString
-	ID        string
+	Slug             string
+	UpdatedAt        sql.NullTime
+	Name             sql.NullString
+	ClearDescription bool
+	Description      sql.NullString
+	ClearLogo        bool
+	Logo             sql.NullString
+	ID               string
 }
 
 func (q *Queries) UpdateTeam(ctx context.Context, arg UpdateTeamParams) error {
@@ -1550,6 +1606,8 @@ func (q *Queries) UpdateTeam(ctx context.Context, arg UpdateTeamParams) error {
 		arg.Slug,
 		arg.UpdatedAt,
 		arg.Name,
+		arg.ClearDescription,
+		arg.Description,
 		arg.ClearLogo,
 		arg.Logo,
 		arg.ID,
