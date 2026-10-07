@@ -35,8 +35,13 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 			return nil, err
 		}
 	}
+	targetOrgID := id
 	if _, err := q().OrgIDByID(ctx, id); errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
+		if primOrg, errPrim := q().GetPrimaryOrgForTeam(ctx, id); errPrim == nil && primOrg.ID != "" {
+			targetOrgID = primOrg.ID
+		} else {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
+		}
 	} else if err != nil {
 		return nil, err
 	}
@@ -62,11 +67,12 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 		PointsAverage:         pointsAverage,
 		SeasonRank:            seasonRank,
 		AveragePointsPerEvent: averagePointsPerEvent,
-		ID:                    id,
+		ID:                    targetOrgID,
 	}); err != nil {
 		return nil, err
 	}
 	invalidateTeamCache(ctx, id)
+	invalidateTeamCache(ctx, targetOrgID)
 	if loaded, err := loadTeam(ctx, id); err == nil {
 		return loaded, nil
 	}

@@ -108,8 +108,8 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                   <PixelStack gap={1} className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
-                        to="/t/$team"
-                        params={{ team: org.slug || org.id }}
+                        to="/$user"
+                        params={{ user: org.slug || org.id }}
                         className="font-pixel text-sm text-retro-text hover:text-retro-primary font-bold truncate"
                         title={org.name}
                       >
@@ -130,42 +130,46 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
         </div>
       )}
 
-      {/* Team Aggregate Statistics */}
-      <PixelSectionHeader
-        title="TEAM STATISTICS"
-        titleTone="purple"
-        size="md"
-      />
+      {/* Team Aggregate Statistics - Excluded for governing bodies / standalone organizations */}
+      {!isStandaloneOrg && (
+        <>
+          <PixelSectionHeader
+            title="TEAM STATISTICS"
+            titleTone="purple"
+            size="md"
+          />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 mb-8">
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">SEASON RANK</div>
-          <div className="font-pixel text-3xl text-retro-gold font-bold">
-            {team.stats?.seasonRank ? `#${team.stats.seasonRank}` : '—'}
-          </div>
-        </PixelCard>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 mb-8">
+            <PixelCard className="bg-retro-surface text-center py-5">
+              <div className="font-pixel text-xs text-retro-muted mb-1">SEASON RANK</div>
+              <div className="font-pixel text-3xl text-retro-gold font-bold">
+                {team.stats?.seasonRank ? `#${team.stats.seasonRank}` : '—'}
+              </div>
+            </PixelCard>
 
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">RANKING AVERAGE</div>
-          <div className="font-mono text-3xl text-retro-text font-bold">
-            {team.stats?.rankingAverage ? team.stats.rankingAverage.toFixed(1) : '—'}
-          </div>
-        </PixelCard>
+            <PixelCard className="bg-retro-surface text-center py-5">
+              <div className="font-pixel text-xs text-retro-muted mb-1">RANKING AVERAGE</div>
+              <div className="font-mono text-3xl text-retro-text font-bold">
+                {team.stats?.rankingAverage ? team.stats.rankingAverage.toFixed(1) : '—'}
+              </div>
+            </PixelCard>
 
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">AVG POINTS / EVENT</div>
-          <div className="font-mono text-3xl text-retro-text font-bold">
-            {team.stats?.averagePointsPerEvent ? team.stats.averagePointsPerEvent.toFixed(1) : '—'}
-          </div>
-        </PixelCard>
+            <PixelCard className="bg-retro-surface text-center py-5">
+              <div className="font-pixel text-xs text-retro-muted mb-1">AVG POINTS / EVENT</div>
+              <div className="font-mono text-3xl text-retro-text font-bold">
+                {team.stats?.averagePointsPerEvent ? team.stats.averagePointsPerEvent.toFixed(1) : '—'}
+              </div>
+            </PixelCard>
 
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">POINTS AVERAGE</div>
-          <div className="font-mono text-3xl text-retro-green font-bold">
-            {team.stats?.pointsAverage ? team.stats.pointsAverage.toFixed(1) : '—'}
+            <PixelCard className="bg-retro-surface text-center py-5">
+              <div className="font-pixel text-xs text-retro-muted mb-1">POINTS AVERAGE</div>
+              <div className="font-mono text-3xl text-retro-green font-bold">
+                {team.stats?.pointsAverage ? team.stats.pointsAverage.toFixed(1) : '—'}
+              </div>
+            </PixelCard>
           </div>
-        </PixelCard>
-      </div>
+        </>
+      )}
 
       {/* Team Roster Section */}
       <PixelCard className="bg-retro-surface">
