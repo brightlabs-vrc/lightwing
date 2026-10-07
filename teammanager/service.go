@@ -342,7 +342,58 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 				t.Stats.AveragePointsPerEvent = computedStats.AveragePointsPerEvent
 			}
 		}
+
+		if primOrgID != "" {
+			if orgRow, err := q().GetOrgByID(ctx, primOrgID); err == nil {
+				if t.Stats.RankingAverage == nil {
+					t.Stats.RankingAverage = nullFloatToPtr(orgRow.RankingAverage)
+				}
+				if t.Stats.PointsAverage == nil {
+					t.Stats.PointsAverage = nullFloatToPtr(orgRow.PointsAverage)
+				}
+				if t.Stats.SeasonRank == nil {
+					t.Stats.SeasonRank = nullInt32ToPtr(orgRow.SeasonRank)
+				}
+				if t.Stats.AveragePointsPerEvent == nil {
+					t.Stats.AveragePointsPerEvent = nullFloatToPtr(orgRow.AveragePointsPerEvent)
+				}
+			}
+		}
 		return t, nil
+	}
+
+	// If not found in `team` table, fall back to `organization` table (standalone / legacy governing organization)
+	if errors.Is(err, sql.ErrNoRows) {
+		var orgRow sqlc.GetOrgByIDRow
+		orgRow, err = q().GetOrgByID(ctx, id)
+		if errors.Is(err, sql.ErrNoRows) {
+			var slugRow sqlc.GetOrgBySlugRow
+			slugRow, err = q().GetOrgBySlug(ctx, id)
+			if err == nil {
+				orgRow = sqlc.GetOrgByIDRow{
+					ID: slugRow.ID, Name: slugRow.Name, Slug: slugRow.Slug, Logo: slugRow.Logo,
+					OrgType: slugRow.OrgType, Status: slugRow.Status,
+					DiscordInvite: slugRow.DiscordInvite, VrchatGroupId: slugRow.VrchatGroupId,
+					SubmittedByUserId: slugRow.SubmittedByUserId, CreatedAt: slugRow.CreatedAt, UpdatedAt: slugRow.UpdatedAt,
+					RankingAverage: slugRow.RankingAverage, PointsAverage: slugRow.PointsAverage,
+					SeasonRank: slugRow.SeasonRank, AveragePointsPerEvent: slugRow.AveragePointsPerEvent,
+				}
+			}
+		}
+
+		if err == nil {
+			members, mErr := loadMemberRows(ctx, orgRow.ID)
+			if mErr != nil {
+				return nil, mErr
+			}
+			orgShape := &sqlc.Organization{
+				ID: orgRow.ID, Name: orgRow.Name, Slug: orgRow.Slug, Logo: orgRow.Logo,
+			}
+			t := toTeam(orgShape, members)
+			// Organizations do not have ranking layer / team stats attached
+			t.Stats = TeamStats{}
+			return t, nil
+		}
 	}
 
 	if errors.Is(err, sql.ErrNoRows) {

@@ -477,9 +477,18 @@ func TestUpdateTeamStats(t *testing.T) {
 		createOrgWithMembers(t, ctx, orgID, "Update Team", nextTeamID("update-team"), []memberSpec{
 			{userID: updater, role: "administrator", name: "Updater"},
 		})
-		token := insertTestSession(t, ctx, updater)
 
-		team, err := updateTeamStats(ctx, bearer(token), orgID, &TeamStatsUpdate{
+		// Create a competition team in the team table for stats testing
+		teamName := "Update Team Competition"
+		siteAdminUser := nextTeamID("site-admin-stats")
+		insertTestUser(t, ctx, siteAdminUser, "Stats Site Admin", "SITE_ADMIN")
+		siteToken := insertTestSession(t, ctx, siteAdminUser)
+		compTeam, err := createTeam(ctx, bearer(siteToken), teamName, nil, &orgID)
+		if err != nil {
+			t.Fatalf("createTeam failed: %v", err)
+		}
+
+		team, err := updateTeamStats(ctx, bearer(siteToken), compTeam.ID, &TeamStatsUpdate{
 			RankingAverage: fptr(5.5),
 			PointsAverage:  fptr(99.1),
 		})
