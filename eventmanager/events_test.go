@@ -729,6 +729,118 @@ func Test_EventConclusionRecalculatesLeaderboard(t *testing.T) {
 	}
 }
 
+func Test_OrgAdminOfficialEventTag(t *testing.T) {
+	f := newFixtures(t)
+	orgAdminID := f.createUser("org-admin", "Org Admin User", nil, "USER")
+	token := f.createSession(orgAdminID)
+
+	orgID := "org-" + newID()[:8]
+	now := time.Now().UTC()
+	_, err := db.Exec(f.ctx,
+		`INSERT INTO "organization" (id, name, slug, "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $4)`,
+		orgID, "Test Org", "test-org-"+orgID, now)
+	if err != nil {
+		t.Fatalf("insert org: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.Exec(context.Background(), `DELETE FROM "member" WHERE "organizationId"=$1`, orgID)
+		_, _ = db.Exec(context.Background(), `DELETE FROM "organization" WHERE id=$1`, orgID)
+	})
+
+	_, err = db.Exec(f.ctx,
+		`INSERT INTO "member" (id, "organizationId", "userId", role, "createdAt") VALUES ($1, $2, $3, 'administrator', $4)`,
+		"mem-"+newID()[:8], orgID, orgAdminID, now)
+	if err != nil {
+		t.Fatalf("insert member: %v", err)
+	}
+
+	// 1. Create org event without tag -> defaults to OFFICIAL for org events
+	orgEvent1, err := CreateEventCore(f.ctx, &CreateEventRequest{
+		Authorization: token,
+		Name:          "Org Event Default Tag",
+		OwnerType:     "ORGANIZATION",
+		OrganizationID: &orgID,
+		ScoringType:   ScoringPoints,
+	})
+	if err != nil {
+		t.Fatalf("create org event default tag: %v", err)
+	}
+	f.events = append(f.events, orgEvent1.ID)
+	if orgEvent1.Tag != "OFFICIAL" {
+		t.Errorf("orgEvent1.Tag = %q, want OFFICIAL", orgEvent1.Tag)
+	}
+
+	// 2. Create org event with explicit tag "OFFICIAL"
+	offTag := "OFFICIAL"
+	orgEvent2, err := CreateEventCore(f.ctx, &CreateEventRequest{
+		Authorization: token,
+		Name:          "Org Event Explicit Official Tag",
+		OwnerType:     "ORGANIZATION",
+		OrganizationID: &orgID,
+		Tag:           &offTag,
+		ScoringType:   ScoringPoints,
+	})
+	if err != nil {
+		t.Fatalf("create org event explicit official tag: %v", err)
+	}
+	f.events = append(f.events, orgEvent2.ID)
+	if orgEvent2.Tag != "OFFICIAL" {
+		t.Errorf("orgEvent2.Tag = %q, want OFFICIAL", orgEvent2.Tag)
+	}
+
+	// 3. Update tag on org event to COMMUNITY and back to OFFICIAL
+	commTag := "COMMUNITY"
+	updated, err := UpdateEventCore(f.ctx, &UpdateEventRequest{
+		ID:            orgEvent2.ID,
+		Authorization: token,
+		Tag:           &commTag,
+	})
+	if err != nil {
+		t.Fatalf("update tag to COMMUNITY: %v", err)
+	}
+	if updated.Tag != "COMMUNITY" {
+		t.Errorf("updated.Tag = %q, want COMMUNITY", updated.Tag)
+	}
+
+	updated2, err := UpdateEventCore(f.ctx, &UpdateEventRequest{
+		ID:            orgEvent2.ID,
+		Authorization: token,
+		Tag:           &offTag,
+	})
+	if err != nil {
+		t.Fatalf("update tag back to OFFICIAL: %v", err)
+	}
+	if updated2.Tag != "OFFICIAL" {
+		t.Errorf("updated2.Tag = %q, want OFFICIAL", updated2.Tag)
+	}
+
+	// 4. Set status & tag via SetEventStatusCore
+	statusUpdated, err := SetEventStatusCore(f.ctx, &SetEventStatusRequest{
+		ID:            orgEvent2.ID,
+		Authorization: token,
+		Status:        strptr("PENDING"),
+		Tag:           &offTag,
+	})
+	if err != nil {
+		t.Fatalf("set event status and tag: %v", err)
+	}
+	if statusUpdated.Status != "PENDING" || statusUpdated.Tag != "OFFICIAL" {
+		t.Errorf("statusUpdated status=%q tag=%q, want PENDING, OFFICIAL", statusUpdated.Status, statusUpdated.Tag)
+	}
+
+	// 5. Non-admin or user-owned OFFICIAL tag still rejected for regular users
+	normalUserID := f.createUser("normal-user", "Normal User", nil, "USER")
+	normalToken := f.createSession(normalUserID)
+	_, err = CreateEventCore(f.ctx, &CreateEventRequest{
+		Authorization: normalToken,
+		Name:          "User Official Event",
+		OwnerType:     "USER",
+		Tag:           &offTag,
+		ScoringType:   ScoringPoints,
+	})
+	requireErrCode(t, err, errs.PermissionDenied, "")
+}
+
 // NOTE on ordering.test.ts and eligible_races.test.ts: both exercise
 // race-scoped services (raceevents.ts createRaceEvent/reorderRaceEvents and
 // classes.ts listEligibleEvents), which are ported separately. The event-level

@@ -168,7 +168,8 @@ type SetEventStatusRequest struct {
 
 // SetEventStatusCore sets an event's lifecycle status and/or hosting tag.
 func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDetail, error) {
-	if _, err := requireEventRow(ctx, p.ID); err != nil {
+	existing, err := requireEventRow(ctx, p.ID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -178,8 +179,14 @@ func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDe
 			tag = "COMMUNITY"
 		}
 		if tag == "OFFICIAL" {
-			if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
-				return nil, err
+			if existing.OwnerType != "ORGANIZATION" {
+				if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
+					return nil, err
+				}
+			} else {
+				if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+					return nil, err
+				}
 			}
 		} else if tag != "COMMUNITY" {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "tag must be OFFICIAL or COMMUNITY"}

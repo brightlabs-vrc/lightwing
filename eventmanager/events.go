@@ -593,13 +593,19 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 	tag := "COMMUNITY"
 	if p.Tag != nil && *p.Tag != "" {
 		tag = *p.Tag
+	} else if p.OwnerType == "ORGANIZATION" {
+		tag = "OFFICIAL"
 	}
 	if tag == "UNOFFICIAL" {
 		tag = "COMMUNITY"
 	}
 	if tag == "OFFICIAL" {
-		if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
-			return nil, err
+		if p.OwnerType == "ORGANIZATION" && organizationID != nil {
+			// Permission already verified above for OrganizationID with ResourceEvent, ActionCreate.
+		} else {
+			if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
+				return nil, err
+			}
 		}
 	} else if tag != "COMMUNITY" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "tag must be OFFICIAL or COMMUNITY"}

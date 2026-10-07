@@ -2058,6 +2058,70 @@ export async function recomputeEventPoints(
   return { success: true }
 }
 
+// -----------------------------------------------------------------------------
+// DATASETS OPERATIONS
+// -----------------------------------------------------------------------------
+
+export async function listAdminDatasets(eventId: string): Promise<{ datasets: eventmanager.DatasetView[] }> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.ListDatasets({ EventID: eventId })
+  }
+  return { datasets: [] }
+}
+
+export async function createAdminDataset(
+  eventId: string,
+  source: string,
+  rows: number,
+  status: string,
+  authHeader: string
+): Promise<eventmanager.DatasetView> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.CreateDataset({
+      eventId,
+      source,
+      rows,
+      status,
+      Authorization: authHeader,
+    })
+  }
+  const id = `dataset_${Math.floor(Math.random() * 10000)}`
+  return {
+    id,
+    eventId,
+    source,
+    rows,
+    status,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+export async function updateAdminDatasetStatus(
+  eventId: string,
+  datasetId: string,
+  status: string,
+  authHeader: string
+): Promise<eventmanager.DatasetView> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.UpdateDatasetStatus({
+      eventId,
+      datasetId,
+      status,
+      Authorization: authHeader,
+    })
+  }
+  return {
+    id: datasetId,
+    eventId,
+    source: 'Mock Source',
+    rows: 10,
+    status,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
 export async function createAdminTeam(
   params: { name: string; logo?: string | null; primaryOrganizationId?: string | null },
   authorization: string,

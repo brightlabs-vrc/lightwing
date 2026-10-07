@@ -193,8 +193,10 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 			tag = "COMMUNITY"
 		}
 		if tag == "OFFICIAL" {
-			if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
-				return nil, err
+			if existing.OwnerType != "ORGANIZATION" {
+				if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
+					return nil, err
+				}
 			}
 		} else if tag != "COMMUNITY" {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "tag must be OFFICIAL or COMMUNITY"}

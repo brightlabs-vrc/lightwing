@@ -21,6 +21,9 @@ import {
   listAdminApplications,
   reviewAdminApplication,
   updateAdminOrganization,
+  listAdminDatasets,
+  createAdminDataset,
+  updateAdminDatasetStatus,
 } from '../../lib/admin-api'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
 import { Pagination } from '../../components/Pagination'
@@ -39,10 +42,17 @@ import {
   PixelTextarea,
   PixelModal,
   PixelTable,
+  PixelSpinner,
   type PixelTableColumn,
   useToast,
 } from '@pxlkit/ui-kit'
 import { ManagementLayout } from './-ManagementLayout'
+import { useEventDetail } from '../../hooks/useEventDetail'
+import { EventScoringTablesEditor } from '../../components/EventScoringTablesEditor'
+import { StandingsEditor } from '../../components/StandingsEditor'
+import { DEFAULT_SCORING_TABLES } from '../../lib/scoringDefaults'
+import { toLocalISOString } from '../../lib/datetime'
+import type { ClassTier, EventStatus, EventTag } from '../../types'
 
 export const Route = createFileRoute('/teams/manage/$id')({
   beforeLoad: async ({ location }) => {
@@ -77,6 +87,7 @@ function ManageOrgPage() {
   // Events state
   const [events, setEvents] = useState<eventmanager.EventListItem[]>([])
   const [loadingEvents, setLoadingEvents] = useState(false)
+  const [selectedManagedEventId, setSelectedManagedEventId] = useState<string | null>(null)
 
   // Applications state
   const [applications, setApplications] = useState<teammanager.TeamApplicationView[]>([])
@@ -88,8 +99,6 @@ function ManageOrgPage() {
   const [isLinkOrgModalOpen, setIsLinkOrgModalOpen] = useState(false)
   const [isApplyOrgModalOpen, setIsApplyOrgModalOpen] = useState(false)
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false)
-  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false)
-  const [selectedEventToEdit, setSelectedEventToEdit] = useState<eventmanager.EventListItem | null>(null)
 
   // Metadata form state
   const [teamName, setTeamName] = useState('')
@@ -118,9 +127,15 @@ function ManageOrgPage() {
   // Event form state
   const [eventName, setEventName] = useState('')
   const [eventDescription, setEventDescription] = useState('')
-  const [eventScoringType, setEventScoringType] = useState(1)
-  const [eventClassRestriction, setEventClassRestriction] = useState('')
+  const [eventTag, setEventTag] = useState<EventTag>('OFFICIAL')
+  const [eventScoringType, setEventScoringType] = useState<number>(1)
+  const [eventClassRestriction, setEventClassRestriction] = useState<string>('')
   const [eventGranular, setEventGranular] = useState(true)
+  const [eventScheduledAt, setEventScheduledAt] = useState('')
+  const [eventParticipantLimit, setEventParticipantLimit] = useState('')
+  const [eventMaxConcurrent, setEventMaxConcurrent] = useState('')
+  const [eventScoringRulesMode, setEventScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
+  const [eventCustomScoringTables, setEventCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [creatingEvent, setCreatingEvent] = useState(false)
   const [eventError, setEventError] = useState<string | null>(null)
 
@@ -128,23 +143,6 @@ function ManageOrgPage() {
     const token = session?.session.token
     return token ? `Bearer ${token}` : null
   }, [session?.session.token])
-
-  const userManagedOrgs = useMemo(() => {
-    const list: Array<{ id: string; name: string; slug: string }> = []
-    if (session?.user?.teams) {
-      for (const t of session.user.teams) {
-        list.push({ id: t.organizationId, name: t.name, slug: t.slug })
-      }
-    }
-    if (approvedOrgs.length > 0) {
-      for (const ao of approvedOrgs) {
-        if (!list.some((x) => x.id === ao.id)) {
-          list.push({ id: ao.id, name: ao.name, slug: ao.slug })
-        }
-      }
-    }
-    return list
-  }, [session?.user?.teams, approvedOrgs])
 
   async function loadTeamData() {
     setLoading(true)
@@ -334,54 +332,42 @@ function ManageOrgPage() {
     setCreatingEvent(true)
     setEventError(null)
     try {
+      const limitNum = eventParticipantLimit.trim() ? Number(eventParticipantLimit) : null
+      const maxConcurrentNum = eventMaxConcurrent.trim() ? Number(eventMaxConcurrent) : null
+
       await createAdminEvent(
         {
           name: eventName,
           description: eventDescription || null,
           ownerType: 'ORGANIZATION',
           organizationId: teamId,
+          tag: eventTag,
           scoringType: eventScoringType,
           classRestriction: (eventClassRestriction as any) || null,
           granularParticipation: eventGranular,
+          scoringRulesMode: eventScoringType === 1 ? eventScoringRulesMode : null,
+          customScoringTables: eventScoringType === 1 && eventScoringRulesMode === 'CUSTOM' ? eventCustomScoringTables : null,
+          scheduledAt: eventScheduledAt ? new Date(eventScheduledAt).toISOString() : null,
+          participantLimit: !eventGranular ? limitNum : null,
+          maxConcurrentRaceParticipations: eventGranular ? maxConcurrentNum : null,
         },
         authHeader
       )
       setIsCreateEventModalOpen(false)
       setEventName('')
       setEventDescription('')
+      setEventTag('OFFICIAL')
+      setEventClassRestriction('')
+      setEventScheduledAt('')
+      setEventParticipantLimit('')
+      setEventMaxConcurrent('')
+      setEventScoringRulesMode('STANDARD')
+      setEventCustomScoringTables(DEFAULT_SCORING_TABLES)
       setSuccess('Organization event created successfully.')
       toast({ tone: 'green', title: 'Event created successfully.' })
       void fetchOrgEvents()
     } catch (cause) {
       setEventError(cause instanceof Error ? cause.message : 'Failed to create event')
-    } finally {
-      setCreatingEvent(false)
-    }
-  }
-
-  async function handleUpdateEvent(evt: React.FormEvent) {
-    evt.preventDefault()
-    if (!authHeader || !selectedEventToEdit) return
-
-    setCreatingEvent(true)
-    setEventError(null)
-    try {
-      await updateAdminEvent(
-        selectedEventToEdit.id,
-        {
-          name: eventName,
-          description: eventDescription || null,
-          classRestriction: (eventClassRestriction as any) || null,
-        },
-        authHeader
-      )
-      setIsEditEventModalOpen(false)
-      setSelectedEventToEdit(null)
-      setSuccess('Event updated successfully.')
-      toast({ tone: 'green', title: 'Event updated.' })
-      void fetchOrgEvents()
-    } catch (cause) {
-      setEventError(cause instanceof Error ? cause.message : 'Failed to update event')
     } finally {
       setCreatingEvent(false)
     }
@@ -780,114 +766,123 @@ function ManageOrgPage() {
 
               {/* TAB 2: EVENTS & RACES */}
               {activeTab === 'events' && (
-                <PixelCard className="bg-retro-surface">
-                  <PixelStack gap={4}>
-                    <PixelStack direction="row" align="center" justify="between" wrap>
-                      <PixelSectionHeader title={`ORGANIZATION EVENTS (${events.length})`} size="sm" />
-                      <PixelButton
-                        variant="solid"
-                        tone="purple"
-                        size="sm"
-                        onClick={() => {
-                          setEventError(null)
-                          setIsCreateEventModalOpen(true)
-                        }}
-                      >
-                        + CREATE EVENT
-                      </PixelButton>
+                selectedManagedEventId ? (
+                  <OrgEventDetailView
+                    eventId={selectedManagedEventId}
+                    authHeader={authHeader}
+                    onBack={() => {
+                      setSelectedManagedEventId(null)
+                      void fetchOrgEvents()
+                    }}
+                  />
+                ) : (
+                  <PixelCard className="bg-retro-surface">
+                    <PixelStack gap={4}>
+                      <PixelStack direction="row" align="center" justify="between" wrap>
+                        <PixelSectionHeader title={`ORGANIZATION EVENTS (${events.length})`} size="sm" />
+                        <PixelButton
+                          variant="solid"
+                          tone="purple"
+                          size="sm"
+                          onClick={() => {
+                            setEventError(null)
+                            setIsCreateEventModalOpen(true)
+                          }}
+                        >
+                          + CREATE EVENT
+                        </PixelButton>
+                      </PixelStack>
+
+                      {loadingEvents ? (
+                        <div className="font-pixel text-xs text-retro-muted py-4">LOADING EVENTS...</div>
+                      ) : events.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {events.map((evt) => (
+                            <PixelCard
+                              key={evt.id}
+                              className="bg-retro-bg p-4 border border-retro-border hover:border-retro-primary transition-all flex flex-col justify-between"
+                            >
+                              <PixelStack gap={2}>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <h3 className="font-pixel text-sm font-bold text-retro-text truncate">
+                                    {evt.name}
+                                  </h3>
+                                  <div className="flex items-center gap-1">
+                                    <PixelBadge tone={evt.tag === 'OFFICIAL' ? 'purple' : 'cyan'}>
+                                      {evt.tag || 'OFFICIAL'}
+                                    </PixelBadge>
+                                    <PixelBadge
+                                      tone={
+                                        evt.status === 'ONGOING'
+                                          ? 'green'
+                                          : evt.status === 'CONCLUDED'
+                                          ? 'neutral'
+                                          : evt.status === 'PENDING_DELETION'
+                                          ? 'pink'
+                                          : 'purple'
+                                      }
+                                    >
+                                      {evt.status}
+                                    </PixelBadge>
+                                  </div>
+                                </div>
+
+                                <p className="font-sans text-xs text-retro-muted line-clamp-2">
+                                  {evt.description || 'No description provided.'}
+                                </p>
+
+                                <div className="flex items-center gap-3 font-pixel text-[10px] text-retro-muted flex-wrap">
+                                  <span>RACES: {evt.raceCount}</span>
+                                  <span>MEMBERS: {evt.memberCount}</span>
+                                  <span>TYPE: {evt.scoringTypeLabel.toUpperCase()}</span>
+                                </div>
+                              </PixelStack>
+
+                              <div className="flex items-center justify-end gap-2 pt-4 mt-2 border-t border-retro-border">
+                                <PixelButton
+                                  variant="solid"
+                                  tone="purple"
+                                  size="sm"
+                                  onClick={() => setSelectedManagedEventId(evt.id)}
+                                >
+                                  MANAGE EVENT
+                                </PixelButton>
+                                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
+                                  <Link to="/events/$eventId" params={{ eventId: evt.id }}>
+                                    PUBLIC VIEW
+                                  </Link>
+                                </PixelButton>
+                                {evt.status === 'PENDING_DELETION' ? (
+                                  <PixelButton
+                                    variant="ghost"
+                                    tone="green"
+                                    size="sm"
+                                    onClick={() => handleRestoreEvent(evt.id)}
+                                  >
+                                    RESTORE
+                                  </PixelButton>
+                                ) : (
+                                  <PixelButton
+                                    variant="ghost"
+                                    tone="red"
+                                    size="sm"
+                                    onClick={() => handleDeleteEvent(evt.id)}
+                                  >
+                                    DELETE
+                                  </PixelButton>
+                                )}
+                              </div>
+                            </PixelCard>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="font-pixel text-xs text-retro-muted">
+                          NO EVENTS CREATED UNDER THIS ORGANIZATION YET.
+                        </span>
+                      )}
                     </PixelStack>
-
-                    {loadingEvents ? (
-                      <div className="font-pixel text-xs text-retro-muted py-4">LOADING EVENTS...</div>
-                    ) : events.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {events.map((evt) => (
-                          <PixelCard
-                            key={evt.id}
-                            className="bg-retro-bg p-4 border border-retro-border hover:border-retro-primary transition-all flex flex-col justify-between"
-                          >
-                            <PixelStack gap={2}>
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <h3 className="font-pixel text-sm font-bold text-retro-text truncate">
-                                  {evt.name}
-                                </h3>
-                                <PixelBadge
-                                  tone={
-                                    evt.status === 'ONGOING'
-                                      ? 'green'
-                                      : evt.status === 'CONCLUDED'
-                                      ? 'neutral'
-                                      : evt.status === 'PENDING_DELETION'
-                                      ? 'pink'
-                                      : 'purple'
-                                  }
-                                >
-                                  {evt.status}
-                                </PixelBadge>
-                              </div>
-
-                              <p className="font-sans text-xs text-retro-muted line-clamp-2">
-                                {evt.description || 'No description provided.'}
-                              </p>
-
-                              <div className="flex items-center gap-3 font-pixel text-[10px] text-retro-muted flex-wrap">
-                                <span>RACES: {evt.raceCount}</span>
-                                <span>MEMBERS: {evt.memberCount}</span>
-                                <span>TYPE: {evt.scoringTypeLabel.toUpperCase()}</span>
-                              </div>
-                            </PixelStack>
-
-                            <div className="flex items-center justify-end gap-2 pt-4 mt-2 border-t border-retro-border">
-                              <PixelButton asChild variant="ghost" tone="neutral" size="sm">
-                                <Link to="/events/$eventId" params={{ eventId: evt.id }}>
-                                  VIEW
-                                </Link>
-                              </PixelButton>
-                              <PixelButton
-                                variant="ghost"
-                                tone="purple"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedEventToEdit(evt)
-                                  setEventName(evt.name)
-                                  setEventDescription(evt.description || '')
-                                  setEventClassRestriction(evt.classRestriction || '')
-                                  setEventError(null)
-                                  setIsEditEventModalOpen(true)
-                                }}
-                              >
-                                EDIT
-                              </PixelButton>
-                              {evt.status === 'PENDING_DELETION' ? (
-                                <PixelButton
-                                  variant="ghost"
-                                  tone="green"
-                                  size="sm"
-                                  onClick={() => handleRestoreEvent(evt.id)}
-                                >
-                                  RESTORE
-                                </PixelButton>
-                              ) : (
-                                <PixelButton
-                                  variant="ghost"
-                                  tone="red"
-                                  size="sm"
-                                  onClick={() => handleDeleteEvent(evt.id)}
-                                >
-                                  DELETE
-                                </PixelButton>
-                              )}
-                            </div>
-                          </PixelCard>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="font-pixel text-xs text-retro-muted">
-                        NO EVENTS CREATED UNDER THIS ORGANIZATION YET.
-                      </span>
-                    )}
-                  </PixelStack>
-                </PixelCard>
+                  </PixelCard>
+                )
               )}
 
               {/* TAB 3: TEAM APPROVALS */}
@@ -1045,7 +1040,7 @@ function ManageOrgPage() {
               onClose={() => setIsCreateEventModalOpen(false)}
               title="CREATE ORGANIZATION EVENT"
             >
-              <form onSubmit={handleCreateEvent} className="space-y-4">
+              <form onSubmit={handleCreateEvent} className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
                 {eventError && <PixelAlert tone="red" message={eventError} />}
 
                 <PixelInput
@@ -1063,6 +1058,18 @@ function ManageOrgPage() {
                 />
 
                 <div>
+                  <label className="block font-pixel text-xs text-retro-text mb-1">EVENT HOSTING TAG</label>
+                  <select
+                    value={eventTag}
+                    onChange={(e) => setEventTag(e.target.value as EventTag)}
+                    className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                  >
+                    <option value="OFFICIAL">Official (Officially Hosted by Org)</option>
+                    <option value="COMMUNITY">Community (Community Hosted)</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-pixel text-xs text-retro-text mb-1">SCORING TYPE</label>
                   <select
                     value={eventScoringType}
@@ -1073,6 +1080,50 @@ function ManageOrgPage() {
                     <option value={2}>Ladder-Elo (Global Elo ranking)</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block font-pixel text-xs text-retro-text mb-1">CLASS TIER RESTRICTION</label>
+                  <select
+                    value={eventClassRestriction}
+                    onChange={(e) => setEventClassRestriction(e.target.value)}
+                    className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                  >
+                    <option value="">Any Tier Eligibility (None)</option>
+                    <option value="G3">G3</option>
+                    <option value="G2">G2</option>
+                    <option value="G1">G1</option>
+                  </select>
+                </div>
+
+                {eventScoringType === 1 && (
+                  <div>
+                    <label className="block font-pixel text-xs text-retro-text mb-1">POINTS SCORING RULES MODE</label>
+                    <select
+                      value={eventScoringRulesMode}
+                      onChange={(e) => setEventScoringRulesMode(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                    >
+                      <option value="STANDARD">Standard Default Tables</option>
+                      <option value="CUSTOM">Custom Event Tables (Configure below)</option>
+                    </select>
+
+                    {eventScoringRulesMode === 'CUSTOM' && (
+                      <div className="mt-2">
+                        <EventScoringTablesEditor
+                          value={eventCustomScoringTables}
+                          onChange={setEventCustomScoringTables}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <PixelInput
+                  label="SCHEDULED DATE / TIME"
+                  type="datetime-local"
+                  value={eventScheduledAt}
+                  onChange={(e) => setEventScheduledAt(e.target.value)}
+                />
 
                 <div className="flex items-center gap-2 pt-2">
                   <input
@@ -1087,48 +1138,30 @@ function ManageOrgPage() {
                   </label>
                 </div>
 
+                {!eventGranular ? (
+                  <PixelInput
+                    label="PARTICIPANT LIMIT"
+                    type="number"
+                    placeholder="e.g. 20"
+                    value={eventParticipantLimit}
+                    onChange={(e) => setEventParticipantLimit(e.target.value)}
+                  />
+                ) : (
+                  <PixelInput
+                    label="MAX RACES PER PARTICIPANT"
+                    type="number"
+                    placeholder="e.g. 3"
+                    value={eventMaxConcurrent}
+                    onChange={(e) => setEventMaxConcurrent(e.target.value)}
+                  />
+                )}
+
                 <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
                   <PixelButton variant="ghost" tone="neutral" onClick={() => setIsCreateEventModalOpen(false)}>
                     CANCEL
                   </PixelButton>
                   <PixelButton variant="solid" tone="purple" type="submit" loading={creatingEvent}>
                     CREATE EVENT
-                  </PixelButton>
-                </div>
-              </form>
-            </PixelModal>
-          )}
-
-          {/* EDIT EVENT MODAL */}
-          {isEditEventModalOpen && selectedEventToEdit && (
-            <PixelModal
-              open={isEditEventModalOpen}
-              onClose={() => setIsEditEventModalOpen(false)}
-              title="EDIT ORGANIZATION EVENT"
-            >
-              <form onSubmit={handleUpdateEvent} className="space-y-4">
-                {eventError && <PixelAlert tone="red" message={eventError} />}
-
-                <PixelInput
-                  label="EVENT NAME"
-                  required
-                  value={eventName}
-                  onChange={(e) => setEventName(e.target.value)}
-                />
-
-                <PixelTextarea
-                  label="DESCRIPTION"
-                  value={eventDescription}
-                  onChange={(e) => setEventDescription(e.target.value)}
-                  rows={3}
-                />
-
-                <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
-                  <PixelButton variant="ghost" tone="neutral" onClick={() => setIsEditEventModalOpen(false)}>
-                    CANCEL
-                  </PixelButton>
-                  <PixelButton variant="solid" tone="purple" type="submit" loading={creatingEvent}>
-                    SAVE CHANGES
                   </PixelButton>
                 </div>
               </form>
@@ -1221,5 +1254,845 @@ function ManageOrgPage() {
         </PixelStack>
       </PixelContainer>
     </ManagementLayout>
+  )
+}
+
+function OrgEventDetailView({
+  eventId,
+  authHeader,
+  onBack,
+}: {
+  eventId: string
+  authHeader: string | null
+  onBack: () => void
+}) {
+  const { toast } = useToast()
+  const detail = useEventDetail(eventId)
+  const {
+    selectedEvent,
+    activeTab,
+    setActiveTab,
+    races,
+    selectedRaceId,
+    selectedRace,
+    loadingEventDetail,
+    loadingResults,
+    savingBatch,
+    eventStatusSaving,
+    signupsLockedSaving,
+    globalError,
+    globalSuccess,
+    derivedStates,
+    changeSummary,
+    handleUpdateEventStatus,
+    handleSetSignupsLocked,
+    handleUpdateEventDetails,
+    handleRecomputeEventPoints,
+    handleDeleteEvent,
+    handleRestoreEvent,
+    handleAddMember,
+    handleRemoveMember,
+    handleAddRaceMember,
+    handleCreateRace,
+    handleStartRace,
+    handleEndRace,
+    handleDeleteRace,
+    handleSelectRace,
+    handleResultChange,
+    togglePendingDeletion,
+    handleUndoRow,
+    resetStandingsDraft,
+    handleInferFinishTimes,
+    handleCancelStandingsEdit,
+    handleUnifiedSave,
+  } = detail
+
+  // Edit Event Modal State
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editClassRestriction, setEditClassRestriction] = useState('')
+  const [editScheduledAt, setEditScheduledAt] = useState('')
+  const [editParticipantLimit, setEditParticipantLimit] = useState('')
+  const [editMaxConcurrent, setEditMaxConcurrent] = useState('')
+  const [editSignupsLocked, setEditSignupsLocked] = useState(false)
+  const [editScoringRulesMode, setEditScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
+  const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
+
+  // Member Add State
+  const [addMemberUserId, setAddMemberUserId] = useState('')
+
+  // Create Race Modal State
+  const [showCreateRaceModal, setShowCreateRaceModal] = useState(false)
+  const [raceName, setRaceName] = useState('')
+  const [raceTrackType, setRaceTrackType] = useState('Turf')
+  const [raceLocation, setRaceLocation] = useState('')
+  const [raceDistance, setRaceDistance] = useState(1200)
+  const [raceGrade, setRaceGrade] = useState('')
+
+  // Race Member Add State
+  const [addRaceMemberUserId, setAddRaceMemberUserId] = useState('')
+
+  // Datasets State
+  const [datasets, setDatasets] = useState<eventmanager.DatasetView[]>([])
+  const [loadingDatasets, setLoadingDatasets] = useState(false)
+  const [showCreateDatasetModal, setShowCreateDatasetModal] = useState(false)
+  const [datasetSource, setDatasetSource] = useState('')
+  const [datasetRows, setDatasetRows] = useState(10)
+
+  useEffect(() => {
+    if (selectedEvent) {
+      setEditName(selectedEvent.name)
+      setEditDescription(selectedEvent.description ?? '')
+      setEditClassRestriction(selectedEvent.classRestriction ?? '')
+      setEditScheduledAt(selectedEvent.scheduledAt ? toLocalISOString(selectedEvent.scheduledAt) : '')
+      setEditParticipantLimit(selectedEvent.participantLimit !== null ? String(selectedEvent.participantLimit) : '')
+      setEditMaxConcurrent(selectedEvent.maxConcurrentRaceParticipations !== null ? String(selectedEvent.maxConcurrentRaceParticipations) : '')
+      setEditSignupsLocked(selectedEvent.signupsLocked)
+      setEditScoringRulesMode((selectedEvent.scoringRulesMode as 'STANDARD' | 'CUSTOM') || 'STANDARD')
+      if (selectedEvent.customScoringTables) {
+        setEditCustomScoringTables(selectedEvent.customScoringTables as Record<string, Record<number, number>>)
+      } else {
+        setEditCustomScoringTables(DEFAULT_SCORING_TABLES)
+      }
+    }
+  }, [selectedEvent, showEditModal])
+
+  useEffect(() => {
+    if (activeTab === 'datasets' && eventId) {
+      void fetchDatasets()
+    }
+  }, [activeTab, eventId])
+
+  async function fetchDatasets() {
+    setLoadingDatasets(true)
+    try {
+      const res = await listAdminDatasets(eventId)
+      setDatasets(res.datasets || [])
+    } catch (err) {
+      console.error('Failed to load datasets', err)
+    } finally {
+      setLoadingDatasets(false)
+    }
+  }
+
+  async function handleCreateDataset(e: React.FormEvent) {
+    e.preventDefault()
+    if (!authHeader || !datasetSource) return
+    try {
+      await createAdminDataset(eventId, datasetSource, datasetRows, 'PENDING', authHeader)
+      setShowCreateDatasetModal(false)
+      setDatasetSource('')
+      toast({ tone: 'green', title: 'Dataset created.' })
+      void fetchDatasets()
+    } catch (err) {
+      toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to create dataset' })
+    }
+  }
+
+  async function handleUpdateDatasetStatus(dsId: string, status: string) {
+    if (!authHeader) return
+    try {
+      await updateAdminDatasetStatus(eventId, dsId, status, authHeader)
+      toast({ tone: 'green', title: 'Dataset status updated.' })
+      void fetchDatasets()
+    } catch (err) {
+      toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to update dataset status' })
+    }
+  }
+
+  async function onSaveEditDetails(e: React.FormEvent) {
+    e.preventDefault()
+    const limitNum = editParticipantLimit.trim() ? Number(editParticipantLimit) : null
+    const maxConcurrentNum = editMaxConcurrent.trim() ? Number(editMaxConcurrent) : null
+
+    await handleUpdateEventDetails({
+      name: editName,
+      description: editDescription || null,
+      classRestriction: (editClassRestriction as any) || null,
+      scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
+      participantLimit: limitNum,
+      maxConcurrentRaceParticipations: maxConcurrentNum,
+      scoringRulesMode: editScoringRulesMode,
+      customScoringTables: editScoringRulesMode === 'CUSTOM' ? editCustomScoringTables : null,
+    })
+    if (selectedEvent && editSignupsLocked !== selectedEvent.signupsLocked) {
+      await handleSetSignupsLocked(editSignupsLocked)
+    }
+    setShowEditModal(false)
+  }
+
+  async function onCreateRaceSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!authHeader) return
+    try {
+      await handleCreateRace(e)
+      setShowCreateRaceModal(false)
+      setRaceName('')
+      setRaceLocation('')
+      setRaceGrade('')
+    } catch (err) {
+      toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to create race' })
+    }
+  }
+
+  if (loadingEventDetail) {
+    return (
+      <PixelCard className="bg-retro-surface">
+        <div className="flex items-center gap-3 p-4 font-pixel text-xs text-retro-muted">
+          <PixelSpinner size="sm" /> LOADING EVENT DETAILS...
+        </div>
+      </PixelCard>
+    )
+  }
+
+  if (!selectedEvent) {
+    return (
+      <PixelCard className="bg-retro-surface p-4">
+        <PixelAlert tone="red" message="Event not found or failed to load." />
+        <PixelButton variant="ghost" tone="neutral" size="sm" onClick={onBack} className="mt-4">
+          &lt; BACK TO EVENTS LIST
+        </PixelButton>
+      </PixelCard>
+    )
+  }
+
+  const STATUS_OPTIONS: EventStatus[] = ['DRAFT', 'PENDING', 'ONGOING', 'CONCLUDED', 'PENDING_DELETION']
+  const TAG_OPTIONS: EventTag[] = ['OFFICIAL', 'COMMUNITY']
+
+  return (
+    <PixelStack gap={6}>
+      {/* Top Header Card */}
+      <PixelCard className="bg-retro-surface">
+        <PixelStack gap={4}>
+          <PixelStack direction="row" align="center" justify="between" wrap gap={4}>
+            <PixelStack gap={1}>
+              <div className="flex items-center gap-2">
+                <PixelButton variant="ghost" tone="neutral" size="sm" onClick={onBack}>
+                  &lt; BACK
+                </PixelButton>
+                <h2 className="text-xl font-pixel font-bold text-retro-text truncate">
+                  {selectedEvent.name}
+                </h2>
+              </div>
+              <div className="font-pixel text-[10px] text-retro-muted">
+                ID: {selectedEvent.id} | TYPE: {selectedEvent.scoringTypeLabel.toUpperCase()}
+              </div>
+            </PixelStack>
+
+            <PixelStack direction="row" gap={2} align="center" wrap>
+              <PixelBadge tone={selectedEvent.tag === 'OFFICIAL' ? 'purple' : 'cyan'}>
+                {selectedEvent.tag || 'OFFICIAL'}
+              </PixelBadge>
+              <PixelBadge
+                tone={
+                  selectedEvent.status === 'ONGOING'
+                    ? 'green'
+                    : selectedEvent.status === 'CONCLUDED'
+                    ? 'neutral'
+                    : selectedEvent.status === 'PENDING_DELETION'
+                    ? 'pink'
+                    : 'cyan'
+                }
+              >
+                {selectedEvent.status}
+              </PixelBadge>
+            </PixelStack>
+          </PixelStack>
+
+          {/* Controls Bar */}
+          <div className="flex items-center justify-between gap-4 pt-3 border-t border-retro-border flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 font-pixel text-xs text-retro-text">
+                <span>STATUS:</span>
+                <select
+                  disabled={eventStatusSaving}
+                  value={selectedEvent.status}
+                  onChange={(e) => void handleUpdateEventStatus({ status: e.target.value as any })}
+                  className="px-2 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text"
+                >
+                  {STATUS_OPTIONS.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 font-pixel text-xs text-retro-text">
+                <span>TAG:</span>
+                <select
+                  disabled={eventStatusSaving}
+                  value={selectedEvent.tag || 'OFFICIAL'}
+                  onChange={(e) => void handleUpdateEventStatus({ tag: e.target.value as any })}
+                  className="px-2 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text"
+                >
+                  {TAG_OPTIONS.map((tg) => (
+                    <option key={tg} value={tg}>
+                      {tg}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <PixelButton
+                variant="ghost"
+                tone={selectedEvent.signupsLocked ? 'pink' : 'purple'}
+                size="sm"
+                disabled={signupsLockedSaving}
+                onClick={() => void handleSetSignupsLocked(!selectedEvent.signupsLocked)}
+              >
+                {selectedEvent.signupsLocked ? 'SIGNUPS LOCKED' : 'SIGNUPS OPEN'}
+              </PixelButton>
+
+              {selectedEvent.scoringType === 1 && (
+                <PixelButton
+                  variant="ghost"
+                  tone="neutral"
+                  size="sm"
+                  onClick={() => void handleRecomputeEventPoints()}
+                >
+                  RECOMPUTE POINTS
+                </PixelButton>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedEvent.status === 'PENDING_DELETION' ? (
+                <PixelButton variant="solid" tone="green" size="sm" onClick={() => void handleRestoreEvent()}>
+                  RESTORE
+                </PixelButton>
+              ) : (
+                <PixelButton
+                  variant="ghost"
+                  tone="red"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Move this event to Pending Deletion?')) {
+                      void handleDeleteEvent(false)
+                    }
+                  }}
+                >
+                  DELETE EVENT
+                </PixelButton>
+              )}
+            </div>
+          </div>
+
+          {/* Sub Navigation Tabs */}
+          <div className="flex items-center gap-2 border-b-2 border-retro-border pt-2">
+            {[
+              { id: 'details', label: 'OVERVIEW & DETAILS' },
+              { id: 'members', label: `MEMBERS (${selectedEvent.members.length})` },
+              { id: 'races', label: `RACES (${races.length})` },
+              { id: 'datasets', label: 'DATASETS' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                  activeTab === tab.id
+                    ? 'border-retro-primary text-retro-primary bg-retro-bg'
+                    : 'border-transparent text-retro-muted hover:text-retro-text'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </PixelStack>
+      </PixelCard>
+
+      {globalError && <PixelAlert tone="red" message={globalError} />}
+      {globalSuccess && <PixelAlert tone="green" message={globalSuccess} />}
+
+      {/* SUB-TAB 1: OVERVIEW & DETAILS */}
+      {activeTab === 'details' && (
+        <PixelStack gap={6}>
+          <PixelCard className="bg-retro-surface">
+            <PixelStack gap={4}>
+              <PixelStack direction="row" align="center" justify="between">
+                <PixelSectionHeader title="EVENT INFORMATION" size="sm" />
+                <PixelButton variant="solid" tone="purple" size="sm" onClick={() => setShowEditModal(true)}>
+                  EDIT DETAILS
+                </PixelButton>
+              </PixelStack>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-sans text-xs text-retro-text">
+                <div className="p-3 bg-retro-bg rounded border border-retro-border">
+                  <div className="font-pixel text-[10px] text-retro-muted uppercase">SCHEDULED AT</div>
+                  <div className="font-bold mt-1">
+                    {selectedEvent.scheduledAt ? new Date(selectedEvent.scheduledAt).toLocaleString() : 'Unscheduled'}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-retro-bg rounded border border-retro-border">
+                  <div className="font-pixel text-[10px] text-retro-muted uppercase">CLASS RESTRICTION</div>
+                  <div className="font-bold mt-1">
+                    {selectedEvent.classRestriction || 'Open to All'}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-retro-bg rounded border border-retro-border">
+                  <div className="font-pixel text-[10px] text-retro-muted uppercase">PARTICIPATION MODEL</div>
+                  <div className="font-bold mt-1">
+                    {selectedEvent.granularParticipation ? 'Granular (Per-Race)' : 'Regular (Event-wide)'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-retro-bg rounded border border-retro-border">
+                <div className="font-pixel text-xs text-retro-muted uppercase mb-2">DESCRIPTION</div>
+                <MarkdownView
+                  content={selectedEvent.description}
+                  fallbackText="No description details registered for this event."
+                />
+              </div>
+            </PixelStack>
+          </PixelCard>
+
+          {/* Standings Overview */}
+          <PixelCard className="bg-retro-surface">
+            <PixelStack gap={4}>
+              <PixelSectionHeader title="OVERALL EVENT LEADERBOARD" size="sm" />
+              {selectedEvent.scoringType === 1 ? (
+                selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
+                  <PixelTable
+                    columns={[
+                      { key: 'rank', header: '#', width: '10%', render: (_, idx) => idx + 1 },
+                      {
+                        key: 'name',
+                        header: 'COMPETITOR',
+                        width: '60%',
+                        render: (p) => <UserLink userId={p.userId} name={p.name} />,
+                      },
+                      { key: 'points', header: 'POINTS', width: '30%', render: (p) => `${p.points} pts` },
+                    ]}
+                    data={selectedEvent.pointsOverview}
+                  />
+                ) : (
+                  <span className="font-pixel text-xs text-retro-muted">NO POINTS STANDINGS RECORDED YET</span>
+                )
+              ) : (
+                selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
+                  <PixelTable
+                    columns={[
+                      { key: 'rank', header: 'RANK', width: '10%', render: (l) => l.rank },
+                      {
+                        key: 'name',
+                        header: 'COMPETITOR',
+                        width: '50%',
+                        render: (l) => <UserLink userId={l.userId} name={l.name} />,
+                      },
+                      { key: 'elo', header: 'ELO', width: '20%', render: (l) => l.elo },
+                      { key: 'wl', header: 'W-L', width: '20%', render: (l) => `${l.wins}W - ${l.losses}L` },
+                    ]}
+                    data={selectedEvent.ladderOverview}
+                  />
+                ) : (
+                  <span className="font-pixel text-xs text-retro-muted">NO LADDER RECORDS FOUND</span>
+                )
+              )}
+            </PixelStack>
+          </PixelCard>
+        </PixelStack>
+      )}
+
+      {/* SUB-TAB 2: EVENT MEMBERS */}
+      {activeTab === 'members' && (
+        <PixelCard className="bg-retro-surface">
+          <PixelStack gap={4}>
+            <PixelSectionHeader title={`EVENT MEMBERS (${selectedEvent.members.length})`} size="sm" />
+
+            {/* Add Member Bar */}
+            <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
+              <div className="flex-1">
+                <UserSearchCombobox value={addMemberUserId} onChange={setAddMemberUserId} />
+              </div>
+              <PixelButton
+                variant="solid"
+                tone="purple"
+                size="sm"
+                disabled={!addMemberUserId}
+                onClick={async () => {
+                  if (!addMemberUserId) return
+                  await handleAddMember(addMemberUserId)
+                  setAddMemberUserId('')
+                }}
+              >
+                + ENROLL MEMBER
+              </PixelButton>
+            </div>
+
+            {selectedEvent.members.length > 0 ? (
+              <PixelTable
+                columns={[
+                  {
+                    key: 'name',
+                    header: 'MEMBER NAME',
+                    width: '50%',
+                    render: (m) => <UserLink userId={m.userId} name={m.name} />,
+                  },
+                  {
+                    key: 'classTier',
+                    header: 'CLASS TIER',
+                    width: '30%',
+                    render: (m) => <PixelBadge tone="neutral">{m.classTier || 'NONE'}</PixelBadge>,
+                  },
+                  {
+                    key: 'action',
+                    header: 'ACTION',
+                    width: '20%',
+                    render: (m) => (
+                      <PixelButton
+                        variant="ghost"
+                        tone="red"
+                        size="sm"
+                        onClick={() => void handleRemoveMember(m.userId)}
+                      >
+                        REMOVE
+                      </PixelButton>
+                    ),
+                  },
+                ]}
+                data={selectedEvent.members}
+              />
+            ) : (
+              <span className="font-pixel text-xs text-retro-muted">NO MEMBERS ENROLLED IN THIS EVENT YET</span>
+            )}
+          </PixelStack>
+        </PixelCard>
+      )}
+
+      {/* SUB-TAB 3: RACES & TRACKS */}
+      {activeTab === 'races' && (
+        <PixelStack gap={6}>
+          <PixelCard className="bg-retro-surface">
+            <PixelStack gap={4}>
+              <PixelStack direction="row" align="center" justify="between" wrap>
+                <PixelSectionHeader title={`RACE TRACKS (${races.length})`} size="sm" />
+                <PixelButton variant="solid" tone="purple" size="sm" onClick={() => setShowCreateRaceModal(true)}>
+                  + CREATE RACE TRACK
+                </PixelButton>
+              </PixelStack>
+
+              {races.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {races.map((r) => (
+                    <div
+                      key={r.id}
+                      className={`p-4 rounded border transition-all ${
+                        selectedRaceId === r.id
+                          ? 'bg-retro-bg border-retro-primary shadow'
+                          : 'bg-retro-bg border-retro-border hover:border-retro-muted'
+                      }`}
+                    >
+                      <PixelStack gap={2}>
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="font-pixel text-sm font-bold text-retro-text">
+                            #{r.sequence}. {r.name}
+                          </h4>
+                          <PixelBadge tone={selectedRaceId === r.id ? 'purple' : 'neutral'}>
+                            {r.trackType} ({r.distanceMeters}m)
+                          </PixelBadge>
+                        </div>
+
+                        <div className="font-sans text-xs text-retro-muted">
+                          LOCATION: <strong>{r.location}</strong> | GRADE: <strong>{r.grade || 'OP'}</strong>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-retro-border">
+                          <PixelButton
+                            variant={selectedRaceId === r.id ? 'solid' : 'ghost'}
+                            tone="purple"
+                            size="sm"
+                            onClick={() => void handleSelectRace(r, true)}
+                          >
+                            {selectedRaceId === r.id ? 'MANAGING STANDINGS' : 'SELECT STANDINGS'}
+                          </PixelButton>
+
+                          {r.startsAt === null ? (
+                            <PixelButton variant="ghost" tone="green" size="sm" onClick={() => void handleStartRace(r.id)}>
+                              START RACE
+                            </PixelButton>
+                          ) : r.endsAt === null ? (
+                            <PixelButton variant="ghost" tone="pink" size="sm" onClick={() => void handleEndRace(r.id)}>
+                              END RACE
+                            </PixelButton>
+                          ) : null}
+
+                          <PixelButton variant="ghost" tone="red" size="sm" onClick={() => void handleDeleteRace(r.id)}>
+                            DELETE
+                          </PixelButton>
+                        </div>
+                      </PixelStack>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="font-pixel text-xs text-retro-muted">NO RACE TRACKS CONSTRUCTED YET</span>
+              )}
+            </PixelStack>
+          </PixelCard>
+
+          {/* Selected Race Management & Standings Editor */}
+          {selectedRace && (
+            <PixelCard className="bg-retro-surface">
+              <PixelStack gap={6}>
+                {/* Race Members Section */}
+                {selectedEvent.granularParticipation && (
+                  <PixelStack gap={3}>
+                    <PixelSectionHeader title={`RACE PARTICIPANTS (${selectedRace.members?.length || 0})`} size="sm" />
+                    <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
+                      <div className="flex-1">
+                        <UserSearchCombobox value={addRaceMemberUserId} onChange={setAddRaceMemberUserId} />
+                      </div>
+                      <PixelButton
+                        variant="solid"
+                        tone="purple"
+                        size="sm"
+                        disabled={!addRaceMemberUserId}
+                        onClick={async () => {
+                          if (!addRaceMemberUserId) return
+                          await handleAddRaceMember(addRaceMemberUserId)
+                          setAddRaceMemberUserId('')
+                        }}
+                      >
+                        + REGISTER TO RACE
+                      </PixelButton>
+                    </div>
+                  </PixelStack>
+                )}
+
+                {/* Standings Grid Editor */}
+                <StandingsEditor
+                  raceName={selectedRace.name}
+                  isRaceOngoing={selectedRace.startsAt !== null && selectedRace.endsAt === null}
+                  isRaceNotStarted={selectedRace.startsAt === null}
+                  loadingResults={loadingResults}
+                  memberCount={selectedEvent.granularParticipation ? (selectedRace.members?.length || 0) : selectedEvent.members.length}
+                  rows={derivedStates.rows}
+                  changeSummary={changeSummary}
+                  savingBatch={savingBatch}
+                  onInferTimes={() => void handleInferFinishTimes()}
+                  onCancel={handleCancelStandingsEdit}
+                  onSave={() => void handleUnifiedSave()}
+                  onResetAll={resetStandingsDraft}
+                  onResultChange={handleResultChange}
+                  onTogglePendingDeletion={togglePendingDeletion}
+                  onUndoRow={handleUndoRow}
+                  noTopMargin
+                  scoringType={selectedEvent.scoringType}
+                  scoringRulesMode={selectedEvent.scoringRulesMode}
+                  customScoringTables={selectedEvent.customScoringTables}
+                  raceGrade={selectedRace.grade}
+                />
+              </PixelStack>
+            </PixelCard>
+          )}
+        </PixelStack>
+      )}
+
+      {/* SUB-TAB 4: DATASETS */}
+      {activeTab === 'datasets' && (
+        <PixelCard className="bg-retro-surface">
+          <PixelStack gap={4}>
+            <PixelStack direction="row" align="center" justify="between">
+              <PixelSectionHeader title="EVENT DATASETS" size="sm" />
+              <PixelButton variant="solid" tone="purple" size="sm" onClick={() => setShowCreateDatasetModal(true)}>
+                + CREATE DATASET
+              </PixelButton>
+            </PixelStack>
+
+            {loadingDatasets ? (
+              <div className="font-pixel text-xs text-retro-muted">LOADING DATASETS...</div>
+            ) : datasets.length > 0 ? (
+              <PixelTable
+                columns={[
+                  { key: 'id', header: 'ID', width: '20%', render: (d) => d.id },
+                  { key: 'source', header: 'SOURCE', width: '30%', render: (d) => d.source },
+                  { key: 'rows', header: 'ROWS', width: '15%', render: (d) => d.rows },
+                  {
+                    key: 'status',
+                    header: 'STATUS',
+                    width: '20%',
+                    render: (d) => <PixelBadge tone={d.status === 'DONE' ? 'green' : 'neutral'}>{d.status}</PixelBadge>,
+                  },
+                  {
+                    key: 'action',
+                    header: 'ACTION',
+                    width: '15%',
+                    render: (d) =>
+                      d.status !== 'DONE' ? (
+                        <PixelButton
+                          variant="ghost"
+                          tone="green"
+                          size="sm"
+                          onClick={() => handleUpdateDatasetStatus(d.id, 'DONE')}
+                        >
+                          MARK DONE
+                        </PixelButton>
+                      ) : null,
+                  },
+                ]}
+                data={datasets}
+              />
+            ) : (
+              <span className="font-pixel text-xs text-retro-muted">NO DATASETS CREATED FOR THIS EVENT YET</span>
+            )}
+          </PixelStack>
+        </PixelCard>
+      )}
+
+      {/* EDIT EVENT DETAILS MODAL */}
+      {showEditModal && (
+        <PixelModal open={showEditModal} onClose={() => setShowEditModal(false)} title="EDIT EVENT DETAILS">
+          <form onSubmit={onSaveEditDetails} className="space-y-4">
+            <PixelInput label="EVENT NAME" required value={editName} onChange={(e) => setEditName(e.target.value)} />
+
+            <PixelTextarea
+              label="DESCRIPTION"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              rows={3}
+            />
+
+            <div>
+              <label className="block font-pixel text-xs text-retro-text mb-1">CLASS TIER ELIGIBILITY</label>
+              <select
+                value={editClassRestriction}
+                onChange={(e) => setEditClassRestriction(e.target.value)}
+                className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+              >
+                <option value="">Any Tier Eligibility (None)</option>
+                <option value="G3">G3</option>
+                <option value="G2">G2</option>
+                <option value="G1">G1</option>
+              </select>
+            </div>
+
+            {selectedEvent.scoringType === 1 && (
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">POINTS SCORING RULES MODE</label>
+                <select
+                  value={editScoringRulesMode}
+                  onChange={(e) => setEditScoringRulesMode(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                >
+                  <option value="STANDARD">Standard Default Tables</option>
+                  <option value="CUSTOM">Custom Event Tables</option>
+                </select>
+
+                {editScoringRulesMode === 'CUSTOM' && (
+                  <div className="mt-3">
+                    <EventScoringTablesEditor
+                      value={editCustomScoringTables}
+                      onChange={setEditCustomScoringTables}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+              <PixelButton variant="ghost" tone="neutral" onClick={() => setShowEditModal(false)}>
+                CANCEL
+              </PixelButton>
+              <PixelButton variant="solid" tone="purple" type="submit">
+                SAVE CHANGES
+              </PixelButton>
+            </div>
+          </form>
+        </PixelModal>
+      )}
+
+      {/* CREATE RACE TRACK MODAL */}
+      {showCreateRaceModal && (
+        <PixelModal open={showCreateRaceModal} onClose={() => setShowCreateRaceModal(false)} title="CREATE RACE TRACK">
+          <form onSubmit={onCreateRaceSubmit} className="space-y-4">
+            <PixelInput label="RACE NAME" required value={raceName} onChange={(e) => setRaceName(e.target.value)} />
+
+            <div className="grid grid-cols-2 gap-4">
+              <PixelInput
+                label="TRACK TYPE"
+                required
+                value={raceTrackType}
+                onChange={(e) => setRaceTrackType(e.target.value)}
+              />
+              <PixelInput
+                label="LOCATION"
+                required
+                value={raceLocation}
+                onChange={(e) => setRaceLocation(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <PixelInput
+                label="DISTANCE (METERS)"
+                type="number"
+                required
+                value={String(raceDistance)}
+                onChange={(e) => setRaceDistance(Number(e.target.value))}
+              />
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">RACE GRADE</label>
+                <select
+                  value={raceGrade}
+                  onChange={(e) => setRaceGrade(e.target.value)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                >
+                  <option value="">-- Choose Grade --</option>
+                  <option value="OP">OP</option>
+                  <option value="GIII">GIII</option>
+                  <option value="GII">GII</option>
+                  <option value="GI">GI</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+              <PixelButton variant="ghost" tone="neutral" onClick={() => setShowCreateRaceModal(false)}>
+                CANCEL
+              </PixelButton>
+              <PixelButton variant="solid" tone="purple" type="submit">
+                CREATE TRACK
+              </PixelButton>
+            </div>
+          </form>
+        </PixelModal>
+      )}
+
+      {/* CREATE DATASET MODAL */}
+      {showCreateDatasetModal && (
+        <PixelModal open={showCreateDatasetModal} onClose={() => setShowCreateDatasetModal(false)} title="CREATE DATASET">
+          <form onSubmit={handleCreateDataset} className="space-y-4">
+            <PixelInput
+              label="DATASET SOURCE"
+              required
+              value={datasetSource}
+              onChange={(e) => setDatasetSource(e.target.value)}
+            />
+            <PixelInput
+              label="ROWS COUNT"
+              type="number"
+              required
+              value={String(datasetRows)}
+              onChange={(e) => setDatasetRows(Number(e.target.value))}
+            />
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+              <PixelButton variant="ghost" tone="neutral" onClick={() => setShowCreateDatasetModal(false)}>
+                CANCEL
+              </PixelButton>
+              <PixelButton variant="solid" tone="purple" type="submit">
+                CREATE DATASET
+              </PixelButton>
+            </div>
+          </form>
+        </PixelModal>
+      )}
+    </PixelStack>
   )
 }
