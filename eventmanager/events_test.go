@@ -841,8 +841,185 @@ func Test_OrgAdminOfficialEventTag(t *testing.T) {
 	requireErrCode(t, err, errs.PermissionDenied, "")
 }
 
-// NOTE on ordering.test.ts and eligible_races.test.ts: both exercise
-// race-scoped services (raceevents.ts createRaceEvent/reorderRaceEvents and
-// classes.ts listEligibleEvents), which are ported separately. The event-level
-// behaviors those files depend on (join/leave, signups lock, member cleanup,
-// participant limits, schedules) are covered above.
+func (f *fixtures) createTeamDirect(name string, adminUserID string) string {
+	f.t.Helper()
+	id := "team-" + newID()[:8]
+	slug := "team-slug-" + id
+	now := time.Now().UTC()
+	_, err := db.Exec(f.ctx,
+		`INSERT INTO "team" (id, name, slug, status, "submittedByUserId", "createdAt")
+		 VALUES ($1, $2, $3, 'APPROVED', $4, $5)`,
+		id, name, slug, adminUserID, now)
+	if err != nil {
+		f.t.Fatalf("insert team: %v", err)
+	}
+	f.t.Cleanup(func() {
+		_, _ = db.Exec(context.Background(), `DELETE FROM "teamMember" WHERE "teamId"=$1`, id)
+		_, _ = db.Exec(context.Background(), `DELETE FROM "team" WHERE id=$1`, id)
+	})
+	if adminUserID != "" {
+		_, err := db.Exec(f.ctx,
+			`INSERT INTO "teamMember" (id, "teamId", "userId", role, "createdAt")
+			 VALUES ($1, $2, $3, 'administrator', $4)`,
+			"tm-"+newID()[:8], id, adminUserID, now)
+		if err != nil {
+			f.t.Fatalf("insert teamMember admin: %v", err)
+		}
+	}
+	return id
+}
+
+func (f *fixtures) addTeamMemberDirect(teamID, userID, role string) {
+	f.t.Helper()
+	now := time.Now().UTC()
+	_, err := db.Exec(f.ctx,
+		`INSERT INTO "teamMember" (id, "teamId", "userId", role, "createdAt")
+		 VALUES ($1, $2, $3, $4, $5)`,
+		"tm-"+newID()[:8], teamID, userID, role, now)
+	if err != nil {
+		f.t.Fatalf("add team member: %v", err)
+	}
+}
+
+func Test_TeamEvents(t *testing.T) {
+	f := newFixtures(t)
+	adminID := f.createUser("site-admin", "Site Admin", nil, "SITE_ADMIN")
+	adminToken := f.createSession(adminID)
+
+	teamAdminID := f.createUser("team-admin", "Team Admin", strptr("OP"), "USER")
+	teamAdminToken := f.createSession(teamAdminID)
+
+	u1 := f.createUser("u1", "Driver 1", strptr("OP"), "USER")
+	u2 := f.createUser("u2", "Driver 2", strptr("OP"), "USER")
+	u3 := f.createUser("u3", "Driver 3", strptr("OP"), "USER")
+
+	teamID := f.createTeamDirect("Red Racing", teamAdminID)
+	f.addTeamMemberDirect(teamID, u1, "member")
+	f.addTeamMemberDirect(teamID, u2, "member")
+	f.addTeamMemberDirect(teamID, u3, "member")
+
+	// 1. Create TEAM mode event with roster limits
+	teamMode := "TEAM"
+	activeLimit := 2
+	backupLimit := 1
+	teamLimit := 5
+
+	event, err := CreateEventCore(f.ctx, &CreateEventRequest{
+		Authorization:     adminToken,
+		Name:              "Team Championship",
+		OwnerType:         "USER",
+		ScoringType:       ScoringPoints,
+		ParticipationMode: &teamMode,
+		ActiveRosterLimit: OptInt{Set: true, Value: &activeLimit},
+		BackupRosterLimit: OptInt{Set: true, Value: &backupLimit},
+		TeamLimit:         OptInt{Set: true, Value: &teamLimit},
+	})
+	if err != nil {
+		t.Fatalf("create team event: %v", err)
+	}
+	f.events = append(f.events, event.ID)
+
+	if event.ParticipationMode != "TEAM" {
+		t.Errorf("ParticipationMode = %q, want TEAM", event.ParticipationMode)
+	}
+
+	// Publish event to PENDING so signups work
+	_, err = SetEventStatusCore(f.ctx, &SetEventStatusRequest{
+		ID:            event.ID,
+		Authorization: adminToken,
+		Status:        strptr("PENDING"),
+	})
+	if err != nil {
+		t.Fatalf("publish event: %v", err)
+	}
+
+	// 2. Reject individual signup on TEAM event
+	u1Token := f.createSession(u1)
+	_, err = JoinEventCore(f.ctx, &JoinEventRequest{EventID: event.ID, Authorization: u1Token})
+	requireErrCode(t, err, errs.FailedPrecondition, "Individual signups are not allowed")
+
+	// 3. Reject team join from non-admin user
+	_, err = JoinEventTeamCore(f.ctx, &JoinEventTeamRequest{
+		Authorization: u1Token,
+		EventID:       event.ID,
+		TeamID:        teamID,
+		ActiveUserIDs: []string{u1, u2},
+		BackupUserIDs: []string{u3},
+	})
+	requireErrCode(t, err, errs.PermissionDenied, "must be a team administrator")
+
+	// 4. Team join from team admin succeeds
+	joinedEvent, err := JoinEventTeamCore(f.ctx, &JoinEventTeamRequest{
+		Authorization: teamAdminToken,
+		EventID:       event.ID,
+		TeamID:        teamID,
+		ActiveUserIDs: []string{u1, u2},
+		BackupUserIDs: []string{u3},
+	})
+	if err != nil {
+		t.Fatalf("team join: %v", err)
+	}
+
+	if len(joinedEvent.Members) != 3 {
+		t.Fatalf("members count = %d, want 3", len(joinedEvent.Members))
+	}
+
+	// Check member slots
+	activeCount := 0
+	backupCount := 0
+	for _, m := range joinedEvent.Members {
+		if m.Slot == "ACTIVE" {
+			activeCount++
+		} else if m.Slot == "BACKUP" {
+			backupCount++
+		}
+	}
+	if activeCount != 2 || backupCount != 1 {
+		t.Errorf("active=%d backup=%d, want 2 active, 1 backup", activeCount, backupCount)
+	}
+
+	// 5. Check active member vs backup member race joining restrictions
+	raceID := f.createRace(event.ID, "Heat 1")
+
+	// Active member (u1) joins race -> succeeds
+	if _, err := AddRaceEventMemberCore(f.ctx, &RaceMemberRequest{
+		EventID: event.ID, RaceID: raceID, UserID: u1, Authorization: adminToken,
+	}); err != nil {
+		t.Fatalf("active member join race: %v", err)
+	}
+
+	// Backup member (u3) joins race -> rejected
+	_, err = AddRaceEventMemberCore(f.ctx, &RaceMemberRequest{
+		EventID: event.ID, RaceID: raceID, UserID: u3, Authorization: adminToken,
+	})
+	requireErrCode(t, err, errs.FailedPrecondition, "only ACTIVE team members can join races")
+
+	// 6. Substitution: substitute u1 (ACTIVE) with u3 (BACKUP)
+	subDetail, err := SubstituteEventTeamMemberCore(f.ctx, &SubstituteEventTeamMemberRequest{
+		Authorization:     teamAdminToken,
+		EventID:           event.ID,
+		RemovedUserID:     u1,
+		ReplacementUserID: u3,
+		Disposition:       "DEMOTE_TO_BACKUP",
+	})
+	if err != nil {
+		t.Fatalf("substitute: %v", err)
+	}
+
+	// Verify u3 is now ACTIVE and u1 is now BACKUP
+	for _, m := range subDetail.Members {
+		if m.UserID == u3 && m.Slot != "ACTIVE" {
+			t.Errorf("u3 slot = %q, want ACTIVE", m.Slot)
+		}
+		if m.UserID == u1 && m.Slot != "BACKUP" {
+			t.Errorf("u1 slot = %q, want BACKUP", m.Slot)
+		}
+	}
+
+	// Now u3 (now ACTIVE) can join race -> succeeds
+	if _, err := AddRaceEventMemberCore(f.ctx, &RaceMemberRequest{
+		EventID: event.ID, RaceID: raceID, UserID: u3, Authorization: adminToken,
+	}); err != nil {
+		t.Fatalf("promoted u3 join race: %v", err)
+	}
+}
