@@ -10,6 +10,7 @@ import (
 	"encore.dev/beta/errs"
 	"encore.dev/et"
 
+	"encore.app/auth"
 	"encore.app/shared"
 )
 
@@ -101,6 +102,13 @@ func (f *fixtures) createSession(userID string) string {
 
 func strptr(s string) *string { return &s }
 
+func testActor(userID, siteRole string) *auth.Actor {
+	return &auth.Actor{
+		UserID:   userID,
+		SiteRole: auth.SiteRoleName(siteRole),
+	}
+}
+
 // createEventDirect inserts an event row without going through the API.
 func (f *fixtures) createEventDirect(ownerID, name, status string, restriction *string, granular bool) string {
 	f.t.Helper()
@@ -181,10 +189,10 @@ func requireErrCode(t *testing.T, err error, code errs.ErrCode, substr string) {
 func Test_JoinAndLeaveUnofficialEvent(t *testing.T) {
 	f := newFixtures(t)
 	userID := f.createUser("participant", "Participant User", strptr("OP"), "USER")
-	token := f.createSession(userID)
 	eventID := f.createEventDirect(userID, "Summer Open", "UNOFFICIAL", strptr("OP"), false)
 
-	joined, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: eventID, Authorization: token})
+	actor := testActor(userID, "USER")
+	joined, err := JoinEventCore(f.ctx, actor, &JoinEventRequest{EventID: eventID})
 	if err != nil {
 		t.Fatalf("join: %v", err)
 	}
@@ -206,7 +214,7 @@ func Test_JoinAndLeaveUnofficialEvent(t *testing.T) {
 		t.Fatalf("loaded members = %d, want 1", len(loaded.Members))
 	}
 
-	left, err := LeaveEventCore(f.ctx, &LeaveEventRequest{EventID: eventID, Authorization: token})
+	left, err := LeaveEventCore(f.ctx, actor, &LeaveEventRequest{EventID: eventID})
 	if err != nil {
 		t.Fatalf("leave: %v", err)
 	}
@@ -225,13 +233,13 @@ func Test_JoinAndLeaveUnofficialEvent(t *testing.T) {
 func Test_JoinRejectedOnDraftOrConcluded(t *testing.T) {
 	f := newFixtures(t)
 	userID := f.createUser("participant", "Participant User", strptr("G3"), "USER")
-	token := f.createSession(userID)
 	draftID := f.createEventDirect(userID, "Draft Cup", "DRAFT", strptr("G3"), false)
 	concludedID := f.createEventDirect(userID, "Concluded Cup", "CONCLUDED", strptr("G3"), false)
 
-	_, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: draftID, Authorization: token})
+	actor := testActor(userID, "USER")
+	_, err := JoinEventCore(f.ctx, actor, &JoinEventRequest{EventID: draftID})
 	requireErrCode(t, err, errs.FailedPrecondition, "not open for public signup")
-	_, err = JoinEventCore(f.ctx, &JoinEventRequest{EventID: concludedID, Authorization: token})
+	_, err = JoinEventCore(f.ctx, actor, &JoinEventRequest{EventID: concludedID})
 	requireErrCode(t, err, errs.FailedPrecondition, "not open for public signup")
 }
 
@@ -239,10 +247,10 @@ func Test_JoinRejectedOnClassTierMismatch(t *testing.T) {
 	f := newFixtures(t)
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
 	userID := f.createUser("participant-low", "Low Tier Participant", strptr("G1"), "USER")
-	token := f.createSession(userID)
 	eventID := f.createEventDirect(creatorID, "Elite G3 Championship", "OFFICIAL", strptr("G3"), false)
 
-	_, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: eventID, Authorization: token})
+	actor := testActor(userID, "USER")
+	_, err := JoinEventCore(f.ctx, actor, &JoinEventRequest{EventID: eventID})
 	requireErrCode(t, err, errs.FailedPrecondition, "class tier does not satisfy")
 }
 
@@ -251,44 +259,44 @@ func Test_JoinRejectedOnClassTierMismatch(t *testing.T) {
 func Test_SignupsLockedBlocksSelfService(t *testing.T) {
 	f := newFixtures(t)
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
-	creatorToken := f.createSession(creatorID)
 	userID := f.createUser("participant", "Participant User", strptr("OP"), "USER")
-	token := f.createSession(userID)
 	eventID := f.createEventDirect(creatorID, "Summer Open", "UNOFFICIAL", strptr("OP"), false)
 
-	if _, err := SetEventSignupsLockedCore(f.ctx, &SetEventSignupsLockedRequest{
-		EventID: eventID, Locked: true, Authorization: creatorToken,
+	creatorActor := testActor(creatorID, "USER")
+	userActor := testActor(userID, "USER")
+	if _, err := SetEventSignupsLockedCore(f.ctx, creatorActor, &SetEventSignupsLockedRequest{
+		EventID: eventID, Locked: true,
 	}); err != nil {
 		t.Fatalf("lock: %v", err)
 	}
 
-	_, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: eventID, Authorization: token})
+	_, err := JoinEventCore(f.ctx, userActor, &JoinEventRequest{EventID: eventID})
 	requireErrCode(t, err, errs.FailedPrecondition, "signups are locked")
 
 	// Admin bypass still works while locked.
-	if _, err := AddEventMemberCore(f.ctx, &AddEventMemberRequest{
-		EventID: eventID, UserID: userID, Authorization: creatorToken,
+	if _, err := AddEventMemberCore(f.ctx, creatorActor, &AddEventMemberRequest{
+		EventID: eventID, UserID: userID,
 	}); err != nil {
 		t.Fatalf("admin add while locked: %v", err)
 	}
-	_, err = LeaveEventCore(f.ctx, &LeaveEventRequest{EventID: eventID, Authorization: token})
+	_, err = LeaveEventCore(f.ctx, userActor, &LeaveEventRequest{EventID: eventID})
 	requireErrCode(t, err, errs.FailedPrecondition, "signups are locked")
 }
 
 func Test_AdminMutationsSucceedWhileLocked(t *testing.T) {
 	f := newFixtures(t)
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
-	creatorToken := f.createSession(creatorID)
 	userID := f.createUser("participant", "Participant User", strptr("OP"), "USER")
 	eventID := f.createEventDirect(creatorID, "Summer Open", "UNOFFICIAL", strptr("OP"), false)
 
-	if _, err := SetEventSignupsLockedCore(f.ctx, &SetEventSignupsLockedRequest{
-		EventID: eventID, Locked: true, Authorization: creatorToken,
+	creatorActor := testActor(creatorID, "USER")
+	if _, err := SetEventSignupsLockedCore(f.ctx, creatorActor, &SetEventSignupsLockedRequest{
+		EventID: eventID, Locked: true,
 	}); err != nil {
 		t.Fatalf("lock: %v", err)
 	}
-	added, err := AddEventMemberCore(f.ctx, &AddEventMemberRequest{
-		EventID: eventID, UserID: userID, Authorization: creatorToken,
+	added, err := AddEventMemberCore(f.ctx, creatorActor, &AddEventMemberRequest{
+		EventID: eventID, UserID: userID,
 	})
 	if err != nil {
 		t.Fatalf("admin add: %v", err)
@@ -296,8 +304,8 @@ func Test_AdminMutationsSucceedWhileLocked(t *testing.T) {
 	if len(added.Members) != 1 {
 		t.Fatalf("members = %d, want 1", len(added.Members))
 	}
-	removed, err := RemoveEventMemberCore(f.ctx, &RemoveEventMemberRequest{
-		EventID: eventID, UserID: userID, Authorization: creatorToken,
+	removed, err := RemoveEventMemberCore(f.ctx, creatorActor, &RemoveEventMemberRequest{
+		EventID: eventID, UserID: userID,
 	})
 	if err != nil {
 		t.Fatalf("admin remove: %v", err)
@@ -312,14 +320,14 @@ func Test_AdminMutationsSucceedWhileLocked(t *testing.T) {
 func Test_LeaveRemovesStandingsAndRaceRows(t *testing.T) {
 	f := newFixtures(t)
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
-	creatorToken := f.createSession(creatorID)
 	userID := f.createUser("participant", "Participant User", strptr("OP"), "USER")
-	token := f.createSession(userID)
 	eventID := f.createEventDirect(creatorID, "Championship Series", "UNOFFICIAL", strptr("OP"), false)
 	raceID := f.createRace(eventID, "Race 1")
 
-	if _, err := AddEventMemberCore(f.ctx, &AddEventMemberRequest{
-		EventID: eventID, UserID: userID, Authorization: creatorToken,
+	creatorActor := testActor(creatorID, "USER")
+	userActor := testActor(userID, "USER")
+	if _, err := AddEventMemberCore(f.ctx, creatorActor, &AddEventMemberRequest{
+		EventID: eventID, UserID: userID,
 	}); err != nil {
 		t.Fatalf("add member: %v", err)
 	}
@@ -350,7 +358,7 @@ func Test_LeaveRemovesStandingsAndRaceRows(t *testing.T) {
 		t.Fatalf("points rows = %d, want 1", n)
 	}
 
-	if _, err := LeaveEventCore(f.ctx, &LeaveEventRequest{EventID: eventID, Authorization: token}); err != nil {
+	if _, err := LeaveEventCore(f.ctx, userActor, &LeaveEventRequest{EventID: eventID}); err != nil {
 		t.Fatalf("leave: %v", err)
 	}
 	tables := [][2]string{
@@ -373,9 +381,10 @@ func Test_ScheduledAtRoundTrip(t *testing.T) {
 	f := newFixtures(t)
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
 	creatorToken := f.createSession(creatorID)
+	_ = creatorToken
 	iso := "2026-12-25T18:00:00.000Z"
-	detail, err := CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: creatorToken, Name: "Scheduled Event",
+	detail, err := CreateEventCore(f.ctx, testActor(creatorID, "USER"), &CreateEventRequest{
+		Name: "Scheduled Event",
 		OwnerType: "USER", ScoringType: ScoringPoints, ScheduledAt: &iso,
 	})
 	if err != nil {
@@ -400,18 +409,18 @@ func Test_RegularEventEnforcesParticipantLimit(t *testing.T) {
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
 	eventID := f.createEventDirectWithLimit(creatorID, "Cap 2 Event", 2)
 
-	tokens := []string{}
+	uids := []string{}
 	for _, p := range []string{"u1", "u2", "u3"} {
 		uid := f.createUser(p, "User "+p, strptr("OP"), "USER")
-		tokens = append(tokens, f.createSession(uid))
+		uids = append(uids, uid)
 	}
-	if _, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: eventID, Authorization: tokens[0]}); err != nil {
+	if _, err := JoinEventCore(f.ctx, testActor(uids[0], "USER"), &JoinEventRequest{EventID: eventID}); err != nil {
 		t.Fatalf("join 1: %v", err)
 	}
-	if _, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: eventID, Authorization: tokens[1]}); err != nil {
+	if _, err := JoinEventCore(f.ctx, testActor(uids[1], "USER"), &JoinEventRequest{EventID: eventID}); err != nil {
 		t.Fatalf("join 2: %v", err)
 	}
-	_, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: eventID, Authorization: tokens[2]})
+	_, err := JoinEventCore(f.ctx, testActor(uids[2], "USER"), &JoinEventRequest{EventID: eventID})
 	requireErrCode(t, err, errs.FailedPrecondition, "capacity has been reached")
 }
 
@@ -444,33 +453,33 @@ func Test_ParseOptionalPositiveInt(t *testing.T) {
 func Test_CreateEventValidation(t *testing.T) {
 	f := newFixtures(t)
 	userID := f.createUser("creator", "Creator User", nil, "USER")
-	token := f.createSession(userID)
+	userActor := testActor(userID, "USER")
 
 	two := 2
-	_, err := CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: token, Name: "Granular Capped", OwnerType: "USER",
+	_, err := CreateEventCore(f.ctx, userActor, &CreateEventRequest{
+		Name: "Granular Capped", OwnerType: "USER",
 		ScoringType: ScoringPoints, GranularParticipation: true,
 		ParticipantLimit: OptInt{Set: true, Value: &two},
 	})
 	requireErrCode(t, err, errs.InvalidArgument, "Granular events cannot have")
 
-	_, err = CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: token, Name: "Regular Maxed", OwnerType: "USER",
+	_, err = CreateEventCore(f.ctx, userActor, &CreateEventRequest{
+		Name: "Regular Maxed", OwnerType: "USER",
 		ScoringType: ScoringPoints,
 		MaxConcurrentRaceParticipations: OptInt{Set: true, Value: &two},
 	})
 	requireErrCode(t, err, errs.InvalidArgument, "Regular events cannot have")
 
 	custom := "CUSTOM"
-	_, err = CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: token, Name: "Custom No Tables", OwnerType: "USER",
+	_, err = CreateEventCore(f.ctx, userActor, &CreateEventRequest{
+		Name: "Custom No Tables", OwnerType: "USER",
 		ScoringType: ScoringPoints, ScoringRulesMode: &custom,
 	})
 	requireErrCode(t, err, errs.InvalidArgument, "customScoringTables is required")
 
 	org := "org-" + newID()[:8]
-	_, err = CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: token, Name: "Org Event", OwnerType: "ORGANIZATION",
+	_, err = CreateEventCore(f.ctx, userActor, &CreateEventRequest{
+		Name: "Org Event", OwnerType: "ORGANIZATION",
 		OrganizationID: &org, ScoringType: ScoringPoints,
 	})
 	requireErrCode(t, err, errs.PermissionDenied, "")
@@ -479,26 +488,25 @@ func Test_CreateEventValidation(t *testing.T) {
 func Test_UpdateEventLimitReductionRejected(t *testing.T) {
 	f := newFixtures(t)
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
-	creatorToken := f.createSession(creatorID)
+	creatorActor := testActor(creatorID, "USER")
 	eventID := f.createEventDirectWithLimit(creatorID, "Capped Event", 5)
 
 	for _, p := range []string{"m1", "m2"} {
 		uid := f.createUser(p, "Member "+p, strptr("OP"), "USER")
-		tok := f.createSession(uid)
-		if _, err := JoinEventCore(f.ctx, &JoinEventRequest{EventID: eventID, Authorization: tok}); err != nil {
+		if _, err := JoinEventCore(f.ctx, testActor(uid, "USER"), &JoinEventRequest{EventID: eventID}); err != nil {
 			t.Fatalf("join: %v", err)
 		}
 	}
 	one := 1
-	_, err := UpdateEventCore(f.ctx, &UpdateEventRequest{
-		ID: eventID, Authorization: creatorToken,
+	_, err := UpdateEventCore(f.ctx, creatorActor, &UpdateEventRequest{
+		ID: eventID,
 		ParticipantLimit: OptInt{Set: true, Value: &one},
 	})
 	requireErrCode(t, err, errs.FailedPrecondition, "cannot be lower than the current enrollment")
 
 	renamed := "Renamed Event"
-	updated, err := UpdateEventCore(f.ctx, &UpdateEventRequest{
-		ID: eventID, Authorization: creatorToken, Name: &renamed,
+	updated, err := UpdateEventCore(f.ctx, creatorActor, &UpdateEventRequest{
+		ID: eventID, Name: &renamed,
 	})
 	if err != nil {
 		t.Fatalf("rename: %v", err)
@@ -513,11 +521,11 @@ func Test_UpdateEventLimitReductionRejected(t *testing.T) {
 func Test_AddScheduleAndAdmins(t *testing.T) {
 	f := newFixtures(t)
 	creatorID := f.createUser("creator", "Creator User", nil, "USER")
-	creatorToken := f.createSession(creatorID)
+	creatorActor := testActor(creatorID, "USER")
 	eventID := f.createEventDirect(creatorID, "Scheduled Admin Event", "UNOFFICIAL", nil, false)
 
-	withSched, err := AddEventScheduleCore(f.ctx, &AddEventScheduleRequest{
-		EventID: eventID, Authorization: creatorToken,
+	withSched, err := AddEventScheduleCore(f.ctx, creatorActor, &AddEventScheduleRequest{
+		EventID: eventID,
 		Title: strptr("Qualifiers"), StartsAt: "2026-09-01T10:00:00Z", Location: strptr("Hall A"),
 	})
 	if err != nil {
@@ -529,8 +537,8 @@ func Test_AddScheduleAndAdmins(t *testing.T) {
 	}
 
 	adminID := f.createUser("admin2", "Second Admin", nil, "USER")
-	if _, err := AddEventAdminCore(f.ctx, &AddEventAdminRequest{
-		EventID: eventID, UserID: adminID, Authorization: creatorToken,
+	if _, err := AddEventAdminCore(f.ctx, creatorActor, &AddEventAdminRequest{
+		EventID: eventID, UserID: adminID,
 	}); err != nil {
 		t.Fatalf("add admin: %v", err)
 	}
@@ -541,8 +549,8 @@ func Test_AddScheduleAndAdmins(t *testing.T) {
 	if len(listed.Admins) != 1 || listed.Admins[0].UserID != adminID {
 		t.Fatalf("admins = %+v, want [%q]", listed.Admins, adminID)
 	}
-	if _, err := RemoveEventAdminCore(f.ctx, &RemoveEventAdminRequest{
-		EventID: eventID, UserID: adminID, Authorization: creatorToken,
+	if _, err := RemoveEventAdminCore(f.ctx, creatorActor, &RemoveEventAdminRequest{
+		EventID: eventID, UserID: adminID,
 	}); err != nil {
 		t.Fatalf("remove admin: %v", err)
 	}
@@ -560,10 +568,10 @@ func Test_AddScheduleAndAdmins(t *testing.T) {
 func Test_ListAndDeleteEvents(t *testing.T) {
 	f := newFixtures(t)
 	adminID := f.createUser("admin-lister", "Admin Lister User", nil, "SITE_ADMIN")
-	adminToken := f.createSession(adminID)
+	adminActor := testActor(adminID, "SITE_ADMIN")
 
-	a, err := CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: adminToken, Name: "List Event A " + newID()[:8],
+	a, err := CreateEventCore(f.ctx, adminActor, &CreateEventRequest{
+		Name: "List Event A " + newID()[:8],
 		OwnerType: "USER", ScoringType: ScoringPoints, Tag: strptr("OFFICIAL"),
 	})
 	if err != nil {
@@ -575,15 +583,15 @@ func Test_ListAndDeleteEvents(t *testing.T) {
 	}
 
 	// Publish event A
-	a, err = SetEventStatusCore(f.ctx, &SetEventStatusRequest{
-		ID: a.ID, Authorization: adminToken, Status: strptr("PENDING"),
+	a, err = SetEventStatusCore(f.ctx, adminActor, &SetEventStatusRequest{
+		ID: a.ID, Status: strptr("PENDING"),
 	})
 	if err != nil {
 		t.Fatalf("publish A: %v", err)
 	}
 
-	b, err := CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: adminToken, Name: "List Event B " + newID()[:8],
+	b, err := CreateEventCore(f.ctx, adminActor, &CreateEventRequest{
+		Name: "List Event B " + newID()[:8],
 		OwnerType: "USER", ScoringType: ScoringLadder, Tag: strptr("COMMUNITY"),
 	})
 	if err != nil {
@@ -592,8 +600,8 @@ func Test_ListAndDeleteEvents(t *testing.T) {
 	f.events = append(f.events, b.ID)
 
 	// Publish event B
-	b, err = SetEventStatusCore(f.ctx, &SetEventStatusRequest{
-		ID: b.ID, Authorization: adminToken, Status: strptr("PENDING"),
+	b, err = SetEventStatusCore(f.ctx, adminActor, &SetEventStatusRequest{
+		ID: b.ID, Status: strptr("PENDING"),
 	})
 	if err != nil {
 		t.Fatalf("publish B: %v", err)
@@ -634,7 +642,7 @@ func Test_ListAndDeleteEvents(t *testing.T) {
 	}
 
 	// Soft delete event A
-	del, err := DeleteEventCore(f.ctx, &DeleteEventRequest{ID: a.ID, Authorization: adminToken})
+	del, err := DeleteEventCore(f.ctx, adminActor, &DeleteEventRequest{ID: a.ID})
 	if err != nil || !del.Deleted {
 		t.Fatalf("delete: %v %+v", del, err)
 	}
@@ -657,13 +665,13 @@ func Test_ListAndDeleteEvents(t *testing.T) {
 	}
 
 	// Restore event A
-	restored, err := RestoreEventCore(f.ctx, &RestoreEventRequest{ID: a.ID, Authorization: adminToken})
+	restored, err := RestoreEventCore(f.ctx, adminActor, &RestoreEventRequest{ID: a.ID})
 	if err != nil || restored.Status != "PENDING" {
 		t.Fatalf("restore: status = %v, err = %v", restored.Status, err)
 	}
 
 	// Permanent delete event A
-	delPerm, err := DeleteEventCore(f.ctx, &DeleteEventRequest{ID: a.ID, Authorization: adminToken, Permanent: true})
+	delPerm, err := DeleteEventCore(f.ctx, adminActor, &DeleteEventRequest{ID: a.ID, Permanent: true})
 	if err != nil || !delPerm.Deleted {
 		t.Fatalf("permanent delete: %v %+v", delPerm, err)
 	}
@@ -706,10 +714,10 @@ func Test_SoftDeleteAnd7DayAutoPurge(t *testing.T) {
 func Test_EventConclusionRecalculatesLeaderboard(t *testing.T) {
 	f := newFixtures(t)
 	adminID := f.createUser("admin-conclude", "Admin Conclude User", nil, "SITE_ADMIN")
-	adminToken := f.createSession(adminID)
+	adminActor := testActor(adminID, "SITE_ADMIN")
 
-	e, err := CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: adminToken, Name: "Conclude Test Event " + newID()[:8],
+	e, err := CreateEventCore(f.ctx, adminActor, &CreateEventRequest{
+		Name: "Conclude Test Event " + newID()[:8],
 		OwnerType: "USER", ScoringType: ScoringPoints, Tag: strptr("OFFICIAL"),
 	})
 	if err != nil {
@@ -718,8 +726,8 @@ func Test_EventConclusionRecalculatesLeaderboard(t *testing.T) {
 	f.events = append(f.events, e.ID)
 
 	// Set status to CONCLUDED
-	concluded, err := SetEventStatusCore(f.ctx, &SetEventStatusRequest{
-		ID: e.ID, Authorization: adminToken, Status: strptr("CONCLUDED"),
+	concluded, err := SetEventStatusCore(f.ctx, adminActor, &SetEventStatusRequest{
+		ID: e.ID, Status: strptr("CONCLUDED"),
 	})
 	if err != nil {
 		t.Fatalf("set status CONCLUDED: %v", err)
@@ -732,7 +740,7 @@ func Test_EventConclusionRecalculatesLeaderboard(t *testing.T) {
 func Test_OrgAdminOfficialEventTag(t *testing.T) {
 	f := newFixtures(t)
 	orgAdminID := f.createUser("org-admin", "Org Admin User", nil, "USER")
-	token := f.createSession(orgAdminID)
+	orgActor := testActor(orgAdminID, "USER")
 
 	orgID := "org-" + newID()[:8]
 	now := time.Now().UTC()
@@ -755,8 +763,7 @@ func Test_OrgAdminOfficialEventTag(t *testing.T) {
 	}
 
 	// 1. Create org event without tag -> defaults to OFFICIAL for org events
-	orgEvent1, err := CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: token,
+	orgEvent1, err := CreateEventCore(f.ctx, orgActor, &CreateEventRequest{
 		Name:          "Org Event Default Tag",
 		OwnerType:     "ORGANIZATION",
 		OrganizationID: &orgID,
@@ -772,8 +779,7 @@ func Test_OrgAdminOfficialEventTag(t *testing.T) {
 
 	// 2. Create org event with explicit tag "OFFICIAL"
 	offTag := "OFFICIAL"
-	orgEvent2, err := CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: token,
+	orgEvent2, err := CreateEventCore(f.ctx, orgActor, &CreateEventRequest{
 		Name:          "Org Event Explicit Official Tag",
 		OwnerType:     "ORGANIZATION",
 		OrganizationID: &orgID,
@@ -790,10 +796,9 @@ func Test_OrgAdminOfficialEventTag(t *testing.T) {
 
 	// 3. Update tag on org event to COMMUNITY and back to OFFICIAL
 	commTag := "COMMUNITY"
-	updated, err := UpdateEventCore(f.ctx, &UpdateEventRequest{
-		ID:            orgEvent2.ID,
-		Authorization: token,
-		Tag:           &commTag,
+	updated, err := UpdateEventCore(f.ctx, orgActor, &UpdateEventRequest{
+		ID:  orgEvent2.ID,
+		Tag: &commTag,
 	})
 	if err != nil {
 		t.Fatalf("update tag to COMMUNITY: %v", err)
@@ -802,10 +807,9 @@ func Test_OrgAdminOfficialEventTag(t *testing.T) {
 		t.Errorf("updated.Tag = %q, want COMMUNITY", updated.Tag)
 	}
 
-	updated2, err := UpdateEventCore(f.ctx, &UpdateEventRequest{
-		ID:            orgEvent2.ID,
-		Authorization: token,
-		Tag:           &offTag,
+	updated2, err := UpdateEventCore(f.ctx, orgActor, &UpdateEventRequest{
+		ID:  orgEvent2.ID,
+		Tag: &offTag,
 	})
 	if err != nil {
 		t.Fatalf("update tag back to OFFICIAL: %v", err)
@@ -815,11 +819,10 @@ func Test_OrgAdminOfficialEventTag(t *testing.T) {
 	}
 
 	// 4. Set status & tag via SetEventStatusCore
-	statusUpdated, err := SetEventStatusCore(f.ctx, &SetEventStatusRequest{
-		ID:            orgEvent2.ID,
-		Authorization: token,
-		Status:        strptr("PENDING"),
-		Tag:           &offTag,
+	statusUpdated, err := SetEventStatusCore(f.ctx, orgActor, &SetEventStatusRequest{
+		ID:     orgEvent2.ID,
+		Status: strptr("PENDING"),
+		Tag:    &offTag,
 	})
 	if err != nil {
 		t.Fatalf("set event status and tag: %v", err)
@@ -830,13 +833,12 @@ func Test_OrgAdminOfficialEventTag(t *testing.T) {
 
 	// 5. Non-admin or user-owned OFFICIAL tag still rejected for regular users
 	normalUserID := f.createUser("normal-user", "Normal User", nil, "USER")
-	normalToken := f.createSession(normalUserID)
-	_, err = CreateEventCore(f.ctx, &CreateEventRequest{
-		Authorization: normalToken,
-		Name:          "User Official Event",
-		OwnerType:     "USER",
-		Tag:           &offTag,
-		ScoringType:   ScoringPoints,
+	normalActor := testActor(normalUserID, "USER")
+	_, err = CreateEventCore(f.ctx, normalActor, &CreateEventRequest{
+		Name:        "User Official Event",
+		OwnerType:   "USER",
+		Tag:         &offTag,
+		ScoringType: ScoringPoints,
 	})
 	requireErrCode(t, err, errs.PermissionDenied, "")
 }

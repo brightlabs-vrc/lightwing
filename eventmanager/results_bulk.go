@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
@@ -18,10 +19,9 @@ import (
 
 // BulkResultsRequest mirrors Replace/MergeRaceResultsParams.
 type BulkResultsRequest struct {
-	EventID       string            `json:"eventId"`
-	RaceID        string            `json:"raceId"`
-	Authorization string            `header:"Authorization"`
-	Results       []*RaceResultInput `json:"results"`
+	EventID string            `json:"eventId"`
+	RaceID  string            `json:"raceId"`
+	Results []*RaceResultInput `json:"results"`
 }
 
 // ValidateResultInputs rejects duplicate userIds and asserts each
@@ -46,8 +46,8 @@ func ValidateResultInputs(ctx context.Context, eventID, raceID string, results [
 // ReplaceRaceResultsCore makes the payload the complete result set for the
 // race: each entry is upserted, existing results absent from the payload are
 // deleted, and every affected participant is recomputed.
-func ReplaceRaceResultsCore(ctx context.Context, p *BulkResultsRequest) (*RaceResultsResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func ReplaceRaceResultsCore(ctx context.Context, actor *auth.Actor, p *BulkResultsRequest) (*RaceResultsResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	e, err := requireEventRow(ctx, p.EventID)
@@ -100,15 +100,16 @@ func ReplaceRaceResultsCore(ctx context.Context, p *BulkResultsRequest) (*RaceRe
 	return &RaceResultsResponse{Results: results}, nil
 }
 
-//encore:api public method=PUT path=/api/race-results-bulk
+//encore:api auth method=PUT path=/api/race-results-bulk
 func ReplaceRaceResults(ctx context.Context, p *BulkResultsRequest) (*RaceResultsResponse, error) {
-	return ReplaceRaceResultsCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return ReplaceRaceResultsCore(ctx, actor, p)
 }
 
 // MergeRaceResultsCore upserts each payload entry, leaving results absent
 // from the payload untouched.
-func MergeRaceResultsCore(ctx context.Context, p *BulkResultsRequest) (*RaceResultsResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func MergeRaceResultsCore(ctx context.Context, actor *auth.Actor, p *BulkResultsRequest) (*RaceResultsResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	e, err := requireEventRow(ctx, p.EventID)
@@ -148,9 +149,10 @@ func MergeRaceResultsCore(ctx context.Context, p *BulkResultsRequest) (*RaceResu
 	return &RaceResultsResponse{Results: results}, nil
 }
 
-//encore:api public method=POST path=/api/race-results-bulk
+//encore:api auth method=POST path=/api/race-results-bulk
 func MergeRaceResults(ctx context.Context, p *BulkResultsRequest) (*RaceResultsResponse, error) {
-	return MergeRaceResultsCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return MergeRaceResultsCore(ctx, actor, p)
 }
 
 // scoringRulesOf extracts the scoring mode + parsed custom tables from an event row.

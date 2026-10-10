@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
@@ -157,10 +158,9 @@ func resolvePrimaryOrgOrTarget(ctx context.Context, id string) (string, error) {
 
 // --- addTeamMember (mirrors addTeamMember) ---
 
-func addTeamMember(ctx context.Context, authorization, id, userID, role string) (*Team, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func addTeamMember(ctx context.Context, actor *auth.Actor, id, userID, role string) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
@@ -169,7 +169,7 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
 		}
 
-		if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "create"); err != nil {
+		if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "create"); err != nil {
 			return nil, err
 		}
 	}
@@ -252,10 +252,9 @@ func addTeamMember(ctx context.Context, authorization, id, userID, role string) 
 
 // --- updateTeamMemberRole (mirrors updateTeamMemberRole) ---
 
-func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role string) (*Team, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func updateTeamMemberRole(ctx context.Context, actor *auth.Actor, id, userID, role string) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
@@ -264,7 +263,7 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
 		}
 
-		if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "update"); err != nil {
+		if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "update"); err != nil {
 			return nil, err
 		}
 	}
@@ -334,10 +333,9 @@ func updateTeamMemberRole(ctx context.Context, authorization, id, userID, role s
 
 // --- removeTeamMember (mirrors removeTeamMember) ---
 
-func removeTeamMember(ctx context.Context, authorization, id, userID string) (*Team, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func removeTeamMember(ctx context.Context, actor *auth.Actor, id, userID string) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
@@ -346,7 +344,7 @@ func removeTeamMember(ctx context.Context, authorization, id, userID string) (*T
 			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
 		}
 
-		if _, _, err := auth.RequirePermission(ctx, authorization, targetOrgID, "member", "delete"); err != nil {
+		if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "delete"); err != nil {
 			return nil, err
 		}
 	}
@@ -420,36 +418,36 @@ func (s *Service) ListTeamMembers(ctx context.Context, p *ListTeamMembersRequest
 }
 
 type AddTeamMemberRequest struct {
-	ID            string `json:"id"`
-	Authorization string `header:"Authorization"`
-	UserID        string `json:"userId"`
-	Role          string `json:"role,omitempty"`
+	ID     string `json:"id"`
+	UserID string `json:"userId"`
+	Role   string `json:"role,omitempty"`
 }
 
-//encore:api public method=POST path=/api/team-members
+//encore:api auth method=POST path=/api/team-members
 func (s *Service) AddTeamMember(ctx context.Context, p *AddTeamMemberRequest) (*Team, error) {
-	return addTeamMember(ctx, p.Authorization, p.ID, p.UserID, p.Role)
+	actor := encoreauth.Data().(*auth.Actor)
+	return addTeamMember(ctx, actor, p.ID, p.UserID, p.Role)
 }
 
 type UpdateTeamMemberRoleRequest struct {
-	ID            string `json:"id"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
-	Role          string `json:"role"`
+	ID     string `json:"id"`
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
 }
 
-//encore:api public method=PATCH path=/api/team-members
+//encore:api auth method=PATCH path=/api/team-members
 func (s *Service) UpdateTeamMemberRole(ctx context.Context, p *UpdateTeamMemberRoleRequest) (*Team, error) {
-	return updateTeamMemberRole(ctx, p.Authorization, p.ID, p.UserID, p.Role)
+	actor := encoreauth.Data().(*auth.Actor)
+	return updateTeamMemberRole(ctx, actor, p.ID, p.UserID, p.Role)
 }
 
 type RemoveTeamMemberRequest struct {
-	ID            string `query:"id"`
-	UserID        string `query:"userId"`
-	Authorization string `header:"Authorization"`
+	ID     string `query:"id"`
+	UserID string `query:"userId"`
 }
 
-//encore:api public method=DELETE path=/api/team-members
+//encore:api auth method=DELETE path=/api/team-members
 func (s *Service) RemoveTeamMember(ctx context.Context, p *RemoveTeamMemberRequest) (*Team, error) {
-	return removeTeamMember(ctx, p.Authorization, p.ID, p.UserID)
+	actor := encoreauth.Data().(*auth.Actor)
+	return removeTeamMember(ctx, actor, p.ID, p.UserID)
 }

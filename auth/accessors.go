@@ -18,8 +18,8 @@ const MemberRole = memberRole
 const AdministratorRoleLimit = administratorRoleLimit
 
 // RequireSiteAdmin asserts the caller holds the global SITE_ADMIN role.
-func RequireSiteAdmin(ctx context.Context, authorization string) (*Actor, error) {
-	return requireSiteAdmin(ctx, authorization)
+func RequireSiteAdmin(actor *Actor) (*Actor, error) {
+	return requireSiteAdmin(actor)
 }
 
 // InvalidateMemberRole drops the cached role for an org membership.

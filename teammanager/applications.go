@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
 )
 
 type SubmitOrgApplicationRequest struct {
-	Authorization string   `header:"Authorization"`
 	Name          string   `json:"name"`
 	Slug          *string  `json:"slug,omitempty"`
 	Logo          *string  `json:"logo,omitempty"`
@@ -24,7 +24,6 @@ type SubmitOrgApplicationRequest struct {
 }
 
 type SubmitTeamApplicationRequest struct {
-	Authorization            string   `header:"Authorization"`
 	TeamID                   *string  `json:"teamId,omitempty"`
 	Name                     string   `json:"name"`
 	Slug                     *string  `json:"slug,omitempty"`
@@ -35,24 +34,19 @@ type SubmitTeamApplicationRequest struct {
 }
 
 type ReviewApplicationRequest struct {
-	Authorization string `header:"Authorization"`
-	ID            string `json:"id"`
-	Type          string `json:"type"`   // "ORGANIZATION" | "TEAM"
-	Action        string `json:"action"` // "APPROVE" | "REJECT"
+	ID     string `json:"id"`
+	Type   string `json:"type"`   // "ORGANIZATION" | "TEAM"
+	Action string `json:"action"` // "APPROVE" | "REJECT"
 }
 
-type ListApplicationsRequest struct {
-	Authorization string `header:"Authorization"`
-}
+type ListApplicationsRequest struct{}
 
 type LinkSecondaryOrgRequest struct {
-	Authorization  string `header:"Authorization"`
 	TeamID         string `json:"teamId"`
 	OrganizationID string `json:"organizationId"`
 }
 
 type UnlinkSecondaryOrgRequest struct {
-	Authorization  string `header:"Authorization"`
 	TeamID         string `json:"teamId"`
 	OrganizationID string `json:"organizationId"`
 }
@@ -281,10 +275,9 @@ func getTeamApplicationView(ctx context.Context, id string) (*TeamApplicationVie
 	}, nil
 }
 
-func submitOrganizationApplication(ctx context.Context, p *SubmitOrgApplicationRequest) (*OrgApplicationView, error) {
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
+func submitOrganizationApplication(ctx context.Context, actor *auth.Actor, p *SubmitOrgApplicationRequest) (*OrgApplicationView, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if strings.TrimSpace(p.Name) == "" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "organization name is required"}
@@ -358,10 +351,9 @@ func submitOrganizationApplication(ctx context.Context, p *SubmitOrgApplicationR
 	return getOrgApplicationView(ctx, orgID)
 }
 
-func submitTeamApplication(ctx context.Context, p *SubmitTeamApplicationRequest) (*TeamApplicationView, error) {
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
+func submitTeamApplication(ctx context.Context, actor *auth.Actor, p *SubmitTeamApplicationRequest) (*TeamApplicationView, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	if p.TeamID != nil && *p.TeamID != "" {
@@ -539,10 +531,9 @@ func submitTeamApplication(ctx context.Context, p *SubmitTeamApplicationRequest)
 	return getTeamApplicationView(ctx, teamID)
 }
 
-func listAdminApplications(ctx context.Context, authorization string) (*ListApplicationsResponse, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func listAdminApplications(ctx context.Context, actor *auth.Actor) (*ListApplicationsResponse, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	resp := &ListApplicationsResponse{
@@ -596,10 +587,9 @@ func listAdminApplications(ctx context.Context, authorization string) (*ListAppl
 	return resp, nil
 }
 
-func reviewApplication(ctx context.Context, p *ReviewApplicationRequest) error {
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return err
+func reviewApplication(ctx context.Context, actor *auth.Actor, p *ReviewApplicationRequest) error {
+	if actor == nil {
+		return &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	status := "APPROVED"
@@ -654,10 +644,9 @@ func reviewApplication(ctx context.Context, p *ReviewApplicationRequest) error {
 	return nil
 }
 
-func linkSecondaryOrganization(ctx context.Context, p *LinkSecondaryOrgRequest) (*Team, error) {
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
+func linkSecondaryOrganization(ctx context.Context, actor *auth.Actor, p *LinkSecondaryOrgRequest) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	primOrg, err := q().GetPrimaryOrgForTeam(ctx, p.TeamID)
@@ -710,10 +699,9 @@ func linkSecondaryOrganization(ctx context.Context, p *LinkSecondaryOrgRequest) 
 	return loadTeam(ctx, p.TeamID)
 }
 
-func unlinkSecondaryOrganization(ctx context.Context, p *UnlinkSecondaryOrgRequest) (*Team, error) {
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
+func unlinkSecondaryOrganization(ctx context.Context, actor *auth.Actor, p *UnlinkSecondaryOrgRequest) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	primOrg, err := q().GetPrimaryOrgForTeam(ctx, p.TeamID)
@@ -781,34 +769,40 @@ func listApprovedOrganizations(ctx context.Context) (*ListOrganizationsResponse,
 
 // --- HTTP Endpoints ---
 
-//encore:api public method=POST path=/api/applications/organization
+//encore:api auth method=POST path=/api/applications/organization
 func (s *Service) SubmitOrganizationApplication(ctx context.Context, p *SubmitOrgApplicationRequest) (*OrgApplicationView, error) {
-	return submitOrganizationApplication(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return submitOrganizationApplication(ctx, actor, p)
 }
 
-//encore:api public method=POST path=/api/applications/team
+//encore:api auth method=POST path=/api/applications/team
 func (s *Service) SubmitTeamApplication(ctx context.Context, p *SubmitTeamApplicationRequest) (*TeamApplicationView, error) {
-	return submitTeamApplication(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return submitTeamApplication(ctx, actor, p)
 }
 
-//encore:api public method=GET path=/api/admin/applications
+//encore:api auth method=GET path=/api/admin/applications
 func (s *Service) ListApplications(ctx context.Context, p *ListApplicationsRequest) (*ListApplicationsResponse, error) {
-	return listAdminApplications(ctx, p.Authorization)
+	actor := encoreauth.Data().(*auth.Actor)
+	return listAdminApplications(ctx, actor)
 }
 
-//encore:api public method=POST path=/api/admin/applications/review
+//encore:api auth method=POST path=/api/admin/applications/review
 func (s *Service) ReviewApplication(ctx context.Context, p *ReviewApplicationRequest) error {
-	return reviewApplication(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return reviewApplication(ctx, actor, p)
 }
 
-//encore:api public method=POST path=/api/teams/link-secondary
+//encore:api auth method=POST path=/api/teams/link-secondary
 func (s *Service) LinkSecondaryOrganization(ctx context.Context, p *LinkSecondaryOrgRequest) (*Team, error) {
-	return linkSecondaryOrganization(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return linkSecondaryOrganization(ctx, actor, p)
 }
 
-//encore:api public method=POST path=/api/teams/unlink-secondary
+//encore:api auth method=POST path=/api/teams/unlink-secondary
 func (s *Service) UnlinkSecondaryOrganization(ctx context.Context, p *UnlinkSecondaryOrgRequest) (*Team, error) {
-	return unlinkSecondaryOrganization(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return unlinkSecondaryOrganization(ctx, actor, p)
 }
 
 //encore:api public method=GET path=/api/organizations

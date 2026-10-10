@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
@@ -45,7 +46,6 @@ func ListClassTiers(ctx context.Context) (*ClassTiersResponse, error) {
 // may set a tier globally.
 type SetUserClassRequest struct {
 	UserID         string  `json:"userId"`
-	Authorization  string  `header:"Authorization"`
 	OrganizationID *string `json:"organizationId,omitempty"`
 	ClassTier      *string `json:"classTier"`
 }
@@ -57,12 +57,12 @@ type SetUserClassResponse struct {
 }
 
 // SetUserClassCore tags a participant with a skill class tier.
-func SetUserClassCore(ctx context.Context, p *SetUserClassRequest) (*SetUserClassResponse, error) {
+func SetUserClassCore(ctx context.Context, actor *auth.Actor, p *SetUserClassRequest) (*SetUserClassResponse, error) {
 	if p.OrganizationID != nil && *p.OrganizationID != "" {
-		if _, _, err := auth.RequirePermission(ctx, p.Authorization, *p.OrganizationID, auth.ResourceEvent, auth.ActionUpdate); err != nil {
+		if _, _, err := auth.RequirePermission(ctx, actor, *p.OrganizationID, auth.ResourceEvent, auth.ActionUpdate); err != nil {
 			return nil, err
 		}
-	} else if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
+	} else if _, err := auth.RequireSiteAdmin(actor); err != nil {
 		return nil, err
 	}
 	exists, err := q().UserExists(ctx, p.UserID)
@@ -84,9 +84,10 @@ func SetUserClassCore(ctx context.Context, p *SetUserClassRequest) (*SetUserClas
 	return &SetUserClassResponse{UserID: p.UserID, ClassTier: p.ClassTier}, nil
 }
 
-//encore:api public method=PUT path=/api/user-class
+//encore:api auth method=PUT path=/api/user-class
 func SetUserClass(ctx context.Context, p *SetUserClassRequest) (*SetUserClassResponse, error) {
-	return SetUserClassCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return SetUserClassCore(ctx, actor, p)
 }
 
 // EligibleRace is one race the participant may enter.
@@ -280,19 +281,18 @@ func ListDatasets(ctx context.Context, q *DatasetsQuery) (*DatasetsResponse, err
 
 // CreateDatasetRequest mirrors CreateDatasetParams.
 type CreateDatasetRequest struct {
-	EventID       string  `json:"eventId"`
-	Authorization string  `header:"Authorization"`
-	Source        string  `json:"source"`
-	Rows          int     `json:"rows"`
-	Status        *string `json:"status,omitempty"`
+	EventID string  `json:"eventId"`
+	Source  string  `json:"source"`
+	Rows    int     `json:"rows"`
+	Status  *string `json:"status,omitempty"`
 }
 
 // CreateDatasetCore creates a dataset record for an event.
-func CreateDatasetCore(ctx context.Context, p *CreateDatasetRequest) (*DatasetView, error) {
+func CreateDatasetCore(ctx context.Context, actor *auth.Actor, p *CreateDatasetRequest) (*DatasetView, error) {
 	if _, err := requireEventRow(ctx, p.EventID); err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	status := "PENDING"
@@ -318,25 +318,25 @@ func CreateDatasetCore(ctx context.Context, p *CreateDatasetRequest) (*DatasetVi
 		created.ImportedAt, created.CreatedAt, created.UpdatedAt)), nil
 }
 
-//encore:api public method=POST path=/api/datasets
+//encore:api auth method=POST path=/api/datasets
 func CreateDataset(ctx context.Context, p *CreateDatasetRequest) (*DatasetView, error) {
-	return CreateDatasetCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return CreateDatasetCore(ctx, actor, p)
 }
 
 // UpdateDatasetStatusRequest mirrors UpdateDatasetStatusParams.
 type UpdateDatasetStatusRequest struct {
-	EventID       string `json:"eventId"`
-	DatasetID     string `json:"datasetId"`
-	Authorization string `header:"Authorization"`
-	Status        string `json:"status"`
+	EventID   string `json:"eventId"`
+	DatasetID string `json:"datasetId"`
+	Status    string `json:"status"`
 }
 
 // UpdateDatasetStatusCore updates a dataset record's processing status.
-func UpdateDatasetStatusCore(ctx context.Context, p *UpdateDatasetStatusRequest) (*DatasetView, error) {
+func UpdateDatasetStatusCore(ctx context.Context, actor *auth.Actor, p *UpdateDatasetStatusRequest) (*DatasetView, error) {
 	if _, err := requireEventRow(ctx, p.EventID); err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	fetched, err := q().GetDatasetByID(ctx, sqlc.GetDatasetByIDParams{
@@ -367,7 +367,8 @@ func UpdateDatasetStatusCore(ctx context.Context, p *UpdateDatasetStatusRequest)
 		updated.ImportedAt, updated.CreatedAt, updated.UpdatedAt)), nil
 }
 
-//encore:api public method=PUT path=/api/dataset-status
+//encore:api auth method=PUT path=/api/dataset-status
 func UpdateDatasetStatus(ctx context.Context, p *UpdateDatasetStatusRequest) (*DatasetView, error) {
-	return UpdateDatasetStatusCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return UpdateDatasetStatusCore(ctx, actor, p)
 }

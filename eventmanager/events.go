@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/cron"
 	"encore.app/auth"
@@ -454,25 +455,27 @@ func EnsureEventStandingsRow(ctx context.Context, eventID, userID string, scorin
 //
 // Mirrors ts-legacy/eventmanager/events.ts CreateEventParams (POST /api/events).
 type CreateEventRequest struct {
-	Authorization                     string          `header:"Authorization"`
-	Name                              string          `json:"name"`
-	Description                       *string         `json:"description,omitempty"`
-	OwnerType                         string          `json:"ownerType"`
-	OrganizationID                    *string         `json:"organizationId,omitempty"`
-	OwnerUserID                       *string         `json:"ownerUserId,omitempty"`
-	Tag                               *string         `json:"tag,omitempty"`
-	ScoringType                       int             `json:"scoringType"`
-	ScoringRulesMode                  *string         `json:"scoringRulesMode,omitempty"`
-	CustomScoringTables               json.RawMessage `json:"customScoringTables,omitempty"`
-	ClassRestriction                  *string         `json:"classRestriction,omitempty"`
-	GranularParticipation             bool            `json:"granularParticipation,omitempty"`
-	ScheduledAt                       *string         `json:"scheduledAt,omitempty"`
-	ParticipantLimit                  OptInt          `json:"participantLimit,omitempty"`
-	MaxConcurrentRaceParticipations   OptInt          `json:"maxConcurrentRaceParticipations,omitempty"`
+	Name                            string          `json:"name"`
+	Description                     *string         `json:"description,omitempty"`
+	OwnerType                       string          `json:"ownerType"`
+	OrganizationID                  *string         `json:"organizationId,omitempty"`
+	OwnerUserID                     *string         `json:"ownerUserId,omitempty"`
+	Tag                             *string         `json:"tag,omitempty"`
+	ScoringType                     int             `json:"scoringType"`
+	ScoringRulesMode                *string         `json:"scoringRulesMode,omitempty"`
+	CustomScoringTables             json.RawMessage `json:"customScoringTables,omitempty"`
+	ClassRestriction                *string         `json:"classRestriction,omitempty"`
+	GranularParticipation           bool            `json:"granularParticipation,omitempty"`
+	ScheduledAt                     *string         `json:"scheduledAt,omitempty"`
+	ParticipantLimit                OptInt          `json:"participantLimit,omitempty"`
+	MaxConcurrentRaceParticipations OptInt          `json:"maxConcurrentRaceParticipations,omitempty"`
 }
 
 // CreateEventCore creates an event and returns its detail.
-func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, error) {
+func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventRequest) (*EventDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
+	}
 	if p.Name == "" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "name is required"}
 	}
@@ -485,7 +488,7 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 		if p.OrganizationID == nil || *p.OrganizationID == "" {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "organizationId is required for organization-owned events"}
 		}
-		if _, _, err := auth.RequirePermission(ctx, p.Authorization, *p.OrganizationID, auth.ResourceEvent, auth.ActionCreate); err != nil {
+		if _, _, err := auth.RequirePermission(ctx, actor, *p.OrganizationID, auth.ResourceEvent, auth.ActionCreate); err != nil {
 			return nil, err
 		}
 		orgExists, err := q().OrgExists(ctx, *p.OrganizationID)
@@ -497,10 +500,6 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 		}
 		organizationID = p.OrganizationID
 	} else {
-		actor, err := auth.ResolveActor(ctx, p.Authorization)
-		if err != nil {
-			return nil, err
-		}
 		owner := actor.UserID
 		if p.OwnerUserID != nil && *p.OwnerUserID != "" {
 			owner = *p.OwnerUserID
@@ -603,7 +602,7 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 		if p.OwnerType == "ORGANIZATION" && organizationID != nil {
 			// Permission already verified above for OrganizationID with ResourceEvent, ActionCreate.
 		} else {
-			if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
+			if _, err := auth.RequireSiteAdmin(actor); err != nil {
 				return nil, err
 			}
 		}
@@ -645,9 +644,10 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 	return LoadEvent(ctx, id)
 }
 
-//encore:api public method=POST path=/api/events
+//encore:api auth method=POST path=/api/events
 func CreateEvent(ctx context.Context, p *CreateEventRequest) (*EventDetail, error) {
-	return CreateEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return CreateEventCore(ctx, actor, p)
 }
 
 // --- List ---
@@ -844,9 +844,8 @@ func ListEventAdmins(ctx context.Context, eventID string) (*ListEventAdminsRespo
 //
 // Mirrors ts-legacy/eventmanager/events.ts addEventAdmin (POST /api/events/:id/admins).
 type AddEventAdminRequest struct {
-	EventID       string `json:"eventId"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	UserID  string `json:"userId"`
 }
 
 // AddEventAdminResponse reports success.
@@ -855,8 +854,8 @@ type AddEventAdminResponse struct {
 }
 
 // AddEventAdminCore adds an administrator to an event (idempotent).
-func AddEventAdminCore(ctx context.Context, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func AddEventAdminCore(ctx context.Context, actor *auth.Actor, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	userExists, err := q().UserExists(ctx, p.UserID)
@@ -875,24 +874,24 @@ func AddEventAdminCore(ctx context.Context, p *AddEventAdminRequest) (*AddEventA
 	return &AddEventAdminResponse{Success: true}, nil
 }
 
-//encore:api public method=POST path=/api/event-admins
+//encore:api auth method=POST path=/api/event-admins
 func AddEventAdmin(ctx context.Context, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
-	return AddEventAdminCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return AddEventAdminCore(ctx, actor, p)
 }
 
-// RemoveEventAdminRequest carries the event/user ids plus the auth header
+// RemoveEventAdminRequest carries the event/user ids
 // (DELETE decodes the struct from query params).
 //
 // Mirrors ts-legacy/eventmanager/events.ts removeEventAdmin.
 type RemoveEventAdminRequest struct {
-	EventID       string `query:"eventId"`
-	UserID        string `query:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `query:"eventId"`
+	UserID  string `query:"userId"`
 }
 
 // RemoveEventAdminCore removes an administrator from an event.
-func RemoveEventAdminCore(ctx context.Context, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func RemoveEventAdminCore(ctx context.Context, actor *auth.Actor, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if err := q().DeleteEventAdmin(ctx, sqlc.DeleteEventAdminParams{
@@ -904,19 +903,18 @@ func RemoveEventAdminCore(ctx context.Context, p *RemoveEventAdminRequest) (*Add
 	return &AddEventAdminResponse{Success: true}, nil
 }
 
-//encore:api public method=DELETE path=/api/event-admins
+//encore:api auth method=DELETE path=/api/event-admins
 func RemoveEventAdmin(ctx context.Context, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
-	return RemoveEventAdminCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RemoveEventAdminCore(ctx, actor, p)
 }
 
 // --- Delete ---
 
-// DeleteEventRequest carries the event id plus the auth header (DELETE
-// decodes the struct from query params).
+// DeleteEventRequest carries the event id (DELETE decodes the struct from query params).
 type DeleteEventRequest struct {
-	ID            string `query:"id"`
-	Authorization string `header:"Authorization"`
-	Permanent     bool   `query:"permanent"`
+	ID        string `query:"id"`
+	Permanent bool   `query:"permanent"`
 }
 
 // DeleteEventResponse reports deletion.
@@ -925,7 +923,7 @@ type DeleteEventResponse struct {
 }
 
 // DeleteEventCore soft-deletes an event (putting it into PENDING_DELETION) or permanently deletes it if specified/already pending.
-func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventResponse, error) {
+func DeleteEventCore(ctx context.Context, actor *auth.Actor, p *DeleteEventRequest) (*DeleteEventResponse, error) {
 	status, err := q().GetEventStatus(ctx, p.ID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
@@ -933,7 +931,7 @@ func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventRe
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionDelete); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionDelete); err != nil {
 		return nil, err
 	}
 	if p.Permanent || status == "PENDING_DELETION" {
@@ -951,19 +949,19 @@ func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventRe
 	return &DeleteEventResponse{Deleted: true}, nil
 }
 
-//encore:api public method=DELETE path=/api/events
+//encore:api auth method=DELETE path=/api/events
 func DeleteEvent(ctx context.Context, p *DeleteEventRequest) (*DeleteEventResponse, error) {
-	return DeleteEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return DeleteEventCore(ctx, actor, p)
 }
 
-// RestoreEventRequest carries the event id plus the auth header.
+// RestoreEventRequest carries the event id.
 type RestoreEventRequest struct {
-	ID            string `json:"id"`
-	Authorization string `header:"Authorization"`
+	ID string `json:"id"`
 }
 
 // RestoreEventCore restores a soft-deleted event back to PENDING.
-func RestoreEventCore(ctx context.Context, p *RestoreEventRequest) (*EventDetail, error) {
+func RestoreEventCore(ctx context.Context, actor *auth.Actor, p *RestoreEventRequest) (*EventDetail, error) {
 	exists, err := q().EventExists(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -971,7 +969,7 @@ func RestoreEventCore(ctx context.Context, p *RestoreEventRequest) (*EventDetail
 	if !exists {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if err := q().RestoreEventStatus(ctx, p.ID); err != nil {
@@ -980,7 +978,8 @@ func RestoreEventCore(ctx context.Context, p *RestoreEventRequest) (*EventDetail
 	return LoadEvent(ctx, p.ID)
 }
 
-//encore:api public method=POST path=/api/event-restore
+//encore:api auth method=POST path=/api/event-restore
 func RestoreEvent(ctx context.Context, p *RestoreEventRequest) (*EventDetail, error) {
-	return RestoreEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RestoreEventCore(ctx, actor, p)
 }

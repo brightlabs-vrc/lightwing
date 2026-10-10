@@ -24,14 +24,14 @@ func Test_GranularResultsGating(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("gradmin", "Granular Admin", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	p1 := f.createUser("grpart1", "Participant One", nil, "USER")
 	p2 := f.createUser("grpart2", "Participant Two", nil, "USER")
 
 	eventID := f.createEventDirect(admin, "Granular Event", "UNOFFICIAL", nil, true)
 
-	race, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 1",
+	race, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1",
 		DistanceMeters: 1000, TrackType: "Dirt", Location: "Tokyo", Grade: strptr("OP"),
 	})
 	if err != nil {
@@ -39,21 +39,21 @@ func Test_GranularResultsGating(t *testing.T) {
 	}
 
 	for _, uid := range []string{p1, p2} {
-		if _, err := AddEventMemberCore(ctx, &AddEventMemberRequest{
-			EventID: eventID, UserID: uid, Authorization: authHeader,
+		if _, err := AddEventMemberCore(ctx, adminActor, &AddEventMemberRequest{
+			EventID: eventID, UserID: uid,
 		}); err != nil {
 			t.Fatalf("AddEventMemberCore(%s): %v", uid, err)
 		}
 	}
-	if _, err := AddRaceEventMemberCore(ctx, &RaceMemberRequest{
-		EventID: eventID, RaceID: race.ID, UserID: p1, Authorization: authHeader,
+	if _, err := AddRaceEventMemberCore(ctx, adminActor, &RaceMemberRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p1,
 	}); err != nil {
 		t.Fatalf("AddRaceEventMemberCore: %v", err)
 	}
 
 	// Race member result assignment succeeds; points resolve via the table.
-	r1, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race.ID, UserID: p1, Authorization: authHeader,
+	r1, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p1,
 		Position: intptr(2), Points: intptr(10),
 	})
 	if err != nil {
@@ -67,24 +67,24 @@ func Test_GranularResultsGating(t *testing.T) {
 	}
 
 	// Event-only member without race registration is rejected.
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race.ID, UserID: p2, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p2,
 		Points: intptr(5),
 	}); err == nil {
 		t.Error("assign to non-race member should fail, got nil")
 	}
 
 	// Bulk replace including the unregistered user fails.
-	if _, err := ReplaceRaceResultsCore(ctx, &BulkResultsRequest{
-		EventID: eventID, RaceID: race.ID, Authorization: authHeader,
+	if _, err := ReplaceRaceResultsCore(ctx, adminActor, &BulkResultsRequest{
+		EventID: eventID, RaceID: race.ID,
 		Results: []*RaceResultInput{{UserID: p1, Points: intptr(12)}, {UserID: p2, Points: intptr(8)}},
 	}); err == nil {
 		t.Error("replace including non-race member should fail, got nil")
 	}
 
 	// Merge including the unregistered user fails.
-	if _, err := MergeRaceResultsCore(ctx, &BulkResultsRequest{
-		EventID: eventID, RaceID: race.ID, Authorization: authHeader,
+	if _, err := MergeRaceResultsCore(ctx, adminActor, &BulkResultsRequest{
+		EventID: eventID, RaceID: race.ID,
 		Results: []*RaceResultInput{{UserID: p2, Points: intptr(8)}},
 	}); err == nil {
 		t.Error("merge including non-race member should fail, got nil")
@@ -96,14 +96,14 @@ func Test_GranularEventMembersSurfacedAndSelectableForRace(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("gradmin2", "Granular Admin 2", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	p1 := f.createUser("grpart3", "Participant Three", nil, "USER")
 
 	eventID := f.createEventDirect(admin, "Granular Event 2", "UNOFFICIAL", nil, true)
 
 	// Add p1 as event member
-	addedEvent, err := AddEventMemberCore(ctx, &AddEventMemberRequest{
-		EventID: eventID, UserID: p1, Authorization: authHeader,
+	addedEvent, err := AddEventMemberCore(ctx, adminActor, &AddEventMemberRequest{
+		EventID: eventID, UserID: p1,
 	})
 	if err != nil {
 		t.Fatalf("AddEventMemberCore: %v", err)
@@ -122,8 +122,8 @@ func Test_GranularEventMembersSurfacedAndSelectableForRace(t *testing.T) {
 	}
 
 	// Create a race
-	race, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 1",
+	race, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1",
 		DistanceMeters: 1000, TrackType: "Dirt", Location: "Tokyo",
 	})
 	if err != nil {
@@ -131,8 +131,8 @@ func Test_GranularEventMembersSurfacedAndSelectableForRace(t *testing.T) {
 	}
 
 	// Add p1 to race
-	addedRace, err := AddRaceEventMemberCore(ctx, &RaceMemberRequest{
-		EventID: eventID, RaceID: race.ID, UserID: p1, Authorization: authHeader,
+	addedRace, err := AddRaceEventMemberCore(ctx, adminActor, &RaceMemberRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p1,
 	})
 	if err != nil {
 		t.Fatalf("AddRaceEventMemberCore: %v", err)
@@ -155,27 +155,27 @@ func Test_NonGranularFallsBackToEventMembership(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("ngadmin", "Non-Granular Admin", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	p1 := f.createUser("ngpart1", "Participant One", nil, "USER")
 	p2 := f.createUser("ngpart2", "Participant Two", nil, "USER")
 
 	eventID := f.createEventDirect(admin, "Non-Granular Event", "UNOFFICIAL", nil, false)
 
-	race, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 1",
+	race, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1",
 		DistanceMeters: 1000, TrackType: "Dirt", Location: "Tokyo", Grade: strptr("OP"),
 	})
 	if err != nil {
 		t.Fatalf("CreateRaceEventCore: %v", err)
 	}
-	if _, err := AddEventMemberCore(ctx, &AddEventMemberRequest{
-		EventID: eventID, UserID: p1, Authorization: authHeader,
+	if _, err := AddEventMemberCore(ctx, adminActor, &AddEventMemberRequest{
+		EventID: eventID, UserID: p1,
 	}); err != nil {
 		t.Fatalf("AddEventMemberCore: %v", err)
 	}
 
-	r1, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race.ID, UserID: p1, Authorization: authHeader,
+	r1, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p1,
 		Position: intptr(2), Points: intptr(10),
 	})
 	if err != nil {
@@ -185,8 +185,8 @@ func Test_NonGranularFallsBackToEventMembership(t *testing.T) {
 		t.Errorf("userId = %q, want %q", r1.UserID, p1)
 	}
 
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race.ID, UserID: p2, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race.ID, UserID: p2,
 		Points: intptr(5),
 	}); err == nil {
 		t.Error("assign to non-member should fail, got nil")
@@ -200,7 +200,7 @@ func Test_AutoDeferralOnOPWin(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("adadmin", "Defer Admin", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	u1 := f.createUser("adungraded", "Ungraded Competitor", nil, "USER")
 	u2 := f.createUser("adgraded", "Graded Competitor", strptr("G1"), "USER")
 
@@ -208,15 +208,15 @@ func Test_AutoDeferralOnOPWin(t *testing.T) {
 	f.addEventMemberDirect(eventID, u1)
 	f.addEventMemberDirect(eventID, u2)
 
-	race1, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 1 OP",
+	race1, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1 OP",
 		DistanceMeters: 1200, TrackType: "Turf", Location: "Kyoto", Grade: strptr("OP"),
 	})
 	if err != nil {
 		t.Fatalf("create race1: %v", err)
 	}
-	race2, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 2 GIII",
+	race2, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 2 GIII",
 		DistanceMeters: 1600, TrackType: "Dirt", Location: "Tokyo", Grade: strptr("GIII"),
 	})
 	if err != nil {
@@ -224,8 +224,8 @@ func Test_AutoDeferralOnOPWin(t *testing.T) {
 	}
 
 	// Ungraded user wins the OP race.
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race1.ID, UserID: u1, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u1,
 		Position: intptr(1),
 	}); err != nil {
 		t.Fatalf("assign win: %v", err)
@@ -247,16 +247,16 @@ func Test_AutoDeferralOnOPWin(t *testing.T) {
 	}
 
 	// Graded user winning the same race does not disturb u1's deferral.
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race1.ID, UserID: u2, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u2,
 		Position: intptr(1),
 	}); err != nil {
 		t.Fatalf("assign u2 win: %v", err)
 	}
 
 	// Removing u1's win reverts the deferral to null.
-	if _, err := DeleteRaceResultCore(ctx, &DeleteRaceResultRequest{
-		EventID: eventID, RaceID: race1.ID, UserID: u1, Authorization: authHeader,
+	if _, err := DeleteRaceResultCore(ctx, adminActor, &DeleteRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u1,
 	}); err != nil {
 		t.Fatalf("delete win: %v", err)
 	}
@@ -278,7 +278,7 @@ func Test_AutoDeferralCustomTables(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("cdadmin", "Custom Defer Admin", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	u1 := f.createUser("cdungraded", "Ungraded Custom", nil, "USER")
 
 	eventID := f.createEventDirect(admin, "Custom Auto Defer Event", "UNOFFICIAL", nil, false)
@@ -294,15 +294,15 @@ func Test_AutoDeferralCustomTables(t *testing.T) {
 	}
 	f.addEventMemberDirect(eventID, u1)
 
-	race1, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 1 GIII",
+	race1, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1 GIII",
 		DistanceMeters: 1200, TrackType: "Turf", Location: "Kyoto", Grade: strptr("GIII"),
 	})
 	if err != nil {
 		t.Fatalf("create race1: %v", err)
 	}
-	race2, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 2 OP",
+	race2, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 2 OP",
 		DistanceMeters: 1600, TrackType: "Dirt", Location: "Tokyo", Grade: strptr("OP"),
 	})
 	if err != nil {
@@ -310,8 +310,8 @@ func Test_AutoDeferralCustomTables(t *testing.T) {
 	}
 
 	// OP win on Race 2 must NOT defer (custom OP autoDefer=false).
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race2.ID, UserID: u1, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race2.ID, UserID: u1,
 		Position: intptr(1),
 	}); err != nil {
 		t.Fatalf("assign OP win: %v", err)
@@ -325,8 +325,8 @@ func Test_AutoDeferralCustomTables(t *testing.T) {
 	}
 
 	// GIII win on Race 1 MUST defer race2 (custom GIII autoDefer=true, seq 1 < seq 2).
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race1.ID, UserID: u1, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u1,
 		Position: intptr(1),
 	}); err != nil {
 		t.Fatalf("assign GIII win: %v", err)
@@ -346,28 +346,28 @@ func Test_AutoDeferralRespectsSequenceOrdering(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("seqadmin", "Seq Admin", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	u1 := f.createUser("sequngraded", "Ungraded Competitor", nil, "USER")
 
 	eventID := f.createEventDirect(admin, "Sequence Auto Defer Event", "UNOFFICIAL", nil, false)
 	f.addEventMemberDirect(eventID, u1)
 
-	race1, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 1 OP", Sequence: intptr(1),
+	race1, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1 OP", Sequence: intptr(1),
 		DistanceMeters: 1200, TrackType: "Turf", Location: "Kyoto", Grade: strptr("OP"),
 	})
 	if err != nil {
 		t.Fatalf("create race1: %v", err)
 	}
-	race2, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 2 OP", Sequence: intptr(2),
+	race2, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 2 OP", Sequence: intptr(2),
 		DistanceMeters: 1400, TrackType: "Turf", Location: "Hanshin", Grade: strptr("OP"),
 	})
 	if err != nil {
 		t.Fatalf("create race2: %v", err)
 	}
-	race3, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race 3 GIII", Sequence: intptr(3),
+	race3, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 3 GIII", Sequence: intptr(3),
 		DistanceMeters: 1600, TrackType: "Dirt", Location: "Tokyo", Grade: strptr("GIII"),
 	})
 	if err != nil {
@@ -375,16 +375,16 @@ func Test_AutoDeferralRespectsSequenceOrdering(t *testing.T) {
 	}
 
 	// User finished 2nd in Race 1
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race1.ID, UserID: u1, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u1,
 		Position: intptr(2),
 	}); err != nil {
 		t.Fatalf("assign race1 pos 2: %v", err)
 	}
 
 	// User wins Race 2 (OP grade win)
-	if _, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race2.ID, UserID: u1, Authorization: authHeader,
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race2.ID, UserID: u1,
 		Position: intptr(1),
 	}); err != nil {
 		t.Fatalf("assign race2 win: %v", err)
@@ -425,21 +425,21 @@ func Test_ManualDeferredStatus(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("mdadmin", "Manual Defer Admin", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	u1 := f.createUser("mdcomp", "Manual Defer Competitor", nil, "USER")
 
 	eventID := f.createEventDirect(admin, "Manual Defer Event", "UNOFFICIAL", nil, false)
 	f.addEventMemberDirect(eventID, u1)
 
-	race, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-		EventID: eventID, Authorization: authHeader, Name: "Race GIII",
+	race, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race GIII",
 		DistanceMeters: 1600, TrackType: "Turf", Location: "Kyoto", Grade: strptr("GIII"),
 	})
 	if err != nil {
 		t.Fatalf("create race: %v", err)
 	}
-	res, err := AssignRaceResultCore(ctx, &AssignRaceResultRequest{
-		EventID: eventID, RaceID: race.ID, UserID: u1, Authorization: authHeader,
+	res, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race.ID, UserID: u1,
 		Position: intptr(5), ResultStatus: strptr("DEFERRED"),
 	})
 	if err != nil {
@@ -468,11 +468,11 @@ func Test_DatasetCreateListUpdate(t *testing.T) {
 	ctx := context.Background()
 
 	owner := f.createUser("dsowner", "Dataset Owner", nil, "SITE_ADMIN")
-	authHeader := f.createSession(owner)
+	ownerActor := testActor(owner, "SITE_ADMIN")
 	eventID := f.createEventDirect(owner, "Main Championship", "UNOFFICIAL", nil, false)
 
-	created, err := CreateDatasetCore(ctx, &CreateDatasetRequest{
-		EventID: eventID, Authorization: authHeader,
+	created, err := CreateDatasetCore(ctx, ownerActor, &CreateDatasetRequest{
+		EventID: eventID,
 		Source: "results_test.csv", Rows: 150, Status: strptr("PENDING"),
 	})
 	if err != nil {
@@ -491,8 +491,8 @@ func Test_DatasetCreateListUpdate(t *testing.T) {
 		t.Errorf("list = %+v, want the created dataset", listed.Datasets)
 	}
 
-	updated, err := UpdateDatasetStatusCore(ctx, &UpdateDatasetStatusRequest{
-		EventID: eventID, DatasetID: created.ID, Authorization: authHeader, Status: "DONE",
+	updated, err := UpdateDatasetStatusCore(ctx, ownerActor, &UpdateDatasetStatusRequest{
+		EventID: eventID, DatasetID: created.ID, Status: "DONE",
 	})
 	if err != nil {
 		t.Fatalf("UpdateDatasetStatusCore: %v", err)
@@ -514,10 +514,10 @@ func Test_DatasetCreateRejectsMissingEvent(t *testing.T) {
 	ctx := context.Background()
 
 	user := f.createUser("dsuser", "Regular User", nil, "USER")
-	authHeader := f.createSession(user)
+	userActor := testActor(user, "USER")
 
-	_, err := CreateDatasetCore(ctx, &CreateDatasetRequest{
-		EventID: "non-existent-event", Authorization: authHeader,
+	_, err := CreateDatasetCore(ctx, userActor, &CreateDatasetRequest{
+		EventID: "non-existent-event",
 		Source: "test.csv", Rows: 10,
 	})
 	if errs.Code(err) != errs.NotFound {

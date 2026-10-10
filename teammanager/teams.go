@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
@@ -156,10 +157,9 @@ func listTeams(ctx context.Context, search string, limit, offset int) (*ListTeam
 
 // --- createTeam (mirrors createTeam; site-admin gated) ---
 
-func createTeam(ctx context.Context, authorization, name string, logo, description, primaryOrganizationID *string) (*Team, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func createTeam(ctx context.Context, actor *auth.Actor, name string, logo, description, primaryOrganizationID *string) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
 		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required"}
@@ -221,10 +221,9 @@ type UpdateTeamParams struct {
 	ClearDescription bool
 }
 
-func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamParams) (*Team, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func updateTeam(ctx context.Context, actor *auth.Actor, id string, p *UpdateTeamParams) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	// Try resolving primary org for team
@@ -243,7 +242,7 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
 			}
 		} else {
-			if _, _, err := auth.RequirePermission(ctx, authorization, id, "organization", "update"); err != nil {
+			if _, _, err := auth.RequirePermission(ctx, actor, id, "organization", "update"); err != nil {
 				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
 			}
 		}
@@ -300,14 +299,12 @@ func updateTeam(ctx context.Context, authorization, id string, p *UpdateTeamPara
 // --- convertTeamToOrg ---
 
 type ConvertTeamToOrgRequest struct {
-	Authorization string `header:"Authorization"`
-	TeamID        string `json:"teamId"`
+	TeamID string `json:"teamId"`
 }
 
-func convertTeamToOrg(ctx context.Context, authorization, teamID string) (*AdminOrganizationDetail, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func convertTeamToOrg(ctx context.Context, actor *auth.Actor, teamID string) (*AdminOrganizationDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
 		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required"}
@@ -464,7 +461,6 @@ type ListAdminOrganizationsResponse struct {
 }
 
 type CreateAdminOrganizationRequest struct {
-	Authorization string  `header:"Authorization"`
 	Name          string  `json:"name"`
 	Logo          *string `json:"logo,omitempty"`
 	Description   *string `json:"description,omitempty"`
@@ -474,7 +470,6 @@ type CreateAdminOrganizationRequest struct {
 
 type UpdateAdminOrganizationRequest struct {
 	ID               string  `json:"id"`
-	Authorization    string  `header:"Authorization"`
 	Name             *string `json:"name,omitempty"`
 	Slug             *string `json:"slug,omitempty"`
 	Logo             *string `json:"logo,omitempty"`
@@ -709,10 +704,9 @@ func getAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDet
 	}, nil
 }
 
-func createAdminOrganization(ctx context.Context, authorization, name string, logo, description, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func createAdminOrganization(ctx context.Context, actor *auth.Actor, name string, logo, description, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
 		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required"}
@@ -765,10 +759,9 @@ func createAdminOrganization(ctx context.Context, authorization, name string, lo
 	return getAdminOrganization(ctx, id)
 }
 
-func updateAdminOrganization(ctx context.Context, authorization, id string, p *UpdateTeamParams, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
-	actor, err := auth.ResolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func updateAdminOrganization(ctx context.Context, actor *auth.Actor, id string, p *UpdateTeamParams, discordInvite, vrchatGroupId *string) (*AdminOrganizationDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
@@ -822,7 +815,7 @@ func updateAdminOrganization(ctx context.Context, authorization, id string, p *U
 		vrchat = sql.NullString{String: *vrchatGroupId, Valid: true}
 	}
 
-	err = q().UpdateOrgDetails(ctx, sqlc.UpdateOrgDetailsParams{
+	if err := q().UpdateOrgDetails(ctx, sqlc.UpdateOrgDetailsParams{
 		Slug:             nextSlug,
 		UpdatedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		Name:             name,
@@ -833,11 +826,9 @@ func updateAdminOrganization(ctx context.Context, authorization, id string, p *U
 		DiscordInvite:    discord,
 		VrchatGroupId:    vrchat,
 		ID:               existingOrgID,
-	})
-	if isUniqueViolation(err) {
+	}); isUniqueViolation(err) {
 		return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization slug is already in use"}
-	}
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -859,32 +850,35 @@ func updateAdminOrganization(ctx context.Context, authorization, id string, p *U
 	return getAdminOrganization(ctx, existingOrgID)
 }
 
-//encore:api public method=GET path=/api/admin/organizations
+//encore:api auth method=GET path=/api/admin/organizations
 func (s *Service) ListAdminOrganizations(ctx context.Context, p *ListAdminOrganizationsRequest) (*ListAdminOrganizationsResponse, error) {
 	return listAdminOrganizations(ctx, p.Search, p.Limit, p.Offset)
 }
 
-//encore:api public method=GET path=/api/admin/organizations/:id
+//encore:api auth method=GET path=/api/admin/organizations/:id
 func (s *Service) GetAdminOrganization(ctx context.Context, id string) (*AdminOrganizationDetail, error) {
 	return getAdminOrganization(ctx, id)
 }
 
-//encore:api public method=POST path=/api/admin/organizations
+//encore:api auth method=POST path=/api/admin/organizations
 func (s *Service) CreateAdminOrganization(ctx context.Context, p *CreateAdminOrganizationRequest) (*AdminOrganizationDetail, error) {
-	return createAdminOrganization(ctx, p.Authorization, p.Name, p.Logo, p.Description, p.DiscordInvite, p.VrchatGroupId)
+	actor := encoreauth.Data().(*auth.Actor)
+	return createAdminOrganization(ctx, actor, p.Name, p.Logo, p.Description, p.DiscordInvite, p.VrchatGroupId)
 }
 
-//encore:api public method=PATCH path=/api/admin/organizations
+//encore:api auth method=PATCH path=/api/admin/organizations
 func (s *Service) UpdateAdminOrganization(ctx context.Context, p *UpdateAdminOrganizationRequest) (*AdminOrganizationDetail, error) {
-	return updateAdminOrganization(ctx, p.Authorization, p.ID, &UpdateTeamParams{
+	actor := encoreauth.Data().(*auth.Actor)
+	return updateAdminOrganization(ctx, actor, p.ID, &UpdateTeamParams{
 		Name: p.Name, Slug: p.Slug, Logo: p.Logo, ClearLogo: p.ClearLogo,
 		Description: p.Description, ClearDescription: p.ClearDescription,
 	}, p.DiscordInvite, p.VrchatGroupId)
 }
 
-//encore:api public method=POST path=/api/admin/teams/convert-to-org
+//encore:api auth method=POST path=/api/admin/teams/convert-to-org
 func (s *Service) ConvertTeamToOrg(ctx context.Context, p *ConvertTeamToOrgRequest) (*AdminOrganizationDetail, error) {
-	return convertTeamToOrg(ctx, p.Authorization, p.TeamID)
+	actor := encoreauth.Data().(*auth.Actor)
+	return convertTeamToOrg(ctx, actor, p.TeamID)
 }
 
 // --- HTTP endpoints (thin wrappers over the cores above) ---
@@ -918,26 +912,25 @@ func (s *Service) ListTeams(ctx context.Context, p *ListTeamsRequest) (*ListTeam
 	return listTeams(ctx, p.Search, p.Limit, p.Offset)
 }
 
-// CreateTeamRequest carries the auth header plus the new team's fields.
+// CreateTeamRequest carries the new team's fields.
 type CreateTeamRequest struct {
-	Authorization         string  `header:"Authorization"`
 	Name                  string  `json:"name"`
 	Logo                  *string `json:"logo,omitempty"`
 	Description           *string `json:"description,omitempty"`
 	PrimaryOrganizationID *string `json:"primaryOrganizationId,omitempty"`
 }
 
-//encore:api public method=POST path=/api/teams
+//encore:api auth method=POST path=/api/teams
 func (s *Service) CreateTeam(ctx context.Context, p *CreateTeamRequest) (*Team, error) {
-	return createTeam(ctx, p.Authorization, p.Name, p.Logo, p.Description, p.PrimaryOrganizationID)
+	actor := encoreauth.Data().(*auth.Actor)
+	return createTeam(ctx, actor, p.Name, p.Logo, p.Description, p.PrimaryOrganizationID)
 }
 
-// UpdateTeamRequest carries the target id, auth header, and editable fields.
+// UpdateTeamRequest carries the target id and editable fields.
 // The id travels in the body because this Encore version only accepts scalar
 // params alongside path params.
 type UpdateTeamRequest struct {
 	ID               string  `json:"id"`
-	Authorization    string  `header:"Authorization"`
 	Name             *string `json:"name,omitempty"`
 	Slug             *string `json:"slug,omitempty"`
 	Logo             *string `json:"logo,omitempty"`
@@ -946,9 +939,10 @@ type UpdateTeamRequest struct {
 	ClearDescription bool    `json:"clearDescription,omitempty"`
 }
 
-//encore:api public method=PATCH path=/api/teams
+//encore:api auth method=PATCH path=/api/teams
 func (s *Service) UpdateTeam(ctx context.Context, p *UpdateTeamRequest) (*Team, error) {
-	return updateTeam(ctx, p.Authorization, p.ID, &UpdateTeamParams{
+	actor := encoreauth.Data().(*auth.Actor)
+	return updateTeam(ctx, actor, p.ID, &UpdateTeamParams{
 		Name: p.Name, Slug: p.Slug, Logo: p.Logo, ClearLogo: p.ClearLogo,
 		Description: p.Description, ClearDescription: p.ClearDescription,
 	})

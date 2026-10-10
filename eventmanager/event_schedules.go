@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
@@ -15,16 +16,15 @@ import (
 // Mirrors ts-legacy/eventmanager/event-schedules.ts AddScheduleParams
 // (POST /api/events/:id/schedules).
 type AddEventScheduleRequest struct {
-	EventID       string  `json:"eventId"`
-	Title         *string `json:"title,omitempty"`
-	StartsAt      string  `json:"startsAt"`
-	EndsAt        *string `json:"endsAt,omitempty"`
-	Location      *string `json:"location,omitempty"`
-	Authorization string  `header:"Authorization"`
+	EventID  string  `json:"eventId"`
+	Title    *string `json:"title,omitempty"`
+	StartsAt string  `json:"startsAt"`
+	EndsAt   *string `json:"endsAt,omitempty"`
+	Location *string `json:"location,omitempty"`
 }
 
 // AddEventScheduleCore adds a schedule slot to an event.
-func AddEventScheduleCore(ctx context.Context, p *AddEventScheduleRequest) (*EventDetail, error) {
+func AddEventScheduleCore(ctx context.Context, actor *auth.Actor, p *AddEventScheduleRequest) (*EventDetail, error) {
 	exists, err := q().EventExists(ctx, p.EventID)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func AddEventScheduleCore(ctx context.Context, p *AddEventScheduleRequest) (*Eve
 	if !exists {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 
@@ -70,7 +70,8 @@ func AddEventScheduleCore(ctx context.Context, p *AddEventScheduleRequest) (*Eve
 	return LoadEvent(ctx, p.EventID)
 }
 
-//encore:api public method=POST path=/api/event-schedules
+//encore:api auth method=POST path=/api/event-schedules
 func AddEventSchedule(ctx context.Context, p *AddEventScheduleRequest) (*EventDetail, error) {
-	return AddEventScheduleCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return AddEventScheduleCore(ctx, actor, p)
 }

@@ -18,13 +18,13 @@ func Test_RaceAutoSequencing(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("ordadmin", "Admin User", strptr("OP"), "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	eventID := f.createEventDirect(admin, "Auto Seq Event", "UNOFFICIAL", nil, false)
 
 	mkRace := func(name string, seq *int) *RaceEventDetail {
 		t.Helper()
-		r, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-			EventID: eventID, Authorization: authHeader, Name: name,
+		r, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+			EventID: eventID, Name: name,
 			DistanceMeters: 1600, TrackType: "Turf", Location: "Kyoto", Sequence: seq,
 		})
 		if err != nil {
@@ -54,13 +54,13 @@ func Test_RaceReorderSuccessAndIdempotent(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("reoadmin", "Admin User", strptr("OP"), "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	eventID := f.createEventDirect(admin, "Reorder Event", "UNOFFICIAL", nil, false)
 
 	var ids []string
 	for _, name := range []string{"Race A", "Race B", "Race C"} {
-		r, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-			EventID: eventID, Authorization: authHeader, Name: name,
+		r, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+			EventID: eventID, Name: name,
 			DistanceMeters: 1200, TrackType: "Turf", Location: "Kyoto",
 		})
 		if err != nil {
@@ -70,8 +70,8 @@ func Test_RaceReorderSuccessAndIdempotent(t *testing.T) {
 	}
 	r1, r2, r3 := ids[0], ids[1], ids[2]
 
-	resp, err := ReorderRaceEventsCore(ctx, &ReorderRaceEventsRequest{
-		EventID: eventID, Authorization: authHeader,
+	resp, err := ReorderRaceEventsCore(ctx, adminActor, &ReorderRaceEventsRequest{
+		EventID: eventID,
 		OrderedRaceIDs: []string{r3, r1, r2},
 	})
 	if err != nil {
@@ -92,8 +92,8 @@ func Test_RaceReorderSuccessAndIdempotent(t *testing.T) {
 	}
 
 	// Idempotency: same order again succeeds and is stable.
-	again, err := ReorderRaceEventsCore(ctx, &ReorderRaceEventsRequest{
-		EventID: eventID, Authorization: authHeader,
+	again, err := ReorderRaceEventsCore(ctx, adminActor, &ReorderRaceEventsRequest{
+		EventID: eventID,
 		OrderedRaceIDs: []string{r3, r1, r2},
 	})
 	if err != nil {
@@ -112,13 +112,13 @@ func Test_RaceReorderValidation(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("reovadmin", "Admin User", strptr("OP"), "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	eventID := f.createEventDirect(admin, "Validation Event", "UNOFFICIAL", nil, false)
 
 	mk := func(name string) string {
 		t.Helper()
-		r, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-			EventID: eventID, Authorization: authHeader, Name: name,
+		r, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+			EventID: eventID, Name: name,
 			DistanceMeters: 1200, TrackType: "Turf", Location: "Kyoto",
 		})
 		if err != nil {
@@ -130,8 +130,8 @@ func Test_RaceReorderValidation(t *testing.T) {
 	mk("Race 2")
 
 	reorder := func(ids []string) error {
-		_, err := ReorderRaceEventsCore(ctx, &ReorderRaceEventsRequest{
-			EventID: eventID, Authorization: authHeader, OrderedRaceIDs: ids,
+		_, err := ReorderRaceEventsCore(ctx, adminActor, &ReorderRaceEventsRequest{
+			EventID: eventID, OrderedRaceIDs: ids,
 		})
 		return err
 	}
@@ -157,7 +157,7 @@ func Test_EligibleRacesDiscovery(t *testing.T) {
 	ctx := context.Background()
 
 	admin := f.createUser("eligadmin", "Eligibility Admin", nil, "SITE_ADMIN")
-	authHeader := f.createSession(admin)
+	adminActor := testActor(admin, "SITE_ADMIN")
 	user := f.createUser("eliguser", "Eligible User", strptr("OP"), "USER")
 
 	event1 := f.createEventDirect(admin, "Event OP", "UNOFFICIAL", strptr("OP"), false)
@@ -166,8 +166,8 @@ func Test_EligibleRacesDiscovery(t *testing.T) {
 
 	mkRace := func(eventID, name string, seq int, restr *string) string {
 		t.Helper()
-		r, err := CreateRaceEventCore(ctx, &CreateRaceEventRequest{
-			EventID: eventID, Authorization: authHeader, Name: name, Sequence: &seq,
+		r, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+			EventID: eventID, Name: name, Sequence: &seq,
 			DistanceMeters: 1000, TrackType: "Turf", Location: "Tokyo", ClassRestriction: restr,
 		})
 		if err != nil {

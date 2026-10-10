@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/cache"
 
@@ -471,14 +472,13 @@ type GetUserBySlugParams struct {
 	Slug string `query:"slug"`
 }
 
-// UpdateUserRequest carries the target id, auth header, and editable fields.
+// UpdateUserRequest carries the target id and editable fields.
 // (The id travels in the body rather than a :id path param because this
 // Encore version only accepts scalar params alongside path params.)
 //
 // Mirrors ts-legacy/auth/users.ts updateUserProfile (PATCH /api/users/:id)
 type UpdateUserRequest struct {
 	ID              string  `json:"id"`
-	Authorization   string  `header:"Authorization"`
 	Name            *string `json:"name,omitempty"`
 	Slug            *string `json:"slug,omitempty"`
 	Image           *string `json:"image,omitempty"`
@@ -487,12 +487,9 @@ type UpdateUserRequest struct {
 	VrchatUsername  *string `json:"vrchatUsername,omitempty"`
 }
 
-//encore:api public method=PATCH path=/api/users
+//encore:api auth method=PATCH path=/api/users
 func (s *Service) UpdateUser(ctx context.Context, p *UpdateUserRequest) (*UserProfile, error) {
-	actor, err := resolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
-	}
+	actor := encoreauth.Data().(*Actor)
 	return updateUserProfile(ctx, actor, p.ID, &UpdateUserProfileParams{
 		Name:           p.Name,
 		Slug:           p.Slug,
@@ -503,42 +500,34 @@ func (s *Service) UpdateUser(ctx context.Context, p *UpdateUserRequest) (*UserPr
 	})
 }
 
-// SetUserSiteRoleRequest carries the target id, auth header, and new role.
+// SetUserSiteRoleRequest carries the target id and new role.
 // (The id travels in the body rather than a :id path param because this
 // Encore version only accepts scalar params alongside path params.)
 //
 // Mirrors ts-legacy/auth/users.ts setUserSiteRole
 // (PUT /api/users/:id/site-role)
 type SetUserSiteRoleRequest struct {
-	ID            string `json:"id"`
-	Authorization string `header:"Authorization"`
-	SiteRole      string `json:"siteRole"`
+	ID       string `json:"id"`
+	SiteRole string `json:"siteRole"`
 }
 
-//encore:api public method=PUT path=/api/users/site-role
+//encore:api auth method=PUT path=/api/users/site-role
 func (s *Service) SetUserSiteRole(ctx context.Context, p *SetUserSiteRoleRequest) (*UserProfile, error) {
-	actor, err := resolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
-	}
+	actor := encoreauth.Data().(*Actor)
 	return setUserSiteRole(ctx, actor, &SetUserSiteRoleParams{UserID: p.ID, SiteRole: p.SiteRole})
 }
 
-// ListUsersRequest carries the auth header plus search/pagination query params.
+// ListUsersRequest carries search/pagination query params.
 //
 // Mirrors ts-legacy/auth/users.ts listUsers (GET /api/users)
 type ListUsersRequest struct {
-	Authorization string `header:"Authorization"`
-	Search        string `query:"search"`
-	Limit         int    `query:"limit"`
-	Offset        int    `query:"offset"`
+	Search string `query:"search"`
+	Limit  int    `query:"limit"`
+	Offset int    `query:"offset"`
 }
 
-//encore:api public method=GET path=/api/users
+//encore:api auth method=GET path=/api/users
 func (s *Service) ListUsers(ctx context.Context, p *ListUsersRequest) (*ListUsersResponse, error) {
-	actor, err := resolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
-	}
+	actor := encoreauth.Data().(*Actor)
 	return listUsers(ctx, actor, ListUsersQuery{Search: p.Search, Limit: p.Limit, Offset: p.Offset})
 }

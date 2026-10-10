@@ -17,9 +17,9 @@ import (
 // to sign in without a provider. When the LIGHTWING_DEBUG_LOGIN environment
 // variable is set (to any non-empty value), the browser sign-in endpoint
 // (POST /api/auth/sign-in/social) provisions a fixed SITE_ADMIN "debug user",
-// sets the normal session cookie, and returns the caller's callbackURL — the
-// SPA navigates there and picks up the session through the regular
-// get-session cookie flow. Same auth, no provider round-trip.
+// and redirects back to the caller's callbackURL with the session token appended
+// as a URL fragment (access_token=...) — the SPA extracts it and stores it in localStorage.
+// Same auth, no provider round-trip.
 //
 // NEVER set LIGHTWING_DEBUG_LOGIN in production: anyone could mint an admin
 // session.

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
@@ -23,7 +24,6 @@ import (
 // (PATCH /api/events/:id). Scoring type is immutable once set.
 type UpdateEventRequest struct {
 	ID                              string          `json:"id"`
-	Authorization                   string          `header:"Authorization"`
 	Name                            *string         `json:"name,omitempty"`
 	Description                     OptString       `json:"description,omitempty"`
 	Tag                             *string         `json:"tag,omitempty"`
@@ -59,12 +59,12 @@ func jsonEqual(a, b []byte) bool {
 }
 
 // UpdateEventCore updates an event's editable fields and returns its detail.
-func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, error) {
+func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventRequest) (*EventDetail, error) {
 	existing, err := requireEventRow(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 
@@ -194,7 +194,7 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 		}
 		if tag == "OFFICIAL" {
 			if existing.OwnerType != "ORGANIZATION" {
-				if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
+				if _, err := auth.RequireSiteAdmin(actor); err != nil {
 					return nil, err
 				}
 			}
@@ -366,7 +366,8 @@ func recomputeEventPoints(ctx context.Context, eventID string) error {
 	return nil
 }
 
-//encore:api public method=PATCH path=/api/events
+//encore:api auth method=PATCH path=/api/events
 func UpdateEvent(ctx context.Context, p *UpdateEventRequest) (*EventDetail, error) {
-	return UpdateEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return UpdateEventCore(ctx, actor, p)
 }

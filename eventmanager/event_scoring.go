@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
@@ -19,19 +20,18 @@ import (
 
 // SetEventPointsRequest mirrors SetPointsParams (PUT /api/events/:id/points/:userId).
 type SetEventPointsRequest struct {
-	ID            string `json:"id"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
-	Points        int    `json:"points"`
+	ID     string `json:"id"`
+	UserID string `json:"userId"`
+	Points int    `json:"points"`
 }
 
 // SetEventPointsCore sets a participant's points on a points-based event.
-func SetEventPointsCore(ctx context.Context, p *SetEventPointsRequest) (*EventDetail, error) {
+func SetEventPointsCore(ctx context.Context, actor *auth.Actor, p *SetEventPointsRequest) (*EventDetail, error) {
 	e, err := requireEventRow(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if e.ScoringType != ScoringPoints {
@@ -57,27 +57,27 @@ func SetEventPointsCore(ctx context.Context, p *SetEventPointsRequest) (*EventDe
 	return LoadEvent(ctx, p.ID)
 }
 
-//encore:api public method=PUT path=/api/event-points
+//encore:api auth method=PUT path=/api/event-points
 func SetEventPoints(ctx context.Context, p *SetEventPointsRequest) (*EventDetail, error) {
-	return SetEventPointsCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return SetEventPointsCore(ctx, actor, p)
 }
 
 // LadderMatchRequest mirrors LadderMatchParams (POST /api/events/:id/ladder/matches).
 type LadderMatchRequest struct {
-	ID            string `json:"id"`
-	Authorization string `header:"Authorization"`
-	WinnerID      string `json:"winnerId"`
-	LoserID       string `json:"loserId"`
+	ID       string `json:"id"`
+	WinnerID string `json:"winnerId"`
+	LoserID  string `json:"loserId"`
 }
 
 // RecordLadderMatchCore records a 1v1 result on a ladder-elo event and
 // updates both ratings.
-func RecordLadderMatchCore(ctx context.Context, p *LadderMatchRequest) (*EventDetail, error) {
+func RecordLadderMatchCore(ctx context.Context, actor *auth.Actor, p *LadderMatchRequest) (*EventDetail, error) {
 	e, err := requireEventRow(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if e.ScoringType != ScoringLadder {
@@ -152,22 +152,22 @@ func getOrCreateLadderElo(ctx context.Context, eventID, userID string) (int, err
 	return int(elo32), err
 }
 
-//encore:api public method=POST path=/api/event-ladder-matches
+//encore:api auth method=POST path=/api/event-ladder-matches
 func RecordLadderMatch(ctx context.Context, p *LadderMatchRequest) (*EventDetail, error) {
-	return RecordLadderMatchCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RecordLadderMatchCore(ctx, actor, p)
 }
 
 // SetEventStatusRequest mirrors SetStatusParams (PUT /api/events/:id/status).
 // Endorsing an event with OFFICIAL tag is reserved for site administrators.
 type SetEventStatusRequest struct {
-	ID            string  `json:"id"`
-	Authorization string  `header:"Authorization"`
-	Status        *string `json:"status,omitempty"`
-	Tag           *string `json:"tag,omitempty"`
+	ID     string  `json:"id"`
+	Status *string `json:"status,omitempty"`
+	Tag    *string `json:"tag,omitempty"`
 }
 
 // SetEventStatusCore sets an event's lifecycle status and/or hosting tag.
-func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDetail, error) {
+func SetEventStatusCore(ctx context.Context, actor *auth.Actor, p *SetEventStatusRequest) (*EventDetail, error) {
 	existing, err := requireEventRow(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -180,17 +180,17 @@ func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDe
 		}
 		if tag == "OFFICIAL" {
 			if existing.OwnerType != "ORGANIZATION" {
-				if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
+				if _, err := auth.RequireSiteAdmin(actor); err != nil {
 					return nil, err
 				}
 			} else {
-				if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+				if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 					return nil, err
 				}
 			}
 		} else if tag != "COMMUNITY" {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "tag must be OFFICIAL or COMMUNITY"}
-		} else if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+		} else if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 			return nil, err
 		}
 		if err := q().UpdateEventTag(ctx, sqlc.UpdateEventTagParams{
@@ -205,7 +205,7 @@ func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDe
 		if st != "DRAFT" && st != "PENDING" && st != "ONGOING" && st != "CONCLUDED" && st != "PENDING_DELETION" {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid event status"}
 		}
-		if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+		if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 			return nil, err
 		}
 		if st == "PENDING_DELETION" {
@@ -230,15 +230,15 @@ func SetEventStatusCore(ctx context.Context, p *SetEventStatusRequest) (*EventDe
 	return LoadEvent(ctx, p.ID)
 }
 
-//encore:api public method=PUT path=/api/event-status
+//encore:api auth method=PUT path=/api/event-status
 func SetEventStatus(ctx context.Context, p *SetEventStatusRequest) (*EventDetail, error) {
-	return SetEventStatusCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return SetEventStatusCore(ctx, actor, p)
 }
 
 // RecomputePointsRequest mirrors RecomputePointsParams.
 type RecomputePointsRequest struct {
-	ID            string `json:"id"`
-	Authorization string `header:"Authorization"`
+	ID string `json:"id"`
 }
 
 // RecomputePointsResponse reports success.
@@ -247,11 +247,11 @@ type RecomputePointsResponse struct {
 }
 
 // RecomputeEventPointsCore recomputes all points-based results for an event.
-func RecomputeEventPointsCore(ctx context.Context, p *RecomputePointsRequest) (*RecomputePointsResponse, error) {
+func RecomputeEventPointsCore(ctx context.Context, actor *auth.Actor, p *RecomputePointsRequest) (*RecomputePointsResponse, error) {
 	if _, err := requireEventRow(ctx, p.ID); err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if err := recomputeEventPoints(ctx, p.ID); err != nil {
@@ -260,7 +260,8 @@ func RecomputeEventPointsCore(ctx context.Context, p *RecomputePointsRequest) (*
 	return &RecomputePointsResponse{Success: true}, nil
 }
 
-//encore:api public method=POST path=/api/event-recompute-points
+//encore:api auth method=POST path=/api/event-recompute-points
 func RecomputeEventPoints(ctx context.Context, p *RecomputePointsRequest) (*RecomputePointsResponse, error) {
-	return RecomputeEventPointsCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RecomputeEventPointsCore(ctx, actor, p)
 }
