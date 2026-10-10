@@ -43,8 +43,13 @@ func Test_DebugSignInBypass(t *testing.T) {
 		t.Fatalf("access_token in fragment is empty")
 	}
 
+	actor, err := resolveActor(ctx, token)
+	if err != nil {
+		t.Fatalf("resolveActor failed: %v", err)
+	}
+
 	// The token authenticates GetSession like a real Discord login.
-	sessionResp, err := getSessionData(ctx, token, false)
+	sessionResp, err := getSessionData(ctx, actor)
 	if err != nil {
 		t.Fatalf("getSessionData status failed: %v", err)
 	}
@@ -85,7 +90,7 @@ func Test_EnsureDebugUserSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ensureDebugUserSession: %v", err)
 	}
-	actor, err := resolveActor(ctx, "Bearer "+token)
+	actor, err := resolveActor(ctx, token)
 	if err != nil {
 		t.Fatalf("resolveActor: %v", err)
 	}

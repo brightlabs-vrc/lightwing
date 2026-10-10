@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/cache"
 	"encore.app/auth"
@@ -284,7 +285,6 @@ type AssignRaceResultRequest struct {
 	EventID       string  `json:"eventId"`
 	RaceID        string  `json:"raceId"`
 	UserID        string  `json:"userId"`
-	Authorization string  `header:"Authorization"`
 	Position      *int    `json:"position,omitempty"`
 	Points        *int    `json:"points,omitempty"`
 	GateNumber    *int    `json:"gateNumber,omitempty"`
@@ -315,8 +315,8 @@ func (p *AssignRaceResultRequest) toResultInput() RaceResultInput {
 }
 
 // AssignRaceResultCore assigns (or updates) a participant's result on a race.
-func AssignRaceResultCore(ctx context.Context, p *AssignRaceResultRequest) (*RaceResultView, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func AssignRaceResultCore(ctx context.Context, actor *auth.Actor, p *AssignRaceResultRequest) (*RaceResultView, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	e, err := requireEventRow(ctx, p.EventID)
@@ -362,19 +362,19 @@ func AssignRaceResultCore(ctx context.Context, p *AssignRaceResultRequest) (*Rac
 	return toRaceResultView(result), nil
 }
 
-//encore:api public method=PUT path=/api/race-results
+//encore:api auth method=PUT path=/api/race-results
 func AssignRaceResult(ctx context.Context, p *AssignRaceResultRequest) (*RaceResultView, error) {
-	return AssignRaceResultCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return AssignRaceResultCore(ctx, actor, p)
 }
 
 // --- Delete ---
 
 // DeleteRaceResultRequest mirrors DeleteRaceResultParams.
 type DeleteRaceResultRequest struct {
-	EventID       string `json:"eventId"`
-	RaceID        string `json:"raceId"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	RaceID  string `json:"raceId"`
+	UserID  string `json:"userId"`
 }
 
 // DeleteRaceResultResponse reports deletion.
@@ -383,8 +383,8 @@ type DeleteRaceResultResponse struct {
 }
 
 // DeleteRaceResultCore removes a participant's result from a race.
-func DeleteRaceResultCore(ctx context.Context, p *DeleteRaceResultRequest) (*DeleteRaceResultResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func DeleteRaceResultCore(ctx context.Context, actor *auth.Actor, p *DeleteRaceResultRequest) (*DeleteRaceResultResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if _, err := RequireRace(ctx, p.EventID, p.RaceID); err != nil {
@@ -409,9 +409,10 @@ func DeleteRaceResultCore(ctx context.Context, p *DeleteRaceResultRequest) (*Del
 	return &DeleteRaceResultResponse{Deleted: true}, nil
 }
 
-//encore:api public method=DELETE path=/api/race-results
+//encore:api auth method=DELETE path=/api/race-results
 func DeleteRaceResult(ctx context.Context, p *DeleteRaceResultRequest) (*DeleteRaceResultResponse, error) {
-	return DeleteRaceResultCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return DeleteRaceResultCore(ctx, actor, p)
 }
 
 // --- List ---

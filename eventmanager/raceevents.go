@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
@@ -198,24 +199,23 @@ func parseTimePtr(s *string) (*time.Time, error) {
 
 // CreateRaceEventRequest mirrors CreateRaceEventParams (POST /api/events/:eventId/races).
 type CreateRaceEventRequest struct {
-	EventID           string  `json:"eventId"`
-	Authorization     string  `header:"Authorization"`
-	Name              string  `json:"name"`
-	Sequence          *int    `json:"sequence,omitempty"`
-	DistanceMeters    int     `json:"distanceMeters"`
-	TrackType         string  `json:"trackType"`
-	Location          string  `json:"location"`
-	ScoringType       *int    `json:"scoringType,omitempty"`
-	Grade             *string `json:"grade,omitempty"`
-	ClassRestriction  *string `json:"classRestriction,omitempty"`
-	StartsAt          *string `json:"startsAt,omitempty"`
-	EndsAt            *string `json:"endsAt,omitempty"`
-	ParticipantLimit  OptInt  `json:"participantLimit,omitempty"`
+	EventID          string  `json:"eventId"`
+	Name             string  `json:"name"`
+	Sequence         *int    `json:"sequence,omitempty"`
+	DistanceMeters   int     `json:"distanceMeters"`
+	TrackType        string  `json:"trackType"`
+	Location         string  `json:"location"`
+	ScoringType      *int    `json:"scoringType,omitempty"`
+	Grade            *string `json:"grade,omitempty"`
+	ClassRestriction *string `json:"classRestriction,omitempty"`
+	StartsAt         *string `json:"startsAt,omitempty"`
+	EndsAt           *string `json:"endsAt,omitempty"`
+	ParticipantLimit OptInt  `json:"participantLimit,omitempty"`
 }
 
 // CreateRaceEventCore adds a race to an event, gated by event-create permission.
-func CreateRaceEventCore(ctx context.Context, p *CreateRaceEventRequest) (*RaceEventDetail, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionCreate); err != nil {
+func CreateRaceEventCore(ctx context.Context, actor *auth.Actor, p *CreateRaceEventRequest) (*RaceEventDetail, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionCreate); err != nil {
 		return nil, err
 	}
 	e, err := requireEventRow(ctx, p.EventID)
@@ -276,9 +276,10 @@ func CreateRaceEventCore(ctx context.Context, p *CreateRaceEventRequest) (*RaceE
 	return loadRaceDetail(ctx, r)
 }
 
-//encore:api public method=POST path=/api/race-events
+//encore:api auth method=POST path=/api/race-events
 func CreateRaceEvent(ctx context.Context, p *CreateRaceEventRequest) (*RaceEventDetail, error) {
-	return CreateRaceEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return CreateRaceEventCore(ctx, actor, p)
 }
 
 // --- Reorder ---
@@ -286,7 +287,6 @@ func CreateRaceEvent(ctx context.Context, p *CreateRaceEventRequest) (*RaceEvent
 // ReorderRaceEventsRequest mirrors ReorderRaceEventsParams.
 type ReorderRaceEventsRequest struct {
 	EventID        string   `json:"eventId"`
-	Authorization  string   `header:"Authorization"`
 	OrderedRaceIDs []string `json:"orderedRaceIds"`
 }
 
@@ -296,8 +296,8 @@ type ReorderRaceEventsResponse struct {
 }
 
 // ReorderRaceEventsCore reorders races, requiring full coverage and no duplicates.
-func ReorderRaceEventsCore(ctx context.Context, p *ReorderRaceEventsRequest) (*ReorderRaceEventsResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func ReorderRaceEventsCore(ctx context.Context, actor *auth.Actor, p *ReorderRaceEventsRequest) (*ReorderRaceEventsResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	seqRows, err := q().ListRaceIDSequences(ctx, p.EventID)
@@ -357,9 +357,10 @@ func ReorderRaceEventsCore(ctx context.Context, p *ReorderRaceEventsRequest) (*R
 	return ListRaceEventsCore(ctx, &ListRaceEventsQuery{EventID: p.EventID})
 }
 
-//encore:api public method=PUT path=/api/race-events-reorder
+//encore:api auth method=PUT path=/api/race-events-reorder
 func ReorderRaceEvents(ctx context.Context, p *ReorderRaceEventsRequest) (*ReorderRaceEventsResponse, error) {
-	return ReorderRaceEventsCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return ReorderRaceEventsCore(ctx, actor, p)
 }
 
 // --- List / get ---
@@ -423,30 +424,29 @@ func GetRaceEventCore(ctx context.Context, q *RaceEventQuery) (*RaceEventDetail,
 // UpdateRaceEventRequest mirrors UpdateRaceEventParams. Pointer fields
 // distinguish omitted (nil, leave unchanged) from explicit null (clear).
 type UpdateRaceEventRequest struct {
-	EventID           string   `json:"eventId"`
-	RaceID            string   `json:"raceId"`
-	Authorization     string   `header:"Authorization"`
-	Name              *string  `json:"name,omitempty"`
-	Sequence          *int     `json:"sequence,omitempty"`
-	DistanceMeters    *int     `json:"distanceMeters,omitempty"`
-	TrackType         *string  `json:"trackType,omitempty"`
-	Location          *string  `json:"location,omitempty"`
-	ScoringType       *int     `json:"scoringType,omitempty"`
-	ClearScoringType  bool     `json:"clearScoringType,omitempty"`
-	Grade             *string  `json:"grade,omitempty"`
-	ClearGrade        bool     `json:"clearGrade,omitempty"`
-	ClassRestriction  *string  `json:"classRestriction,omitempty"`
-	ClearClassRestr   bool     `json:"clearClassRestriction,omitempty"`
-	StartsAt          *string  `json:"startsAt,omitempty"`
-	ClearStartsAt     bool     `json:"clearStartsAt,omitempty"`
-	EndsAt            *string  `json:"endsAt,omitempty"`
-	ClearEndsAt       bool     `json:"clearEndsAt,omitempty"`
-	ParticipantLimit  OptInt   `json:"participantLimit,omitempty"`
+	EventID          string  `json:"eventId"`
+	RaceID           string  `json:"raceId"`
+	Name             *string `json:"name,omitempty"`
+	Sequence         *int    `json:"sequence,omitempty"`
+	DistanceMeters   *int    `json:"distanceMeters,omitempty"`
+	TrackType        *string `json:"trackType,omitempty"`
+	Location         *string `json:"location,omitempty"`
+	ScoringType      *int    `json:"scoringType,omitempty"`
+	ClearScoringType bool    `json:"clearScoringType,omitempty"`
+	Grade            *string `json:"grade,omitempty"`
+	ClearGrade       bool    `json:"clearGrade,omitempty"`
+	ClassRestriction *string `json:"classRestriction,omitempty"`
+	ClearClassRestr  bool    `json:"clearClassRestriction,omitempty"`
+	StartsAt         *string `json:"startsAt,omitempty"`
+	ClearStartsAt    bool    `json:"clearStartsAt,omitempty"`
+	EndsAt           *string `json:"endsAt,omitempty"`
+	ClearEndsAt      bool    `json:"clearEndsAt,omitempty"`
+	ParticipantLimit OptInt  `json:"participantLimit,omitempty"`
 }
 
 // UpdateRaceEventCore updates editable race fields. A grade change triggers
 // points recomputation for the event.
-func UpdateRaceEventCore(ctx context.Context, p *UpdateRaceEventRequest) (*RaceEventDetail, error) {
+func UpdateRaceEventCore(ctx context.Context, actor *auth.Actor, p *UpdateRaceEventRequest) (*RaceEventDetail, error) {
 	existing, err := requireRaceEvent(ctx, p.EventID, p.RaceID)
 	if err != nil {
 		return nil, err
@@ -455,7 +455,7 @@ func UpdateRaceEventCore(ctx context.Context, p *UpdateRaceEventRequest) (*RaceE
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	var limit any
@@ -584,18 +584,18 @@ func UpdateRaceEventCore(ctx context.Context, p *UpdateRaceEventRequest) (*RaceE
 	return loadRaceDetail(ctx, updated)
 }
 
-//encore:api public method=PATCH path=/api/race-events
+//encore:api auth method=PATCH path=/api/race-events
 func UpdateRaceEvent(ctx context.Context, p *UpdateRaceEventRequest) (*RaceEventDetail, error) {
-	return UpdateRaceEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return UpdateRaceEventCore(ctx, actor, p)
 }
 
 // --- Delete ---
 
 // DeleteRaceEventRequest mirrors DeleteRaceEventParams.
 type DeleteRaceEventRequest struct {
-	EventID       string `json:"eventId"`
-	RaceID        string `json:"raceId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	RaceID  string `json:"raceId"`
 }
 
 // DeleteRaceEventResponse reports deletion.
@@ -604,11 +604,11 @@ type DeleteRaceEventResponse struct {
 }
 
 // DeleteRaceEventCore deletes a race and its results (cascade).
-func DeleteRaceEventCore(ctx context.Context, p *DeleteRaceEventRequest) (*DeleteRaceEventResponse, error) {
+func DeleteRaceEventCore(ctx context.Context, actor *auth.Actor, p *DeleteRaceEventRequest) (*DeleteRaceEventResponse, error) {
 	if _, err := requireRaceEvent(ctx, p.EventID, p.RaceID); err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionDelete); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionDelete); err != nil {
 		return nil, err
 	}
 	if err := q().DeleteRaceEvent(ctx, p.RaceID); err != nil {
@@ -617,24 +617,24 @@ func DeleteRaceEventCore(ctx context.Context, p *DeleteRaceEventRequest) (*Delet
 	return &DeleteRaceEventResponse{Deleted: true}, nil
 }
 
-//encore:api public method=DELETE path=/api/race-events
+//encore:api auth method=DELETE path=/api/race-events
 func DeleteRaceEvent(ctx context.Context, p *DeleteRaceEventRequest) (*DeleteRaceEventResponse, error) {
-	return DeleteRaceEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return DeleteRaceEventCore(ctx, actor, p)
 }
 
 // --- Race members ---
 
 // RaceMemberRequest carries event/race/user ids for member mutations.
 type RaceMemberRequest struct {
-	EventID       string `json:"eventId"`
-	RaceID        string `json:"raceId"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	RaceID  string `json:"raceId"`
+	UserID  string `json:"userId"`
 }
 
 // AddRaceEventMemberCore registers a participant for a race. The user must be
 // an event member first; class restriction and capacity limits are enforced.
-func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEventDetail, error) {
+func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMemberRequest) (*RaceEventDetail, error) {
 	tier, err := q().GetUserClassTier(ctx, p.UserID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
@@ -657,7 +657,7 @@ func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEve
 		return nil, err
 	}
 	e := toEventRow(erow)
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	rrow, err := qq.GetRaceEventRow(ctx, p.RaceID)
@@ -735,9 +735,10 @@ func AddRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEve
 	return loadRaceDetail(ctx, rr)
 }
 
-//encore:api public method=POST path=/api/race-event-members
+//encore:api auth method=POST path=/api/race-event-members
 func AddRaceEventMember(ctx context.Context, p *RaceMemberRequest) (*RaceEventDetail, error) {
-	return AddRaceEventMemberCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return AddRaceEventMemberCore(ctx, actor, p)
 }
 
 // removeRaceMemberUser removes a user from a race and handles granular participation cleanup.
@@ -774,12 +775,12 @@ func removeRaceMemberUser(ctx context.Context, e *eventRow, eventID, raceID, use
 
 // RemoveRaceEventMemberCore removes a participant from a race. On granular
 // events, losing the last race membership also removes event membership.
-func RemoveRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*RaceEventDetail, error) {
+func RemoveRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMemberRequest) (*RaceEventDetail, error) {
 	e, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if _, err := requireRaceEvent(ctx, p.EventID, p.RaceID); err != nil {
@@ -795,9 +796,10 @@ func RemoveRaceEventMemberCore(ctx context.Context, p *RaceMemberRequest) (*Race
 	return loadRaceDetail(ctx, rr)
 }
 
-//encore:api public method=DELETE path=/api/race-event-members
+//encore:api auth method=DELETE path=/api/race-event-members
 func RemoveRaceEventMember(ctx context.Context, p *RaceMemberRequest) (*RaceEventDetail, error) {
-	return RemoveRaceEventMemberCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RemoveRaceEventMemberCore(ctx, actor, p)
 }
 
 // RaceMembersQuery lists participants of a race.
@@ -830,19 +832,17 @@ func ListRaceEventMembersCore(ctx context.Context, q *RaceMembersQuery) (*RaceMe
 
 // --- Join / leave (self-service) ---
 
-// RaceJoinRequest carries event/race ids plus the caller's auth header.
+// RaceJoinRequest carries event/race ids.
 type RaceJoinRequest struct {
-	EventID       string `json:"eventId"`
-	RaceID        string `json:"raceId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	RaceID  string `json:"raceId"`
 }
 
 // JoinRaceEventCore lets the caller join a race. On granular events the
 // caller is auto-joined to the parent event.
-func JoinRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDetail, error) {
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
+func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinRequest) (*RaceEventDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	userID := actor.UserID
 	tier, err := q().GetUserClassTier(ctx, userID)
@@ -945,14 +945,18 @@ func JoinRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDetai
 	return loadRaceDetail(ctx, rr)
 }
 
-//encore:api public method=POST path=/api/race-event-join
+//encore:api auth method=POST path=/api/race-event-join
 func JoinRaceEvent(ctx context.Context, p *RaceJoinRequest) (*RaceEventDetail, error) {
-	return JoinRaceEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return JoinRaceEventCore(ctx, actor, p)
 }
 
 // LeaveRaceEventCore lets the caller leave a race. Self-service leave is
 // blocked while signups are locked.
-func LeaveRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDetail, error) {
+func LeaveRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinRequest) (*RaceEventDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
+	}
 	e, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
 		return nil, err
@@ -961,10 +965,6 @@ func LeaveRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDeta
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "signups are locked for this event"}
 	}
 	if _, err := requireRaceEvent(ctx, p.EventID, p.RaceID); err != nil {
-		return nil, err
-	}
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
 		return nil, err
 	}
 	if err := removeRaceMemberUser(ctx, e, p.EventID, p.RaceID, actor.UserID); err != nil {
@@ -977,9 +977,10 @@ func LeaveRaceEventCore(ctx context.Context, p *RaceJoinRequest) (*RaceEventDeta
 	return loadRaceDetail(ctx, rr)
 }
 
-//encore:api public method=DELETE path=/api/race-event-join
+//encore:api auth method=DELETE path=/api/race-event-join
 func LeaveRaceEvent(ctx context.Context, p *RaceJoinRequest) (*RaceEventDetail, error) {
-	return LeaveRaceEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return LeaveRaceEventCore(ctx, actor, p)
 }
 
 // raceRestriction returns the effective class restriction for a race,

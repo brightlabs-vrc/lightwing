@@ -18,8 +18,12 @@ func Test_getSessionData(t *testing.T) {
 	t.Run("returns vrchatUsername in session user when set", func(t *testing.T) {
 		userID := createUsersTestUser(t, ctx, "VRC User", string(SiteRoleUser), "", "TestVRChatUser123")
 		token := createUsersTestSession(t, ctx, userID)
+		actor, err := resolveActor(ctx, token)
+		if err != nil {
+			t.Fatalf("resolveActor failed: %v", err)
+		}
 
-		resp, err := getSessionData(ctx, token, false)
+		resp, err := getSessionData(ctx, actor)
 		if err != nil {
 			t.Fatalf("getSessionData failed: %v", err)
 		}
@@ -38,8 +42,12 @@ func Test_getSessionData(t *testing.T) {
 	t.Run("returns falsy vrchatUsername in session when not set", func(t *testing.T) {
 		userID := createUsersTestUser(t, ctx, "No VRC User", string(SiteRoleUser), "", "")
 		token := createUsersTestSession(t, ctx, userID)
+		actor, err := resolveActor(ctx, token)
+		if err != nil {
+			t.Fatalf("resolveActor failed: %v", err)
+		}
 
-		resp, err := getSessionData(ctx, token, false)
+		resp, err := getSessionData(ctx, actor)
 		if err != nil {
 			t.Fatalf("getSessionData failed: %v", err)
 		}

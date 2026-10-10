@@ -15,6 +15,7 @@ import (
 	"encore.dev/beta/errs"
 	"encore.dev/et"
 
+	"encore.app/auth"
 	"encore.app/shared"
 )
 
@@ -40,7 +41,12 @@ func fptr(f float64) *float64 { return &f }
 func i32ptr(i int32) *int32   { return &i }
 func sptr(s string) *string   { return &s }
 
-func bearer(token string) string { return "Bearer " + token }
+func testActor(userID, siteRole string) *auth.Actor {
+	return &auth.Actor{
+		UserID:   userID,
+		SiteRole: auth.SiteRoleName(siteRole),
+	}
+}
 
 func insertTestUser(t *testing.T, ctx context.Context, id, name, siteRole string) {
 	t.Helper()
@@ -203,19 +209,15 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 	// Setup users and roles
 	applicantUser := nextTeamID("applicant")
 	insertTestUser(t, ctx, applicantUser, "Applicant User", "USER")
-	applicantToken := insertTestSession(t, ctx, applicantUser)
 
 	siteAdmin := nextTeamID("app-site-admin")
 	insertTestUser(t, ctx, siteAdmin, "App Site Admin", "SITE_ADMIN")
-	siteAdminToken := insertTestSession(t, ctx, siteAdmin)
 
 	eventAdmin := nextTeamID("app-event-admin")
 	insertTestUser(t, ctx, eventAdmin, "App Event Admin", "EVENT_ADMIN")
-	eventAdminToken := insertTestSession(t, ctx, eventAdmin)
 
 	t.Run("Submit and review Organization application", func(t *testing.T) {
-		orgApp, err := submitOrganizationApplication(ctx, &SubmitOrgApplicationRequest{
-			Authorization: bearer(applicantToken),
+		orgApp, err := submitOrganizationApplication(ctx, testActor(applicantUser, "USER"), &SubmitOrgApplicationRequest{
 			Name:          "Apex Esports",
 			DiscordInvite: "https://discord.gg/apex",
 			VrchatGroupID: "grp_apex_123",
@@ -228,7 +230,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// EVENT_ADMIN cannot see org applications
-		listEvt, err := listAdminApplications(ctx, bearer(eventAdminToken))
+		listEvt, err := listAdminApplications(ctx, testActor(eventAdmin, "EVENT_ADMIN"))
 		if err != nil {
 			t.Fatalf("listAdminApplications failed for EVENT_ADMIN: %v", err)
 		}
@@ -237,7 +239,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// SITE_ADMIN sees org applications
-		listSite, err := listAdminApplications(ctx, bearer(siteAdminToken))
+		listSite, err := listAdminApplications(ctx, testActor(siteAdmin, "SITE_ADMIN"))
 		if err != nil {
 			t.Fatalf("listAdminApplications failed for SITE_ADMIN: %v", err)
 		}
@@ -252,11 +254,10 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// Approve organization application
-		err = reviewApplication(ctx, &ReviewApplicationRequest{
-			Authorization: bearer(siteAdminToken),
-			ID:            orgApp.ID,
-			Type:          "ORGANIZATION",
-			Action:        "APPROVE",
+		err = reviewApplication(ctx, testActor(siteAdmin, "SITE_ADMIN"), &ReviewApplicationRequest{
+			ID:     orgApp.ID,
+			Type:   "ORGANIZATION",
+			Action: "APPROVE",
 		})
 		if err != nil {
 			t.Fatalf("reviewApplication APPROVE failed: %v", err)
@@ -273,8 +274,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		})
 		_, _ = db.Exec(ctx, `UPDATE "organization" SET status = 'APPROVED' WHERE id IN ($1, $2)`, org1ID, org2ID)
 
-		teamApp, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
-			Authorization:         bearer(applicantToken),
+		teamApp, err := submitTeamApplication(ctx, testActor(applicantUser, "USER"), &SubmitTeamApplicationRequest{
 			Name:                  "Apex Racing Red",
 			PrimaryOrganizationID: org1ID,
 		})
@@ -286,19 +286,17 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// Approve team application via EVENT_ADMIN
-		err = reviewApplication(ctx, &ReviewApplicationRequest{
-			Authorization: bearer(eventAdminToken),
-			ID:            teamApp.ID,
-			Type:          "TEAM",
-			Action:        "APPROVE",
+		err = reviewApplication(ctx, testActor(eventAdmin, "EVENT_ADMIN"), &ReviewApplicationRequest{
+			ID:     teamApp.ID,
+			Type:   "TEAM",
+			Action: "APPROVE",
 		})
 		if err != nil {
 			t.Fatalf("reviewApplication for team failed: %v", err)
 		}
 
 		// Link secondary org
-		linkedTeam, err := linkSecondaryOrganization(ctx, &LinkSecondaryOrgRequest{
-			Authorization:  bearer(applicantToken),
+		linkedTeam, err := linkSecondaryOrganization(ctx, testActor(applicantUser, "USER"), &LinkSecondaryOrgRequest{
 			TeamID:         teamApp.ID,
 			OrganizationID: org2ID,
 		})
@@ -310,8 +308,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// Cannot unlink primary org
-		_, err = unlinkSecondaryOrganization(ctx, &UnlinkSecondaryOrgRequest{
-			Authorization:  bearer(applicantToken),
+		_, err = unlinkSecondaryOrganization(ctx, testActor(applicantUser, "USER"), &UnlinkSecondaryOrgRequest{
 			TeamID:         teamApp.ID,
 			OrganizationID: org1ID,
 		})
@@ -320,8 +317,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// Unlink secondary org succeeds
-		unlinkedTeam, err := unlinkSecondaryOrganization(ctx, &UnlinkSecondaryOrgRequest{
-			Authorization:  bearer(applicantToken),
+		unlinkedTeam, err := unlinkSecondaryOrganization(ctx, testActor(applicantUser, "USER"), &UnlinkSecondaryOrgRequest{
 			TeamID:         teamApp.ID,
 			OrganizationID: org2ID,
 		})
@@ -336,15 +332,13 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 	t.Run("Non-admin user can submit team application to approved org", func(t *testing.T) {
 		nonAdminUser := nextTeamID("non-admin-user")
 		insertTestUser(t, ctx, nonAdminUser, "Non Admin User", "USER")
-		nonAdminToken := insertTestSession(t, ctx, nonAdminUser)
 
 		orgID := createOrgWithMembers(t, ctx, nextTeamID("org-other"), "Other Org", nextTeamID("other-org-slug"), []memberSpec{
 			{userID: siteAdmin, role: "administrator", name: "Org Admin"},
 		})
 		_, _ = db.Exec(ctx, `UPDATE "organization" SET status = 'APPROVED' WHERE id = $1`, orgID)
 
-		app, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
-			Authorization:         bearer(nonAdminToken),
+		app, err := submitTeamApplication(ctx, testActor(nonAdminUser, "USER"), &SubmitTeamApplicationRequest{
 			Name:                  "Community Speedsters",
 			PrimaryOrganizationID: orgID,
 		})
@@ -359,7 +353,6 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 	t.Run("ConvertTeamToOrg and existing team application flow", func(t *testing.T) {
 		siteAdminUser := nextTeamID("site-admin-cvt")
 		insertTestUser(t, ctx, siteAdminUser, "Convert Site Admin", "SITE_ADMIN")
-		siteAdminTok := insertTestSession(t, ctx, siteAdminUser)
 
 		// Create an approved organization
 		targetOrgID := createOrgWithMembers(t, ctx, nextTeamID("org-target"), "Target Organization", nextTeamID("target-org-slug"), []memberSpec{
@@ -369,7 +362,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 
 		// Create a team via createTeam
 		teamName := "Velocity Racing"
-		newTeam, err := createTeam(ctx, bearer(siteAdminTok), teamName, nil, nil, nil)
+		newTeam, err := createTeam(ctx, testActor(siteAdminUser, "SITE_ADMIN"), teamName, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -377,14 +370,13 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		// Add an admin user to the new team
 		teamAdminUser := nextTeamID("user-team-admin")
 		insertTestUser(t, ctx, teamAdminUser, "Team Admin User", "USER")
-		teamAdminTok := insertTestSession(t, ctx, teamAdminUser)
-		_, err = addTeamMember(ctx, bearer(siteAdminTok), newTeam.ID, teamAdminUser, "administrator")
+		_, err = addTeamMember(ctx, testActor(siteAdminUser, "SITE_ADMIN"), newTeam.ID, teamAdminUser, "administrator")
 		if err != nil {
 			t.Fatalf("addTeamMember failed: %v", err)
 		}
 
 		// Convert team to organization
-		convertedTeam, err := convertTeamToOrg(ctx, bearer(siteAdminTok), newTeam.ID)
+		convertedTeam, err := convertTeamToOrg(ctx, testActor(siteAdminUser, "SITE_ADMIN"), newTeam.ID)
 		if err != nil {
 			t.Fatalf("convertTeamToOrg failed: %v", err)
 		}
@@ -416,17 +408,16 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// Existing team applies to join target organization (using a newly created team)
-		secondTeam, err := createTeam(ctx, bearer(siteAdminTok), "Second Velocity Team", nil, nil, nil)
+		secondTeam, err := createTeam(ctx, testActor(siteAdminUser, "SITE_ADMIN"), "Second Velocity Team", nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam secondTeam failed: %v", err)
 		}
-		_, err = addTeamMember(ctx, bearer(siteAdminTok), secondTeam.ID, teamAdminUser, "administrator")
+		_, err = addTeamMember(ctx, testActor(siteAdminUser, "SITE_ADMIN"), secondTeam.ID, teamAdminUser, "administrator")
 		if err != nil {
 			t.Fatalf("addTeamMember for secondTeam failed: %v", err)
 		}
 
-		appView, err := submitTeamApplication(ctx, &SubmitTeamApplicationRequest{
-			Authorization:         bearer(teamAdminTok),
+		appView, err := submitTeamApplication(ctx, testActor(teamAdminUser, "USER"), &SubmitTeamApplicationRequest{
 			TeamID:                sptr(secondTeam.ID),
 			PrimaryOrganizationID: targetOrgID,
 		})
@@ -441,14 +432,13 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 	t.Run("ConvertTeamToOrg fallback and slug lookups", func(t *testing.T) {
 		siteAdminUser := nextTeamID("site-admin-cvt2")
 		insertTestUser(t, ctx, siteAdminUser, "Convert Site Admin 2", "SITE_ADMIN")
-		siteAdminTok := insertTestSession(t, ctx, siteAdminUser)
 
 		// 1. Create a team and convert by team slug
-		newTeam, err := createTeam(ctx, bearer(siteAdminTok), "Slug Team Test", nil, nil, nil)
+		newTeam, err := createTeam(ctx, testActor(siteAdminUser, "SITE_ADMIN"), "Slug Team Test", nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
-		convertedBySlug, err := convertTeamToOrg(ctx, bearer(siteAdminTok), newTeam.Slug)
+		convertedBySlug, err := convertTeamToOrg(ctx, testActor(siteAdminUser, "SITE_ADMIN"), newTeam.Slug)
 		if err != nil {
 			t.Fatalf("convertTeamToOrg by slug failed: %v", err)
 		}
@@ -461,7 +451,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		legacyOrgID := createOrgWithMembers(t, ctx, nextTeamID("org-legacy"), "Legacy Org", legacyOrgSlug, []memberSpec{
 			{userID: siteAdminUser, role: "administrator", name: "Site Admin"},
 		})
-		convertedLegacyID, err := convertTeamToOrg(ctx, bearer(siteAdminTok), legacyOrgID)
+		convertedLegacyID, err := convertTeamToOrg(ctx, testActor(siteAdminUser, "SITE_ADMIN"), legacyOrgID)
 		if err != nil {
 			t.Fatalf("convertTeamToOrg for legacy org ID failed: %v", err)
 		}
@@ -470,7 +460,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// 3. Convert a legacy organization by slug
-		convertedLegacySlug, err := convertTeamToOrg(ctx, bearer(siteAdminTok), legacyOrgSlug)
+		convertedLegacySlug, err := convertTeamToOrg(ctx, testActor(siteAdminUser, "SITE_ADMIN"), legacyOrgSlug)
 		if err != nil {
 			t.Fatalf("convertTeamToOrg for legacy org slug failed: %v", err)
 		}
@@ -479,7 +469,7 @@ func Test_ApplicationsAndPrimarySecondaryLinking(t *testing.T) {
 		}
 
 		// 4. Missing team returns 404 Not Found
-		_, err = convertTeamToOrg(ctx, bearer(siteAdminTok), "missing-team-or-org-12345")
+		_, err = convertTeamToOrg(ctx, testActor(siteAdminUser, "SITE_ADMIN"), "missing-team-or-org-12345")
 		if err == nil {
 			t.Fatal("expected error for missing team/org")
 		}
@@ -505,13 +495,12 @@ func TestUpdateTeamStats(t *testing.T) {
 		teamName := "Update Team Competition"
 		siteAdminUser := nextTeamID("site-admin-stats")
 		insertTestUser(t, ctx, siteAdminUser, "Stats Site Admin", "SITE_ADMIN")
-		siteToken := insertTestSession(t, ctx, siteAdminUser)
-		compTeam, err := createTeam(ctx, bearer(siteToken), teamName, nil, nil, &orgID)
+		compTeam, err := createTeam(ctx, testActor(siteAdminUser, "SITE_ADMIN"), teamName, nil, nil, &orgID)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
 
-		team, err := updateTeamStats(ctx, bearer(siteToken), compTeam.ID, &TeamStatsUpdate{
+		team, err := updateTeamStats(ctx, testActor(siteAdminUser, "SITE_ADMIN"), compTeam.ID, &TeamStatsUpdate{
 			RankingAverage: fptr(5.5),
 			PointsAverage:  fptr(99.1),
 		})
@@ -535,8 +524,7 @@ func TestUpdateTeamStats(t *testing.T) {
 			{userID: admin, role: "administrator", name: "Admin"},
 		})
 		insertTestUser(t, ctx, outsider, "Outsider", "USER")
-		token := insertTestSession(t, ctx, outsider)
-		if _, err := updateTeamStats(ctx, bearer(token), orgID, &TeamStatsUpdate{
+		if _, err := updateTeamStats(ctx, testActor(outsider, "USER"), orgID, &TeamStatsUpdate{
 			PointsAverage: fptr(1.0),
 		}); err == nil {
 			t.Fatal("expected permission error")
@@ -548,8 +536,7 @@ func TestUpdateTeamStats(t *testing.T) {
 	t.Run("throws not found for missing organization", func(t *testing.T) {
 		siteAdmin := nextTeamID("site-admin-missing-org")
 		insertTestUser(t, ctx, siteAdmin, "Missing Org Site Admin", "SITE_ADMIN")
-		token := insertTestSession(t, ctx, siteAdmin)
-		_, err := updateTeamStats(ctx, bearer(token), "missing-org", &TeamStatsUpdate{
+		_, err := updateTeamStats(ctx, testActor(siteAdmin, "SITE_ADMIN"), "missing-org", &TeamStatsUpdate{
 			PointsAverage: fptr(12.3),
 		})
 		if err == nil {
@@ -568,10 +555,9 @@ func TestCreateTeam(t *testing.T) {
 	t.Run("creates team and listTeams lists it", func(t *testing.T) {
 		siteAdmin := nextTeamID("site-admin-create-team")
 		insertTestUser(t, ctx, siteAdmin, "Create Team Site Admin", "SITE_ADMIN")
-		token := insertTestSession(t, ctx, siteAdmin)
 
 		name := fmt.Sprintf("Alpha Racing Syndicate %d", teamTestSeq.Add(1))
-		team, err := createTeam(ctx, bearer(token), name, nil, nil, nil)
+		team, err := createTeam(ctx, testActor(siteAdmin, "SITE_ADMIN"), name, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("createTeam failed: %v", err)
 		}
@@ -604,8 +590,7 @@ func TestCreateTeam(t *testing.T) {
 	t.Run("rejects non-site-admins", func(t *testing.T) {
 		regular := nextTeamID("regular-user-create-team")
 		insertTestUser(t, ctx, regular, "Regular User", "USER")
-		token := insertTestSession(t, ctx, regular)
-		if _, err := createTeam(ctx, bearer(token), "Forbidden Team", nil, nil, nil); err == nil {
+		if _, err := createTeam(ctx, testActor(regular, "USER"), "Forbidden Team", nil, nil, nil); err == nil {
 			t.Fatal("expected permission error")
 		} else if errs.Code(err) != errs.PermissionDenied {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
@@ -615,12 +600,11 @@ func TestCreateTeam(t *testing.T) {
 	t.Run("slug collision yields already_exists", func(t *testing.T) {
 		siteAdmin := nextTeamID("site-admin-col")
 		insertTestUser(t, ctx, siteAdmin, "Collision Site Admin", "SITE_ADMIN")
-		token := insertTestSession(t, ctx, siteAdmin)
 		name := fmt.Sprintf("Collision Team %d", teamTestSeq.Add(1))
-		if _, err := createTeam(ctx, bearer(token), name, nil, nil, nil); err != nil {
+		if _, err := createTeam(ctx, testActor(siteAdmin, "SITE_ADMIN"), name, nil, nil, nil); err != nil {
 			t.Fatalf("first createTeam failed: %v", err)
 		}
-		if _, err := createTeam(ctx, bearer(token), name, nil, nil, nil); err == nil {
+		if _, err := createTeam(ctx, testActor(siteAdmin, "SITE_ADMIN"), name, nil, nil, nil); err == nil {
 			t.Fatal("expected already_exists error")
 		} else if errs.Code(err) != errs.AlreadyExists {
 			t.Errorf("code = %v, want already_exists", errs.Code(err))
@@ -657,13 +641,12 @@ func TestTeamMembers(t *testing.T) {
 		{userID: admin1, role: "administrator", name: "Admin One"},
 		{userID: admin2, role: "administrator", name: "Admin Two"},
 	})
-	adminToken := insertTestSession(t, ctx, admin1)
-	authz := bearer(adminToken)
+	adminActor := testActor(admin1, "USER")
 
 	newMember := nextTeamID("user-new-member")
 	insertTestUser(t, ctx, newMember, "New Member", "USER")
 
-	teamAfterAdd, err := addTeamMember(ctx, authz, orgID, newMember, "member")
+	teamAfterAdd, err := addTeamMember(ctx, adminActor, orgID, newMember, "member")
 	if err != nil {
 		t.Fatalf("addTeamMember failed: %v", err)
 	}
@@ -671,7 +654,7 @@ func TestTeamMembers(t *testing.T) {
 		t.Errorf("added member missing: %+v", teamAfterAdd.Members)
 	}
 
-	if _, err := addTeamMember(ctx, authz, orgID, newMember, "member"); err == nil {
+	if _, err := addTeamMember(ctx, adminActor, orgID, newMember, "member"); err == nil {
 		t.Fatal("expected already_exists for duplicate member")
 	} else if errs.Code(err) != errs.AlreadyExists {
 		t.Errorf("code = %v, want already_exists", errs.Code(err))
@@ -680,21 +663,21 @@ func TestTeamMembers(t *testing.T) {
 	// Administrator slots remaining is 1: adding a third admin succeeds...
 	newAdmin1 := nextTeamID("user-new-admin-1")
 	insertTestUser(t, ctx, newAdmin1, "New Admin One", "USER")
-	if _, err := addTeamMember(ctx, authz, orgID, newAdmin1, "administrator"); err != nil {
+	if _, err := addTeamMember(ctx, adminActor, orgID, newAdmin1, "administrator"); err != nil {
 		t.Fatalf("adding third admin failed: %v", err)
 	}
 
 	// ...but a fourth administrator hits the cap.
 	newAdmin2 := nextTeamID("user-new-admin-2")
 	insertTestUser(t, ctx, newAdmin2, "New Admin Two", "USER")
-	if _, err := addTeamMember(ctx, authz, orgID, newAdmin2, "administrator"); err == nil {
+	if _, err := addTeamMember(ctx, adminActor, orgID, newAdmin2, "administrator"); err == nil {
 		t.Fatal("expected failed_precondition for fourth admin")
 	} else if errs.Code(err) != errs.FailedPrecondition {
 		t.Errorf("code = %v, want failed_precondition", errs.Code(err))
 	}
 
 	// Role updates to a non-cap role succeed even at the cap.
-	teamAfterUpdate, err := updateTeamMemberRole(ctx, authz, orgID, newMember, "organizationAdministrator")
+	teamAfterUpdate, err := updateTeamMemberRole(ctx, adminActor, orgID, newMember, "organizationAdministrator")
 	if err != nil {
 		t.Fatalf("updateTeamMemberRole failed: %v", err)
 	}
@@ -703,13 +686,13 @@ func TestTeamMembers(t *testing.T) {
 	}
 
 	// Promoting to administrator at the cap fails.
-	if _, err := updateTeamMemberRole(ctx, authz, orgID, newMember, "administrator"); err == nil {
+	if _, err := updateTeamMemberRole(ctx, adminActor, orgID, newMember, "administrator"); err == nil {
 		t.Fatal("expected failed_precondition promoting at cap")
 	} else if errs.Code(err) != errs.FailedPrecondition {
 		t.Errorf("code = %v, want failed_precondition", errs.Code(err))
 	}
 
-	teamAfterRemove, err := removeTeamMember(ctx, authz, orgID, newMember)
+	teamAfterRemove, err := removeTeamMember(ctx, adminActor, orgID, newMember)
 	if err != nil {
 		t.Fatalf("removeTeamMember failed: %v", err)
 	}
@@ -718,7 +701,7 @@ func TestTeamMembers(t *testing.T) {
 	}
 
 	t.Run("remove missing member yields not found", func(t *testing.T) {
-		if _, err := removeTeamMember(ctx, authz, orgID, newMember); err == nil {
+		if _, err := removeTeamMember(ctx, adminActor, orgID, newMember); err == nil {
 			t.Fatal("expected not found error")
 		} else if errs.Code(err) != errs.NotFound {
 			t.Errorf("code = %v, want not_found", errs.Code(err))
@@ -729,7 +712,7 @@ func TestTeamMembers(t *testing.T) {
 		// Mirrors TS ordering: requirePermission runs before the
 		// organization lookup, so a non-site-admin caller without a grant
 		// on "missing-org" gets permission_denied, not not_found.
-		if _, err := addTeamMember(ctx, authz, "missing-org", newAdmin2, "member"); err == nil {
+		if _, err := addTeamMember(ctx, adminActor, "missing-org", newAdmin2, "member"); err == nil {
 			t.Fatal("expected permission error")
 		} else if errs.Code(err) != errs.PermissionDenied {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
@@ -742,7 +725,6 @@ func TestUpdateTeam(t *testing.T) {
 	ctx := context.Background()
 	siteAdmin := nextTeamID("site-admin-update-meta")
 	insertTestUser(t, ctx, siteAdmin, "Site Admin Update", "SITE_ADMIN")
-	siteToken := insertTestSession(t, ctx, siteAdmin)
 
 	teamID := createTeamWithRoster(t, ctx, nextTeamID("team-update-meta"), "Meta Team", nextTeamID("meta-team"), []memberSpec{
 		{userID: siteAdmin, role: "administrator", name: "Site Admin"},
@@ -750,7 +732,7 @@ func TestUpdateTeam(t *testing.T) {
 
 	t.Run("site admin can rename and reslug", func(t *testing.T) {
 		newSlug := nextTeamID("renamed-team")
-		team, err := updateTeam(ctx, bearer(siteToken), teamID, &UpdateTeamParams{
+		team, err := updateTeam(ctx, testActor(siteAdmin, "SITE_ADMIN"), teamID, &UpdateTeamParams{
 			Name: sptr("Renamed Team"),
 			Slug: sptr(newSlug),
 		})
@@ -770,7 +752,7 @@ func TestUpdateTeam(t *testing.T) {
 	})
 
 	t.Run("rejects invalid slug", func(t *testing.T) {
-		if _, err := updateTeam(ctx, bearer(siteToken), teamID, &UpdateTeamParams{
+		if _, err := updateTeam(ctx, testActor(siteAdmin, "SITE_ADMIN"), teamID, &UpdateTeamParams{
 			Slug: sptr("BAD SLUG!!"),
 		}); err == nil {
 			t.Fatal("expected invalid_argument error")
@@ -783,7 +765,7 @@ func TestUpdateTeam(t *testing.T) {
 		otherID := nextTeamID("team-other")
 		otherSlug := nextTeamID("other-team")
 		createTeamWithRoster(t, ctx, otherID, "Other Team", otherSlug, nil)
-		if _, err := updateTeam(ctx, bearer(siteToken), teamID, &UpdateTeamParams{
+		if _, err := updateTeam(ctx, testActor(siteAdmin, "SITE_ADMIN"), teamID, &UpdateTeamParams{
 			Slug: sptr(otherSlug),
 		}); err == nil {
 			t.Fatal("expected already_exists error")
@@ -795,15 +777,14 @@ func TestUpdateTeam(t *testing.T) {
 	t.Run("rejects outsiders and missing teams", func(t *testing.T) {
 		outsider := nextTeamID("user-outsider-meta")
 		insertTestUser(t, ctx, outsider, "Outsider", "USER")
-		outsiderToken := insertTestSession(t, ctx, outsider)
-		if _, err := updateTeam(ctx, bearer(outsiderToken), teamID, &UpdateTeamParams{
+		if _, err := updateTeam(ctx, testActor(outsider, "USER"), teamID, &UpdateTeamParams{
 			Name: sptr("Hijacked"),
 		}); err == nil {
 			t.Fatal("expected permission error")
 		} else if errs.Code(err) != errs.PermissionDenied {
 			t.Errorf("code = %v, want permission_denied", errs.Code(err))
 		}
-		if _, err := updateTeam(ctx, bearer(siteToken), "missing-team-999", &UpdateTeamParams{
+		if _, err := updateTeam(ctx, testActor(siteAdmin, "SITE_ADMIN"), "missing-team-999", &UpdateTeamParams{
 			Name: sptr("Ghost"),
 		}); err == nil {
 			t.Fatal("expected not found error")

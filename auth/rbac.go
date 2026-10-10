@@ -18,20 +18,21 @@ type Actor struct {
 	UserID               string
 	ActiveOrganizationID string
 	SiteRole             SiteRoleName
+	Token                string
 }
 
 // actorCacheTTL is the conservative default TTL for cached actors (4 min).
 const actorCacheTTL = 240 * time.Second
 
-// resolveActor authenticates a caller from a session token supplied via the
-// Authorization: Bearer *** header. The session table is queried to identify
+// resolveActor authenticates a caller from a session token.
+// The session table is queried to identify
 // the caller, and the user's global siteRole is loaded alongside.
 // Results are cached for up to 4 minutes (or the remaining session lifetime,
 // whichever is shorter).
 //
 // Mirrors ts-legacy/auth/rbac.ts resolveActor
-func resolveActor(ctx context.Context, authorization string) (*Actor, error) {
-	token := strings.TrimPrefix(authorization, "Bearer ")
+func resolveActor(ctx context.Context, token string) (*Actor, error) {
+	token = strings.TrimPrefix(token, "Bearer ")
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
@@ -65,6 +66,7 @@ func resolveActor(ctx context.Context, authorization string) (*Actor, error) {
 	actor := Actor{
 		UserID:   userID,
 		SiteRole: SiteRoleName(siteRole),
+		Token:    token,
 	}
 	if activeOrgID.Valid {
 		actor.ActiveOrganizationID = activeOrgID.String
@@ -119,10 +121,9 @@ func getMemberRole(ctx context.Context, organizationId, userId string) (string, 
 // Returns the resolved actor and their role on success.
 //
 // Mirrors ts-legacy/auth/rbac.ts requirePermission
-func requirePermission(ctx context.Context, authorization string, organizationId string, resource Resource, action Action) (*Actor, string, error) {
-	actor, err := resolveActor(ctx, authorization)
-	if err != nil {
-		return nil, "", err
+func requirePermission(ctx context.Context, actor *Actor, organizationId string, resource Resource, action Action) (*Actor, string, error) {
+	if actor == nil {
+		return nil, "", &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if isSiteAdmin(actor.SiteRole) {
 		return actor, string(actor.SiteRole), nil
@@ -146,10 +147,9 @@ func requirePermission(ctx context.Context, authorization string, organizationId
 // requireSiteAdmin asserts the caller holds the global SITE_ADMIN role.
 //
 // Mirrors ts-legacy/auth/rbac.ts requireSiteAdmin
-func requireSiteAdmin(ctx context.Context, authorization string) (*Actor, error) {
-	actor, err := resolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func requireSiteAdmin(actor *Actor) (*Actor, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if !isSiteAdmin(actor.SiteRole) {
 		return nil, &errs.Error{
@@ -169,10 +169,9 @@ func requireSiteAdmin(ctx context.Context, authorization string) (*Actor, error)
 // Otherwise the request is denied.
 //
 // Mirrors ts-legacy/auth/rbac.ts requireEventPermission
-func requireEventPermission(ctx context.Context, authorization string, eventId string, action Action) (*Actor, error) {
-	actor, err := resolveActor(ctx, authorization)
-	if err != nil {
-		return nil, err
+func requireEventPermission(ctx context.Context, actor *Actor, eventId string, action Action) (*Actor, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if isSiteAdmin(actor.SiteRole) || isEventAdmin(actor.SiteRole) {
 		return actor, nil

@@ -58,7 +58,7 @@ func createUsersTestSession(t *testing.T, ctx context.Context, userID string) st
 
 func mustResolveActor(t *testing.T, ctx context.Context, token string) *Actor {
 	t.Helper()
-	actor, err := resolveActor(ctx, "Bearer "+token)
+	actor, err := resolveActor(ctx, token)
 	if err != nil {
 		t.Fatalf("resolveActor failed: %v", err)
 	}

@@ -64,7 +64,7 @@ func Test_resolveActor(t *testing.T) {
 	insertTestSession(t, ctx, "user-1", "valid-token", time.Now().Add(1*time.Hour))
 
 	t.Run("valid token", func(t *testing.T) {
-		actor, err := resolveActor(ctx, "Bearer valid-token")
+		actor, err := resolveActor(ctx, "valid-token")
 		if err != nil {
 			t.Fatalf("resolveActor failed: %v", err)
 		}
@@ -87,7 +87,7 @@ func Test_resolveActor(t *testing.T) {
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-		_, err := resolveActor(ctx, "Bearer nonexistent-token")
+		_, err := resolveActor(ctx, "nonexistent-token")
 		if err == nil {
 			t.Fatal("expected error for invalid token")
 		}
@@ -98,7 +98,7 @@ func Test_resolveActor(t *testing.T) {
 
 	t.Run("expired token", func(t *testing.T) {
 		insertTestSession(t, ctx, "user-1", "expired-token", time.Now().Add(-1*time.Hour))
-		_, err := resolveActor(ctx, "Bearer expired-token")
+		_, err := resolveActor(ctx, "expired-token")
 		if err == nil {
 			t.Fatal("expected error for expired token")
 		}
@@ -110,7 +110,7 @@ func Test_resolveActor(t *testing.T) {
 	t.Run("site admin", func(t *testing.T) {
 		insertTestUser(t, ctx, "admin-1", "Admin User", string(SiteRoleSiteAdmin), "admin-user")
 		insertTestSession(t, ctx, "admin-1", "admin-token", time.Now().Add(1*time.Hour))
-		actor, err := resolveActor(ctx, "Bearer admin-token")
+		actor, err := resolveActor(ctx, "admin-token")
 		if err != nil {
 			t.Fatalf("resolveActor failed: %v", err)
 		}
@@ -129,19 +129,21 @@ func Test_requireSiteAdmin(t *testing.T) {
 	t.Run("site admin passes", func(t *testing.T) {
 		insertTestUser(t, ctx, "admin-2", "Admin", string(SiteRoleSiteAdmin), "admin2")
 		insertTestSession(t, ctx, "admin-2", "admin-token-2", time.Now().Add(1*time.Hour))
-		actor, err := requireSiteAdmin(ctx, "Bearer admin-token-2")
+		actor, _ := resolveActor(ctx, "admin-token-2")
+		res, err := requireSiteAdmin(actor)
 		if err != nil {
 			t.Fatalf("requireSiteAdmin failed: %v", err)
 		}
-		if actor.UserID != "admin-2" {
-			t.Errorf("actor.UserID = %q, want %q", actor.UserID, "admin-2")
+		if res.UserID != "admin-2" {
+			t.Errorf("actor.UserID = %q, want %q", res.UserID, "admin-2")
 		}
 	})
 
 	t.Run("regular user denied", func(t *testing.T) {
 		insertTestUser(t, ctx, "user-2", "Regular", string(SiteRoleUser), "user2")
 		insertTestSession(t, ctx, "user-2", "user-token-2", time.Now().Add(1*time.Hour))
-		_, err := requireSiteAdmin(ctx, "Bearer user-token-2")
+		actor, _ := resolveActor(ctx, "user-token-2")
+		_, err := requireSiteAdmin(actor)
 		if err == nil {
 			t.Fatal("expected error for non-admin")
 		}
@@ -151,7 +153,7 @@ func Test_requireSiteAdmin(t *testing.T) {
 	})
 
 	t.Run("unauthenticated denied", func(t *testing.T) {
-		_, err := requireSiteAdmin(ctx, "")
+		_, err := requireSiteAdmin(nil)
 		if err == nil {
 			t.Fatal("expected error for unauthenticated")
 		}
@@ -178,7 +180,8 @@ func Test_requirePermission(t *testing.T) {
 	t.Run("site admin bypasses org check", func(t *testing.T) {
 		insertTestUser(t, ctx, "admin-3", "Admin", string(SiteRoleSiteAdmin), "admin3")
 		insertTestSession(t, ctx, "admin-3", "admin-token-3", time.Now().Add(1*time.Hour))
-		_, role, err := requirePermission(ctx, "Bearer admin-token-3", "org-1", ResourceEvent, ActionRead)
+		actor, _ := resolveActor(ctx, "admin-token-3")
+		_, role, err := requirePermission(ctx, actor, "org-1", ResourceEvent, ActionRead)
 		if err != nil {
 			t.Fatalf("requirePermission failed for site admin: %v", err)
 		}
@@ -199,15 +202,16 @@ func Test_requirePermission(t *testing.T) {
 			t.Fatalf("failed to insert member: %v", err)
 		}
 
-		actor, role, err := requirePermission(ctx, "Bearer org-admin-token", "org-1", ResourceEvent, ActionCreate)
+		actor, _ := resolveActor(ctx, "org-admin-token")
+		resActor, role, err := requirePermission(ctx, actor, "org-1", ResourceEvent, ActionCreate)
 		if err != nil {
 			t.Fatalf("requirePermission failed for org admin: %v", err)
 		}
 		if role != administratorRole {
 			t.Errorf("role = %q, want %q", role, administratorRole)
 		}
-		if actor.UserID != "org-admin" {
-			t.Errorf("actor.UserID = %q, want %q", actor.UserID, "org-admin")
+		if resActor.UserID != "org-admin" {
+			t.Errorf("actor.UserID = %q, want %q", resActor.UserID, "org-admin")
 		}
 	})
 
@@ -223,14 +227,15 @@ func Test_requirePermission(t *testing.T) {
 			t.Fatalf("failed to insert member: %v", err)
 		}
 
+		actor, _ := resolveActor(ctx, "member-token")
 		// Member can read
-		_, _, err = requirePermission(ctx, "Bearer member-token", "org-1", ResourceEvent, ActionRead)
+		_, _, err = requirePermission(ctx, actor, "org-1", ResourceEvent, ActionRead)
 		if err != nil {
 			t.Errorf("member should be able to read: %v", err)
 		}
 
 		// Member cannot create
-		_, _, err = requirePermission(ctx, "Bearer member-token", "org-1", ResourceEvent, ActionCreate)
+		_, _, err = requirePermission(ctx, actor, "org-1", ResourceEvent, ActionCreate)
 		if err == nil {
 			t.Fatal("member should not be able to create")
 		}
@@ -243,7 +248,8 @@ func Test_requirePermission(t *testing.T) {
 		insertTestUser(t, ctx, "outsider", "Outsider", string(SiteRoleUser), "outsider")
 		insertTestSession(t, ctx, "outsider", "outsider-token", time.Now().Add(1*time.Hour))
 
-		_, _, err := requirePermission(ctx, "Bearer outsider-token", "org-1", ResourceEvent, ActionRead)
+		actor, _ := resolveActor(ctx, "outsider-token")
+		_, _, err := requirePermission(ctx, actor, "org-1", ResourceEvent, ActionRead)
 		if err == nil {
 			t.Fatal("expected error for user not in org")
 		}
@@ -285,12 +291,13 @@ func Test_requireEventPermission(t *testing.T) {
 		// "event-owner" user was created alongside the event above.
 		insertTestSession(t, ctx, "event-owner", "owner-token", time.Now().Add(1*time.Hour))
 
-		actor, err := requireEventPermission(ctx, "Bearer owner-token", "event-user-owned", ActionUpdate)
+		actor, _ := resolveActor(ctx, "owner-token")
+		resActor, err := requireEventPermission(ctx, actor, "event-user-owned", ActionUpdate)
 		if err != nil {
 			t.Fatalf("requireEventPermission failed for owner: %v", err)
 		}
-		if actor.UserID != "event-owner" {
-			t.Errorf("actor.UserID = %q, want %q", actor.UserID, "event-owner")
+		if resActor.UserID != "event-owner" {
+			t.Errorf("actor.UserID = %q, want %q", resActor.UserID, "event-owner")
 		}
 	})
 
@@ -298,7 +305,8 @@ func Test_requireEventPermission(t *testing.T) {
 		insertTestUser(t, ctx, "non-owner", "NonOwner", string(SiteRoleUser), "nonowner")
 		insertTestSession(t, ctx, "non-owner", "non-owner-token", time.Now().Add(1*time.Hour))
 
-		_, err := requireEventPermission(ctx, "Bearer non-owner-token", "event-user-owned", ActionUpdate)
+		actor, _ := resolveActor(ctx, "non-owner-token")
+		_, err := requireEventPermission(ctx, actor, "event-user-owned", ActionUpdate)
 		if err == nil {
 			t.Fatal("expected error for non-owner on user-owned event")
 		}
@@ -311,7 +319,8 @@ func Test_requireEventPermission(t *testing.T) {
 		insertTestUser(t, ctx, "site-admin-2", "SiteAdmin", string(SiteRoleSiteAdmin), "siteadmin2")
 		insertTestSession(t, ctx, "site-admin-2", "site-admin-token-2", time.Now().Add(1*time.Hour))
 
-		_, err := requireEventPermission(ctx, "Bearer site-admin-token-2", "event-user-owned", ActionDelete)
+		actor, _ := resolveActor(ctx, "site-admin-token-2")
+		_, err := requireEventPermission(ctx, actor, "event-user-owned", ActionDelete)
 		if err != nil {
 			t.Fatalf("requireEventPermission should pass for site admin: %v", err)
 		}
@@ -370,23 +379,25 @@ func Test_EventAdminPermissions(t *testing.T) {
 	})
 
 	t.Run("EVENT_ADMIN permitted on event resources in requirePermission", func(t *testing.T) {
+		actor, _ := resolveActor(ctx, "event-admin-token-1")
 		for _, res := range []Resource{ResourceEvent, ResourceRaceEvent, ResourceRaceResult} {
-			actor, role, err := requirePermission(ctx, "Bearer event-admin-token-1", "any-org", res, ActionUpdate)
+			resActor, role, err := requirePermission(ctx, actor, "any-org", res, ActionUpdate)
 			if err != nil {
 				t.Errorf("requirePermission failed for EVENT_ADMIN on %s: %v", res, err)
 			}
 			if role != string(SiteRoleEventAdmin) {
 				t.Errorf("role = %q, want %q", role, SiteRoleEventAdmin)
 			}
-			if actor.UserID != "event-admin-1" {
-				t.Errorf("actor.UserID = %q, want %q", actor.UserID, "event-admin-1")
+			if resActor.UserID != "event-admin-1" {
+				t.Errorf("actor.UserID = %q, want %q", resActor.UserID, "event-admin-1")
 			}
 		}
 	})
 
 	t.Run("EVENT_ADMIN denied on non-event resources in requirePermission", func(t *testing.T) {
+		actor, _ := resolveActor(ctx, "event-admin-token-1")
 		for _, res := range []Resource{ResourceOrganization, ResourceMember, ResourceInvitation} {
-			_, _, err := requirePermission(ctx, "Bearer event-admin-token-1", "non-existent-org", res, ActionRead)
+			_, _, err := requirePermission(ctx, actor, "non-existent-org", res, ActionRead)
 			if err == nil {
 				t.Errorf("requirePermission should fail for EVENT_ADMIN on %s", res)
 			} else if !isPermissionDenied(err) {
@@ -396,12 +407,13 @@ func Test_EventAdminPermissions(t *testing.T) {
 	})
 
 	t.Run("EVENT_ADMIN permitted in requireEventPermission", func(t *testing.T) {
-		actor, err := requireEventPermission(ctx, "Bearer event-admin-token-1", "event-user-owned", ActionUpdate)
+		actor, _ := resolveActor(ctx, "event-admin-token-1")
+		resActor, err := requireEventPermission(ctx, actor, "event-user-owned", ActionUpdate)
 		if err != nil {
 			t.Fatalf("requireEventPermission failed for EVENT_ADMIN: %v", err)
 		}
-		if actor.UserID != "event-admin-1" {
-			t.Errorf("actor.UserID = %q, want %q", actor.UserID, "event-admin-1")
+		if resActor.UserID != "event-admin-1" {
+			t.Errorf("actor.UserID = %q, want %q", resActor.UserID, "event-admin-1")
 		}
 	})
 }
