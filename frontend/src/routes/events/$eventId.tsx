@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import { formatLocalDateTime } from '../../lib/datetime'
@@ -72,6 +73,12 @@ function EventDetailPage() {
   const { data: event, isLoading, error } = useQuery({
     queryKey: ['public-event', eventId],
     queryFn: () => getPublicEvent(eventId),
+  })
+
+  usePageHead({
+    title: event ? event.name : 'Event',
+    description: event?.description || (event ? `Event details for ${event.name} on UmaKeiba.` : undefined),
+    type: 'website',
   })
 
   const joinMutation = useMutation({

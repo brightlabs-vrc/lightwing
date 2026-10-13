@@ -12,6 +12,7 @@ import {
 import type { auth, eventmanager } from '../lib/client'
 import { getLeaderboard, getUserRaceRecords, LeaderboardEntry } from '../lib/public-api'
 import { useAuth } from '../hooks/useAuth'
+import { usePageHead } from '../hooks/usePageHead'
 import { Pagination } from './Pagination'
 
 interface UserProfileViewProps {
@@ -23,6 +24,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
   const [stats, setStats] = useState<LeaderboardEntry | null>(null)
   const [loadingStats, setLoadingStats] = useState(true)
   const isSelf = session?.user.id === user.id
+
+  const displayName = user.vrchatUsername || user.name
+
+  usePageHead({
+    title: displayName,
+    description: user.biography || `User profile for ${displayName} on UmaKeiba.`,
+    image: user.image || undefined,
+    type: 'profile',
+  })
 
   // Race records pagination state
   const [records, setRecords] = useState<eventmanager.UserRaceRecordView[]>([])
@@ -66,8 +76,6 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
     }
     void loadRaceRecords()
   }, [user.id, page, pageSize])
-
-  const displayName = user.vrchatUsername || user.name
 
   return (
     <PixelContainer maxWidth="full" padding="md">

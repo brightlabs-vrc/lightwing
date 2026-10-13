@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 import { requireAuth } from '../../lib/auth-guard'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
 import { submitOrganizationApplication, submitTeamApplication, listApprovedOrganizations, listAdminTeams } from '../../lib/admin-api'
@@ -25,6 +26,11 @@ export const Route = createFileRoute('/teams/new')({
 })
 
 function NewTeamWizardPage() {
+  usePageHead({
+    title: 'Create Team',
+    description: 'Register a new team or organization on UmaKeiba.',
+  })
+
   const { session } = useAuth()
   const navigate = useNavigate()
 
