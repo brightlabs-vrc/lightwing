@@ -12,6 +12,7 @@ import type { teammanager } from '../lib/client'
 import { UserLink } from './UserLink'
 import { MarkdownView } from './MarkdownView'
 import { useAuth } from '../hooks/useAuth'
+import { usePageHead } from '../hooks/usePageHead'
 
 interface TeamProfileViewProps {
   team: teammanager.Team
@@ -21,6 +22,15 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
   const { session } = useAuth()
   const currentUserId = session?.user?.id
   const currentSiteRole = session?.user?.siteRole
+
+  const isOrg = team.isOrganization ?? (!team.primaryOrganizationId || team.primaryOrganizationId === team.id)
+
+  usePageHead({
+    title: team.name,
+    description: team.description || `${isOrg ? 'Organization' : 'Team'} profile for ${team.name} on UmaKeiba.`,
+    image: team.logo || undefined,
+    type: 'website',
+  })
 
   const isTeamAdmin = Boolean(
     currentUserId && (
@@ -37,8 +47,6 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
   const affiliatedOrganizations = (team.organizations || []).filter(
     (org) => org.id !== team.id
   )
-
-  const isOrg = team.isOrganization ?? (!team.primaryOrganizationId || team.primaryOrganizationId === team.id)
 
   return (
     <PixelContainer maxWidth="full" padding="md">

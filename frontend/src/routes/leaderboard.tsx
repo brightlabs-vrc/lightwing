@@ -16,12 +16,17 @@ import {
   LeaderboardResponse,
 } from '../lib/public-api'
 import { Pagination } from '../components/Pagination'
+import { usePageHead } from '../hooks/usePageHead'
 
 export const Route = createFileRoute('/leaderboard')({
   component: LeaderboardPage,
 })
 
 export function LeaderboardPage() {
+  usePageHead({
+    title: 'Leaderboard',
+    description: 'Global driver standings and ranking leaderboard on UmaKeiba.',
+  })
   const [sortBy, setSortBy] = useState<'points' | 'avgPosition' | 'avgPointsPerSeason'>('points')
   const [search, setSearch] = useState('')
   const [classTier, setClassTier] = useState('')

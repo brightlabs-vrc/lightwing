@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 
 // Import Salesforce Lightning Design System CSS directly from node_modules
 import '@salesforce-ux/design-system/assets/styles/salesforce-lightning-design-system.min.css'
@@ -13,6 +14,11 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutProps) {
+  usePageHead({
+    title: title ? `Admin - ${title}` : 'Admin',
+    description: 'UmaKeiba Site & Event Administration.',
+  })
+
   const { session, signOutUser } = useAuth()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
 

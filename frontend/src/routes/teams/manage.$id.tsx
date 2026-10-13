@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 import { requireAuth } from '../../lib/auth-guard'
 import {
   getAdminTeam,
@@ -75,6 +76,11 @@ function ManageOrgPage() {
   const [activeTab, setActiveTab] = useState<TabType>('overview')
 
   const [team, setTeam] = useState<teammanager.Team | null>(null)
+
+  usePageHead({
+    title: team ? `${team.name} - Management` : 'Management',
+    description: 'Manage organization and team details on UmaKeiba.',
+  })
   const isOrg = team
     ? (team.isOrganization ?? (!team.primaryOrganizationId || team.primaryOrganizationId === team.id))
     : true
