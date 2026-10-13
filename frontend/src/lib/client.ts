@@ -645,6 +645,8 @@ export namespace eventmanager {
         organizationId: string
         ownerUserId: string
         ownerName?: string | null
+        ownerSlug?: string | null
+        ownerLogo?: string | null
         status: string
         tag: string
         deletedAt: string
@@ -678,6 +680,8 @@ export namespace eventmanager {
         organizationId: string
         ownerUserId: string
         ownerName?: string | null
+        ownerSlug?: string | null
+        ownerLogo?: string | null
         status: string
         tag: string
         deletedAt: string

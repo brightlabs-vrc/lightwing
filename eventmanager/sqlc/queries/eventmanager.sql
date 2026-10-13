@@ -122,7 +122,9 @@ SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1);
 -- Full event row (replaces eventColumns scans).
 -- name: GetEventRow :one
 SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
-COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
+COALESCE(o.slug, u.slug) AS "ownerSlug",
+COALESCE(o.logo, u.image) AS "ownerLogo"
 FROM "event" e
 LEFT JOIN "organization" o ON e."organizationId" = o.id
 LEFT JOIN "user" u ON e."ownerUserId" = u.id
@@ -180,7 +182,9 @@ e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRacePa
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
-COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
+COALESCE(o.slug, u.slug) AS "ownerSlug",
+COALESCE(o.logo, u.image) AS "ownerLogo"
 FROM "event" e
 LEFT JOIN "organization" o ON e."organizationId" = o.id
 LEFT JOIN "user" u ON e."ownerUserId" = u.id
@@ -204,7 +208,9 @@ e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRacePa
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
-COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
+COALESCE(o.slug, u.slug) AS "ownerSlug",
+COALESCE(o.logo, u.image) AS "ownerLogo"
 FROM "event" e
 LEFT JOIN "organization" o ON e."organizationId" = o.id
 LEFT JOIN "user" u ON e."ownerUserId" = u.id

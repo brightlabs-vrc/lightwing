@@ -221,11 +221,6 @@ function EventDetailPage() {
           <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
             <PixelStack gap={1}>
               <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">{event.name}</h1>
-              {event.ownerName && (
-                <div className="font-pixel text-xs text-retro-primary">
-                  ORGANIZER: {event.ownerName.toUpperCase()}
-                </div>
-              )}
               {event.scheduledAt && (
                 <div className="font-pixel text-xs text-retro-gold">
                   SCHEDULED: <time dateTime={event.scheduledAt}>{formatLocalDateTime(event.scheduledAt)}</time>
@@ -310,6 +305,72 @@ function EventDetailPage() {
 
         {/* Right Column: Event Description & Schedule Panel */}
         <div className="flex flex-col gap-6">
+          {event.ownerName && (
+            <div>
+              <PixelSectionHeader title="ORGANIZER" size="sm" spacing="tight" />
+              <PixelCard className="bg-retro-surface">
+                {(() => {
+                  const targetSlug = event.ownerSlug || event.organizationId || event.ownerUserId || ''
+                  const ownerName = event.ownerName
+                  const ownerLogo = event.ownerLogo
+                  const ownerTypeLabel = event.ownerType === 'USER' ? 'ORGANIZER' : 'ORGANIZATION'
+
+                  const cardInner = (
+                    <PixelStack direction="row" justify="between" align="center">
+                      <div className="flex items-center gap-3">
+                        {ownerLogo ? (
+                          <img
+                            src={ownerLogo}
+                            alt={ownerName}
+                            onError={(e) => {
+                              e.currentTarget.src = '/fallback_avatar.jpg'
+                            }}
+                            className="w-10 h-10 rounded border border-retro-border bg-retro-bg object-cover shadow-sm flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded border border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {ownerName.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-pixel text-sm text-retro-text font-bold">
+                            {ownerName}
+                          </div>
+                          {(event.ownerSlug || targetSlug) && (
+                            <div className="font-sans text-xs text-retro-muted">
+                              @{event.ownerSlug || targetSlug}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <PixelBadge tone="purple">
+                        {ownerTypeLabel}
+                      </PixelBadge>
+                    </PixelStack>
+                  )
+
+                  if (targetSlug) {
+                    return (
+                      <Link
+                        to="/$user"
+                        params={{ user: targetSlug }}
+                        className="block p-3 border-2 border-retro-border rounded hover:border-retro-primary transition-colors bg-retro-bg"
+                      >
+                        {cardInner}
+                      </Link>
+                    )
+                  }
+
+                  return (
+                    <div className="p-3 border-2 border-retro-border rounded bg-retro-bg">
+                      {cardInner}
+                    </div>
+                  )
+                })()}
+              </PixelCard>
+            </div>
+          )}
+
           {event.description && (
             <div>
               <PixelSectionHeader title="ABOUT EVENT" size="sm" spacing="tight" />
