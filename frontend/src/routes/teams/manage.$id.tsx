@@ -1282,6 +1282,7 @@ function OrgEventDetailView({
     races,
     selectedRaceId,
     selectedRace,
+    results,
     loadingEventDetail,
     loadingResults,
     savingBatch,
@@ -1304,6 +1305,7 @@ function OrgEventDetailView({
     handleCreateRace,
     handleStartRace,
     handleEndRace,
+    handleUpdateRace,
     handleDeleteRace,
     handleSelectRace,
     handleResultChange,
@@ -1313,6 +1315,7 @@ function OrgEventDetailView({
     handleInferFinishTimes,
     handleCancelStandingsEdit,
     handleUnifiedSave,
+    handleReorderRaces,
   } = detail
 
   // Edit Event Modal State
@@ -1326,6 +1329,7 @@ function OrgEventDetailView({
   const [editSignupsLocked, setEditSignupsLocked] = useState(false)
   const [editScoringRulesMode, setEditScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   // Member Add State
   const [addMemberUserId, setAddMemberUserId] = useState('')
@@ -1337,6 +1341,19 @@ function OrgEventDetailView({
   const [raceLocation, setRaceLocation] = useState('')
   const [raceDistance, setRaceDistance] = useState(1200)
   const [raceGrade, setRaceGrade] = useState('')
+
+  // Edit Race Modal State
+  const [showEditRaceModal, setShowEditRaceModal] = useState(false)
+  const [editingRace, setEditingRace] = useState<eventmanager.RaceEventDetail | null>(null)
+  const [raceEditName, setRaceEditName] = useState('')
+  const [raceEditLocation, setRaceEditLocation] = useState('')
+  const [raceEditDistance, setRaceEditDistance] = useState(1200)
+  const [raceEditTrackType, setRaceEditTrackType] = useState('Turf')
+  const [raceEditClassRestriction, setRaceEditClassRestriction] = useState<string>('')
+  const [raceEditGrade, setRaceEditGrade] = useState<string>('')
+  const [raceEditParticipantLimit, setRaceEditParticipantLimit] = useState<string>('')
+  const [raceEditError, setRaceEditError] = useState<string | null>(null)
+  const [showRaceGradeConfirm, setShowRaceGradeConfirm] = useState(false)
 
   // Race Member Add State
   const [addRaceMemberUserId, setAddRaceMemberUserId] = useState('')
@@ -1409,10 +1426,19 @@ function OrgEventDetailView({
     }
   }
 
-  async function onSaveEditDetails(e: React.FormEvent) {
-    e.preventDefault()
+  const performSaveEventDetails = async () => {
     const limitNum = editParticipantLimit.trim() ? Number(editParticipantLimit) : null
     const maxConcurrentNum = editMaxConcurrent.trim() ? Number(editMaxConcurrent) : null
+
+    if (!selectedEvent?.granularParticipation && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
+      alert('Participant limit must be a positive whole number.')
+      return
+    }
+
+    if (selectedEvent?.granularParticipation && maxConcurrentNum !== null && (isNaN(maxConcurrentNum) || !Number.isSafeInteger(maxConcurrentNum) || maxConcurrentNum <= 0)) {
+      alert('Max races per participant must be a positive whole number.')
+      return
+    }
 
     await handleUpdateEventDetails({
       name: editName,
@@ -1428,6 +1454,125 @@ function OrgEventDetailView({
       await handleSetSignupsLocked(editSignupsLocked)
     }
     setShowEditModal(false)
+  }
+
+  async function onSaveEditDetails(e: React.FormEvent) {
+    e.preventDefault()
+
+    // Validation for custom scoring rules
+    if (selectedEvent && selectedEvent.scoringType === 1 && editScoringRulesMode === 'CUSTOM') {
+      const grades = ['OP', 'GIII', 'GII', 'GI']
+      for (const grade of grades) {
+        const table = editCustomScoringTables[grade]
+        if (!table) {
+          alert(`Custom table for grade ${grade} is missing.`)
+          return
+        }
+        for (let pos = 1; pos <= 10; pos++) {
+          const val = table[pos]
+          if (val === undefined || val === null || String(val).trim() === '') {
+            alert(`Custom table for grade ${grade} is missing value for position #${pos}.`)
+            return
+          }
+          const num = Number(val)
+          if (!Number.isInteger(num) || num < 0) {
+            alert(`Custom table for grade ${grade}, position #${pos} must be a valid non-negative integer.`)
+            return
+          }
+        }
+      }
+    }
+
+    const scoringRulesChanged = selectedEvent && selectedEvent.scoringType === 1 && (
+      selectedEvent.scoringRulesMode !== editScoringRulesMode ||
+      (editScoringRulesMode === 'CUSTOM' && JSON.stringify(selectedEvent.customScoringTables) !== JSON.stringify(editCustomScoringTables))
+    )
+
+    if (scoringRulesChanged) {
+      setShowConfirmModal(true)
+    } else {
+      await performSaveEventDetails()
+    }
+  }
+
+  function handleOpenEditRaceModal(race: eventmanager.RaceEventDetail) {
+    setEditingRace(race)
+    setRaceEditName(race.name)
+    setRaceEditLocation(race.location)
+    setRaceEditDistance(race.distanceMeters)
+    setRaceEditTrackType(race.trackType)
+    setRaceEditClassRestriction(race.classRestriction || '')
+    setRaceEditGrade(race.grade || '')
+    setRaceEditParticipantLimit(race.participantLimit !== null ? String(race.participantLimit) : '')
+    setRaceEditError(null)
+    setShowEditRaceModal(true)
+  }
+
+  const performSaveRaceDetails = async () => {
+    if (!editingRace) return
+    const limitNum = raceEditParticipantLimit.trim() ? Number(raceEditParticipantLimit) : null
+    if (limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
+      setRaceEditError('Race participant limit must be a positive whole number.')
+      return
+    }
+
+    await handleUpdateRace(editingRace.id, {
+      name: raceEditName.trim(),
+      location: raceEditLocation.trim(),
+      distanceMeters: raceEditDistance,
+      trackType: raceEditTrackType.trim(),
+      classRestriction: (raceEditClassRestriction as any) || null,
+      grade: raceEditGrade || null,
+      participantLimit: limitNum,
+    })
+    setShowEditRaceModal(false)
+    setEditingRace(null)
+    toast({ tone: 'green', title: 'Race details updated successfully.' })
+  }
+
+  async function onEditRaceSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setRaceEditError(null)
+
+    if (!raceEditName.trim()) {
+      setRaceEditError('Race name is required.')
+      return
+    }
+    if (!raceEditLocation.trim()) {
+      setRaceEditError('Location is required.')
+      return
+    }
+    if (!raceEditTrackType.trim()) {
+      setRaceEditError('Track Type is required.')
+      return
+    }
+    if (!Number.isInteger(raceEditDistance) || raceEditDistance <= 0) {
+      setRaceEditError('Distance must be a valid integer greater than 0.')
+      return
+    }
+
+    const hasResults = results && results.length > 0
+    const gradeChanged = editingRace && editingRace.grade !== raceEditGrade
+    const isPointsBased = selectedEvent && selectedEvent.scoringType === 1
+
+    if (isPointsBased && hasResults && gradeChanged) {
+      setShowRaceGradeConfirm(true)
+    } else {
+      await performSaveRaceDetails()
+    }
+  }
+
+  async function handleMoveRace(raceIndex: number, direction: 'up' | 'down') {
+    const targetIndex = direction === 'up' ? raceIndex - 1 : raceIndex + 1
+    if (targetIndex < 0 || targetIndex >= races.length) return
+
+    const reordered = [...races]
+    const [moved] = reordered.splice(raceIndex, 1)
+    reordered.splice(targetIndex, 0, moved)
+
+    const reorderedIds = reordered.map((r) => r.id)
+    await handleReorderRaces(reorderedIds)
+    toast({ tone: 'green', title: 'Race sequence updated.' })
   }
 
   async function onCreateRaceSubmit(e: React.FormEvent) {
@@ -1479,7 +1624,6 @@ function OrgEventDetailView({
   }
 
   const STATUS_OPTIONS: EventStatus[] = ['DRAFT', 'PENDING', 'ONGOING', 'CONCLUDED', 'PENDING_DELETION']
-  const TAG_OPTIONS: EventTag[] = ['OFFICIAL', 'COMMUNITY']
 
   return (
     <PixelStack gap={6}>
@@ -1822,7 +1966,7 @@ function OrgEventDetailView({
 
               {races.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {races.map((r) => (
+                  {races.map((r, idx) => (
                     <div
                       key={r.id}
                       className={`p-4 rounded border transition-all ${
@@ -1836,16 +1980,42 @@ function OrgEventDetailView({
                           <h4 className="font-pixel text-sm font-bold text-retro-text">
                             #{r.sequence}. {r.name}
                           </h4>
-                          <PixelBadge tone={selectedRaceId === r.id ? 'purple' : 'neutral'}>
-                            {r.trackType} ({r.distanceMeters}m)
-                          </PixelBadge>
+                          <div className="flex items-center gap-1">
+                            <PixelBadge tone={selectedRaceId === r.id ? 'purple' : 'neutral'}>
+                              {r.trackType} ({r.distanceMeters}m)
+                            </PixelBadge>
+                            {/* Sequence Move Controls */}
+                            <PixelButton
+                              variant="ghost"
+                              tone="neutral"
+                              size="sm"
+                              disabled={idx === 0}
+                              onClick={() => void handleMoveRace(idx, 'up')}
+                              title="Move race up in schedule"
+                            >
+                              ▲
+                            </PixelButton>
+                            <PixelButton
+                              variant="ghost"
+                              tone="neutral"
+                              size="sm"
+                              disabled={idx === races.length - 1}
+                              onClick={() => void handleMoveRace(idx, 'down')}
+                              title="Move race down in schedule"
+                            >
+                              ▼
+                            </PixelButton>
+                          </div>
                         </div>
 
                         <div className="font-sans text-xs text-retro-muted">
                           LOCATION: <strong>{r.location}</strong> | GRADE: <strong>{r.grade || 'OP'}</strong>
+                          {r.participantLimit !== null && (
+                            <span> | LIMIT: <strong>{r.participantLimit}</strong></span>
+                          )}
                         </div>
 
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-retro-border">
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-retro-border flex-wrap">
                           <PixelButton
                             variant={selectedRaceId === r.id ? 'solid' : 'ghost'}
                             tone="purple"
@@ -1853,6 +2023,15 @@ function OrgEventDetailView({
                             onClick={() => void handleSelectRace(r, true)}
                           >
                             {selectedRaceId === r.id ? 'MANAGING STANDINGS' : 'SELECT STANDINGS'}
+                          </PixelButton>
+
+                          <PixelButton
+                            variant="ghost"
+                            tone="neutral"
+                            size="sm"
+                            onClick={() => handleOpenEditRaceModal(r)}
+                          >
+                            EDIT RACE
                           </PixelButton>
 
                           {r.startsAt === null ? (
@@ -2031,7 +2210,7 @@ function OrgEventDetailView({
       {/* EDIT EVENT DETAILS MODAL */}
       {showEditModal && (
         <PixelModal open={showEditModal} onClose={() => setShowEditModal(false)} title="EDIT EVENT DETAILS">
-          <form onSubmit={onSaveEditDetails} className="space-y-4">
+          <form onSubmit={onSaveEditDetails} className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
             <PixelInput label="EVENT NAME" required value={editName} onChange={(e) => setEditName(e.target.value)} />
 
             <PixelTextarea
@@ -2053,6 +2232,44 @@ function OrgEventDetailView({
                 <option value="G2">G2</option>
                 <option value="G1">G1</option>
               </select>
+            </div>
+
+            <PixelInput
+              label="SCHEDULED DATE / TIME"
+              type="datetime-local"
+              value={editScheduledAt}
+              onChange={(e) => setEditScheduledAt(e.target.value)}
+            />
+
+            {!selectedEvent.granularParticipation ? (
+              <PixelInput
+                label="PARTICIPANT LIMIT"
+                type="number"
+                placeholder="e.g. 20"
+                value={editParticipantLimit}
+                onChange={(e) => setEditParticipantLimit(e.target.value)}
+              />
+            ) : (
+              <PixelInput
+                label="MAX RACES PER PARTICIPANT"
+                type="number"
+                placeholder="e.g. 3"
+                value={editMaxConcurrent}
+                onChange={(e) => setEditMaxConcurrent(e.target.value)}
+              />
+            )}
+
+            <div className="flex items-center gap-2 pt-2">
+              <input
+                type="checkbox"
+                id="edit-signups-locked"
+                checked={editSignupsLocked}
+                onChange={(e) => setEditSignupsLocked(e.target.checked)}
+                className="w-4 h-4 accent-retro-primary cursor-pointer"
+              />
+              <label htmlFor="edit-signups-locked" className="font-pixel text-xs text-retro-text cursor-pointer">
+                LOCK EVENT SIGNUPS
+              </label>
             </div>
 
             {selectedEvent.scoringType === 1 && (
@@ -2087,6 +2304,176 @@ function OrgEventDetailView({
               </PixelButton>
             </div>
           </form>
+        </PixelModal>
+      )}
+
+      {/* CONFIRM RECOMPUTE WARNING MODAL */}
+      {showConfirmModal && (
+        <PixelModal
+          open={showConfirmModal}
+          onClose={() => setShowConfirmModal(false)}
+          title="RECALCULATE POINTS WARNING"
+        >
+          <PixelStack gap={4}>
+            <PixelAlert
+              tone="red"
+              message="Changing the event's scoring rules will trigger an automatic background recomputation of points for all existing race results associated with this event. This can invalidate previously recorded standings."
+            />
+            <p className="font-sans text-xs text-retro-text">
+              Are you sure you want to proceed and save these scoring changes?
+            </p>
+            <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+              <PixelButton variant="ghost" tone="neutral" onClick={() => setShowConfirmModal(false)}>
+                CANCEL
+              </PixelButton>
+              <PixelButton
+                variant="solid"
+                tone="purple"
+                onClick={async () => {
+                  setShowConfirmModal(false)
+                  await performSaveEventDetails()
+                }}
+              >
+                CONFIRM & SAVE
+              </PixelButton>
+            </div>
+          </PixelStack>
+        </PixelModal>
+      )}
+
+      {/* EDIT RACE DETAILS MODAL */}
+      {showEditRaceModal && editingRace && (
+        <PixelModal
+          open={showEditRaceModal}
+          onClose={() => {
+            setShowEditRaceModal(false)
+            setEditingRace(null)
+          }}
+          title="EDIT RACE DETAILS"
+        >
+          <form onSubmit={onEditRaceSubmit} className="space-y-4">
+            {raceEditError && <PixelAlert tone="red" message={raceEditError} />}
+
+            <PixelInput
+              label="RACE NAME"
+              required
+              value={raceEditName}
+              onChange={(e) => setRaceEditName(e.target.value)}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <PixelInput
+                label="TRACK TYPE"
+                required
+                value={raceEditTrackType}
+                onChange={(e) => setRaceEditTrackType(e.target.value)}
+              />
+              <PixelInput
+                label="LOCATION"
+                required
+                value={raceEditLocation}
+                onChange={(e) => setRaceEditLocation(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <PixelInput
+                label="DISTANCE (METERS)"
+                type="number"
+                required
+                value={String(raceEditDistance)}
+                onChange={(e) => setRaceEditDistance(Number(e.target.value))}
+              />
+              <div>
+                <label className="block font-pixel text-xs text-retro-text mb-1">RACE GRADE</label>
+                <select
+                  value={raceEditGrade}
+                  onChange={(e) => setRaceEditGrade(e.target.value)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                >
+                  <option value="">-- Choose Grade --</option>
+                  <option value="OP">OP</option>
+                  <option value="GIII">GIII</option>
+                  <option value="GII">GII</option>
+                  <option value="GI">GI</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-pixel text-xs text-retro-text mb-1">CLASS RESTRICTION</label>
+              <select
+                value={raceEditClassRestriction}
+                onChange={(e) => setRaceEditClassRestriction(e.target.value)}
+                className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+              >
+                <option value="">Any Tier Eligibility (None)</option>
+                <option value="G3">G3</option>
+                <option value="G2">G2</option>
+                <option value="G1">G1</option>
+              </select>
+            </div>
+
+            {selectedEvent.granularParticipation && (
+              <PixelInput
+                label="RACE PARTICIPANT LIMIT"
+                type="number"
+                placeholder="e.g. 10"
+                value={raceEditParticipantLimit}
+                onChange={(e) => setRaceEditParticipantLimit(e.target.value)}
+              />
+            )}
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+              <PixelButton
+                variant="ghost"
+                tone="neutral"
+                onClick={() => {
+                  setShowEditRaceModal(false)
+                  setEditingRace(null)
+                }}
+              >
+                CANCEL
+              </PixelButton>
+              <PixelButton variant="solid" tone="purple" type="submit">
+                SAVE CHANGES
+              </PixelButton>
+            </div>
+          </form>
+        </PixelModal>
+      )}
+
+      {/* CONFIRM RACE GRADE CHANGE RECOMPUTE WARNING MODAL */}
+      {showRaceGradeConfirm && (
+        <PixelModal
+          open={showRaceGradeConfirm}
+          onClose={() => setShowRaceGradeConfirm(false)}
+          title="RECALCULATE RACE POINTS WARNING"
+        >
+          <PixelStack gap={4}>
+            <PixelAlert
+              tone="red"
+              message="Changing this race's grade will trigger an automatic recomputation of points for all recorded results in this specific race."
+            />
+            <p className="font-sans text-xs text-retro-text">
+              Are you sure you want to proceed and update the race grade?
+            </p>
+            <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
+              <PixelButton variant="ghost" tone="neutral" onClick={() => setShowRaceGradeConfirm(false)}>
+                CANCEL
+              </PixelButton>
+              <PixelButton
+                variant="solid"
+                tone="purple"
+                onClick={async () => {
+                  setShowRaceGradeConfirm(false)
+                  await performSaveRaceDetails()
+                }}
+              >
+                CONFIRM & SAVE
+              </PixelButton>
+            </div>
+          </PixelStack>
         </PixelModal>
       )}
 
