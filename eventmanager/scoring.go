@@ -362,11 +362,46 @@ func ResolveRacePoints(scoringRulesMode string, customScoringTables any, grade s
 
 // ResolvePoints maps a single finishing position to points under event rules.
 func ResolvePoints(scoringRulesMode string, customScoringTables any, grade string, position *int, resultStatus string) int {
-	item := &RaceResultItem{
-		UserID:       "single",
-		Position:     position,
-		ResultStatus: resultStatus,
+	statusUpper := strings.ToUpper(strings.TrimSpace(resultStatus))
+	if zeroPointStatuses[statusUpper] {
+		return 0
 	}
-	res := ResolveRacePoints(scoringRulesMode, customScoringTables, grade, []*RaceResultItem{item})
-	return res["single"]
+
+	if position == nil || *position < 1 || *position > 10 {
+		return 0
+	}
+
+	table := GetActiveScoringTable(scoringRulesMode, customScoringTables, grade)
+	if table == nil {
+		return 0
+	}
+
+	if strings.HasPrefix(statusUpper, "PEN (POS-") && strings.HasSuffix(statusUpper, ")") {
+		numStr := strings.TrimSuffix(strings.TrimPrefix(statusUpper, "PEN (POS-"), ")")
+		penalty, err := strconv.Atoi(strings.TrimSpace(numStr))
+		if err != nil || penalty < 0 {
+			penalty = 0
+		}
+		effectivePos := *position + penalty
+		if effectivePos > 10 {
+			return 0
+		}
+		return table.Points[effectivePos]
+	}
+
+	if strings.HasPrefix(statusUpper, "PEN (PTS-") && strings.HasSuffix(statusUpper, ")") {
+		numStr := strings.TrimSuffix(strings.TrimPrefix(statusUpper, "PEN (PTS-"), ")")
+		penalty, err := strconv.Atoi(strings.TrimSpace(numStr))
+		if err != nil || penalty < 0 {
+			penalty = 0
+		}
+		basePts := table.Points[*position]
+		pts := basePts - penalty
+		if pts < 0 {
+			return 0
+		}
+		return pts
+	}
+
+	return table.Points[*position]
 }
