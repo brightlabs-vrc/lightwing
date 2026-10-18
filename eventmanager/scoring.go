@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -229,75 +230,143 @@ var zeroPointStatuses = map[string]bool{
 	"DSQ": true, "DNF": true, "DNS": true, "DEFERRED": true,
 }
 
-// ResolvePoints maps a finishing position to points under event rules.
-// DSQ/DNF/DNS/DEFERRED and out-of-range positions resolve to 0.
-// Handles position reduction penalties PEN (POS-x) and points reduction penalties PEN (PTS-x).
+type RaceResultItem struct {
+	UserID       string
+	Position     *int
+	ResultStatus string
+}
+
+type ActiveFinisher struct {
+	UserID      string
+	PosNum      int
+	TargetPos   int
+	PenaltyType string
+	PenaltyAmt  int
+	BasePoints  int
+}
+
+// ResolveRacePoints calculates the effective points awarded to each participant in a race.
+// It handles position reduction penalties PEN (POS-x), points reduction penalties PEN (PTS-x),
+// terminal penalties (DSQ/DNF/DNS/DEFERRED), and re-ranks active finishers so promoted
+// participants get the correct position points.
+func ResolveRacePoints(scoringRulesMode string, customScoringTables any, grade string, items []*RaceResultItem) map[string]int {
+	pointsMap := make(map[string]int)
+	if len(items) == 0 {
+		return pointsMap
+	}
+
+	getPointsForPos := func(p int) int {
+		if p < 1 || p > 10 || !validGrade(grade) {
+			return 0
+		}
+		table := GetActiveScoringTable(scoringRulesMode, customScoringTables, grade)
+		if table == nil {
+			return 0
+		}
+		return table.Points[p]
+	}
+
+	var activeFinishers []ActiveFinisher
+
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		statusUpper := strings.ToUpper(strings.TrimSpace(item.ResultStatus))
+		if zeroPointStatuses[statusUpper] {
+			pointsMap[item.UserID] = 0
+			continue
+		}
+
+		if item.Position == nil || *item.Position < 1 {
+			pointsMap[item.UserID] = 0
+			continue
+		}
+
+		posNum := *item.Position
+		basePts := getPointsForPos(posNum)
+
+		if strings.HasPrefix(statusUpper, "PEN (POS-") && strings.HasSuffix(statusUpper, ")") {
+			numStr := strings.TrimSuffix(strings.TrimPrefix(statusUpper, "PEN (POS-"), ")")
+			penalty, err := strconv.Atoi(strings.TrimSpace(numStr))
+			if err != nil || penalty < 0 {
+				penalty = 0
+			}
+			targetPos := posNum + penalty
+			activeFinishers = append(activeFinishers, ActiveFinisher{
+				UserID:      item.UserID,
+				PosNum:      posNum,
+				TargetPos:   targetPos,
+				PenaltyType: "POS",
+				PenaltyAmt:  penalty,
+				BasePoints:  basePts,
+			})
+		} else if strings.HasPrefix(statusUpper, "PEN (PTS-") && strings.HasSuffix(statusUpper, ")") {
+			numStr := strings.TrimSuffix(strings.TrimPrefix(statusUpper, "PEN (PTS-"), ")")
+			penalty, err := strconv.Atoi(strings.TrimSpace(numStr))
+			if err != nil || penalty < 0 {
+				penalty = 0
+			}
+			activeFinishers = append(activeFinishers, ActiveFinisher{
+				UserID:      item.UserID,
+				PosNum:      posNum,
+				TargetPos:   posNum,
+				PenaltyType: "PTS",
+				PenaltyAmt:  penalty,
+				BasePoints:  basePts,
+			})
+		} else {
+			activeFinishers = append(activeFinishers, ActiveFinisher{
+				UserID:      item.UserID,
+				PosNum:      posNum,
+				TargetPos:   posNum,
+				PenaltyType: "NONE",
+				PenaltyAmt:  0,
+				BasePoints:  basePts,
+			})
+		}
+	}
+
+	// Sort active finishers by TargetPos ascending.
+	// Tie-breaker: finisher with larger PosNum (unpenalized/less-penalized) ranks ahead.
+	sort.SliceStable(activeFinishers, func(i, j int) bool {
+		if activeFinishers[i].TargetPos != activeFinishers[j].TargetPos {
+			return activeFinishers[i].TargetPos < activeFinishers[j].TargetPos
+		}
+		return activeFinishers[i].PosNum > activeFinishers[j].PosNum
+	})
+
+	// Assign sequential 1-based effective positions and compute awarded points.
+	for idx, finisher := range activeFinishers {
+		effectivePos := idx + 1
+		if finisher.PenaltyType == "POS" {
+			if finisher.TargetPos > effectivePos {
+				effectivePos = finisher.TargetPos
+			}
+		}
+
+		awardedPts := getPointsForPos(effectivePos)
+		if finisher.PenaltyType == "PTS" {
+			pts := awardedPts - finisher.PenaltyAmt
+			if pts < 0 {
+				pts = 0
+			}
+			awardedPts = pts
+		}
+
+		pointsMap[finisher.UserID] = awardedPts
+	}
+
+	return pointsMap
+}
+
+// ResolvePoints maps a single finishing position to points under event rules.
 func ResolvePoints(scoringRulesMode string, customScoringTables any, grade string, position *int, resultStatus string) int {
-	statusUpper := strings.ToUpper(strings.TrimSpace(resultStatus))
-	if zeroPointStatuses[statusUpper] {
-		return 0
+	item := &RaceResultItem{
+		UserID:       "single",
+		Position:     position,
+		ResultStatus: resultStatus,
 	}
-
-	if statusUpper == "" {
-		if position == nil || *position < 1 || *position > 10 {
-			return 0
-		}
-		table := GetActiveScoringTable(scoringRulesMode, customScoringTables, grade)
-		if table == nil {
-			return 0
-		}
-		return table.Points[*position]
-	}
-
-	// Handle Placement Position Reduction Penalty: PEN (POS-x)
-	if strings.HasPrefix(statusUpper, "PEN (POS-") && strings.HasSuffix(statusUpper, ")") {
-		numStr := strings.TrimSuffix(strings.TrimPrefix(statusUpper, "PEN (POS-"), ")")
-		penalty, err := strconv.Atoi(strings.TrimSpace(numStr))
-		if err != nil || penalty < 0 {
-			penalty = 0
-		}
-		if position == nil || *position < 1 {
-			return 0
-		}
-		effectivePos := *position + penalty
-		if effectivePos > 10 {
-			return 0
-		}
-		table := GetActiveScoringTable(scoringRulesMode, customScoringTables, grade)
-		if table == nil {
-			return 0
-		}
-		return table.Points[effectivePos]
-	}
-
-	// Handle Points Reduction Penalty: PEN (PTS-x)
-	if strings.HasPrefix(statusUpper, "PEN (PTS-") && strings.HasSuffix(statusUpper, ")") {
-		numStr := strings.TrimSuffix(strings.TrimPrefix(statusUpper, "PEN (PTS-"), ")")
-		penalty, err := strconv.Atoi(strings.TrimSpace(numStr))
-		if err != nil || penalty < 0 {
-			penalty = 0
-		}
-		if position == nil || *position < 1 || *position > 10 {
-			return 0
-		}
-		table := GetActiveScoringTable(scoringRulesMode, customScoringTables, grade)
-		if table == nil {
-			return 0
-		}
-		basePts := table.Points[*position]
-		pts := basePts - penalty
-		if pts < 0 {
-			return 0
-		}
-		return pts
-	}
-
-	if position == nil || *position < 1 || *position > 10 {
-		return 0
-	}
-	table := GetActiveScoringTable(scoringRulesMode, customScoringTables, grade)
-	if table == nil {
-		return 0
-	}
-	return table.Points[*position]
+	res := ResolveRacePoints(scoringRulesMode, customScoringTables, grade, []*RaceResultItem{item})
+	return res["single"]
 }

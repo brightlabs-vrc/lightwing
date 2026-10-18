@@ -353,11 +353,22 @@ func AssignRaceResultCore(ctx context.Context, actor *auth.Actor, p *AssignRaceR
 	if err != nil {
 		return nil, err
 	}
+	if err := SyncRacePoints(ctx, p.EventID, p.RaceID); err != nil {
+		return nil, err
+	}
 	if err := ApplyAutoDeferralsForEvent(ctx, p.EventID, &p.RaceID); err != nil {
 		return nil, err
 	}
 	if err := submitCalcForUsers(ctx, p.EventID, []string{p.UserID}); err != nil {
 		return nil, err
+	}
+	updatedRows, err := ListResultsCore(ctx, p.RaceID)
+	if err == nil {
+		for _, ur := range updatedRows {
+			if ur.UserID == p.UserID {
+				return ur, nil
+			}
+		}
 	}
 	return toRaceResultView(result), nil
 }
@@ -399,6 +410,9 @@ func DeleteRaceResultCore(ctx context.Context, actor *auth.Actor, p *DeleteRaceR
 	}
 	if affected == 0 {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "result not found"}
+	}
+	if err := SyncRacePoints(ctx, p.EventID, p.RaceID); err != nil {
+		return nil, err
 	}
 	if err := ApplyAutoDeferralsForEvent(ctx, p.EventID, &p.RaceID); err != nil {
 		return nil, err
@@ -729,6 +743,59 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 			CreatedAt: now,
 		}); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// SyncRacePoints re-calculates effective points for all participants in a race
+// accounting for position demotion penalties and promotions.
+func SyncRacePoints(ctx context.Context, eventID, raceID string) error {
+	scoringType, mode, custom, err := eventScoringRules(ctx, eventID)
+	if err != nil || scoringType != ScoringPoints {
+		return nil
+	}
+	race, err := RequireRace(ctx, eventID, raceID)
+	if err != nil {
+		return err
+	}
+	grade := ""
+	if race.Grade.Valid {
+		grade = race.Grade.String
+	}
+	rows, err := q().ListRaceResults(ctx, raceID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	items := make([]*RaceResultItem, len(rows))
+	for i, r := range rows {
+		var pos *int
+		if r.Position.Valid {
+			p := int(r.Position.Int32)
+			pos = &p
+		}
+		status := ""
+		if r.ResultStatus.Valid {
+			status = r.ResultStatus.String
+		}
+		items[i] = &RaceResultItem{
+			UserID:       r.UserId,
+			Position:     pos,
+			ResultStatus: status,
+		}
+	}
+	pointsMap := ResolveRacePoints(mode, custom, grade, items)
+	for _, r := range rows {
+		calculated := pointsMap[r.UserId]
+		if int(r.Points) != calculated {
+			if err := q().UpdateRaceResultPoints(ctx, sqlc.UpdateRaceResultPointsParams{
+				Points: int32(calculated), ID: r.ID,
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { inferFinishTimes, parseMarginToSeconds, parsePenaltyStatus, formatPenaltyStatus, computePenaltyResultDetails, type DerivedRow, type EditedResult, EMPTY_EDIT } from "./standings";
+import { inferFinishTimes, parseMarginToSeconds, parsePenaltyStatus, formatPenaltyStatus, computePenaltyResultDetails, computeRaceEffectiveResults, type DerivedRow, type EditedResult, EMPTY_EDIT } from "./standings";
 
 function makeMockRow(
   userId: string,
@@ -370,6 +370,32 @@ describe("parsePenaltyStatus & formatPenaltyStatus & computePenaltyResultDetails
     expect(formatPenaltyStatus("DNS")).toBe("DNS");
     expect(formatPenaltyStatus("POS", 3)).toBe("PEN (POS-3)");
     expect(formatPenaltyStatus("PTS", 5)).toBe("PEN (PTS-5)");
+  });
+
+  test("computes race effective results with promotion of P2 when P1 receives POS-1 penalty", () => {
+    // Scenario: P1 (Muzakii) receives PEN (POS-1), P2 (RealMegu) has no penalty.
+    // In GII: Pos 1 = 19 pts, Pos 2 = 15 pts, Pos 3 = 12 pts
+    const p1 = { userId: "muzakii", position: 1, resultStatus: "PEN (POS-1)" };
+    const p2 = { userId: "realmegu", position: 2, resultStatus: "" };
+    const p3 = { userId: "orfevrefan", position: 3, resultStatus: "" };
+
+    const map = computeRaceEffectiveResults([p1, p2, p3], "GII");
+
+    const p1Details = map.get(p1)!;
+    const p2Details = map.get(p2)!;
+    const p3Details = map.get(p3)!;
+
+    // RealMegu (originally P2) is promoted to P1 (effectivePosition 1, 19 awarded points)
+    expect(p2Details.effectivePosition).toBe(1);
+    expect(p2Details.awardedPoints).toBe(19);
+
+    // Muzakii (originally P1) is demoted to P2 (effectivePosition 2, 15 awarded points)
+    expect(p1Details.effectivePosition).toBe(2);
+    expect(p1Details.awardedPoints).toBe(15);
+
+    // Orfevrefan remains P3 (effectivePosition 3, 12 awarded points)
+    expect(p3Details.effectivePosition).toBe(3);
+    expect(p3Details.awardedPoints).toBe(12);
   });
 
   test("computes penalty result details for POS and PTS penalties", () => {
