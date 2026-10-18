@@ -330,26 +330,54 @@ func recomputeEventPoints(ctx context.Context, eventID string) error {
 	if err != nil {
 		return err
 	}
-	affected := map[string]bool{}
-	var stale []storedResultRow
+
+	// Group stored result rows by raceEventId
+	raceGroupMap := make(map[string][]sqlc.ListStoredResultRowsRow)
 	for _, sr := range rows {
-		r := storedResultRow{
-			ID: sr.ID, UserID: sr.UserId,
-			Position: sql.NullInt64{Int64: int64(sr.Position.Int32), Valid: sr.Position.Valid},
-			Points:   int(sr.Points), ResultStatus: sr.ResultStatus, Grade: sr.Grade,
-		}
-		calculated := resolveResultPoints(mode, custom, &r)
-		if r.Points != calculated {
-			stale = append(stale, r)
-		}
-		affected[r.UserID] = true
+		raceGroupMap[sr.RaceEventId] = append(raceGroupMap[sr.RaceEventId], sr)
 	}
-	for _, r := range stale {
-		calculated := resolveResultPoints(mode, custom, &r)
-		if err := q().UpdateRaceResultPoints(ctx, sqlc.UpdateRaceResultPointsParams{
-			Points: int32(calculated), ID: r.ID,
-		}); err != nil {
-			return err
+
+	affected := map[string]bool{}
+
+	for _, group := range raceGroupMap {
+		if len(group) == 0 {
+			continue
+		}
+		grade := ""
+		if group[0].Grade.Valid {
+			grade = group[0].Grade.String
+		}
+
+		items := make([]*RaceResultItem, len(group))
+		for i, sr := range group {
+			var pos *int
+			if sr.Position.Valid {
+				p := int(sr.Position.Int32)
+				pos = &p
+			}
+			status := ""
+			if sr.ResultStatus.Valid {
+				status = sr.ResultStatus.String
+			}
+			items[i] = &RaceResultItem{
+				UserID:       sr.UserId,
+				Position:     pos,
+				ResultStatus: status,
+			}
+		}
+
+		pointsMap := ResolveRacePoints(mode, custom, grade, items)
+
+		for _, sr := range group {
+			calculated := pointsMap[sr.UserId]
+			if int(sr.Points) != calculated {
+				if err := q().UpdateRaceResultPoints(ctx, sqlc.UpdateRaceResultPointsParams{
+					Points: int32(calculated), ID: sr.ID,
+				}); err != nil {
+					return err
+				}
+			}
+			affected[sr.UserId] = true
 		}
 	}
 	if len(affected) > 0 {

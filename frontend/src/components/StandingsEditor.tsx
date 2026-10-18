@@ -3,7 +3,7 @@ import type { eventmanager } from '../lib/client'
 import {
   parsePenaltyStatus,
   formatPenaltyStatus,
-  computePenaltyResultDetails,
+  computeRaceEffectiveResults,
   type PenaltyType,
   type ChangeSummary,
   type DerivedRow,
@@ -318,6 +318,19 @@ function StandingsTable({
   const isPixel = variant === 'pixel'
 
 
+  const rowItems = rows.map((r) => ({
+    userId: r.member.userId,
+    position: r.edit.position,
+    resultStatus: r.edit.resultStatus,
+  }))
+  const detailsMap = computeRaceEffectiveResults(
+    rowItems,
+    raceGrade,
+    scoringRulesMode,
+    customScoringTables
+  )
+  const userDetailsMap = new Map(rowItems.map((item) => [item.userId, detailsMap.get(item)!]))
+
   if (isPixel) {
     return (
       <div>
@@ -358,13 +371,7 @@ function StandingsTable({
                 const isModified = rowState === 'modified'
                 const isNew = rowState === 'new'
 
-                const details = computePenaltyResultDetails(
-                  edit.position,
-                  edit.resultStatus,
-                  raceGrade,
-                  scoringRulesMode,
-                  customScoringTables
-                )
+                const details = userDetailsMap.get(member.userId)!
 
                 return (
                   <tr
@@ -587,13 +594,7 @@ function StandingsTable({
               const isModified = rowState === 'modified'
               const isNew = rowState === 'new'
 
-              const details = computePenaltyResultDetails(
-                edit.position,
-                edit.resultStatus,
-                raceGrade,
-                scoringRulesMode,
-                customScoringTables
-              )
+                const details = userDetailsMap.get(member.userId)!
 
               return (
                 <tr

@@ -4,7 +4,7 @@ import { usePageHead } from '../../hooks/usePageHead'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import { formatLocalDateTime } from '../../lib/datetime'
-import { computePenaltyResultDetails } from '../../lib/standings'
+import { computeRaceEffectiveResults } from '../../lib/standings'
 import { MarkdownView } from '../../components/MarkdownView'
 import {
   PixelContainer,
@@ -516,7 +516,30 @@ function RaceStandingsTable({
     )
   }
 
-  const results = data.results
+  const rawResults = data.results
+  const detailsMap = computeRaceEffectiveResults(
+    rawResults,
+    raceGrade,
+    scoringRulesMode,
+    customScoringTables
+  )
+
+  const sortedResults = [...rawResults].sort((a, b) => {
+    const detailsA = detailsMap.get(a)
+    const detailsB = detailsMap.get(b)
+    const posA = detailsA?.effectivePosition
+    const posB = detailsB?.effectivePosition
+
+    if (posA !== null && posA !== undefined && posB !== null && posB !== undefined) {
+      return posA - posB
+    }
+    if (posA !== null && posA !== undefined) return -1
+    if (posB !== null && posB !== undefined) return 1
+
+    const physA = detailsA?.physicalPosition ?? 999
+    const physB = detailsB?.physicalPosition ?? 999
+    return physA - physB
+  })
 
   const columns: PixelTableColumn<eventmanager.RaceResultView>[] = [
     {
@@ -524,21 +547,15 @@ function RaceStandingsTable({
       header: 'POS',
       width: 75,
       render: (r) => {
-        const details = computePenaltyResultDetails(
-          r.position,
-          r.resultStatus,
-          raceGrade,
-          scoringRulesMode,
-          customScoringTables
-        )
-        if (details.penaltyType === 'POS' && details.effectivePosition !== null) {
+        const details = detailsMap.get(r)
+        if (details?.penaltyType === 'POS' && details.effectivePosition !== null) {
           return (
             <span className="font-pixel text-red-600 font-bold" title={`Original finish position: ${r.position}`}>
               {details.effectivePosition} <span className="text-[10px] text-retro-muted font-normal">({r.position})</span>
             </span>
           )
         }
-        return <span className="font-pixel">{r.position ?? '-'}</span>
+        return <span className="font-pixel">{details?.effectivePosition ?? r.position ?? '-'}</span>
       },
     },
     {
@@ -567,14 +584,8 @@ function RaceStandingsTable({
       align: 'right',
       width: 110,
       render: (r) => {
-        const details = computePenaltyResultDetails(
-          r.position,
-          r.resultStatus,
-          raceGrade,
-          scoringRulesMode,
-          customScoringTables
-        )
-        if (details.hasPenalty && details.basePoints > 0 && details.basePoints !== r.points) {
+        const details = detailsMap.get(r)
+        if (details?.hasPenalty && details.basePoints > 0 && details.basePoints !== r.points) {
           return (
             <div className="text-right">
               <span className="text-retro-primary font-bold">{r.points}</span>{' '}
@@ -634,7 +645,7 @@ function RaceStandingsTable({
     <div className="public-table">
       <PixelTable
         columns={columns}
-        data={results}
+        data={sortedResults}
         emptyState={
           <span className="font-pixel text-xs text-retro-muted">NO STANDINGS RECORDED</span>
         }

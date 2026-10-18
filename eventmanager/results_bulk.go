@@ -86,6 +86,9 @@ func ReplaceRaceResultsCore(ctx context.Context, actor *auth.Actor, p *BulkResul
 			return nil, err
 		}
 	}
+	if err := SyncRacePoints(ctx, p.EventID, p.RaceID); err != nil {
+		return nil, err
+	}
 	if err := ApplyAutoDeferralsForEvent(ctx, p.EventID, &p.RaceID); err != nil {
 		return nil, err
 	}
@@ -135,6 +138,9 @@ func MergeRaceResultsCore(ctx context.Context, actor *auth.Actor, p *BulkResults
 			return nil, err
 		}
 		affected = append(affected, entry.UserID)
+	}
+	if err := SyncRacePoints(ctx, p.EventID, p.RaceID); err != nil {
+		return nil, err
 	}
 	if err := ApplyAutoDeferralsForEvent(ctx, p.EventID, &p.RaceID); err != nil {
 		return nil, err

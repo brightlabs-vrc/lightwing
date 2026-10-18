@@ -373,7 +373,7 @@ UPDATE "race_result" SET "resultStatus" = NULL, points = $1 WHERE id = $2;
 
 -- Stored result rows for points recomputation.
 -- name: ListStoredResultRows :many
-SELECT res.id, res."userId", res.position, res.points, res."resultStatus", r.grade
+SELECT res.id, res."raceEventId", res."userId", res.position, res.points, res."resultStatus", r.grade
 FROM "race_result" res JOIN "race_event" r ON r.id = res."raceEventId"
 WHERE r."eventId" = $1;
 

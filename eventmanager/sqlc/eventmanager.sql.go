@@ -1953,13 +1953,14 @@ func (q *Queries) ListResultUserIDs(ctx context.Context, raceeventid string) ([]
 }
 
 const listStoredResultRows = `-- name: ListStoredResultRows :many
-SELECT res.id, res."userId", res.position, res.points, res."resultStatus", r.grade
+SELECT res.id, res."raceEventId", res."userId", res.position, res.points, res."resultStatus", r.grade
 FROM "race_result" res JOIN "race_event" r ON r.id = res."raceEventId"
 WHERE r."eventId" = $1
 `
 
 type ListStoredResultRowsRow struct {
 	ID           string
+	RaceEventId  string
 	UserId       string
 	Position     sql.NullInt32
 	Points       int32
@@ -1979,6 +1980,7 @@ func (q *Queries) ListStoredResultRows(ctx context.Context, eventid string) ([]L
 		var i ListStoredResultRowsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.RaceEventId,
 			&i.UserId,
 			&i.Position,
 			&i.Points,

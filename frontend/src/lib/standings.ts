@@ -313,35 +313,13 @@ export interface PenaltyResultDetails {
   hasPenalty: boolean
 }
 
-export function computePenaltyResultDetails(
-  positionVal: number | string | null | undefined,
-  resultStatusVal: string | null | undefined,
+export function computeRaceEffectiveResults<T extends { position?: number | string | null; resultStatus?: string | null }>(
+  items: T[],
   raceGrade?: string | null,
   scoringRulesMode?: string | null,
   customScoringTables?: any | null,
-): PenaltyResultDetails {
-  const penalty = parsePenaltyStatus(resultStatusVal || '')
-  let posNum: number | null = null
-  if (typeof positionVal === 'number') {
-    posNum = positionVal > 0 ? positionVal : null
-  } else if (typeof positionVal === 'string' && positionVal.trim() !== '') {
-    const parsed = parseInt(positionVal.trim(), 10)
-    if (!isNaN(parsed) && parsed > 0) {
-      posNum = parsed
-    }
-  }
-
-  if (!posNum) {
-    return {
-      physicalPosition: null,
-      effectivePosition: null,
-      basePoints: 0,
-      awardedPoints: 0,
-      penaltyType: penalty.type,
-      penaltyAmount: penalty.amount,
-      hasPenalty: penalty.type !== 'NONE',
-    }
-  }
+): Map<T, PenaltyResultDetails> {
+  const map = new Map<T, PenaltyResultDetails>()
 
   const getPointsForPos = (p: number): number => {
     if (p < 1 || p > 10 || !raceGrade) return 0
@@ -351,57 +329,128 @@ export function computePenaltyResultDetails(
     return DEFAULT_SCORING_TABLES[raceGrade]?.[p] ?? 0
   }
 
-  const basePoints = getPointsForPos(posNum)
+  type ActiveFinisher = {
+    item: T
+    posNum: number
+    targetPos: number
+    penalty: PenaltyInfo
+    basePoints: number
+  }
 
-  if (penalty.type === 'DSQ' || penalty.type === 'DNF' || penalty.type === 'DNS' || penalty.type === 'DEFERRED') {
-    return {
-      physicalPosition: posNum,
-      effectivePosition: null,
-      basePoints,
-      awardedPoints: 0,
-      penaltyType: penalty.type,
-      penaltyAmount: penalty.amount,
-      hasPenalty: true,
+  const terminalPositions = new Set<number>()
+  const activeFinishers: ActiveFinisher[] = []
+
+  for (const item of items) {
+    const penalty = parsePenaltyStatus(item.resultStatus || '')
+    let posNum: number | null = null
+    if (typeof item.position === 'number') {
+      posNum = item.position > 0 ? item.position : null
+    } else if (typeof item.position === 'string' && item.position.trim() !== '') {
+      const parsed = parseInt(item.position.trim(), 10)
+      if (!isNaN(parsed) && parsed > 0) {
+        posNum = parsed
+      }
+    }
+
+    const isTerminal = penalty.type === 'DSQ' || penalty.type === 'DNF' || penalty.type === 'DNS' || penalty.type === 'DEFERRED'
+
+    if (!posNum || isTerminal) {
+      if (posNum && isTerminal) {
+        terminalPositions.add(posNum)
+      }
+      const basePts = posNum ? getPointsForPos(posNum) : 0
+      map.set(item, {
+        physicalPosition: posNum,
+        effectivePosition: null,
+        basePoints: basePts,
+        awardedPoints: 0,
+        penaltyType: penalty.type,
+        penaltyAmount: penalty.amount,
+        hasPenalty: penalty.type !== 'NONE',
+      })
+    } else {
+      const basePts = getPointsForPos(posNum)
+      let targetPos = posNum
+      if (penalty.type === 'POS') {
+        const amt = penalty.amount && penalty.amount > 0 ? penalty.amount : 1
+        targetPos = posNum + amt
+      }
+      activeFinishers.push({
+        item,
+        posNum,
+        targetPos,
+        penalty,
+        basePoints: basePts,
+      })
     }
   }
 
-  if (penalty.type === 'POS') {
-    const amt = penalty.amount && penalty.amount > 0 ? penalty.amount : 1
-    const effectivePosition = posNum + amt
-    const awardedPoints = getPointsForPos(effectivePosition)
-    return {
-      physicalPosition: posNum,
-      effectivePosition,
-      basePoints,
+  // Sort active finishers by target position ascending.
+  // Tie-breaker: finisher with larger original physical position (unpenalized/less-penalized) ranks ahead.
+  activeFinishers.sort((a, b) => {
+    if (a.targetPos !== b.targetPos) {
+      return a.targetPos - b.targetPos
+    }
+    return b.posNum - a.posNum
+  })
+
+  let prevEffectivePos = 0
+
+  for (const finisher of activeFinishers) {
+    let numTerminalsAhead = 0
+    for (const termPos of terminalPositions) {
+      if (termPos < finisher.posNum) {
+        numTerminalsAhead++
+      }
+    }
+
+    let numDemotedPast = 0
+    for (const other of activeFinishers) {
+      if (other.posNum < finisher.posNum && other.targetPos >= finisher.posNum) {
+        numDemotedPast++
+      }
+    }
+
+    const promotions = numTerminalsAhead + numDemotedPast
+    let rawEffectivePos = finisher.posNum - promotions
+    if (finisher.penalty.type === 'POS') {
+      rawEffectivePos = Math.max(rawEffectivePos, finisher.targetPos)
+    }
+
+    const effectivePos = Math.max(rawEffectivePos, prevEffectivePos + 1)
+    prevEffectivePos = effectivePos
+
+    let awardedPoints = getPointsForPos(effectivePos)
+
+    if (finisher.penalty.type === 'PTS') {
+      const amt = finisher.penalty.amount && finisher.penalty.amount > 0 ? finisher.penalty.amount : 1
+      awardedPoints = Math.max(0, awardedPoints - amt)
+    }
+
+    map.set(finisher.item, {
+      physicalPosition: finisher.posNum,
+      effectivePosition: effectivePos,
+      basePoints: finisher.basePoints,
       awardedPoints,
-      penaltyType: penalty.type,
-      penaltyAmount: amt,
-      hasPenalty: true,
-    }
+      penaltyType: finisher.penalty.type,
+      penaltyAmount: finisher.penalty.amount,
+      hasPenalty: finisher.penalty.type !== 'NONE',
+    })
   }
 
-  if (penalty.type === 'PTS') {
-    const amt = penalty.amount && penalty.amount > 0 ? penalty.amount : 1
-    const awardedPoints = Math.max(0, basePoints - amt)
-    return {
-      physicalPosition: posNum,
-      effectivePosition: posNum,
-      basePoints,
-      awardedPoints,
-      penaltyType: penalty.type,
-      penaltyAmount: amt,
-      hasPenalty: true,
-    }
-  }
+  return map
+}
 
-  return {
-    physicalPosition: posNum,
-    effectivePosition: posNum,
-    basePoints,
-    awardedPoints: basePoints,
-    penaltyType: 'NONE',
-    hasPenalty: false,
-  }
+export function computePenaltyResultDetails(
+  positionVal: number | string | null | undefined,
+  resultStatusVal: string | null | undefined,
+  raceGrade?: string | null,
+  scoringRulesMode?: string | null,
+  customScoringTables?: any | null,
+): PenaltyResultDetails {
+  const item = { position: positionVal, resultStatus: resultStatusVal }
+  const resMap = computeRaceEffectiveResults([item], raceGrade, scoringRulesMode, customScoringTables)
+  return resMap.get(item)!
 }
 
 // Infer missing finish times from the leader's time and ordered per-position margins.
