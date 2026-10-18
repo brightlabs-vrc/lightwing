@@ -1,4 +1,5 @@
 import type { eventmanager } from './client'
+import { DEFAULT_SCORING_TABLES } from './scoringDefaults'
 
 export type EditedResult = {
   position: string
@@ -300,6 +301,107 @@ export function formatPenaltyStatus(type: PenaltyType, amount?: number): string 
     return `PEN (PTS-${amt})`
   }
   return ''
+}
+
+export interface PenaltyResultDetails {
+  physicalPosition: number | null
+  effectivePosition: number | null
+  basePoints: number
+  awardedPoints: number
+  penaltyType: PenaltyType
+  penaltyAmount?: number
+  hasPenalty: boolean
+}
+
+export function computePenaltyResultDetails(
+  positionVal: number | string | null | undefined,
+  resultStatusVal: string | null | undefined,
+  raceGrade?: string | null,
+  scoringRulesMode?: string | null,
+  customScoringTables?: any | null,
+): PenaltyResultDetails {
+  const penalty = parsePenaltyStatus(resultStatusVal || '')
+  let posNum: number | null = null
+  if (typeof positionVal === 'number') {
+    posNum = positionVal > 0 ? positionVal : null
+  } else if (typeof positionVal === 'string' && positionVal.trim() !== '') {
+    const parsed = parseInt(positionVal.trim(), 10)
+    if (!isNaN(parsed) && parsed > 0) {
+      posNum = parsed
+    }
+  }
+
+  if (!posNum) {
+    return {
+      physicalPosition: null,
+      effectivePosition: null,
+      basePoints: 0,
+      awardedPoints: 0,
+      penaltyType: penalty.type,
+      penaltyAmount: penalty.amount,
+      hasPenalty: penalty.type !== 'NONE',
+    }
+  }
+
+  const getPointsForPos = (p: number): number => {
+    if (p < 1 || p > 10 || !raceGrade) return 0
+    if (scoringRulesMode === 'CUSTOM' && customScoringTables && customScoringTables[raceGrade]) {
+      return customScoringTables[raceGrade][p] ?? 0
+    }
+    return DEFAULT_SCORING_TABLES[raceGrade]?.[p] ?? 0
+  }
+
+  const basePoints = getPointsForPos(posNum)
+
+  if (penalty.type === 'DSQ' || penalty.type === 'DNF' || penalty.type === 'DNS' || penalty.type === 'DEFERRED') {
+    return {
+      physicalPosition: posNum,
+      effectivePosition: null,
+      basePoints,
+      awardedPoints: 0,
+      penaltyType: penalty.type,
+      penaltyAmount: penalty.amount,
+      hasPenalty: true,
+    }
+  }
+
+  if (penalty.type === 'POS') {
+    const amt = penalty.amount && penalty.amount > 0 ? penalty.amount : 1
+    const effectivePosition = posNum + amt
+    const awardedPoints = getPointsForPos(effectivePosition)
+    return {
+      physicalPosition: posNum,
+      effectivePosition,
+      basePoints,
+      awardedPoints,
+      penaltyType: penalty.type,
+      penaltyAmount: amt,
+      hasPenalty: true,
+    }
+  }
+
+  if (penalty.type === 'PTS') {
+    const amt = penalty.amount && penalty.amount > 0 ? penalty.amount : 1
+    const awardedPoints = Math.max(0, basePoints - amt)
+    return {
+      physicalPosition: posNum,
+      effectivePosition: posNum,
+      basePoints,
+      awardedPoints,
+      penaltyType: penalty.type,
+      penaltyAmount: amt,
+      hasPenalty: true,
+    }
+  }
+
+  return {
+    physicalPosition: posNum,
+    effectivePosition: posNum,
+    basePoints,
+    awardedPoints: basePoints,
+    penaltyType: 'NONE',
+    hasPenalty: false,
+  }
 }
 
 // Infer missing finish times from the leader's time and ordered per-position margins.

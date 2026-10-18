@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { inferFinishTimes, parseMarginToSeconds, parsePenaltyStatus, formatPenaltyStatus, type DerivedRow, type EditedResult, EMPTY_EDIT } from "./standings";
+import { inferFinishTimes, parseMarginToSeconds, parsePenaltyStatus, formatPenaltyStatus, computePenaltyResultDetails, type DerivedRow, type EditedResult, EMPTY_EDIT } from "./standings";
 
 function makeMockRow(
   userId: string,
@@ -347,7 +347,7 @@ describe("inferFinishTimes", () => {
   });
 });
 
-describe("parsePenaltyStatus & formatPenaltyStatus", () => {
+describe("parsePenaltyStatus & formatPenaltyStatus & computePenaltyResultDetails", () => {
   test("parses standard and terminal penalty statuses", () => {
     expect(parsePenaltyStatus("")).toEqual({ type: "NONE" });
     expect(parsePenaltyStatus("dsq")).toEqual({ type: "DSQ" });
@@ -370,6 +370,41 @@ describe("parsePenaltyStatus & formatPenaltyStatus", () => {
     expect(formatPenaltyStatus("DNS")).toBe("DNS");
     expect(formatPenaltyStatus("POS", 3)).toBe("PEN (POS-3)");
     expect(formatPenaltyStatus("PTS", 5)).toBe("PEN (PTS-5)");
+  });
+
+  test("computes penalty result details for POS and PTS penalties", () => {
+    // In GII: Pos 1 = 19 pts, Pos 2 = 15 pts, Pos 3 = 12 pts
+    const posDetails = computePenaltyResultDetails(1, "PEN (POS-1)", "GII");
+    expect(posDetails).toEqual({
+      physicalPosition: 1,
+      effectivePosition: 2,
+      basePoints: 19,
+      awardedPoints: 15,
+      penaltyType: "POS",
+      penaltyAmount: 1,
+      hasPenalty: true,
+    });
+
+    const ptsDetails = computePenaltyResultDetails(1, "PEN (PTS-4)", "GII");
+    expect(ptsDetails).toEqual({
+      physicalPosition: 1,
+      effectivePosition: 1,
+      basePoints: 19,
+      awardedPoints: 15,
+      penaltyType: "PTS",
+      penaltyAmount: 4,
+      hasPenalty: true,
+    });
+
+    const normalDetails = computePenaltyResultDetails(1, "", "GII");
+    expect(normalDetails).toEqual({
+      physicalPosition: 1,
+      effectivePosition: 1,
+      basePoints: 19,
+      awardedPoints: 19,
+      penaltyType: "NONE",
+      hasPenalty: false,
+    });
   });
 });
 

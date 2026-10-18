@@ -88,7 +88,7 @@ const mockRaceResults = {
       margin: null,
       passingOrder: '2-2-1',
       final3F: '34.2',
-      resultStatus: null,
+      resultStatus: 'PEN (POS-1)',
       createdAt: now,
       updatedAt: now,
     },
