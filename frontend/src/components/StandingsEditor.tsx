@@ -3,6 +3,7 @@ import type { eventmanager } from '../lib/client'
 import {
   parsePenaltyStatus,
   formatPenaltyStatus,
+  computePenaltyResultDetails,
   type PenaltyType,
   type ChangeSummary,
   type DerivedRow,
@@ -316,41 +317,6 @@ function StandingsTable({
   const [penaltyTarget, setPenaltyTarget] = useState<{ userId: string; name: string; currentStatus: string } | null>(null)
   const isPixel = variant === 'pixel'
 
-  const getPreviewPoints = (positionStr: string, resultStatus: string): number => {
-    const statusUpper = (resultStatus || '').trim().toUpperCase()
-    if (statusUpper === 'DSQ' || statusUpper === 'DNF' || statusUpper === 'DNS' || statusUpper === 'DEFERRED') {
-      return 0
-    }
-    const position = parseInt(positionStr, 10)
-    if (isNaN(position) || position < 1 || position > 10) return 0
-    if (!raceGrade) return 0
-
-    let basePoints = 0
-    if (scoringRulesMode === 'CUSTOM' && customScoringTables && customScoringTables[raceGrade]) {
-      basePoints = customScoringTables[raceGrade][position] ?? 0
-    } else {
-      basePoints = DEFAULT_SCORING_TABLES[raceGrade]?.[position] ?? 0
-    }
-
-    if (statusUpper.startsWith('PEN (POS-') && statusUpper.endsWith(')')) {
-      const amtStr = statusUpper.slice('PEN (POS-'.length, -1).trim()
-      const amt = parseInt(amtStr, 10) || 0
-      const effectivePos = position + amt
-      if (effectivePos > 10) return 0
-      if (scoringRulesMode === 'CUSTOM' && customScoringTables && customScoringTables[raceGrade]) {
-        return customScoringTables[raceGrade][effectivePos] ?? 0
-      }
-      return DEFAULT_SCORING_TABLES[raceGrade]?.[effectivePos] ?? 0
-    }
-
-    if (statusUpper.startsWith('PEN (PTS-') && statusUpper.endsWith(')')) {
-      const amtStr = statusUpper.slice('PEN (PTS-'.length, -1).trim()
-      const amt = parseInt(amtStr, 10) || 0
-      return Math.max(0, basePoints - amt)
-    }
-
-    return basePoints
-  }
 
   if (isPixel) {
     return (
@@ -391,6 +357,14 @@ function StandingsTable({
                 const isDeleted = rowState === 'pending_delete'
                 const isModified = rowState === 'modified'
                 const isNew = rowState === 'new'
+
+                const details = computePenaltyResultDetails(
+                  edit.position,
+                  edit.resultStatus,
+                  raceGrade,
+                  scoringRulesMode,
+                  customScoringTables
+                )
 
                 return (
                   <tr
@@ -435,11 +409,21 @@ function StandingsTable({
                         onChange={(e) => onResultChange(member.userId, 'position', e.target.value)}
                         className="w-full px-1.5 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text text-center focus:outline-none focus:border-retro-primary disabled:opacity-50 standings-input-no-spinner"
                       />
+                      {details.penaltyType === 'POS' && details.effectivePosition !== null && (
+                        <div className="text-[10px] text-red-500 font-bold text-center mt-0.5" title={`Position demoted from ${details.physicalPosition} to ${details.effectivePosition}`}>
+                          Demoted: Pos {details.effectivePosition}
+                        </div>
+                      )}
                     </td>
                     <td className="px-2.5 py-1.5 align-middle text-center">
                       {scoringType === 1 ? (
                         <div className="font-bold text-retro-primary text-xs">
-                          {getPreviewPoints(edit.position, edit.resultStatus)} pts
+                          {details.awardedPoints} pts
+                          {details.hasPenalty && details.basePoints > 0 && details.basePoints !== details.awardedPoints && (
+                            <span className="text-retro-muted text-[10px] font-normal block" title={`Original base points: ${details.basePoints}`}>
+                              ({details.basePoints} orig)
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <input
@@ -603,6 +587,14 @@ function StandingsTable({
               const isModified = rowState === 'modified'
               const isNew = rowState === 'new'
 
+              const details = computePenaltyResultDetails(
+                edit.position,
+                edit.resultStatus,
+                raceGrade,
+                scoringRulesMode,
+                customScoringTables
+              )
+
               return (
                 <tr
                   key={member.userId}
@@ -657,11 +649,26 @@ function StandingsTable({
                         />
                       </div>
                     </div>
+                    {details.penaltyType === 'POS' && details.effectivePosition !== null && (
+                      <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: 'bold', textAlign: 'center', marginTop: '2px' }} title={`Position demoted from ${details.physicalPosition} to ${details.effectivePosition}`}>
+                        Demoted: Pos {details.effectivePosition}
+                      </div>
+                    )}
                   </td>
                   <td>
                     {scoringType === 1 ? (
                       <div style={{ fontWeight: 'bold', color: '#0176d3', fontSize: '13px', textAlign: 'center' }}>
-                        {getPreviewPoints(edit.position, edit.resultStatus)} pts <span style={{ fontSize: '9px', color: '#64748b', display: 'block' }}>(Auto)</span>
+                        {details.awardedPoints} pts
+                        {details.hasPenalty && details.basePoints > 0 && details.basePoints !== details.awardedPoints && (
+                          <span style={{ fontSize: '10px', color: '#64748b', display: 'block', fontWeight: 'normal' }}>
+                            ({details.basePoints} orig)
+                          </span>
+                        )}
+                        {!details.hasPenalty && (
+                          <span style={{ fontSize: '9px', color: '#64748b', display: 'block', fontWeight: 'normal' }}>
+                            (Auto)
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div className="slds-form-element">

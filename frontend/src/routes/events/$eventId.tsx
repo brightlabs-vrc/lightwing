@@ -4,6 +4,7 @@ import { usePageHead } from '../../hooks/usePageHead'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import { formatLocalDateTime } from '../../lib/datetime'
+import { computePenaltyResultDetails } from '../../lib/standings'
 import { MarkdownView } from '../../components/MarkdownView'
 import {
   PixelContainer,
@@ -483,10 +484,16 @@ function RaceStandingsTable({
   eventId,
   raceId,
   members,
+  raceGrade,
+  scoringRulesMode,
+  customScoringTables,
 }: {
   eventId: string
   raceId: string
   members: eventmanager.EventMemberView[]
+  raceGrade?: string | null
+  scoringRulesMode?: string | null
+  customScoringTables?: any | null
 }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-race-results', eventId, raceId],
@@ -515,8 +522,24 @@ function RaceStandingsTable({
     {
       key: 'position',
       header: 'POS',
-      width: 60,
-      render: (r) => <span className="font-pixel">{r.position ?? '-'}</span>,
+      width: 75,
+      render: (r) => {
+        const details = computePenaltyResultDetails(
+          r.position,
+          r.resultStatus,
+          raceGrade,
+          scoringRulesMode,
+          customScoringTables
+        )
+        if (details.penaltyType === 'POS' && details.effectivePosition !== null) {
+          return (
+            <span className="font-pixel text-red-600 font-bold" title={`Original finish position: ${r.position}`}>
+              {details.effectivePosition} <span className="text-[10px] text-retro-muted font-normal">({r.position})</span>
+            </span>
+          )
+        }
+        return <span className="font-pixel">{r.position ?? '-'}</span>
+      },
     },
     {
       key: 'gateNumber',
@@ -542,8 +565,27 @@ function RaceStandingsTable({
       key: 'points',
       header: 'POINTS',
       align: 'right',
-      width: 80,
-      render: (r) => <span className="text-retro-primary">{r.points}</span>,
+      width: 110,
+      render: (r) => {
+        const details = computePenaltyResultDetails(
+          r.position,
+          r.resultStatus,
+          raceGrade,
+          scoringRulesMode,
+          customScoringTables
+        )
+        if (details.hasPenalty && details.basePoints > 0 && details.basePoints !== r.points) {
+          return (
+            <div className="text-right">
+              <span className="text-retro-primary font-bold">{r.points}</span>{' '}
+              <span className="text-retro-muted text-[10px] font-normal" title={`Original base points: ${details.basePoints}`}>
+                ({details.basePoints})
+              </span>
+            </div>
+          )
+        }
+        return <span className="text-retro-primary font-bold">{r.points}</span>
+      },
     },
     {
       key: 'finishTime',
@@ -755,7 +797,14 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
             {/* Standings Table */}
             <div className="mt-2">
               <div className="font-pixel text-[11px] text-retro-text mb-2">RACE STANDINGS</div>
-              <RaceStandingsTable eventId={event.id} raceId={race.id} members={event.members} />
+              <RaceStandingsTable
+                eventId={event.id}
+                raceId={race.id}
+                members={event.members}
+                raceGrade={race.grade}
+                scoringRulesMode={event.scoringRulesMode}
+                customScoringTables={event.customScoringTables}
+              />
             </div>
           </PixelStack>
         </PixelCard>
