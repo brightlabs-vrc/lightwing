@@ -266,6 +266,7 @@ func ResolveRacePoints(scoringRulesMode string, customScoringTables any, grade s
 		return table.Points[p]
 	}
 
+	terminalPositions := make(map[int]bool)
 	var activeFinishers []ActiveFinisher
 
 	for _, item := range items {
@@ -274,6 +275,9 @@ func ResolveRacePoints(scoringRulesMode string, customScoringTables any, grade s
 		}
 		statusUpper := strings.ToUpper(strings.TrimSpace(item.ResultStatus))
 		if zeroPointStatuses[statusUpper] {
+			if item.Position != nil && *item.Position >= 1 {
+				terminalPositions[*item.Position] = true
+			}
 			pointsMap[item.UserID] = 0
 			continue
 		}
@@ -336,14 +340,36 @@ func ResolveRacePoints(scoringRulesMode string, customScoringTables any, grade s
 		return activeFinishers[i].PosNum > activeFinishers[j].PosNum
 	})
 
-	// Assign sequential 1-based effective positions and compute awarded points.
-	for idx, finisher := range activeFinishers {
-		effectivePos := idx + 1
-		if finisher.PenaltyType == "POS" {
-			if finisher.TargetPos > effectivePos {
-				effectivePos = finisher.TargetPos
+	prevEffectivePos := 0
+
+	for _, finisher := range activeFinishers {
+		numTerminalsAhead := 0
+		for termPos := range terminalPositions {
+			if termPos < finisher.PosNum {
+				numTerminalsAhead++
 			}
 		}
+
+		numDemotedPast := 0
+		for _, other := range activeFinishers {
+			if other.PosNum < finisher.PosNum && other.TargetPos >= finisher.PosNum {
+				numDemotedPast++
+			}
+		}
+
+		promotions := numTerminalsAhead + numDemotedPast
+		rawEffectivePos := finisher.PosNum - promotions
+		if finisher.PenaltyType == "POS" {
+			if finisher.TargetPos > rawEffectivePos {
+				rawEffectivePos = finisher.TargetPos
+			}
+		}
+
+		effectivePos := rawEffectivePos
+		if effectivePos < prevEffectivePos+1 {
+			effectivePos = prevEffectivePos + 1
+		}
+		prevEffectivePos = effectivePos
 
 		awardedPts := getPointsForPos(effectivePos)
 		if finisher.PenaltyType == "PTS" {

@@ -337,6 +337,7 @@ export function computeRaceEffectiveResults<T extends { position?: number | stri
     basePoints: number
   }
 
+  const terminalPositions = new Set<number>()
   const activeFinishers: ActiveFinisher[] = []
 
   for (const item of items) {
@@ -354,6 +355,9 @@ export function computeRaceEffectiveResults<T extends { position?: number | stri
     const isTerminal = penalty.type === 'DSQ' || penalty.type === 'DNF' || penalty.type === 'DNS' || penalty.type === 'DEFERRED'
 
     if (!posNum || isTerminal) {
+      if (posNum && isTerminal) {
+        terminalPositions.add(posNum)
+      }
       const basePts = posNum ? getPointsForPos(posNum) : 0
       map.set(item, {
         physicalPosition: posNum,
@@ -387,18 +391,34 @@ export function computeRaceEffectiveResults<T extends { position?: number | stri
     if (a.targetPos !== b.targetPos) {
       return a.targetPos - b.targetPos
     }
-    if (a.posNum !== b.posNum) {
-      return b.posNum - a.posNum
-    }
-    return 0
+    return b.posNum - a.posNum
   })
 
-  // Assign sequential 1-based effective positions and compute awarded points.
-  activeFinishers.forEach((finisher, idx) => {
-    let effectivePos = idx + 1
-    if (finisher.penalty.type === 'POS') {
-      effectivePos = Math.max(finisher.targetPos, effectivePos)
+  let prevEffectivePos = 0
+
+  for (const finisher of activeFinishers) {
+    let numTerminalsAhead = 0
+    for (const termPos of terminalPositions) {
+      if (termPos < finisher.posNum) {
+        numTerminalsAhead++
+      }
     }
+
+    let numDemotedPast = 0
+    for (const other of activeFinishers) {
+      if (other.posNum < finisher.posNum && other.targetPos >= finisher.posNum) {
+        numDemotedPast++
+      }
+    }
+
+    const promotions = numTerminalsAhead + numDemotedPast
+    let rawEffectivePos = finisher.posNum - promotions
+    if (finisher.penalty.type === 'POS') {
+      rawEffectivePos = Math.max(rawEffectivePos, finisher.targetPos)
+    }
+
+    const effectivePos = Math.max(rawEffectivePos, prevEffectivePos + 1)
+    prevEffectivePos = effectivePos
 
     let awardedPoints = getPointsForPos(effectivePos)
 
@@ -416,7 +436,7 @@ export function computeRaceEffectiveResults<T extends { position?: number | stri
       penaltyAmount: finisher.penalty.amount,
       hasPenalty: finisher.penalty.type !== 'NONE',
     })
-  })
+  }
 
   return map
 }
