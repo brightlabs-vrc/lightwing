@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"encore.dev"
 	"encore.dev/metrics"
 	"encore.dev/rlog"
 	"encore.dev/storage/cache"
@@ -75,8 +77,9 @@ type serviceSecrets struct {
 	// to. Framework secret first (the only way to set some vars in Encore
 	// Cloud), plain env as fallback, default for local dev.
 	FrontendBaseURL string
-	// SessionCookieSecret signs the session cookie. Empty in local dev yields
-	// an ephemeral key (sessions reset on restart) with a startup warning.
+	// SessionCookieSecret signs the session cookie. Required in production.
+	// Empty in non-production yields an ephemeral key (sessions reset on restart)
+	// with a startup warning.
 	SessionCookieSecret string
 	ephemeralCookieKey  bool
 }
@@ -88,6 +91,21 @@ func secretOrEnv(frameworkValue, envName string) string {
 	return os.Getenv(envName)
 }
 
+func isProduction() bool {
+	if encore.Meta().Environment.Type == encore.EnvProduction {
+		return true
+	}
+	env := strings.ToLower(os.Getenv("ENV"))
+	if env == "production" || env == "prod" {
+		return true
+	}
+	goEnv := strings.ToLower(os.Getenv("GO_ENV"))
+	if goEnv == "production" || goEnv == "prod" {
+		return true
+	}
+	return false
+}
+
 func loadSecrets() *serviceSecrets {
 	s := &serviceSecrets{
 		DiscordAuthClientID:     secretOrEnv(secrets.DISCORD_AUTH_CLIENT_ID, "DISCORD_AUTH_CLIENT_ID"),
@@ -97,6 +115,9 @@ func loadSecrets() *serviceSecrets {
 		SessionCookieSecret:     secretOrEnv(secrets.SESSION_COOKIE_SECRET, "SESSION_COOKIE_SECRET"),
 	}
 	if s.SessionCookieSecret == "" {
+		if isProduction() {
+			panic("SESSION_COOKIE_SECRET must be configured in production")
+		}
 		var b [32]byte
 		if _, err := rand.Read(b[:]); err != nil {
 			panic(fmt.Sprintf("failed to generate ephemeral cookie secret: %v", err))
