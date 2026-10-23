@@ -12,6 +12,15 @@ SELECT COALESCE(MAX(sequence), 0)::integer FROM "race_event" WHERE "eventId" = $
 -- name: UpdateRaceSequence :exec
 UPDATE "race_event" SET sequence = $1 WHERE id = $2;
 
+-- Batch update race event sequences (used by ReorderRaceEvents).
+-- name: UpdateRaceSequencesBatch :exec
+UPDATE "race_event" r
+SET sequence = batch.sequence
+FROM (
+    SELECT unnest($1::text[]) AS id, unnest($2::int[]) AS sequence
+) AS batch
+WHERE r.id = batch.id;
+
 -- Create race event row.
 -- name: InsertRaceEvent :exec
 INSERT INTO "race_event" (id, "eventId", name, sequence, "distanceMeters", "trackType",
