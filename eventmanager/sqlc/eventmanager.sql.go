@@ -2358,6 +2358,26 @@ func (q *Queries) UpdateRaceSequence(ctx context.Context, arg UpdateRaceSequence
 	return err
 }
 
+const updateRaceSequencesBatch = `-- name: UpdateRaceSequencesBatch :exec
+UPDATE "race_event" r
+SET sequence = batch.sequence
+FROM (
+    SELECT unnest($1::text[]) AS id, unnest($2::int[]) AS sequence
+) AS batch
+WHERE r.id = batch.id
+`
+
+type UpdateRaceSequencesBatchParams struct {
+	Column1 []string
+	Column2 []int32
+}
+
+// Batch update race event sequences (used by ReorderRaceEvents).
+func (q *Queries) UpdateRaceSequencesBatch(ctx context.Context, arg UpdateRaceSequencesBatchParams) error {
+	_, err := q.db.ExecContext(ctx, updateRaceSequencesBatch, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	return err
+}
+
 const updateUserClassTier = `-- name: UpdateUserClassTier :exec
 UPDATE "user" SET "classTier" = $1 WHERE id = $2
 `

@@ -345,10 +345,15 @@ func ReorderRaceEventsCore(ctx context.Context, actor *auth.Actor, p *ReorderRac
 		}
 		defer stx.Rollback()
 		qq := q().WithTx(stx)
-		for i, id := range p.OrderedRaceIDs {
-			if err := qq.UpdateRaceSequence(ctx, sqlc.UpdateRaceSequenceParams{Sequence: int32(i + 1), ID: id}); err != nil {
-				return nil, err
-			}
+		seqs32 := make([]int32, len(p.OrderedRaceIDs))
+		for i := range p.OrderedRaceIDs {
+			seqs32[i] = int32(i + 1)
+		}
+		if err := qq.UpdateRaceSequencesBatch(ctx, sqlc.UpdateRaceSequencesBatchParams{
+			Column1: p.OrderedRaceIDs,
+			Column2: seqs32,
+		}); err != nil {
+			return nil, err
 		}
 		if err := stx.Commit(); err != nil {
 			return nil, err
