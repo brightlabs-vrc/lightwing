@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	encoreauth "encore.dev/beta/auth"
-	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 )
 
 type SubmitOrgApplicationRequest struct {
@@ -416,10 +416,10 @@ func submitTeamApplication(ctx context.Context, actor *auth.Actor, p *SubmitTeam
 		})
 
 		_ = q().UpdateTeamStatus(ctx, sqlc.UpdateTeamStatusParams{
-			Status:            "PENDING",
+			Status:           "PENDING",
 			ReviewedByUserId: sql.NullString{},
-			ReviewedAt:        sql.NullTime{},
-			ID:                teamRow.ID,
+			ReviewedAt:       sql.NullTime{},
+			ID:               teamRow.ID,
 		})
 
 		invalidateTeamCache(ctx, teamRow.ID)
@@ -447,21 +447,37 @@ func submitTeamApplication(ctx context.Context, actor *auth.Actor, p *SubmitTeam
 
 	// Verify secondary orgs exist and are APPROVED
 	secOrgIDs := make([]string, 0)
+	candidateSet := make(map[string]bool)
+	candidates := make([]string, 0, len(p.SecondaryOrganizationIDs))
 	for _, secID := range p.SecondaryOrganizationIDs {
-		if secID == "" || secID == p.PrimaryOrganizationID {
+		if secID == "" || secID == p.PrimaryOrganizationID || candidateSet[secID] {
 			continue
 		}
-		sOrg, err := q().GetOrgByID(ctx, secID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, &errs.Error{Code: errs.NotFound, Message: fmt.Sprintf("secondary organization %s not found", secID)}
-		}
+		candidateSet[secID] = true
+		candidates = append(candidates, secID)
+	}
+
+	if len(candidates) > 0 {
+		orgRows, err := q().GetOrgsByIDs(ctx, candidates)
 		if err != nil {
 			return nil, err
 		}
-		if !sOrg.Status.Valid || sOrg.Status.String != "APPROVED" {
-			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: fmt.Sprintf("secondary organization %s must be approved", secID)}
+
+		orgMap := make(map[string]sqlc.GetOrgsByIDsRow, len(orgRows))
+		for _, row := range orgRows {
+			orgMap[row.ID] = row
 		}
-		secOrgIDs = append(secOrgIDs, secID)
+
+		for _, secID := range candidates {
+			sOrg, ok := orgMap[secID]
+			if !ok {
+				return nil, &errs.Error{Code: errs.NotFound, Message: fmt.Sprintf("secondary organization %s not found", secID)}
+			}
+			if !sOrg.Status.Valid || sOrg.Status.String != "APPROVED" {
+				return nil, &errs.Error{Code: errs.FailedPrecondition, Message: fmt.Sprintf("secondary organization %s must be approved", secID)}
+			}
+			secOrgIDs = append(secOrgIDs, secID)
+		}
 	}
 
 	slug := slugifyTeamName(p.Name)
@@ -630,10 +646,10 @@ func reviewApplication(ctx context.Context, actor *auth.Actor, p *ReviewApplicat
 			return &errs.Error{Code: errs.PermissionDenied, Message: "administrative access required for team applications"}
 		}
 		if err := q().UpdateTeamStatus(ctx, sqlc.UpdateTeamStatusParams{
-			Status:            status,
+			Status:           status,
 			ReviewedByUserId: sql.NullString{String: actor.UserID, Valid: true},
-			ReviewedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
-			ID:                p.ID,
+			ReviewedAt:       sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			ID:               p.ID,
 		}); err != nil {
 			return err
 		}

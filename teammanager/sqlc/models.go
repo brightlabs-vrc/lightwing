@@ -129,7 +129,6 @@ type Organization struct {
 	Name                  string
 	Slug                  string
 	Logo                  sql.NullString
-	Description           sql.NullString
 	Metadata              pqtype.NullRawMessage
 	CreatedAt             time.Time
 	UpdatedAt             sql.NullTime
@@ -142,6 +141,7 @@ type Organization struct {
 	DiscordInvite         sql.NullString
 	VrchatGroupId         sql.NullString
 	SubmittedByUserId     sql.NullString
+	Description           sql.NullString
 }
 
 type RaceEvent struct {
@@ -223,13 +223,13 @@ type Team struct {
 	Name              string
 	Slug              string
 	Logo              sql.NullString
-	Description       sql.NullString
 	Status            string
 	SubmittedByUserId sql.NullString
 	ReviewedByUserId  sql.NullString
 	ReviewedAt        sql.NullTime
 	CreatedAt         time.Time
 	UpdatedAt         sql.NullTime
+	Description       sql.NullString
 }
 
 type TeamMember struct {

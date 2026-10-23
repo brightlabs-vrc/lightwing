@@ -71,6 +71,29 @@ func (q *Queries) CheckTeamOrgLink(ctx context.Context, arg CheckTeamOrgLinkPara
 	return isPrimary, err
 }
 
+const countAdminOrgs = `-- name: CountAdminOrgs :one
+SELECT COUNT(*) FROM "organization"
+`
+
+func (q *Queries) CountAdminOrgs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAdminOrgs)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countAdminOrgsBySearch = `-- name: CountAdminOrgsBySearch :one
+SELECT COUNT(*) FROM "organization"
+WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%'
+`
+
+func (q *Queries) CountAdminOrgsBySearch(ctx context.Context, dollar_1 string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAdminOrgsBySearch, dollar_1)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countAdmins = `-- name: CountAdmins :one
 SELECT COUNT(*) FROM "member" WHERE "organizationId" = $1 AND role = $2
 `
@@ -213,57 +236,6 @@ func (q *Queries) CreateOrg(ctx context.Context, arg CreateOrgParams) (string, e
 	return id, err
 }
 
-const listMemberOrgsForUser = `-- name: ListMemberOrgsForUser :many
-SELECT DISTINCT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, m.role
-FROM "organization" o
-JOIN "member" m ON o.id = m."organizationId"
-WHERE m."userId" = $1
-ORDER BY o.name ASC
-`
-
-type ListMemberOrgsForUserRow struct {
-	ID          string
-	Name        string
-	Slug        string
-	Logo        sql.NullString
-	Description sql.NullString
-	OrgType     sql.NullString
-	Status      sql.NullString
-	Role        string
-}
-
-func (q *Queries) ListMemberOrgsForUser(ctx context.Context, userid string) ([]ListMemberOrgsForUserRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMemberOrgsForUser, userid)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListMemberOrgsForUserRow
-	for rows.Next() {
-		var i ListMemberOrgsForUserRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Slug,
-			&i.Logo,
-			&i.Description,
-			&i.OrgType,
-			&i.Status,
-			&i.Role,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const createOrgWithID = `-- name: CreateOrgWithID :one
 INSERT INTO "organization" (id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, $11) RETURNING id
@@ -344,6 +316,16 @@ func (q *Queries) DeleteMember(ctx context.Context, arg DeleteMemberParams) erro
 	return err
 }
 
+const deleteTeam = `-- name: DeleteTeam :exec
+DELETE FROM "team"
+WHERE id = $1
+`
+
+func (q *Queries) DeleteTeam(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteTeam, id)
+	return err
+}
+
 const deleteTeamMemberRow = `-- name: DeleteTeamMemberRow :exec
 DELETE FROM "teamMember" WHERE "teamId" = $1 AND "userId" = $2
 `
@@ -355,6 +337,16 @@ type DeleteTeamMemberRowParams struct {
 
 func (q *Queries) DeleteTeamMemberRow(ctx context.Context, arg DeleteTeamMemberRowParams) error {
 	_, err := q.db.ExecContext(ctx, deleteTeamMemberRow, arg.TeamId, arg.UserId)
+	return err
+}
+
+const deleteTeamMembersForTeam = `-- name: DeleteTeamMembersForTeam :exec
+DELETE FROM "teamMember"
+WHERE "teamId" = $1
+`
+
+func (q *Queries) DeleteTeamMembersForTeam(ctx context.Context, teamid string) error {
+	_, err := q.db.ExecContext(ctx, deleteTeamMembersForTeam, teamid)
 	return err
 }
 
@@ -378,200 +370,9 @@ DELETE FROM "teamOrganization"
 WHERE "teamId" = $1
 `
 
-func (q *Queries) DeleteTeamOrganizationsForTeam(ctx context.Context, teamId string) error {
-	_, err := q.db.ExecContext(ctx, deleteTeamOrganizationsForTeam, teamId)
+func (q *Queries) DeleteTeamOrganizationsForTeam(ctx context.Context, teamid string) error {
+	_, err := q.db.ExecContext(ctx, deleteTeamOrganizationsForTeam, teamid)
 	return err
-}
-
-const deleteTeamMembersForTeam = `-- name: DeleteTeamMembersForTeam :exec
-DELETE FROM "teamMember"
-WHERE "teamId" = $1
-`
-
-func (q *Queries) DeleteTeamMembersForTeam(ctx context.Context, teamId string) error {
-	_, err := q.db.ExecContext(ctx, deleteTeamMembersForTeam, teamId)
-	return err
-}
-
-const deleteTeam = `-- name: DeleteTeam :exec
-DELETE FROM "team"
-WHERE id = $1
-`
-
-func (q *Queries) DeleteTeam(ctx context.Context, id string) error {
-	_, err := q.db.ExecContext(ctx, deleteTeam, id)
-	return err
-}
-
-const updateOrgDetails = `-- name: UpdateOrgDetails :exec
-UPDATE "organization"
-SET "slug" = $1,
-    "updatedAt" = $2,
-    "name" = COALESCE($3, "name"),
-    "description" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "description") END,
-    "logo" = CASE WHEN $6::boolean THEN NULL ELSE COALESCE($7, "logo") END,
-    "discordInvite" = COALESCE($8, "discordInvite"),
-    "vrchatGroupId" = COALESCE($9, "vrchatGroupId")
-WHERE id = $10
-`
-
-type UpdateOrgDetailsParams struct {
-	Slug             string
-	UpdatedAt        sql.NullTime
-	Name             sql.NullString
-	ClearDescription bool
-	Description      sql.NullString
-	ClearLogo        bool
-	Logo             sql.NullString
-	DiscordInvite    sql.NullString
-	VrchatGroupId    sql.NullString
-	ID               string
-}
-
-func (q *Queries) UpdateOrgDetails(ctx context.Context, arg UpdateOrgDetailsParams) error {
-	_, err := q.db.ExecContext(ctx, updateOrgDetails,
-		arg.Slug,
-		arg.UpdatedAt,
-		arg.Name,
-		arg.ClearDescription,
-		arg.Description,
-		arg.ClearLogo,
-		arg.Logo,
-		arg.DiscordInvite,
-		arg.VrchatGroupId,
-		arg.ID,
-	)
-	return err
-}
-
-const countAdminOrgs = `-- name: CountAdminOrgs :one
-SELECT COUNT(*) FROM "organization"
-`
-
-func (q *Queries) CountAdminOrgs(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAdminOrgs)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countAdminOrgsBySearch = `-- name: CountAdminOrgsBySearch :one
-SELECT COUNT(*) FROM "organization"
-WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%'
-`
-
-func (q *Queries) CountAdminOrgsBySearch(ctx context.Context, search string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAdminOrgsBySearch, search)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-type AdminOrgRow struct {
-	ID                string
-	Name              string
-	Slug              string
-	Logo              sql.NullString
-	Description       sql.NullString
-	OrgType           sql.NullString
-	Status            sql.NullString
-	DiscordInvite     sql.NullString
-	VrchatGroupId     sql.NullString
-	SubmittedByUserId sql.NullString
-	CreatedAt         time.Time
-	UpdatedAt         sql.NullTime
-}
-
-const listAdminOrgs = `-- name: ListAdminOrgs :many
-SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
-FROM "organization"
-ORDER BY name ASC
-LIMIT NULLIF($1::int, 0) OFFSET $2
-`
-
-type ListAdminOrgsParams struct {
-	Limit  int32
-	Offset int32
-}
-
-func (q *Queries) ListAdminOrgs(ctx context.Context, arg ListAdminOrgsParams) ([]AdminOrgRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAdminOrgs, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []AdminOrgRow
-	for rows.Next() {
-		var i AdminOrgRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Slug,
-			&i.Logo,
-			&i.Description,
-			&i.OrgType,
-			&i.Status,
-			&i.DiscordInvite,
-			&i.VrchatGroupId,
-			&i.SubmittedByUserId,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAdminOrgsBySearch = `-- name: ListAdminOrgsBySearch :many
-SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
-FROM "organization"
-WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%'
-ORDER BY name ASC
-LIMIT NULLIF($2::int, 0) OFFSET $3
-`
-
-type ListAdminOrgsBySearchParams struct {
-	Search string
-	Limit  int32
-	Offset int32
-}
-
-func (q *Queries) ListAdminOrgsBySearch(ctx context.Context, arg ListAdminOrgsBySearchParams) ([]AdminOrgRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAdminOrgsBySearch, arg.Search, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []AdminOrgRow
-	for rows.Next() {
-		var i AdminOrgRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Slug,
-			&i.Logo,
-			&i.Description,
-			&i.OrgType,
-			&i.Status,
-			&i.DiscordInvite,
-			&i.VrchatGroupId,
-			&i.SubmittedByUserId,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getOrgByID = `-- name: GetOrgByID :one
@@ -672,6 +473,70 @@ func (q *Queries) GetOrgBySlug(ctx context.Context, slug string) (GetOrgBySlugRo
 	return i, err
 }
 
+const getOrgsByIDs = `-- name: GetOrgsByIDs :many
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
+FROM "organization" WHERE id = ANY($1::text[])
+`
+
+type GetOrgsByIDsRow struct {
+	ID                    string
+	Name                  string
+	Slug                  string
+	Logo                  sql.NullString
+	Description           sql.NullString
+	OrgType               sql.NullString
+	Status                sql.NullString
+	DiscordInvite         sql.NullString
+	VrchatGroupId         sql.NullString
+	SubmittedByUserId     sql.NullString
+	CreatedAt             time.Time
+	UpdatedAt             sql.NullTime
+	RankingAverage        sql.NullFloat64
+	PointsAverage         sql.NullFloat64
+	SeasonRank            sql.NullInt32
+	AveragePointsPerEvent sql.NullFloat64
+}
+
+func (q *Queries) GetOrgsByIDs(ctx context.Context, dollar_1 []string) ([]GetOrgsByIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getOrgsByIDs, pq.Array(dollar_1))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOrgsByIDsRow
+	for rows.Next() {
+		var i GetOrgsByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Logo,
+			&i.Description,
+			&i.OrgType,
+			&i.Status,
+			&i.DiscordInvite,
+			&i.VrchatGroupId,
+			&i.SubmittedByUserId,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RankingAverage,
+			&i.PointsAverage,
+			&i.SeasonRank,
+			&i.AveragePointsPerEvent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPrimaryOrgForTeam = `-- name: GetPrimaryOrgForTeam :one
 SELECT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status
 FROM "organization" o
@@ -709,9 +574,23 @@ SELECT id, name, slug, logo, description, status, "submittedByUserId", "reviewed
 FROM "team" WHERE id = $1
 `
 
-func (q *Queries) GetTeamByID(ctx context.Context, id string) (Team, error) {
+type GetTeamByIDRow struct {
+	ID                string
+	Name              string
+	Slug              string
+	Logo              sql.NullString
+	Description       sql.NullString
+	Status            string
+	SubmittedByUserId sql.NullString
+	ReviewedByUserId  sql.NullString
+	ReviewedAt        sql.NullTime
+	CreatedAt         time.Time
+	UpdatedAt         sql.NullTime
+}
+
+func (q *Queries) GetTeamByID(ctx context.Context, id string) (GetTeamByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getTeamByID, id)
-	var i Team
+	var i GetTeamByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -733,9 +612,23 @@ SELECT id, name, slug, logo, description, status, "submittedByUserId", "reviewed
 FROM "team" WHERE slug = $1
 `
 
-func (q *Queries) GetTeamBySlug(ctx context.Context, slug string) (Team, error) {
+type GetTeamBySlugRow struct {
+	ID                string
+	Name              string
+	Slug              string
+	Logo              sql.NullString
+	Description       sql.NullString
+	Status            string
+	SubmittedByUserId sql.NullString
+	ReviewedByUserId  sql.NullString
+	ReviewedAt        sql.NullTime
+	CreatedAt         time.Time
+	UpdatedAt         sql.NullTime
+}
+
+func (q *Queries) GetTeamBySlug(ctx context.Context, slug string) (GetTeamBySlugRow, error) {
 	row := q.db.QueryRowContext(ctx, getTeamBySlug, slug)
-	var i Team
+	var i GetTeamBySlugRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -804,6 +697,134 @@ func (q *Queries) InsertTeamOrganization(ctx context.Context, arg InsertTeamOrga
 	return err
 }
 
+const listAdminOrgs = `-- name: ListAdminOrgs :many
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+FROM "organization"
+ORDER BY name ASC
+LIMIT NULLIF($1::int, 0) OFFSET $2
+`
+
+type ListAdminOrgsParams struct {
+	Column1 int32
+	Offset  int32
+}
+
+type ListAdminOrgsRow struct {
+	ID                string
+	Name              string
+	Slug              string
+	Logo              sql.NullString
+	Description       sql.NullString
+	OrgType           sql.NullString
+	Status            sql.NullString
+	DiscordInvite     sql.NullString
+	VrchatGroupId     sql.NullString
+	SubmittedByUserId sql.NullString
+	CreatedAt         time.Time
+	UpdatedAt         sql.NullTime
+}
+
+func (q *Queries) ListAdminOrgs(ctx context.Context, arg ListAdminOrgsParams) ([]ListAdminOrgsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAdminOrgs, arg.Column1, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminOrgsRow
+	for rows.Next() {
+		var i ListAdminOrgsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Logo,
+			&i.Description,
+			&i.OrgType,
+			&i.Status,
+			&i.DiscordInvite,
+			&i.VrchatGroupId,
+			&i.SubmittedByUserId,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminOrgsBySearch = `-- name: ListAdminOrgsBySearch :many
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt"
+FROM "organization"
+WHERE name ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%'
+ORDER BY name ASC
+LIMIT NULLIF($2::int, 0) OFFSET $3
+`
+
+type ListAdminOrgsBySearchParams struct {
+	Column1 string
+	Column2 int32
+	Offset  int32
+}
+
+type ListAdminOrgsBySearchRow struct {
+	ID                string
+	Name              string
+	Slug              string
+	Logo              sql.NullString
+	Description       sql.NullString
+	OrgType           sql.NullString
+	Status            sql.NullString
+	DiscordInvite     sql.NullString
+	VrchatGroupId     sql.NullString
+	SubmittedByUserId sql.NullString
+	CreatedAt         time.Time
+	UpdatedAt         sql.NullTime
+}
+
+func (q *Queries) ListAdminOrgsBySearch(ctx context.Context, arg ListAdminOrgsBySearchParams) ([]ListAdminOrgsBySearchRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAdminOrgsBySearch, arg.Column1, arg.Column2, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminOrgsBySearchRow
+	for rows.Next() {
+		var i ListAdminOrgsBySearchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Logo,
+			&i.Description,
+			&i.OrgType,
+			&i.Status,
+			&i.DiscordInvite,
+			&i.VrchatGroupId,
+			&i.SubmittedByUserId,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listApprovedOrgs = `-- name: ListApprovedOrgs :many
 SELECT id, name, slug, logo, description, "orgType", status
 FROM "organization"
@@ -838,6 +859,57 @@ func (q *Queries) ListApprovedOrgs(ctx context.Context) ([]ListApprovedOrgsRow, 
 			&i.Description,
 			&i.OrgType,
 			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMemberOrgsForUser = `-- name: ListMemberOrgsForUser :many
+SELECT DISTINCT o.id, o.name, o.slug, o.logo, o.description, o."orgType", o.status, m.role
+FROM "organization" o
+JOIN "member" m ON o.id = m."organizationId"
+WHERE m."userId" = $1
+ORDER BY o.name ASC
+`
+
+type ListMemberOrgsForUserRow struct {
+	ID          string
+	Name        string
+	Slug        string
+	Logo        sql.NullString
+	Description sql.NullString
+	OrgType     sql.NullString
+	Status      sql.NullString
+	Role        string
+}
+
+func (q *Queries) ListMemberOrgsForUser(ctx context.Context, userid string) ([]ListMemberOrgsForUserRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMemberOrgsForUser, userid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMemberOrgsForUserRow
+	for rows.Next() {
+		var i ListMemberOrgsForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Logo,
+			&i.Description,
+			&i.OrgType,
+			&i.Status,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}
@@ -1610,6 +1682,47 @@ func (q *Queries) UpdateOrg(ctx context.Context, arg UpdateOrgParams) error {
 		arg.Description,
 		arg.ClearLogo,
 		arg.Logo,
+		arg.ID,
+	)
+	return err
+}
+
+const updateOrgDetails = `-- name: UpdateOrgDetails :exec
+UPDATE "organization"
+SET "slug" = $1,
+    "updatedAt" = $2,
+    "name" = COALESCE($3, "name"),
+    "description" = CASE WHEN $4::boolean THEN NULL ELSE COALESCE($5, "description") END,
+    "logo" = CASE WHEN $6::boolean THEN NULL ELSE COALESCE($7, "logo") END,
+    "discordInvite" = COALESCE($8, "discordInvite"),
+    "vrchatGroupId" = COALESCE($9, "vrchatGroupId")
+WHERE id = $10
+`
+
+type UpdateOrgDetailsParams struct {
+	Slug             string
+	UpdatedAt        sql.NullTime
+	Name             sql.NullString
+	ClearDescription bool
+	Description      sql.NullString
+	ClearLogo        bool
+	Logo             sql.NullString
+	DiscordInvite    sql.NullString
+	VrchatGroupID    sql.NullString
+	ID               string
+}
+
+func (q *Queries) UpdateOrgDetails(ctx context.Context, arg UpdateOrgDetailsParams) error {
+	_, err := q.db.ExecContext(ctx, updateOrgDetails,
+		arg.Slug,
+		arg.UpdatedAt,
+		arg.Name,
+		arg.ClearDescription,
+		arg.Description,
+		arg.ClearLogo,
+		arg.Logo,
+		arg.DiscordInvite,
+		arg.VrchatGroupID,
 		arg.ID,
 	)
 	return err

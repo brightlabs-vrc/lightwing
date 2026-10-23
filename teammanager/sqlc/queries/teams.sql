@@ -4,6 +4,10 @@
 SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
 FROM "organization" WHERE id = $1;
 
+-- name: GetOrgsByIDs :many
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
+FROM "organization" WHERE id = ANY($1::text[]);
+
 -- name: GetOrgBySlug :one
 SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
 FROM "organization" WHERE slug = $1;

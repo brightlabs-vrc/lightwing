@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
-	encoreauth "encore.dev/beta/auth"
-	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 )
 
 // --- getTeam (mirrors ts-legacy/teammanager/teams.ts getTeam) ---
