@@ -27,17 +27,17 @@ func TestMain(m *testing.M) {
 
 // fixtures tracks rows created by a test for ordered cleanup.
 type fixtures struct {
-	t      *testing.T
+	tb     testing.TB
 	ctx    context.Context
 	users  []string
 	tokens []string
 	events []string
 }
 
-func newFixtures(t *testing.T) *fixtures {
-	t.Helper()
-	f := &fixtures{t: t, ctx: context.Background()}
-	t.Cleanup(f.cleanup)
+func newFixtures(tb testing.TB) *fixtures {
+	tb.Helper()
+	f := &fixtures{tb: tb, ctx: context.Background()}
+	tb.Cleanup(f.cleanup)
 	return f
 }
 
@@ -66,7 +66,7 @@ func (f *fixtures) cleanup() {
 
 // createUser inserts a user with a unique id/email and returns its id.
 func (f *fixtures) createUser(prefix, name string, classTier *string, siteRole string) string {
-	f.t.Helper()
+	f.tb.Helper()
 	id := prefix + "-" + newID()[:8]
 	now := time.Now().UTC()
 	var tier any
@@ -78,7 +78,7 @@ func (f *fixtures) createUser(prefix, name string, classTier *string, siteRole s
 		 VALUES ($1, $2, $3, '', $4, NULL, $5, $6, $7, $7)`,
 		id, name, id+"@example.com", siteRole, "slug-"+id, tier, now)
 	if err != nil {
-		f.t.Fatalf("insert user: %v", err)
+		f.tb.Fatalf("insert user: %v", err)
 	}
 	f.users = append(f.users, id)
 	return id
@@ -86,7 +86,7 @@ func (f *fixtures) createUser(prefix, name string, classTier *string, siteRole s
 
 // createSession mints a Bearer *** for a user.
 func (f *fixtures) createSession(userID string) string {
-	f.t.Helper()
+	f.tb.Helper()
 	token := "token-" + newID()
 	now := time.Now().UTC()
 	_, err := db.Exec(f.ctx,
@@ -94,7 +94,7 @@ func (f *fixtures) createSession(userID string) string {
 		 VALUES (gen_random_uuid()::text, $1, $2, NULL, $3, $4, $4)`,
 		userID, token, now.Add(time.Hour), now)
 	if err != nil {
-		f.t.Fatalf("insert session: %v", err)
+		f.tb.Fatalf("insert session: %v", err)
 	}
 	f.tokens = append(f.tokens, token)
 	return "Bearer " + token
@@ -111,7 +111,7 @@ func testActor(userID, siteRole string) *auth.Actor {
 
 // createEventDirect inserts an event row without going through the API.
 func (f *fixtures) createEventDirect(ownerID, name, status string, restriction *string, granular bool) string {
-	f.t.Helper()
+	f.tb.Helper()
 	id := "event-" + newID()[:8]
 	now := time.Now().UTC()
 	var r any
@@ -132,7 +132,7 @@ func (f *fixtures) createEventDirect(ownerID, name, status string, restriction *
 		 VALUES ($1, $2, 'USER', $3, $4, $5, 1, $6, $7, $8, $8)`,
 		id, name, ownerID, st, tag, r, granular, now)
 	if err != nil {
-		f.t.Fatalf("insert event: %v", err)
+		f.tb.Fatalf("insert event: %v", err)
 	}
 	f.events = append(f.events, id)
 	return id
@@ -140,7 +140,7 @@ func (f *fixtures) createEventDirect(ownerID, name, status string, restriction *
 
 // createEventDirectWithLimit inserts an event row with a participant limit.
 func (f *fixtures) createEventDirectWithLimit(ownerID, name string, limit int) string {
-	f.t.Helper()
+	f.tb.Helper()
 	id := "event-" + newID()[:8]
 	now := time.Now().UTC()
 	_, err := db.Exec(f.ctx,
@@ -149,7 +149,7 @@ func (f *fixtures) createEventDirectWithLimit(ownerID, name string, limit int) s
 		 VALUES ($1, $2, 'USER', $3, 'PENDING', 'OFFICIAL', 1, $4, $5, $5)`,
 		id, name, ownerID, limit, now)
 	if err != nil {
-		f.t.Fatalf("insert event: %v", err)
+		f.tb.Fatalf("insert event: %v", err)
 	}
 	f.events = append(f.events, id)
 	return id
@@ -157,7 +157,7 @@ func (f *fixtures) createEventDirectWithLimit(ownerID, name string, limit int) s
 
 // createRace inserts a race_event row for an event.
 func (f *fixtures) createRace(eventID, name string) string {
-	f.t.Helper()
+	f.tb.Helper()
 	id := "race-" + newID()[:8]
 	now := time.Now().UTC()
 	_, err := db.Exec(f.ctx,
@@ -165,7 +165,7 @@ func (f *fixtures) createRace(eventID, name string) string {
 		 VALUES ($1, $2, $3, 1, 1200, 'Turf', 'Kyoto', $4, $4)`,
 		id, eventID, name, now)
 	if err != nil {
-		f.t.Fatalf("insert race: %v", err)
+		f.tb.Fatalf("insert race: %v", err)
 	}
 	return id
 }

@@ -2,6 +2,7 @@ package eventmanager
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -226,4 +227,37 @@ func Test_EligibleRacesDiscovery(t *testing.T) {
 
 func strEq(s *string, want string) bool {
 	return s != nil && *s == want
+}
+
+func Benchmark_ListEligibleEvents(b *testing.B) {
+	f := newFixtures(b)
+	ctx := context.Background()
+
+	admin := f.createUser("benchadmin", "Bench Admin", nil, "SITE_ADMIN")
+	adminActor := testActor(admin, "SITE_ADMIN")
+	user := f.createUser("benchuser", "Bench User", strptr("OP"), "USER")
+
+	numEvents := 50
+	for i := 0; i < numEvents; i++ {
+		eventID := f.createEventDirect(admin, "Bench Event "+strconv.Itoa(i), "UNOFFICIAL", strptr("OP"), false)
+		r1 := 1
+		_, _ = CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+			EventID: eventID, Name: "Race 1", Sequence: &r1,
+			DistanceMeters: 1000, TrackType: "Turf", Location: "Tokyo",
+		})
+		r2 := 2
+		_, _ = CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+			EventID: eventID, Name: "Race 2", Sequence: &r2,
+			DistanceMeters: 1200, TrackType: "Dirt", Location: "Kyoto",
+		})
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := ListEligibleEventsCore(ctx, &EligibleEventsQuery{UserID: user})
+		if err != nil {
+			b.Fatalf("ListEligibleEventsCore: %v", err)
+		}
+	}
 }

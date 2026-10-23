@@ -964,6 +964,50 @@ func (q *Queries) InsertRaceEventMember(ctx context.Context, arg InsertRaceEvent
 	return err
 }
 
+const listAllEligibleRaces = `-- name: ListAllEligibleRaces :many
+SELECT id, "eventId", name, sequence, grade, "classRestriction" FROM "race_event" ORDER BY "eventId" ASC, sequence ASC
+`
+
+type ListAllEligibleRacesRow struct {
+	ID               string
+	EventId          string
+	Name             string
+	Sequence         int32
+	Grade            sql.NullString
+	ClassRestriction interface{}
+}
+
+// Eligible races for all events (used by ListEligibleEvents).
+func (q *Queries) ListAllEligibleRaces(ctx context.Context) ([]ListAllEligibleRacesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllEligibleRaces)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllEligibleRacesRow
+	for rows.Next() {
+		var i ListAllEligibleRacesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventId,
+			&i.Name,
+			&i.Sequence,
+			&i.Grade,
+			&i.ClassRestriction,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAutoDeferralInputs = `-- name: ListAutoDeferralInputs :many
 SELECT res.id, res."raceEventId", r.grade, res."userId", res.position,
        res.points, res."resultStatus", u."classTier"

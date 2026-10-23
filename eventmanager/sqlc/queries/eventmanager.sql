@@ -471,6 +471,10 @@ SELECT id, name, "organizationId", "classRestriction" FROM "event" ORDER BY "cre
 -- name: ListEligibleRaces :many
 SELECT id, name, sequence, grade, "classRestriction" FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC;
 
+-- Eligible races for all events (used by ListEligibleEvents).
+-- name: ListAllEligibleRaces :many
+SELECT id, "eventId", name, sequence, grade, "classRestriction" FROM "race_event" ORDER BY "eventId" ASC, sequence ASC;
+
 -- Datasets scoped by event.
 -- name: ListDatasetsByEvent :many
 SELECT id, "eventId", source, rows, status, "importedAt", "createdAt", "updatedAt"
