@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"encore.dev/beta/errs"
-	"encore.dev/storage/cache"
 	"encore.app/auth"
 	"encore.app/shared"
 	"encore.app/teammanager/sqlc"
+	"encore.dev/beta/errs"
+	"encore.dev/storage/cache"
 )
 
 //encore:service
@@ -183,16 +183,16 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 		desc = &org.Description.String
 	}
 	return &Team{
-		ID:                          org.ID,
-		Name:                        org.Name,
-		Slug:                        org.Slug,
-		Logo:                        logo,
-		Description:                 desc,
-		Status:                      "APPROVED",
-		Organizations:               []LinkedOrganization{},
-		PrimaryOrganizationID:       org.ID,
-		IsOrganization:              true,
-		Stats:                       TeamStats{
+		ID:                    org.ID,
+		Name:                  org.Name,
+		Slug:                  org.Slug,
+		Logo:                  logo,
+		Description:           desc,
+		Status:                "APPROVED",
+		Organizations:         []LinkedOrganization{},
+		PrimaryOrganizationID: org.ID,
+		IsOrganization:        true,
+		Stats: TeamStats{
 			RankingAverage:        nullFloatToPtr(org.RankingAverage),
 			PointsAverage:         nullFloatToPtr(org.PointsAverage),
 			SeasonRank:            nullInt32ToPtr(org.SeasonRank),

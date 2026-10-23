@@ -624,6 +624,70 @@ func (q *Queries) GetOrgByID(ctx context.Context, id string) (GetOrgByIDRow, err
 	return i, err
 }
 
+const getOrgsByIDs = `-- name: GetOrgsByIDs :many
+SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
+FROM "organization" WHERE id = ANY($1::text[])
+`
+
+type GetOrgsByIDsRow struct {
+	ID                    string
+	Name                  string
+	Slug                  string
+	Logo                  sql.NullString
+	Description           sql.NullString
+	OrgType               sql.NullString
+	Status                sql.NullString
+	DiscordInvite         sql.NullString
+	VrchatGroupId         sql.NullString
+	SubmittedByUserId     sql.NullString
+	CreatedAt             time.Time
+	UpdatedAt             sql.NullTime
+	RankingAverage        sql.NullFloat64
+	PointsAverage         sql.NullFloat64
+	SeasonRank            sql.NullInt32
+	AveragePointsPerEvent sql.NullFloat64
+}
+
+func (q *Queries) GetOrgsByIDs(ctx context.Context, dollar_1 []string) ([]GetOrgsByIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getOrgsByIDs, pq.Array(dollar_1))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetOrgsByIDsRow
+	for rows.Next() {
+		var i GetOrgsByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Logo,
+			&i.Description,
+			&i.OrgType,
+			&i.Status,
+			&i.DiscordInvite,
+			&i.VrchatGroupId,
+			&i.SubmittedByUserId,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RankingAverage,
+			&i.PointsAverage,
+			&i.SeasonRank,
+			&i.AveragePointsPerEvent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getOrgBySlug = `-- name: GetOrgBySlug :one
 SELECT id, name, slug, logo, description, "orgType", status, "discordInvite", "vrchatGroupId", "submittedByUserId", "createdAt", "updatedAt", "rankingAverage", "pointsAverage", "seasonRank", "averagePointsPerEvent"
 FROM "organization" WHERE slug = $1

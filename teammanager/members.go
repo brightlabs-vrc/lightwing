@@ -6,10 +6,10 @@ import (
 	"errors"
 	"strings"
 
-	encoreauth "encore.dev/beta/auth"
-	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 )
 
 // --- listTeamMembers (mirrors listTeamMembers; publicly accessible) ---

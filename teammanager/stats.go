@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"errors"
 
-	encoreauth "encore.dev/beta/auth"
-	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 )
 
 // --- updateTeamStats (mirrors ts-legacy/teammanager/team-stats.ts) ---
