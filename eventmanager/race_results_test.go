@@ -527,11 +527,11 @@ func Test_DatasetCreateRejectsMissingEvent(t *testing.T) {
 
 // addEventMemberDirect inserts an event membership row without the API.
 func (f *fixtures) addEventMemberDirect(eventID, userID string) {
-	f.t.Helper()
+	f.tb.Helper()
 	if _, err := db.Exec(f.ctx,
 		`INSERT INTO "event_member" (id, "eventId", "userId") VALUES ($1,$2,$3)`,
 		"eventmember-"+newID()[:8], eventID, userID); err != nil {
-		f.t.Fatalf("insert event member: %v", err)
+		f.tb.Fatalf("insert event member: %v", err)
 	}
 }
 

@@ -150,6 +150,15 @@ func ListEligibleEventsCore(ctx context.Context, q *EligibleEventsQuery) (*Eligi
 			classRestr: nullStringFromAny(er.ClassRestriction),
 		})
 	}
+	rrows, err := sqlc.New(std()).ListAllEligibleRaces(ctx)
+	if err != nil {
+		return nil, err
+	}
+	racesByEvent := make(map[string][]sqlc.ListAllEligibleRacesRow, len(events))
+	for _, rr := range rrows {
+		racesByEvent[rr.EventId] = append(racesByEvent[rr.EventId], rr)
+	}
+
 	resp := &EligibleEventsResponse{Events: []*EligibleEvent{}}
 	for _, e := range events {
 		var eventRestr *ClassTier
@@ -158,12 +167,9 @@ func ListEligibleEventsCore(ctx context.Context, q *EligibleEventsQuery) (*Eligi
 			eventRestr = &t
 		}
 		eventEligible := IsEligible(tier, eventRestr)
-		rrows, err := sqlc.New(std()).ListEligibleRaces(ctx, e.id)
-		if err != nil {
-			return nil, err
-		}
+		rlist := racesByEvent[e.id]
 		eligibleRaces := []EligibleRace{}
-		for _, rr := range rrows {
+		for _, rr := range rlist {
 			rc := nullStringFromAny(rr.ClassRestriction)
 			effective := eventRestr
 			if rc.Valid {
