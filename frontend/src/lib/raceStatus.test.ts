@@ -21,7 +21,7 @@ const createRace = (startsAt: string | null, endsAt: string | null): eventmanage
     maxParticipants: 20,
     members: [],
     results: [],
-  }) as eventmanager.RaceEventDetail
+  }) as unknown as eventmanager.RaceEventDetail
 
 describe('raceStatus utility functions', () => {
   describe('isRaceOngoing', () => {
