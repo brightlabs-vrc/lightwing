@@ -7,12 +7,12 @@ import (
 	"errors"
 	"time"
 
-	encoreauth "encore.dev/beta/auth"
-	"encore.dev/beta/errs"
-	"encore.dev/cron"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/shared"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
+	"encore.dev/cron"
 
 	"github.com/sqlc-dev/pqtype"
 )
@@ -145,35 +145,35 @@ type RaceEventView struct {
 //
 // Mirrors ts-legacy/eventmanager/events.ts EventDetail.
 type EventDetail struct {
-	ID                              string             `json:"id"`
-	Name                            string             `json:"name"`
-	Description                     *string            `json:"description"`
-	OwnerType                       string             `json:"ownerType"`
-	OrganizationID                  *string            `json:"organizationId"`
-	OwnerUserID                     *string            `json:"ownerUserId"`
-	OwnerName                       *string            `json:"ownerName"`
-	OwnerSlug                       *string            `json:"ownerSlug,omitempty"`
-	OwnerLogo                       *string            `json:"ownerLogo,omitempty"`
-	Status                          string             `json:"status"`
-	Tag                             string             `json:"tag"`
-	DeletedAt                       *string            `json:"deletedAt,omitempty"`
-	ScoringType                     int                `json:"scoringType"`
-	ScoringTypeLabel                string             `json:"scoringTypeLabel"`
-	ScoringRulesMode                *string            `json:"scoringRulesMode"`
-	CustomScoringTables             json.RawMessage    `json:"customScoringTables"`
-	ClassRestriction                *string            `json:"classRestriction"`
-	GranularParticipation           bool               `json:"granularParticipation"`
-	SignupsLocked                   bool               `json:"signupsLocked"`
-	ScheduledAt                     *string            `json:"scheduledAt"`
-	ParticipantLimit                *int               `json:"participantLimit"`
-	MaxConcurrentRaceParticipations *int               `json:"maxConcurrentRaceParticipations"`
-	RaceEvents                      []RaceEventView    `json:"raceEvents"`
-	Members                         []EventMemberView  `json:"members"`
+	ID                              string              `json:"id"`
+	Name                            string              `json:"name"`
+	Description                     *string             `json:"description"`
+	OwnerType                       string              `json:"ownerType"`
+	OrganizationID                  *string             `json:"organizationId"`
+	OwnerUserID                     *string             `json:"ownerUserId"`
+	OwnerName                       *string             `json:"ownerName"`
+	OwnerSlug                       *string             `json:"ownerSlug,omitempty"`
+	OwnerLogo                       *string             `json:"ownerLogo,omitempty"`
+	Status                          string              `json:"status"`
+	Tag                             string              `json:"tag"`
+	DeletedAt                       *string             `json:"deletedAt,omitempty"`
+	ScoringType                     int                 `json:"scoringType"`
+	ScoringTypeLabel                string              `json:"scoringTypeLabel"`
+	ScoringRulesMode                *string             `json:"scoringRulesMode"`
+	CustomScoringTables             json.RawMessage     `json:"customScoringTables"`
+	ClassRestriction                *string             `json:"classRestriction"`
+	GranularParticipation           bool                `json:"granularParticipation"`
+	SignupsLocked                   bool                `json:"signupsLocked"`
+	ScheduledAt                     *string             `json:"scheduledAt"`
+	ParticipantLimit                *int                `json:"participantLimit"`
+	MaxConcurrentRaceParticipations *int                `json:"maxConcurrentRaceParticipations"`
+	RaceEvents                      []RaceEventView     `json:"raceEvents"`
+	Members                         []EventMemberView   `json:"members"`
 	Schedules                       []EventScheduleView `json:"schedules"`
-	PointsOverview                  []PointsEntryView  `json:"pointsOverview"`
-	LadderOverview                  []LadderEntryView  `json:"ladderOverview"`
-	CreatedAt                       string             `json:"createdAt"`
-	UpdatedAt                       string             `json:"updatedAt"`
+	PointsOverview                  []PointsEntryView   `json:"pointsOverview"`
+	LadderOverview                  []LadderEntryView   `json:"ladderOverview"`
+	CreatedAt                       string              `json:"createdAt"`
+	UpdatedAt                       string              `json:"updatedAt"`
 }
 
 // nullString converts sql.NullString to *string.
@@ -257,20 +257,20 @@ func toEventRow(r sqlc.GetEventRowRow) *eventRow {
 	}
 	return &eventRow{
 		ID: r.ID, Name: r.Name, Description: r.Description,
-		OwnerType: stringFromAny(r.OwnerType),
+		OwnerType:      stringFromAny(r.OwnerType),
 		OrganizationID: r.OrganizationId, OwnerUserID: r.OwnerUserId,
 		OwnerName: sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""},
 		OwnerSlug: sql.NullString{String: r.OwnerSlug, Valid: r.OwnerSlug != ""},
 		OwnerLogo: r.OwnerLogo,
-		Status: r.Status, Tag: r.Tag, DeletedAt: timePtrFromNull(r.DeletedAt),
+		Status:    r.Status, Tag: r.Tag, DeletedAt: timePtrFromNull(r.DeletedAt),
 		ScoringType: int(r.ScoringType), ScoringRulesMode: r.ScoringRulesMode,
-		CustomScoringTables: customTables,
-		ClassRestriction: nullStringFromAny(r.ClassRestriction),
+		CustomScoringTables:   customTables,
+		ClassRestriction:      nullStringFromAny(r.ClassRestriction),
 		GranularParticipation: r.GranularParticipation, SignupsLocked: r.SignupsLocked,
-		ScheduledAt: timePtrFromNull(r.ScheduledAt),
-		ParticipantLimit: sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
+		ScheduledAt:                     timePtrFromNull(r.ScheduledAt),
+		ParticipantLimit:                sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
 		MaxConcurrentRaceParticipations: sql.NullInt64{Int64: int64(r.MaxConcurrentRaceParticipations.Int32), Valid: r.MaxConcurrentRaceParticipations.Valid},
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		CreatedAt:                       r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
 
@@ -309,7 +309,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 			ID: rr.ID, Name: rr.Name, Sequence: int(rr.Sequence),
 			DistanceMeters: int(rr.DistanceMeters), TrackType: rr.TrackType, Location: rr.Location,
 			ScoringType: sql.NullInt64{Int64: int64(rr.ScoringType.Int16), Valid: rr.ScoringType.Valid},
-			Grade: rr.Grade, ClassRestriction: nullStringFromAny(rr.ClassRestriction),
+			Grade:       rr.Grade, ClassRestriction: nullStringFromAny(rr.ClassRestriction),
 			StartsAt: timePtrFromNull(rr.StartsAt), EndsAt: timePtrFromNull(rr.EndsAt),
 			ParticipantLimit: sql.NullInt64{Int64: int64(rr.ParticipantLimit.Int32), Valid: rr.ParticipantLimit.Valid},
 		})
@@ -429,15 +429,15 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		OwnerUserID: nullString(e.OwnerUserID), OwnerName: nullString(e.OwnerName),
 		OwnerSlug: nullString(e.OwnerSlug), OwnerLogo: nullString(e.OwnerLogo),
 		Status: e.Status, Tag: e.Tag,
-		DeletedAt: nullTime(e.DeletedAt),
+		DeletedAt:   nullTime(e.DeletedAt),
 		ScoringType: e.ScoringType, ScoringTypeLabel: scoringLabel(e.ScoringType),
 		ScoringRulesMode: nullString(e.ScoringRulesMode), CustomScoringTables: customTables,
-		ClassRestriction: classTierPtr(e.ClassRestriction),
+		ClassRestriction:      classTierPtr(e.ClassRestriction),
 		GranularParticipation: e.GranularParticipation, SignupsLocked: e.SignupsLocked,
-		ScheduledAt: nullTime(e.ScheduledAt),
-		ParticipantLimit: nullInt(e.ParticipantLimit),
+		ScheduledAt:                     nullTime(e.ScheduledAt),
+		ParticipantLimit:                nullInt(e.ParticipantLimit),
 		MaxConcurrentRaceParticipations: nullInt(e.MaxConcurrentRaceParticipations),
-		RaceEvents: raceViews, Members: memberViews, Schedules: schedules,
+		RaceEvents:                      raceViews, Members: memberViews, Schedules: schedules,
 		PointsOverview: pointsOverview, LadderOverview: ladderOverview,
 		CreatedAt: isoTime(e.CreatedAt), UpdatedAt: isoTime(e.UpdatedAt),
 	}, nil
@@ -547,6 +547,14 @@ func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventReque
 			customTables = v
 		} else {
 			mode = "STANDARD"
+			if len(p.CustomScoringTables) > 0 && string(p.CustomScoringTables) != "null" {
+				var v any
+				if err := json.Unmarshal(p.CustomScoringTables, &v); err == nil {
+					if _, err := ValidateCustomScoringTables(v); err == nil {
+						customTables = v
+					}
+				}
+			}
 		}
 		scoringRulesMode = &mode
 	}
@@ -699,20 +707,20 @@ type ListEventsResponse struct {
 func toListItem(r sqlc.ListEventsRow) EventListItem {
 	return EventListItem{
 		ID: r.ID, Name: r.Name, Description: nullString(r.Description),
-		OwnerType: stringFromAny(r.OwnerType),
+		OwnerType:      stringFromAny(r.OwnerType),
 		OrganizationID: nullString(r.OrganizationId),
-		OwnerUserID: nullString(r.OwnerUserId),
-		OwnerName: nullString(sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""}),
-		OwnerSlug: nullString(sql.NullString{String: r.OwnerSlug, Valid: r.OwnerSlug != ""}),
-		OwnerLogo: nullString(r.OwnerLogo),
-		Status: r.Status, Tag: r.Tag, DeletedAt: nullTime(timePtrFromNull(r.DeletedAt)),
+		OwnerUserID:    nullString(r.OwnerUserId),
+		OwnerName:      nullString(sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""}),
+		OwnerSlug:      nullString(sql.NullString{String: r.OwnerSlug, Valid: r.OwnerSlug != ""}),
+		OwnerLogo:      nullString(r.OwnerLogo),
+		Status:         r.Status, Tag: r.Tag, DeletedAt: nullTime(timePtrFromNull(r.DeletedAt)),
 		ScoringType: int(r.ScoringType), ScoringTypeLabel: scoringLabel(int(r.ScoringType)),
-		ClassRestriction: classTierPtr(nullStringFromAny(r.ClassRestriction)),
+		ClassRestriction:      classTierPtr(nullStringFromAny(r.ClassRestriction)),
 		GranularParticipation: r.GranularParticipation, SignupsLocked: r.SignupsLocked,
-		ScheduledAt: nullTime(timePtrFromNull(r.ScheduledAt)),
-		ParticipantLimit: nullInt(sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid}),
+		ScheduledAt:                     nullTime(timePtrFromNull(r.ScheduledAt)),
+		ParticipantLimit:                nullInt(sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid}),
 		MaxConcurrentRaceParticipations: nullInt(sql.NullInt64{Int64: int64(r.MaxConcurrentRaceParticipations.Int32), Valid: r.MaxConcurrentRaceParticipations.Valid}),
-		RaceCount: int(r.Count), MemberCount: int(r.Count_2),
+		RaceCount:                       int(r.Count), MemberCount: int(r.Count_2),
 		CreatedAt: isoTime(r.CreatedAt), UpdatedAt: isoTime(r.UpdatedAt),
 	}
 }
@@ -728,7 +736,7 @@ func toPublicListItem(r sqlc.ListPublicEventsRow) sqlc.ListEventsRow {
 		GranularParticipation: r.GranularParticipation, SignupsLocked: r.SignupsLocked,
 		ScheduledAt: r.ScheduledAt, ParticipantLimit: r.ParticipantLimit,
 		MaxConcurrentRaceParticipations: r.MaxConcurrentRaceParticipations,
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		CreatedAt:                       r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Count: r.Count, Count_2: r.Count_2,
 		OwnerName: r.OwnerName, OwnerSlug: r.OwnerSlug, OwnerLogo: r.OwnerLogo,
 	}

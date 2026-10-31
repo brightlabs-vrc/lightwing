@@ -7,11 +7,11 @@ import (
 	"errors"
 	"time"
 
-	encoreauth "encore.dev/beta/auth"
-	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/scorecalc"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 
 	"github.com/sqlc-dev/pqtype"
 )
@@ -148,33 +148,36 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 				}
 				updatedCustomTables = tables
 			} else {
-				clearCustomTables = true
+				if len(p.CustomScoringTables) > 0 && string(p.CustomScoringTables) != "null" {
+					var v any
+					if err := json.Unmarshal(p.CustomScoringTables, &v); err != nil {
+						return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables must be an object"}
+					}
+					if _, err := ValidateCustomScoringTables(v); err != nil {
+						return nil, err
+					}
+					updatedCustomTables = p.CustomScoringTables
+				} else {
+					clearCustomTables = true
+				}
 			}
 			updatedScoringRulesMode = &mode
 			if !existing.ScoringRulesMode.Valid || existing.ScoringRulesMode.String != mode {
 				triggerRecomputation = true
 			}
 		}
-		if len(p.CustomScoringTables) > 0 {
-			effectiveMode := ""
-			if updatedScoringRulesMode != nil {
-				effectiveMode = *updatedScoringRulesMode
-			} else if existing.ScoringRulesMode.Valid {
-				effectiveMode = existing.ScoringRulesMode.String
+		if len(p.CustomScoringTables) > 0 && updatedCustomTables == nil && !clearCustomTables {
+			var v any
+			if err := json.Unmarshal(p.CustomScoringTables, &v); err != nil {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables must be an object"}
 			}
-			if effectiveMode == "CUSTOM" {
-				var v any
-				if err := json.Unmarshal(p.CustomScoringTables, &v); err != nil {
-					return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables must be an object"}
-				}
-				if _, err := ValidateCustomScoringTables(v); err != nil {
-					return nil, err
-				}
-				updatedCustomTables = p.CustomScoringTables
-				clearCustomTables = false
-				if !jsonEqual(existing.CustomScoringTables, updatedCustomTables) {
-					triggerRecomputation = true
-				}
+			if _, err := ValidateCustomScoringTables(v); err != nil {
+				return nil, err
+			}
+			updatedCustomTables = p.CustomScoringTables
+			clearCustomTables = false
+			if !jsonEqual(existing.CustomScoringTables, updatedCustomTables) {
+				triggerRecomputation = true
 			}
 		}
 	}
@@ -263,6 +266,9 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 
 	if triggerRecomputation {
 		if err := recomputeEventPoints(ctx, p.ID); err != nil {
+			return nil, err
+		}
+		if err := ApplyAutoDeferralsForEvent(ctx, p.ID, nil); err != nil {
 			return nil, err
 		}
 	}

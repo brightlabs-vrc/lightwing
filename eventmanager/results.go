@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"time"
 
-	encoreauth "encore.dev/beta/auth"
-	"encore.dev/beta/errs"
-	"encore.dev/storage/cache"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/scorecalc"
 	"encore.app/shared"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
+	"encore.dev/storage/cache"
 )
 
 type userRaceRecordsCacheKey struct {
@@ -136,8 +136,8 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 func newRaceResultRow(id, raceEventID, userID string, position sql.NullInt32, points int32, gateNumber sql.NullInt16, finishTime, margin, passingOrder, final3F, resultStatus sql.NullString, createdAt, updatedAt time.Time) *raceResultRow {
 	return &raceResultRow{
 		ID: id, RaceEventID: raceEventID, UserID: userID,
-		Position: sql.NullInt64{Int64: int64(position.Int32), Valid: position.Valid},
-		Points:   int(points),
+		Position:   sql.NullInt64{Int64: int64(position.Int32), Valid: position.Valid},
+		Points:     int(points),
 		GateNumber: sql.NullInt64{Int64: int64(gateNumber.Int16), Valid: gateNumber.Valid},
 		FinishTime: finishTime, Margin: margin, PassingOrder: passingOrder,
 		Final3F: final3F, ResultStatus: resultStatus,
@@ -230,12 +230,12 @@ func upsertRaceResult(ctx context.Context, raceID string, entry *RaceResultInput
 	upserted, err := q().UpsertRaceResult(ctx, sqlc.UpsertRaceResultParams{
 		ID: id, RaceEventId: raceID, UserId: entry.UserID, Position: position,
 		Points: int32(points), GateNumber: gateNumber,
-		FinishTime: nullStringFromPtr(entry.FinishTime),
-		Margin:     nullStringFromPtr(entry.Margin),
+		FinishTime:   nullStringFromPtr(entry.FinishTime),
+		Margin:       nullStringFromPtr(entry.Margin),
 		PassingOrder: nullStringFromPtr(entry.PassingOrder),
 		Final3F:      nullStringFromPtr(entry.Final3F),
 		ResultStatus: nullStringFromPtr(entry.ResultStatus),
-		CreatedAt: now,
+		CreatedAt:    now,
 	})
 	if err != nil {
 		return nil, err
@@ -461,19 +461,19 @@ func ListRaceResults(ctx context.Context, q *RaceResultsQuery) (*RaceResultsResp
 
 // UserRaceRecordView represents a single race result entry in a user's career records.
 type UserRaceRecordView struct {
-	ResultID        string  `json:"resultId"`
-	Position        *int    `json:"position"`
-	Points          int     `json:"points"`
-	FinishTime      *string `json:"finishTime"`
-	ResultStatus    *string `json:"resultStatus"`
-	ResultCreatedAt string  `json:"resultCreatedAt"`
-	RaceID          string  `json:"raceId"`
-	RaceName        string  `json:"raceName"`
-	RaceSequence    int     `json:"raceSequence"`
-	RaceGrade       *string `json:"raceGrade"`
-	EventID         string  `json:"eventId"`
-	EventName       string  `json:"eventName"`
-	EventTag        string  `json:"eventTag"`
+	ResultID         string  `json:"resultId"`
+	Position         *int    `json:"position"`
+	Points           int     `json:"points"`
+	FinishTime       *string `json:"finishTime"`
+	ResultStatus     *string `json:"resultStatus"`
+	ResultCreatedAt  string  `json:"resultCreatedAt"`
+	RaceID           string  `json:"raceId"`
+	RaceName         string  `json:"raceName"`
+	RaceSequence     int     `json:"raceSequence"`
+	RaceGrade        *string `json:"raceGrade"`
+	EventID          string  `json:"eventId"`
+	EventName        string  `json:"eventName"`
+	EventTag         string  `json:"eventTag"`
 	EventScheduledAt *string `json:"eventScheduledAt"`
 }
 
@@ -514,19 +514,19 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 	records := make([]UserRaceRecordView, 0, len(rows))
 	for _, r := range rows {
 		records = append(records, UserRaceRecordView{
-			ResultID:        r.ResultId,
-			Position:        nullInt(sql.NullInt64{Int64: int64(r.Position.Int32), Valid: r.Position.Valid}),
-			Points:          int(r.Points),
-			FinishTime:      nullString(r.FinishTime),
-			ResultStatus:    nullString(r.ResultStatus),
-			ResultCreatedAt: isoTime(r.ResultCreatedAt),
-			RaceID:          r.RaceId,
-			RaceName:        r.RaceName,
-			RaceSequence:    int(r.RaceSequence),
-			RaceGrade:       nullString(r.RaceGrade),
-			EventID:         r.EventId,
-			EventName:       r.EventName,
-			EventTag:        r.EventTag,
+			ResultID:         r.ResultId,
+			Position:         nullInt(sql.NullInt64{Int64: int64(r.Position.Int32), Valid: r.Position.Valid}),
+			Points:           int(r.Points),
+			FinishTime:       nullString(r.FinishTime),
+			ResultStatus:     nullString(r.ResultStatus),
+			ResultCreatedAt:  isoTime(r.ResultCreatedAt),
+			RaceID:           r.RaceId,
+			RaceName:         r.RaceName,
+			RaceSequence:     int(r.RaceSequence),
+			RaceGrade:        nullString(r.RaceGrade),
+			EventID:          r.EventId,
+			EventName:        r.EventName,
+			EventTag:         r.EventTag,
 			EventScheduledAt: nullTime(timePtrFromNull(r.EventScheduledAt)),
 		})
 	}
@@ -619,27 +619,38 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 	if err != nil {
 		return err
 	}
+	allOP := len(grows) > 0
 	for _, gr := range grows {
+		g := ""
 		if gr.Grade.Valid {
-			raceGrades[gr.ID] = gr.Grade.String
+			g = gr.Grade.String
+			raceGrades[gr.ID] = g
+		}
+		if g != string(RaceGradeOP) {
+			allOP = false
 		}
 		raceSeqs[gr.ID] = int(gr.Sequence)
 	}
 
+	// Under standard scoring, deferrals should not kick in if every race in the event is OP.
+	skipStandardDeferrals := mode != "CUSTOM" && allOP
+
 	// Qualification: 1st place in an auto-defer grade, ungraded, no terminal status.
 	// Find earliest (lowest race sequence) win for each user.
 	earliestWinSeq := map[string]int{}
-	for _, res := range results {
-		if !res.position.Valid || res.position.Int64 != 1 || isTerminal(res.resultStatus) {
-			continue
-		}
-		if !IsAutoDeferGrade(mode, custom, gradeStr(res.grade)) {
-			continue
-		}
-		if isUngraded(res.classTier) {
-			seq := raceSeqs[res.raceID]
-			if minSeq, ok := earliestWinSeq[res.userID]; !ok || seq < minSeq {
-				earliestWinSeq[res.userID] = seq
+	if !skipStandardDeferrals {
+		for _, res := range results {
+			if !res.position.Valid || res.position.Int64 != 1 || isTerminal(res.resultStatus) {
+				continue
+			}
+			if !IsAutoDeferGrade(mode, custom, gradeStr(res.grade)) {
+				continue
+			}
+			if isUngraded(res.classTier) {
+				seq := raceSeqs[res.raceID]
+				if minSeq, ok := earliestWinSeq[res.userID]; !ok || seq < minSeq {
+					earliestWinSeq[res.userID] = seq
+				}
 			}
 		}
 	}
