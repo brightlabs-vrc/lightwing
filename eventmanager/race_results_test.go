@@ -273,6 +273,143 @@ func Test_AutoDeferralOnOPWin(t *testing.T) {
 	}
 }
 
+func Test_StandardScoringNoDeferralIfAllRacesAreOP(t *testing.T) {
+	f := newFixtures(t)
+	ctx := context.Background()
+
+	admin := f.createUser("allopadmin", "All OP Admin", nil, "SITE_ADMIN")
+	adminActor := testActor(admin, "SITE_ADMIN")
+	u1 := f.createUser("allopuser", "Ungraded Competitor", nil, "USER")
+
+	eventID := f.createEventDirect(admin, "All OP Standard Scoring Event", "UNOFFICIAL", nil, false)
+	f.addEventMemberDirect(eventID, u1)
+
+	race1, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1 OP", Sequence: intptr(1),
+		DistanceMeters: 1200, TrackType: "Turf", Location: "Kyoto", Grade: strptr("OP"),
+	})
+	if err != nil {
+		t.Fatalf("create race1: %v", err)
+	}
+	race2, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 2 OP", Sequence: intptr(2),
+		DistanceMeters: 1400, TrackType: "Dirt", Location: "Hanshin", Grade: strptr("OP"),
+	})
+	if err != nil {
+		t.Fatalf("create race2: %v", err)
+	}
+
+	// Ungraded competitor wins Race 1 (OP)
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u1,
+		Position: intptr(1),
+	}); err != nil {
+		t.Fatalf("assign win race1: %v", err)
+	}
+
+	// In an all-OP event under standard scoring, Race 2 must NOT be auto-deferred!
+	r2, err := ListRaceResultsCore(ctx, &RaceResultsQuery{EventID: eventID, RaceID: race2.ID})
+	if err != nil {
+		t.Fatalf("list race2: %v", err)
+	}
+	u1r2 := findResult(r2.Results, u1)
+	if u1r2 != nil && u1r2.ResultStatus != nil && *u1r2.ResultStatus == "DEFERRED" {
+		t.Fatalf("race2 should NOT be auto-deferred when all races in the event are OP under standard scoring")
+	}
+
+	// Now add a non-OP race (GIII)
+	race3, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 3 GIII", Sequence: intptr(3),
+		DistanceMeters: 1600, TrackType: "Dirt", Location: "Tokyo", Grade: strptr("GIII"),
+	})
+	if err != nil {
+		t.Fatalf("create race3: %v", err)
+	}
+
+	// Re-applying or recording a result should now cause auto-deferral because the event is not all-OP
+	if err := ApplyAutoDeferralsForEvent(ctx, eventID, nil); err != nil {
+		t.Fatalf("ApplyAutoDeferralsForEvent: %v", err)
+	}
+
+	r2After, err := ListRaceResultsCore(ctx, &RaceResultsQuery{EventID: eventID, RaceID: race2.ID})
+	if err != nil {
+		t.Fatalf("list race2 after adding GIII: %v", err)
+	}
+	u1r2After := findResult(r2After.Results, u1)
+	if u1r2After == nil || u1r2After.ResultStatus == nil || *u1r2After.ResultStatus != "DEFERRED" {
+		t.Errorf("race2 status = %v, want DEFERRED once non-OP race is part of event", u1r2After)
+	}
+
+	r3After, err := ListRaceResultsCore(ctx, &RaceResultsQuery{EventID: eventID, RaceID: race3.ID})
+	if err != nil {
+		t.Fatalf("list race3: %v", err)
+	}
+	u1r3After := findResult(r3After.Results, u1)
+	if u1r3After == nil || u1r3After.ResultStatus == nil || *u1r3After.ResultStatus != "DEFERRED" {
+		t.Errorf("race3 status = %v, want DEFERRED once non-OP race is part of event", u1r3After)
+	}
+}
+
+func Test_StandardScoringOverrideAutoDeferral(t *testing.T) {
+	f := newFixtures(t)
+	ctx := context.Background()
+
+	admin := f.createUser("overrideadmin", "Override Admin", nil, "SITE_ADMIN")
+	adminActor := testActor(admin, "SITE_ADMIN")
+	u1 := f.createUser("overrideuser", "Ungraded Competitor", nil, "USER")
+
+	eventID := f.createEventDirect(admin, "Standard Scoring Override Event", "UNOFFICIAL", nil, false)
+	f.addEventMemberDirect(eventID, u1)
+
+	race1, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1 OP", Sequence: intptr(1),
+		DistanceMeters: 1200, TrackType: "Turf", Location: "Kyoto", Grade: strptr("OP"),
+	})
+	if err != nil {
+		t.Fatalf("create race1: %v", err)
+	}
+	race2, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 2 GIII", Sequence: intptr(2),
+		DistanceMeters: 1600, TrackType: "Dirt", Location: "Tokyo", Grade: strptr("GIII"),
+	})
+	if err != nil {
+		t.Fatalf("create race2: %v", err)
+	}
+
+	// Disable auto-deferral via custom tables override while in STANDARD mode
+	overrideConfig := `{"autoDeferEnabled":false,` +
+		`"OP":{"1":12,"2":10,"3":8,"4":7,"5":6,"6":5,"7":4,"8":3,"9":2,"10":1,"autoDefer":false},` +
+		`"GIII":{"1":15,"2":12,"3":10,"4":8,"5":6,"6":5,"7":4,"8":3,"9":2,"10":1,"autoDefer":false},` +
+		`"GII":{"1":19,"2":15,"3":12,"4":9,"5":8,"6":6,"7":5,"8":3,"9":2,"10":1,"autoDefer":false},` +
+		`"GI":{"1":25,"2":18,"3":15,"4":12,"5":10,"6":8,"7":6,"8":4,"9":2,"10":1,"autoDefer":false}}`
+
+	_, err = UpdateEventCore(ctx, adminActor, &UpdateEventRequest{
+		ID:                  eventID,
+		CustomScoringTables: []byte(overrideConfig),
+	})
+	if err != nil {
+		t.Fatalf("UpdateEventCore: %v", err)
+	}
+
+	// Ungraded competitor wins Race 1 (OP)
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u1,
+		Position: intptr(1),
+	}); err != nil {
+		t.Fatalf("assign win race1: %v", err)
+	}
+
+	// Race 2 should NOT be deferred because autoDeferEnabled is false
+	r2, err := ListRaceResultsCore(ctx, &RaceResultsQuery{EventID: eventID, RaceID: race2.ID})
+	if err != nil {
+		t.Fatalf("list race2: %v", err)
+	}
+	u1r2 := findResult(r2.Results, u1)
+	if u1r2 != nil && u1r2.ResultStatus != nil && *u1r2.ResultStatus == "DEFERRED" {
+		t.Fatalf("race2 should NOT be auto-deferred when auto-deferral is overridden in standard scoring")
+	}
+}
+
 func Test_AutoDeferralCustomTables(t *testing.T) {
 	f := newFixtures(t)
 	ctx := context.Background()
@@ -473,7 +610,7 @@ func Test_DatasetCreateListUpdate(t *testing.T) {
 
 	created, err := CreateDatasetCore(ctx, ownerActor, &CreateDatasetRequest{
 		EventID: eventID,
-		Source: "results_test.csv", Rows: 150, Status: strptr("PENDING"),
+		Source:  "results_test.csv", Rows: 150, Status: strptr("PENDING"),
 	})
 	if err != nil {
 		t.Fatalf("CreateDatasetCore: %v", err)
@@ -518,7 +655,7 @@ func Test_DatasetCreateRejectsMissingEvent(t *testing.T) {
 
 	_, err := CreateDatasetCore(ctx, userActor, &CreateDatasetRequest{
 		EventID: "non-existent-event",
-		Source: "test.csv", Rows: 10,
+		Source:  "test.csv", Rows: 10,
 	})
 	if errs.Code(err) != errs.NotFound {
 		t.Errorf("code = %v, want not_found (err: %v)", errs.Code(err), err)

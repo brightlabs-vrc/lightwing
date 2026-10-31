@@ -209,7 +209,7 @@ func IsAutoDeferGrade(scoringRulesMode string, customScoringTables any, grade st
 		return false
 	}
 	g := RaceGrade(grade)
-	if scoringRulesMode == "CUSTOM" && truthy(customScoringTables) {
+	if truthy(customScoringTables) {
 		if m := asCustomMap(customScoringTables); m != nil {
 			if enabled, ok := m["autoDeferEnabled"].(bool); ok && !enabled {
 				return false
