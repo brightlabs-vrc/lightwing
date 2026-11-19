@@ -1,7 +1,11 @@
 -- Race members for a race.
 -- name: ListRaceEventMembers :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
-FROM "race_event_member" m JOIN "user" u ON u.id = m."userId"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+FROM "race_event_member" m
+JOIN "race_event" r ON r.id = m."raceEventId"
+JOIN "event" e ON e.id = r."eventId"
+JOIN "user" u ON u.id = m."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
 WHERE m."raceEventId" = $1;
 
 -- Max sequence for a race event (used by CreateRaceEvent).
@@ -50,9 +54,17 @@ SELECT EXISTS(SELECT 1 FROM "event_member" WHERE "eventId"=$1 AND "userId"=$2);
 -- name: DeleteRaceEventMember :exec
 DELETE FROM "race_event_member" WHERE "raceEventId"=$1 AND "userId"=$2;
 
--- User class tier lookup (used by AddRaceEventMember, JoinRaceEvent).
--- name: GetUserClassTier :one
-SELECT "classTier" FROM "user" WHERE id = $1;
+-- Org-scoped user class tier lookup (used by AddRaceEventMember, JoinRaceEvent, AddEventMember, JoinEvent).
+-- name: GetOrgUserClassTier :one
+SELECT "classTier" FROM "org_class_tier" WHERE "organizationId" = $1 AND "userId" = $2;
+
+-- List all org-scoped class tiers for a user.
+-- name: ListUserOrgClassTiers :many
+SELECT oct."organizationId", o.name AS "organizationName", o.slug AS "organizationSlug", oct."classTier", oct."updatedAt"
+FROM "org_class_tier" oct
+JOIN "organization" o ON o.id = oct."organizationId"
+WHERE oct."userId" = $1
+ORDER BY o.name ASC;
 
 -- Race event member count for limit checks.
 -- name: GetRaceEventMemberCount :one
@@ -261,16 +273,21 @@ FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC;
 
 -- Race members of an event with display names (used by LoadEvent).
 -- name: ListRaceMembersByEvent :many
-SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
+SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
 FROM "race_event_member" m
 JOIN "race_event" r ON r.id = m."raceEventId"
+JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = m."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
 WHERE r."eventId" = $1;
 
 -- Event members with display names (used by LoadEvent).
 -- name: ListEventMembersByEvent :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
-FROM "event_member" m JOIN "user" u ON u.id = m."userId"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+FROM "event_member" m
+JOIN "event" e ON e.id = m."eventId"
+JOIN "user" u ON u.id = m."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
 WHERE m."eventId" = $1;
 
 -- Schedules of an event (used by LoadEvent).
@@ -340,10 +357,12 @@ DELETE FROM "race_result" WHERE "raceEventId" = $1 AND "userId" = $2;
 -- Auto-deferral source rows.
 -- name: ListAutoDeferralInputs :many
 SELECT res.id, res."raceEventId", r.grade, res."userId", res.position,
-       res.points, res."resultStatus", u."classTier"
+       res.points, res."resultStatus", oct."classTier"
 FROM "race_result" res
 JOIN "race_event" r ON r.id = res."raceEventId"
+JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = res."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = res."userId"
 WHERE r."eventId" = $1;
 
 -- Event member ids (used by ApplyAutoDeferrals).
@@ -468,9 +487,39 @@ UPDATE "event" SET status = $1, "deletedAt" = NULL WHERE id = $2;
 -- name: UserExists :one
 SELECT EXISTS(SELECT 1 FROM "user" WHERE id = $1);
 
--- User class tier assignment.
--- name: UpdateUserClassTier :exec
-UPDATE "user" SET "classTier" = $1 WHERE id = $2;
+-- Org-scoped user class tier assignment.
+-- name: UpsertOrgUserClassTier :exec
+INSERT INTO "org_class_tier" (id, "organizationId", "userId", "classTier", "updatedByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+ON CONFLICT ("organizationId", "userId") DO UPDATE SET
+  "classTier" = EXCLUDED."classTier",
+  "updatedByUserId" = EXCLUDED."updatedByUserId",
+  "updatedAt" = NOW();
+
+-- name: DeleteOrgUserClassTier :exec
+DELETE FROM "org_class_tier" WHERE "organizationId" = $1 AND "userId" = $2;
+
+-- name: ListOrgClassTiers :many
+SELECT
+  oct."userId",
+  COALESCE(u."vrchatUsername", u.name) AS name,
+  u.slug,
+  u.image,
+  oct."classTier",
+  oct."updatedAt"
+FROM "org_class_tier" oct
+JOIN "user" u ON u.id = oct."userId"
+WHERE oct."organizationId" = $1
+  AND ($2::text = '' OR u.name ILIKE $2 ESCAPE '\' OR u."vrchatUsername" ILIKE $2 ESCAPE '\' OR u.slug ILIKE $2 ESCAPE '\')
+ORDER BY oct."updatedAt" DESC
+LIMIT $3 OFFSET $4;
+
+-- name: CountOrgClassTiers :one
+SELECT COUNT(*)
+FROM "org_class_tier" oct
+JOIN "user" u ON u.id = oct."userId"
+WHERE oct."organizationId" = $1
+  AND ($2::text = '' OR u.name ILIKE $2 ESCAPE '\' OR u."vrchatUsername" ILIKE $2 ESCAPE '\' OR u.slug ILIKE $2 ESCAPE '\');
 
 -- Eligible events listing (used by ListEligibleEvents).
 -- name: ListEligibleEvents :many

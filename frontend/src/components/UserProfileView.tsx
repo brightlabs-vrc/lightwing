@@ -140,7 +140,33 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
         size="md"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4 mb-8">
+        <PixelCard className="bg-retro-surface text-center py-5">
+          <div className="font-pixel text-xs text-retro-muted mb-1 flex items-center justify-center gap-1.5">
+            <span>RATING</span>
+            <span
+              className="relative group inline-flex items-center justify-center w-4 h-4 rounded-full border border-retro-border text-[10px] text-retro-muted hover:text-retro-primary hover:border-retro-primary cursor-help"
+              tabIndex={0}
+              aria-label="We use Glicko-2 to calculate your rankings"
+              title="We use Glicko-2 to calculate your rankings"
+            >
+              ?
+              <span className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 w-56 p-2 rounded border-2 border-retro-border-strong bg-retro-bg text-retro-text font-sans text-xs font-normal text-left shadow-lg">
+                We use Glicko-2 to calculate your rankings.
+              </span>
+            </span>
+          </div>
+          <div className="font-pixel text-3xl text-retro-primary font-bold">
+            {stats ? stats.rating : 1500}
+          </div>
+          <div className="font-mono text-xs text-retro-muted mt-1">
+            ±{stats ? stats.ratingDeviation : 350} RD
+            {stats && stats.peakRating > 0 && (
+              <span className="ml-2 text-retro-gold">PEAK {stats.peakRating}</span>
+            )}
+          </div>
+        </PixelCard>
+
         <PixelCard className="bg-retro-surface text-center py-5">
           <div className="font-pixel text-xs text-retro-muted mb-1">TOTAL POINTS</div>
           <div className="font-pixel text-3xl text-retro-gold font-bold">
@@ -198,6 +224,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
                         <th className="p-3">GRADE</th>
                         <th className="p-3 text-center">POS / STATUS</th>
                         <th className="p-3 text-center">FINISH TIME</th>
+                        <th className="p-3 text-right">RATING Δ</th>
                         <th className="p-3 text-right">POINTS</th>
                       </tr>
                     </thead>
@@ -236,6 +263,26 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
                           </td>
                           <td className="p-3 text-center font-mono text-xs">
                             {r.finishTime || '—'}
+                          </td>
+                          <td className="p-3 text-right font-mono text-xs whitespace-nowrap">
+                            {r.ratingAfter != null ? (
+                              <span>
+                                <span className="text-retro-text font-semibold">{r.ratingAfter}</span>
+                                {r.ratingDelta != null && r.ratingDelta !== 0 && (
+                                  <span
+                                    className={
+                                      r.ratingDelta > 0
+                                        ? 'ml-1 text-retro-green font-bold'
+                                        : 'ml-1 text-retro-pink font-bold'
+                                    }
+                                  >
+                                    ({r.ratingDelta > 0 ? `+${r.ratingDelta}` : r.ratingDelta})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-retro-muted">—</span>
+                            )}
                           </td>
                           <td className="p-3 text-right font-pixel text-sm font-bold text-retro-gold">
                             {r.points}

@@ -203,17 +203,29 @@ func GetActiveScoringTable(scoringRulesMode string, customScoringTables any, gra
 	return &t
 }
 
-// IsAutoDeferGrade reports whether a grade auto-defers under an event config.
-func IsAutoDeferGrade(scoringRulesMode string, customScoringTables any, grade string) bool {
-	if !validGrade(grade) {
-		return false
-	}
-	g := RaceGrade(grade)
+// IsAutoDeferEnabled reports whether auto-deferral is enabled at the event level.
+func IsAutoDeferEnabled(scoringRulesMode string, customScoringTables any) bool {
 	if truthy(customScoringTables) {
 		if m := asCustomMap(customScoringTables); m != nil {
 			if enabled, ok := m["autoDeferEnabled"].(bool); ok && !enabled {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+// IsAutoDeferGrade reports whether a grade auto-defers under an event config.
+func IsAutoDeferGrade(scoringRulesMode string, customScoringTables any, grade string) bool {
+	if !validGrade(grade) {
+		return false
+	}
+	if !IsAutoDeferEnabled(scoringRulesMode, customScoringTables) {
+		return false
+	}
+	g := RaceGrade(grade)
+	if truthy(customScoringTables) {
+		if m := asCustomMap(customScoringTables); m != nil {
 			if gm, ok := m[string(g)].(map[string]any); ok {
 				if b, ok := gm["autoDefer"].(bool); ok {
 					return b

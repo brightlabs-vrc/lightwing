@@ -9,13 +9,16 @@ import {
   updateAdminTeamMemberRole,
   removeAdminTeamMember,
   listAdminTeamMembers,
+  listOrgClassGrades,
+  updateAdminUserClass,
 } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { UserSearchCombobox } from '../../../components/UserSearchCombobox'
 import { Pagination } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
-import type { teammanager } from '../../../lib/client'
+import type { eventmanager, teammanager } from '../../../lib/client'
+import type { ClassTier } from '../../../types'
 
 export const Route = createFileRoute('/admin/organizations/$orgId')({
   beforeLoad: async ({ location }) => {
@@ -38,6 +41,16 @@ function AdminOrgDetailPage() {
   const [memberPage, setMemberPage] = useState(1)
   const [memberPageSize, setMemberPageSize] = useState(10)
   const [memberSearch, setMemberSearch] = useState('')
+
+  // Org Class Grades state
+  const [classGrades, setClassGrades] = useState<eventmanager.OrgClassEntry[]>([])
+  const [totalClassGrades, setTotalClassGrades] = useState(0)
+  const [gradePage, setGradePage] = useState(1)
+  const [gradePageSize, setGradePageSize] = useState(10)
+  const [gradeSearch, setGradeSearch] = useState('')
+  const [newGradeUserId, setNewGradeUserId] = useState('')
+  const [newGradeTier, setNewGradeTier] = useState<ClassTier>('G3')
+  const [savingGrade, setSavingGrade] = useState(false)
 
   // Modals state
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false)
@@ -93,6 +106,33 @@ function AdminOrgDetailPage() {
     }
   }
 
+  async function fetchClassGrades() {
+    try {
+      const offset = (gradePage - 1) * gradePageSize
+      const response = await listOrgClassGrades(orgId, gradeSearch, gradePageSize, offset)
+      setClassGrades(response.entries)
+      setTotalClassGrades(response.total)
+    } catch (cause) {
+      console.error('Failed to load org class grades', cause)
+    }
+  }
+
+  async function handleAssignClassGrade(userId: string, tier: ClassTier | null) {
+    if (!authHeader || !userId) return
+    setSavingGrade(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await updateAdminUserClass(userId, orgId, tier, authHeader)
+      await fetchClassGrades()
+      setSuccess(tier ? 'Updated participant class grade.' : 'Cleared participant class grade.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update participant class grade.')
+    } finally {
+      setSavingGrade(false)
+    }
+  }
+
   useEffect(() => {
     void loadOrgData()
   }, [orgId, authHeader])
@@ -100,6 +140,10 @@ function AdminOrgDetailPage() {
   useEffect(() => {
     void fetchRoster()
   }, [orgId, memberPage, memberPageSize, memberSearch])
+
+  useEffect(() => {
+    void fetchClassGrades()
+  }, [orgId, gradePage, gradePageSize, gradeSearch])
 
   async function handleUpdateOrg(evt: React.FormEvent) {
     evt.preventDefault()
@@ -410,6 +454,137 @@ function AdminOrgDetailPage() {
                     Back to Organizations Directory
                   </Link>
                 </footer>
+              </article>
+
+              {/* Org Class Grades Card */}
+              <article className="slds-card slds-m-top_large" style={{ borderRadius: '4px', border: '1px solid #dddbda', background: '#ffffff' }}>
+                <div className="slds-card__header slds-grid" style={{ padding: '1rem', borderBottom: '1px solid #f3f2f1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <h2 className="slds-card__header-title" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                    <span>Participant Class Grades ({totalClassGrades})</span>
+                  </h2>
+                  <div style={{ width: '250px' }}>
+                    <input
+                      type="text"
+                      placeholder="Search participant or @username..."
+                      value={gradeSearch}
+                      onChange={(e) => {
+                        setGradeSearch(e.target.value)
+                        setGradePage(1)
+                      }}
+                      className="slds-input"
+                      style={{ padding: '4px 10px', fontSize: '13px' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.25rem' }}>
+                  <div className="slds-m-bottom_medium" style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 260px' }}>
+                      <label className="slds-form-element__label" style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        Assign Class Grade to Participant
+                      </label>
+                      <UserSearchCombobox
+                        value={newGradeUserId}
+                        onChange={setNewGradeUserId}
+                        placeholder="Search participant by name, @username or email..."
+                      />
+                    </div>
+                    <div>
+                      <select
+                        value={newGradeTier}
+                        onChange={(e) => setNewGradeTier(e.target.value as ClassTier)}
+                        className="slds-select"
+                        style={{ padding: '6px 10px' }}
+                      >
+                        <option value="G3">G3</option>
+                        <option value="G2">G2</option>
+                        <option value="G1">G1</option>
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!newGradeUserId || savingGrade}
+                      onClick={() => {
+                        if (!newGradeUserId) return
+                        void handleAssignClassGrade(newGradeUserId, newGradeTier)
+                        setNewGradeUserId('')
+                      }}
+                      className="slds-button slds-button_brand"
+                      style={{ padding: '5px 14px' }}
+                    >
+                      Assign Grade
+                    </button>
+                  </div>
+
+                  {classGrades.length > 0 ? (
+                    <>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="slds-table slds-table_cell-buffer slds-table_bordered">
+                          <thead>
+                            <tr className="slds-line-height_reset">
+                              <th scope="col">Participant</th>
+                              <th scope="col">Class Grade</th>
+                              <th scope="col" style={{ width: '100px' }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {classGrades.map((cg) => (
+                              <tr key={cg.userId}>
+                                <td>
+                                  <UserLink userId={cg.userId} name={cg.name} slug={cg.slug} />
+                                  {cg.slug && (
+                                    <div className="text-slate-500" style={{ fontSize: '11px' }}>
+                                      @{cg.slug}
+                                    </div>
+                                  )}
+                                </td>
+                                <td>
+                                  <select
+                                    value={cg.classTier || ''}
+                                    disabled={savingGrade}
+                                    onChange={(e) => {
+                                      const v = e.target.value as ClassTier | ''
+                                      void handleAssignClassGrade(cg.userId, v === '' ? null : v)
+                                    }}
+                                    className="slds-select"
+                                    style={{ padding: '4px 8px', maxWidth: '140px' }}
+                                  >
+                                    <option value="">OPEN (Clear)</option>
+                                    <option value="G3">G3</option>
+                                    <option value="G2">G2</option>
+                                    <option value="G1">G1</option>
+                                  </select>
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    disabled={savingGrade}
+                                    onClick={() => void handleAssignClassGrade(cg.userId, null)}
+                                    className="slds-button slds-button_destructive"
+                                    style={{ fontSize: '12px', padding: '2px 10px' }}
+                                  >
+                                    Clear
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <Pagination
+                        page={gradePage}
+                        pageSize={gradePageSize}
+                        total={totalClassGrades}
+                        onPageChange={setGradePage}
+                        onPageSizeChange={setGradePageSize}
+                      />
+                    </>
+                  ) : (
+                    <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
+                      <p>No organization-scoped class grades assigned yet.</p>
+                    </div>
+                  )}
+                </div>
               </article>
             </div>
           </>

@@ -27,6 +27,8 @@ import {
   updateAdminDatasetStatus,
   createRaceEvent,
   addEventMember,
+  listOrgClassGrades,
+  updateAdminUserClass,
 } from '../../lib/admin-api'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
 import { RaceMemberCombobox } from '../../components/RaceDetailPane'
@@ -96,6 +98,16 @@ function ManageOrgPage() {
   const [memberPage, setMemberPage] = useState(1)
   const [memberPageSize, setMemberPageSize] = useState(10)
   const [memberSearch, setMemberSearch] = useState('')
+
+  // Org Class Grades state
+  const [classGrades, setClassGrades] = useState<eventmanager.OrgClassEntry[]>([])
+  const [totalClassGrades, setTotalClassGrades] = useState(0)
+  const [gradePage, setGradePage] = useState(1)
+  const [gradePageSize, setGradePageSize] = useState(10)
+  const [gradeSearch, setGradeSearch] = useState('')
+  const [newGradeUserId, setNewGradeUserId] = useState('')
+  const [newGradeTier, setNewGradeTier] = useState<ClassTier>('G3')
+  const [savingGrade, setSavingGrade] = useState(false)
 
   // Events state
   const [events, setEvents] = useState<eventmanager.EventListItem[]>([])
@@ -214,6 +226,18 @@ function ManageOrgPage() {
     }
   }
 
+  async function fetchClassGrades() {
+    if (!isOrg) return
+    try {
+      const offset = (gradePage - 1) * gradePageSize
+      const response = await listOrgClassGrades(teamId, gradeSearch, gradePageSize, offset)
+      setClassGrades(response.entries)
+      setTotalClassGrades(response.total)
+    } catch (cause) {
+      console.error('Failed to load org class grades', cause)
+    }
+  }
+
   useEffect(() => {
     void loadTeamData()
   }, [teamId, authHeader])
@@ -227,12 +251,15 @@ function ManageOrgPage() {
   useEffect(() => {
     if (activeTab === 'overview') {
       void fetchRoster()
+      if (isOrg) {
+        void fetchClassGrades()
+      }
     } else if (activeTab === 'events' && isOrg) {
       void fetchOrgEvents()
     } else if (activeTab === 'approvals' && isOrg) {
       void fetchApplications()
     }
-  }, [teamId, activeTab, memberPage, memberPageSize, memberSearch, isOrg])
+  }, [teamId, activeTab, memberPage, memberPageSize, memberSearch, gradePage, gradePageSize, gradeSearch, isOrg])
 
   async function handleUpdateTeam(evt: React.FormEvent) {
     evt.preventDefault()
@@ -785,6 +812,174 @@ function ManageOrgPage() {
                         )}
                       </PixelStack>
                     </PixelCard>
+
+                    {isOrg && (
+                      <PixelCard className="bg-retro-surface mt-6">
+                        <PixelStack gap={4}>
+                          <PixelStack direction="row" align="center" justify="between" wrap>
+                            <PixelSectionHeader title={`PARTICIPANT CLASS GRADES (${totalClassGrades})`} size="sm" />
+                            <input
+                              type="text"
+                              placeholder="Search participant or @username..."
+                              value={gradeSearch}
+                              onChange={(e) => {
+                                setGradeSearch(e.target.value)
+                                setGradePage(1)
+                              }}
+                              className="px-3 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text focus:outline-none focus:border-retro-primary w-56"
+                            />
+                          </PixelStack>
+
+                          <div className="flex flex-wrap gap-2 items-center">
+                            <div className="flex-1 min-w-[220px]">
+                              <UserSearchCombobox
+                                value={newGradeUserId}
+                                onChange={setNewGradeUserId}
+                                placeholder="Search participant by name, @username or email..."
+                              />
+                            </div>
+                            <select
+                              value={newGradeTier}
+                              onChange={(e) => setNewGradeTier(e.target.value as ClassTier)}
+                              className="px-2.5 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-xs text-retro-text font-sans"
+                            >
+                              <option value="G3">G3</option>
+                              <option value="G2">G2</option>
+                              <option value="G1">G1</option>
+                            </select>
+                            <PixelButton
+                              variant="solid"
+                              tone="purple"
+                              size="sm"
+                              disabled={!newGradeUserId || savingGrade}
+                              onClick={async () => {
+                                if (!newGradeUserId || !authHeader) return
+                                setSavingGrade(true)
+                                try {
+                                  await updateAdminUserClass(newGradeUserId, teamId, newGradeTier, authHeader)
+                                  setNewGradeUserId('')
+                                  const offset = (gradePage - 1) * gradePageSize
+                                  const res = await listOrgClassGrades(teamId, gradeSearch, gradePageSize, offset)
+                                  setClassGrades(res.entries)
+                                  setTotalClassGrades(res.total)
+                                  toast({ tone: 'green', title: 'Assigned organization class grade.' })
+                                } catch (err) {
+                                  toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to assign class grade' })
+                                } finally {
+                                  setSavingGrade(false)
+                                }
+                              }}
+                            >
+                              ASSIGN GRADE
+                            </PixelButton>
+                          </div>
+
+                          {classGrades.length > 0 ? (
+                            <>
+                              <div className="public-table">
+                                <PixelTable
+                                  columns={[
+                                    {
+                                      key: 'name',
+                                      header: 'PARTICIPANT',
+                                      width: '45%',
+                                      render: (cg: eventmanager.OrgClassEntry) => (
+                                        <div>
+                                          <UserLink userId={cg.userId} name={cg.name} slug={cg.slug} />
+                                          {cg.slug && (
+                                            <div className="font-sans text-xs text-retro-muted">@{cg.slug}</div>
+                                          )}
+                                        </div>
+                                      ),
+                                    },
+                                    {
+                                      key: 'classTier',
+                                      header: 'CLASS GRADE',
+                                      width: '30%',
+                                      render: (cg: eventmanager.OrgClassEntry) => (
+                                        <select
+                                          value={cg.classTier || ''}
+                                          disabled={savingGrade}
+                                          onChange={async (e) => {
+                                            if (!authHeader) return
+                                            const v = e.target.value as ClassTier | ''
+                                            setSavingGrade(true)
+                                            try {
+                                              await updateAdminUserClass(cg.userId, teamId, v === '' ? null : v, authHeader)
+                                              const offset = (gradePage - 1) * gradePageSize
+                                              const res = await listOrgClassGrades(teamId, gradeSearch, gradePageSize, offset)
+                                              setClassGrades(res.entries)
+                                              setTotalClassGrades(res.total)
+                                              toast({ tone: 'green', title: v ? 'Updated class grade.' : 'Cleared class grade.' })
+                                            } catch (err) {
+                                              toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to update class grade' })
+                                            } finally {
+                                              setSavingGrade(false)
+                                            }
+                                          }}
+                                          className="px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text font-sans"
+                                        >
+                                          <option value="">OPEN (Clear)</option>
+                                          <option value="G3">G3</option>
+                                          <option value="G2">G2</option>
+                                          <option value="G1">G1</option>
+                                        </select>
+                                      ),
+                                    },
+                                    {
+                                      key: 'action',
+                                      header: 'ACTION',
+                                      width: '25%',
+                                      render: (cg: eventmanager.OrgClassEntry) => (
+                                        <PixelButton
+                                          variant="ghost"
+                                          tone="red"
+                                          size="sm"
+                                          disabled={savingGrade}
+                                          onClick={async () => {
+                                            if (!authHeader) return
+                                            setSavingGrade(true)
+                                            try {
+                                              await updateAdminUserClass(cg.userId, teamId, null, authHeader)
+                                              const offset = (gradePage - 1) * gradePageSize
+                                              const res = await listOrgClassGrades(teamId, gradeSearch, gradePageSize, offset)
+                                              setClassGrades(res.entries)
+                                              setTotalClassGrades(res.total)
+                                              toast({ tone: 'green', title: 'Cleared class grade.' })
+                                            } catch (err) {
+                                              toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to clear class grade' })
+                                            } finally {
+                                              setSavingGrade(false)
+                                            }
+                                          }}
+                                        >
+                                          CLEAR
+                                        </PixelButton>
+                                      ),
+                                    },
+                                  ]}
+                                  data={classGrades}
+                                  emptyState={<span className="font-pixel text-xs text-retro-muted">NO CLASS GRADES ASSIGNED</span>}
+                                />
+                              </div>
+
+                              <Pagination
+                                page={gradePage}
+                                pageSize={gradePageSize}
+                                total={totalClassGrades}
+                                onPageChange={setGradePage}
+                                onPageSizeChange={setGradePageSize}
+                                variant="pixel"
+                              />
+                            </>
+                          ) : (
+                            <span className="font-pixel text-xs text-retro-muted">
+                              NO ORGANIZATION-SCOPED CLASS GRADES ASSIGNED YET.
+                            </span>
+                          )}
+                        </PixelStack>
+                      </PixelCard>
+                    )}
                   </div>
                 </div>
               )}
@@ -1905,7 +2100,35 @@ function OrgEventDetailView({
                     key: 'classTier',
                     header: 'CLASS TIER',
                     width: '20%',
-                    render: (m) => <PixelBadge tone="neutral">{m.classTier || 'NONE'}</PixelBadge>,
+                    render: (m) =>
+                      selectedEvent.organizationId && authHeader ? (
+                        <select
+                          value={m.classTier && m.classTier !== 'PRE_OP' && m.classTier !== 'OP' ? m.classTier : ''}
+                          onChange={async (e) => {
+                            const v = e.target.value as ClassTier | ''
+                            try {
+                              await updateAdminUserClass(
+                                m.userId,
+                                selectedEvent.organizationId!,
+                                v === '' ? null : v,
+                                authHeader,
+                              )
+                              await detail.reloadCurrentEvent()
+                              toast({ tone: 'green', title: v ? `Updated class grade to ${v}.` : 'Cleared class grade.' })
+                            } catch (err) {
+                              toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to update class grade' })
+                            }
+                          }}
+                          className="px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text font-sans"
+                        >
+                          <option value="">OPEN</option>
+                          <option value="G3">G3</option>
+                          <option value="G2">G2</option>
+                          <option value="G1">G1</option>
+                        </select>
+                      ) : (
+                        <PixelBadge tone="neutral">{m.classTier || 'OPEN'}</PixelBadge>
+                      ),
                   },
                   ...(selectedEvent.granularParticipation
                     ? [

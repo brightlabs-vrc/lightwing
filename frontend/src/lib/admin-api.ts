@@ -1497,34 +1497,105 @@ export async function updateAdminUserProfile(
   return updated
 }
 
+const mockOrgClassGrades = new Map<string, Map<string, ClassTier>>()
+
 export async function updateAdminUserClass(
   userId: string,
+  organizationId: string,
   classTier: ClassTier | null,
   authorization: string,
-): Promise<{ userId: string; classTier: ClassTier | null }> {
+): Promise<{ userId: string; organizationId: string; classTier: ClassTier | null }> {
   if (!MOCK_MODE) {
     const res = await appClient.eventmanager.SetUserClass({
       userId,
       Authorization: authorization,
-      organizationId: null,
+      organizationId,
       classTier,
-    } as unknown as eventmanager.SetUserClassRequest)
-    return { userId: res.userId, classTier: res.classTier as ClassTier | null }
+    })
+    return {
+      userId: res.userId,
+      organizationId: res.organizationId,
+      classTier: res.classTier as ClassTier | null,
+    }
   }
 
-  const existing = mockUserProfiles.get(userId)
-  if (!existing) {
-    throw new Error(`User ${userId} was not found in mock records`)
+  let orgMap = mockOrgClassGrades.get(organizationId)
+  if (!orgMap) {
+    orgMap = new Map<string, ClassTier>()
+    mockOrgClassGrades.set(organizationId, orgMap)
+  }
+  if (classTier) {
+    orgMap.set(userId, classTier)
+  } else {
+    orgMap.delete(userId)
   }
 
-  const updated: auth.UserProfile = {
-    ...existing,
-    classTier: classTier ?? existing.classTier,
-    updatedAt: new Date().toISOString(),
+  return { userId, organizationId, classTier }
+}
+
+export async function listOrgClassGrades(
+  organizationId: string,
+  search = '',
+  limit = 20,
+  offset = 0,
+): Promise<eventmanager.ListOrgClassesResponse> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.ListOrgClasses({
+      OrganizationID: organizationId,
+      Search: search || undefined,
+      Limit: limit,
+      Offset: offset,
+    })
   }
 
-  mockUserProfiles.set(userId, updated)
-  return { userId, classTier }
+  const orgMap = mockOrgClassGrades.get(organizationId) ?? new Map<string, ClassTier>()
+  const entries: eventmanager.OrgClassEntry[] = []
+  for (const [uid, tier] of orgMap.entries()) {
+    const u = mockUserProfiles.get(uid)
+    const name = u?.vrchatUsername ?? u?.name ?? uid
+    const slug = u?.slug ?? null
+    if (search) {
+      const lower = search.toLowerCase()
+      if (!name.toLowerCase().includes(lower) && !(slug && slug.toLowerCase().includes(lower))) {
+        continue
+      }
+    }
+    entries.push({
+      userId: uid,
+      name,
+      slug,
+      image: u?.image ?? null,
+      classTier: tier,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+  return {
+    entries: entries.slice(offset, offset + limit),
+    total: entries.length,
+  }
+}
+
+export async function listUserOrgClassGrades(
+  userId: string,
+): Promise<eventmanager.ListUserOrgClassesResponse> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.ListUserOrgClasses({ UserID: userId })
+  }
+
+  const classes: eventmanager.UserOrgClassEntry[] = []
+  for (const [orgId, orgMap] of mockOrgClassGrades.entries()) {
+    const tier = orgMap.get(userId)
+    if (tier) {
+      classes.push({
+        organizationId: orgId,
+        organizationName: orgId,
+        organizationSlug: orgId,
+        classTier: tier,
+        updatedAt: new Date().toISOString(),
+      })
+    }
+  }
+  return { classes }
 }
 
 // -----------------------------------------------------------------------------
@@ -2292,4 +2363,25 @@ export async function removeAdminTeamMember(
   }
 
   return team
+}
+
+export async function recalculateRatings(
+  authorization: string,
+): Promise<{
+  racesProcessed: number
+  resultsUpdated: number
+  usersRated: number
+  yearsProcessed: number[]
+  calculatedAt: string
+}> {
+  if (!MOCK_MODE) {
+    return appClient.scorecalc.RecalculateRatings({ Authorization: authorization })
+  }
+  return {
+    racesProcessed: 4,
+    resultsUpdated: 10,
+    usersRated: 3,
+    yearsProcessed: [new Date().getUTCFullYear()],
+    calculatedAt: new Date().toISOString(),
+  }
 }

@@ -10,6 +10,7 @@ import (
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
+	"encore.app/scorecalc"
 )
 
 // Class tiers and datasets endpoints.
@@ -41,9 +42,8 @@ func ListClassTiers(ctx context.Context) (*ClassTiersResponse, error) {
 	return resp, nil
 }
 
-// SetUserClassRequest mirrors SetUserClassParams (PUT /api/users/:userId/class).
-// Within an organization it is gated by the event-update grant; site admins
-// may set a tier globally.
+// SetUserClassRequest mirrors SetUserClassParams (PUT /api/user-class).
+// Organization-scoped: gated by the event-update grant on the organization.
 type SetUserClassRequest struct {
 	UserID         string  `json:"userId"`
 	OrganizationID *string `json:"organizationId,omitempty"`
@@ -52,17 +52,37 @@ type SetUserClassRequest struct {
 
 // SetUserClassResponse echoes the assignment.
 type SetUserClassResponse struct {
-	UserID    string  `json:"userId"`
-	ClassTier *string `json:"classTier"`
+	UserID         string  `json:"userId"`
+	OrganizationID string  `json:"organizationId"`
+	ClassTier      *string `json:"classTier"`
 }
 
-// SetUserClassCore tags a participant with a skill class tier.
+// getOrgUserTier looks up a participant's class tier within an organization.
+// Returns an empty NullString if the event is not org-owned or no tier is assigned.
+func getOrgUserTier(ctx context.Context, qq *sqlc.Queries, orgID sql.NullString, userID string) (sql.NullString, error) {
+	if !orgID.Valid || orgID.String == "" {
+		return sql.NullString{}, nil
+	}
+	tier, err := qq.GetOrgUserClassTier(ctx, sqlc.GetOrgUserClassTierParams{
+		OrganizationId: orgID.String,
+		UserId:         userID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return sql.NullString{}, nil
+	}
+	if err != nil {
+		return sql.NullString{}, err
+	}
+	return nullStringFromAny(tier), nil
+}
+
+// SetUserClassCore tags a participant with a skill class tier within an organization.
 func SetUserClassCore(ctx context.Context, actor *auth.Actor, p *SetUserClassRequest) (*SetUserClassResponse, error) {
-	if p.OrganizationID != nil && *p.OrganizationID != "" {
-		if _, _, err := auth.RequirePermission(ctx, actor, *p.OrganizationID, auth.ResourceEvent, auth.ActionUpdate); err != nil {
-			return nil, err
-		}
-	} else if _, err := auth.RequireSiteAdmin(actor); err != nil {
+	if p.OrganizationID == nil || *p.OrganizationID == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "organizationId is required"}
+	}
+	orgID := *p.OrganizationID
+	if _, _, err := auth.RequirePermission(ctx, actor, orgID, auth.ResourceEvent, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	exists, err := q().UserExists(ctx, p.UserID)
@@ -72,22 +92,149 @@ func SetUserClassCore(ctx context.Context, actor *auth.Actor, p *SetUserClassReq
 	if !exists {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	}
-	var tier any
-	if p.ClassTier != nil {
-		tier = *p.ClassTier
+	if p.ClassTier == nil || *p.ClassTier == "" {
+		if err := q().DeleteOrgUserClassTier(ctx, sqlc.DeleteOrgUserClassTierParams{
+			OrganizationId: orgID,
+			UserId:         p.UserID,
+		}); err != nil {
+			return nil, err
+		}
+		scorecalc.InvalidateLeaderboardCache(ctx)
+		return &SetUserClassResponse{UserID: p.UserID, OrganizationID: orgID, ClassTier: nil}, nil
 	}
-	if err := q().UpdateUserClassTier(ctx, sqlc.UpdateUserClassTierParams{
-		ClassTier: tier, ID: p.UserID,
+	var actorID sql.NullString
+	if actor != nil && actor.UserID != "" {
+		actorID = sql.NullString{String: actor.UserID, Valid: true}
+	}
+	if err := q().UpsertOrgUserClassTier(ctx, sqlc.UpsertOrgUserClassTierParams{
+		ID:              "oct-" + newID()[:8],
+		OrganizationId:  orgID,
+		UserId:          p.UserID,
+		ClassTier:       *p.ClassTier,
+		UpdatedByUserId: actorID,
 	}); err != nil {
 		return nil, err
 	}
-	return &SetUserClassResponse{UserID: p.UserID, ClassTier: p.ClassTier}, nil
+	scorecalc.InvalidateLeaderboardCache(ctx)
+	return &SetUserClassResponse{UserID: p.UserID, OrganizationID: orgID, ClassTier: p.ClassTier}, nil
 }
 
 //encore:api auth method=PUT path=/api/user-class
 func SetUserClass(ctx context.Context, p *SetUserClassRequest) (*SetUserClassResponse, error) {
 	actor := encoreauth.Data().(*auth.Actor)
 	return SetUserClassCore(ctx, actor, p)
+}
+
+// OrgClassEntry represents one participant's class grade within an organization.
+type OrgClassEntry struct {
+	UserID    string  `json:"userId"`
+	Name      string  `json:"name"`
+	Slug      *string `json:"slug"`
+	Image     *string `json:"image"`
+	ClassTier *string `json:"classTier"`
+	UpdatedAt string  `json:"updatedAt"`
+}
+
+// ListOrgClassesQuery lists class grades assigned within an organization.
+type ListOrgClassesQuery struct {
+	OrganizationID string `query:"organizationId"`
+	Search         string `query:"search"`
+	Limit          int    `query:"limit"`
+	Offset         int    `query:"offset"`
+}
+
+// ListOrgClassesResponse wraps paginated org class grade entries.
+type ListOrgClassesResponse struct {
+	Entries []OrgClassEntry `json:"entries"`
+	Total   int             `json:"total"`
+}
+
+//encore:api public method=GET path=/api/org-classes
+func ListOrgClasses(ctx context.Context, p *ListOrgClassesQuery) (*ListOrgClassesResponse, error) {
+	if p.OrganizationID == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "organizationId is required"}
+	}
+	limit := p.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	offset := p.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	pattern := ""
+	if p.Search != "" {
+		pattern = "%" + p.Search + "%"
+	}
+	rows, err := q().ListOrgClassTiers(ctx, sqlc.ListOrgClassTiersParams{
+		OrganizationId: p.OrganizationID,
+		Column2:        pattern,
+		Limit:          int32(limit),
+		Offset:         int32(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	total, err := q().CountOrgClassTiers(ctx, sqlc.CountOrgClassTiersParams{
+		OrganizationId: p.OrganizationID,
+		Column2:        pattern,
+	})
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]OrgClassEntry, 0, len(rows))
+	for _, r := range rows {
+		entries = append(entries, OrgClassEntry{
+			UserID:    r.UserId,
+			Name:      r.Name,
+			Slug:      nullString(r.Slug),
+			Image:     nullString(r.Image),
+			ClassTier: classTierPtr(nullStringFromAny(r.ClassTier)),
+			UpdatedAt: isoTime(r.UpdatedAt),
+		})
+	}
+	return &ListOrgClassesResponse{Entries: entries, Total: int(total)}, nil
+}
+
+// UserOrgClassEntry represents one org-scoped class grade held by a user.
+type UserOrgClassEntry struct {
+	OrganizationID   string  `json:"organizationId"`
+	OrganizationName string  `json:"organizationName"`
+	OrganizationSlug string  `json:"organizationSlug"`
+	ClassTier        *string `json:"classTier"`
+	UpdatedAt        string  `json:"updatedAt"`
+}
+
+// ListUserOrgClassesQuery fetches all org-scoped class grades for a user.
+type ListUserOrgClassesQuery struct {
+	UserID string `query:"userId"`
+}
+
+// ListUserOrgClassesResponse wraps the user's org class grades.
+type ListUserOrgClassesResponse struct {
+	Classes []UserOrgClassEntry `json:"classes"`
+}
+
+//encore:api public method=GET path=/api/user-org-classes
+func ListUserOrgClasses(ctx context.Context, p *ListUserOrgClassesQuery) (*ListUserOrgClassesResponse, error) {
+	if p.UserID == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "userId is required"}
+	}
+	rows, err := q().ListUserOrgClassTiers(ctx, p.UserID)
+	if err != nil {
+		return nil, err
+	}
+	classes := make([]UserOrgClassEntry, 0, len(rows))
+	for _, r := range rows {
+		classes = append(classes, UserOrgClassEntry{
+			OrganizationID:   r.OrganizationId,
+			OrganizationName: r.OrganizationName,
+			OrganizationSlug: r.OrganizationSlug,
+			ClassTier:        classTierPtr(nullStringFromAny(r.ClassTier)),
+			UpdatedAt:        isoTime(r.UpdatedAt),
+		})
+	}
+	return &ListUserOrgClassesResponse{Classes: classes}, nil
 }
 
 // EligibleRace is one race the participant may enter.
@@ -118,30 +265,36 @@ type EligibleEventsResponse struct {
 }
 
 // ListEligibleEventsCore returns events the participant may enter based on
-// class tier and each event's class restriction.
-func ListEligibleEventsCore(ctx context.Context, q *EligibleEventsQuery) (*EligibleEventsResponse, error) {
-	tierAny, err := sqlc.New(std()).GetUserClassTier(ctx, q.UserID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
-	}
+// org-scoped class tier and each event's class restriction.
+func ListEligibleEventsCore(ctx context.Context, query *EligibleEventsQuery) (*EligibleEventsResponse, error) {
+	exists, err := sqlc.New(std()).UserExists(ctx, query.UserID)
 	if err != nil {
 		return nil, err
 	}
-	userTier := nullStringFromAny(tierAny)
-	var tier *ClassTier
-	if userTier.Valid {
-		t := ClassTier(userTier.String)
-		tier = &t
+	if !exists {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+	}
+	orgRows, err := sqlc.New(std()).ListUserOrgClassTiers(ctx, query.UserID)
+	if err != nil {
+		return nil, err
+	}
+	orgTiers := make(map[string]*ClassTier, len(orgRows))
+	for _, or := range orgRows {
+		ns := nullStringFromAny(or.ClassTier)
+		if ns.Valid && ns.String != "" {
+			t := ClassTier(ns.String)
+			orgTiers[or.OrganizationId] = &t
+		}
 	}
 	erows, err := sqlc.New(std()).ListEligibleEvents(ctx)
 	if err != nil {
 		return nil, err
 	}
 	type eventInfo struct {
-		id           string
-		name         string
-		orgID        sql.NullString
-		classRestr   sql.NullString
+		id         string
+		name       string
+		orgID      sql.NullString
+		classRestr sql.NullString
 	}
 	var events []eventInfo
 	for _, er := range erows {
@@ -161,6 +314,10 @@ func ListEligibleEventsCore(ctx context.Context, q *EligibleEventsQuery) (*Eligi
 
 	resp := &EligibleEventsResponse{Events: []*EligibleEvent{}}
 	for _, e := range events {
+		var tier *ClassTier
+		if e.orgID.Valid {
+			tier = orgTiers[e.orgID.String]
+		}
 		var eventRestr *ClassTier
 		if e.classRestr.Valid {
 			t := ClassTier(e.classRestr.String)

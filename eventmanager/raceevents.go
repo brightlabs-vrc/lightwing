@@ -640,14 +640,13 @@ type RaceMemberRequest struct {
 // AddRaceEventMemberCore registers a participant for a race. The user must be
 // an event member first; class restriction and capacity limits are enforced.
 func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMemberRequest) (*RaceEventDetail, error) {
-	tier, err := q().GetUserClassTier(ctx, p.UserID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
-	}
+	exists, err := q().UserExists(ctx, p.UserID)
 	if err != nil {
 		return nil, err
 	}
-	userTier := nullStringFromAny(tier)
+	if !exists {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+	}
 	stx, err := std().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -658,6 +657,10 @@ func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMembe
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
 	}
+	if err != nil {
+		return nil, err
+	}
+	userTier, err := getOrgUserTier(ctx, qq, erow.OrganizationId, p.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -850,14 +853,13 @@ func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReques
 		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	userID := actor.UserID
-	tier, err := q().GetUserClassTier(ctx, userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
-	}
+	exists, err := q().UserExists(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	userTier := nullStringFromAny(tier)
+	if !exists {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+	}
 	stx, err := std().BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -868,6 +870,10 @@ func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReques
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
 	}
+	if err != nil {
+		return nil, err
+	}
+	userTier, err := getOrgUserTier(ctx, qq, erow.OrganizationId, userID)
 	if err != nil {
 		return nil, err
 	}

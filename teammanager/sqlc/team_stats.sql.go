@@ -17,9 +17,12 @@ SELECT
     COUNT(DISTINCT epe."eventId")::bigint AS events_participated
 FROM "member" m
 LEFT JOIN "event_points_entry" epe ON epe."userId" = m."userId"
-LEFT JOIN "race_event" re ON re."eventId" = epe."eventId"
+LEFT JOIN "event" e ON e.id = epe."eventId"
+    AND EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt")) = EXTRACT(YEAR FROM NOW() AT TIME ZONE 'UTC')
+LEFT JOIN "race_event" re ON re."eventId" = e.id
 LEFT JOIN "race_result" rr ON rr."raceEventId" = re.id AND rr."userId" = m."userId" AND rr.position IS NOT NULL
 WHERE m."organizationId" = $1
+  AND (epe.id IS NULL OR e.id IS NOT NULL)
 GROUP BY m."userId"
 `
 

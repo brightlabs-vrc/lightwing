@@ -2,8 +2,6 @@ package eventmanager
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	encoreauth "encore.dev/beta/auth"
@@ -26,19 +24,23 @@ type AddEventMemberRequest struct {
 // AddEventMemberCore registers a participant, enforcing the event's class
 // restriction and seeding the scoring record. Idempotent for existing members.
 func AddEventMemberCore(ctx context.Context, actor *auth.Actor, p *AddEventMemberRequest) (*EventDetail, error) {
-	tier, err := q().GetUserClassTier(ctx, p.UserID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
-	} else if err != nil {
+	exists, err := q().UserExists(ctx, p.UserID)
+	if err != nil {
 		return nil, err
 	}
-	userTier := nullStringFromAny(tier)
+	if !exists {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+	}
 
 	event, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
+		return nil, err
+	}
+	userTier, err := getOrgUserTier(ctx, q(), event.OrganizationID, p.UserID)
+	if err != nil {
 		return nil, err
 	}
 	if !IsEligible(toClassTier(classTierPtr(userTier)), toClassTier(classTierPtr(event.ClassRestriction))) {
@@ -176,13 +178,13 @@ func JoinEventCore(ctx context.Context, actor *auth.Actor, p *JoinEventRequest) 
 	}
 	userID := actor.UserID
 
-	tier, err := q().GetUserClassTier(ctx, userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
-	} else if err != nil {
+	exists, err := q().UserExists(ctx, userID)
+	if err != nil {
 		return nil, err
 	}
-	userTier := nullStringFromAny(tier)
+	if !exists {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+	}
 
 	event, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
@@ -193,6 +195,10 @@ func JoinEventCore(ctx context.Context, actor *auth.Actor, p *JoinEventRequest) 
 	}
 	if event.SignupsLocked {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "signups are locked for this event"}
+	}
+	userTier, err := getOrgUserTier(ctx, q(), event.OrganizationID, userID)
+	if err != nil {
+		return nil, err
 	}
 	if !IsEligible(toClassTier(classTierPtr(userTier)), toClassTier(classTierPtr(event.ClassRestriction))) {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "participant class tier does not satisfy the event class restriction"}

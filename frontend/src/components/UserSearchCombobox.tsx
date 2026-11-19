@@ -12,7 +12,7 @@ interface UserSearchComboboxProps {
 export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
   value,
   onChange,
-  placeholder = 'Search user by name, slug or email...',
+  placeholder = 'Search user by name, @username or email...',
 }) => {
   const { session } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
@@ -212,7 +212,7 @@ export const UserSearchCombobox: React.FC<UserSearchComboboxProps> = ({
               >
                 <div style={{ fontWeight: '600', color: '#1e293b' }}>{user.name}</div>
                 <div style={{ fontSize: '11px', color: '#64748b' }}>
-                  Slug: {user.slug || 'None'} | Email: {user.email}
+                  @{user.slug || 'none'} | Email: {user.email}
                 </div>
               </div>
             ))}

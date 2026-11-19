@@ -25,11 +25,13 @@ export const Route = createFileRoute('/leaderboard')({
 export function LeaderboardPage() {
   usePageHead({
     title: 'Leaderboard',
-    description: 'Global driver standings and ranking leaderboard on UmaKeiba.',
+    description: 'Global participant standings and ranking leaderboard on UmaKeiba.',
   })
-  const [sortBy, setSortBy] = useState<'points' | 'avgPosition' | 'avgPointsPerSeason'>('points')
+  const currentYear = new Date().getUTCFullYear()
+  const [sortBy, setSortBy] = useState<'points' | 'rating' | 'avgPosition' | 'avgPointsPerSeason'>('points')
   const [search, setSearch] = useState('')
   const [classTier, setClassTier] = useState('')
+  const [year, setYear] = useState<number>(currentYear)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -44,6 +46,7 @@ export function LeaderboardPage() {
         SortBy: sortBy,
         Search: search.trim(),
         ClassTier: classTier,
+        Year: year,
         Limit: pageSize,
         Offset: (page - 1) * pageSize,
       })
@@ -58,10 +61,12 @@ export function LeaderboardPage() {
 
   useEffect(() => {
     void fetchLeaderboard()
-  }, [sortBy, search, classTier, page, pageSize])
+  }, [sortBy, search, classTier, year, page, pageSize])
 
   const entries: LeaderboardEntry[] = data?.entries ?? []
   const total = data?.total ?? 0
+  const availableYears: number[] =
+    data?.availableYears && data.availableYears.length > 0 ? data.availableYears : [year]
 
   return (
     <PixelContainer maxWidth="full" padding="md">
@@ -77,7 +82,7 @@ export function LeaderboardPage() {
           <PixelStack direction="row" gap={3} align="center" wrap>
             <input
               type="text"
-              placeholder="Search driver or slug..."
+              placeholder="Search participant or @username..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -98,11 +103,26 @@ export function LeaderboardPage() {
               <option value="G1">G1</option>
               <option value="G2">G2</option>
               <option value="G3">G3</option>
-              <option value="OP">OP / Unrated</option>
+            </select>
+
+            <select
+              aria-label="Season Year"
+              value={year}
+              onChange={(e) => {
+                setYear(Number(e.target.value))
+                setPage(1)
+              }}
+              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary"
+            >
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  {y} Season
+                </option>
+              ))}
             </select>
           </PixelStack>
 
-          <PixelStack direction="row" gap={2} align="center">
+          <PixelStack direction="row" gap={2} align="center" wrap>
             <span className="font-pixel text-xs text-retro-muted uppercase">SORT BY:</span>
             <PixelButton
               variant={sortBy === 'points' ? 'solid' : 'ghost'}
@@ -114,6 +134,17 @@ export function LeaderboardPage() {
               }}
             >
               TOTAL POINTS
+            </PixelButton>
+            <PixelButton
+              variant={sortBy === 'rating' ? 'solid' : 'ghost'}
+              tone={sortBy === 'rating' ? 'gold' : 'neutral'}
+              size="sm"
+              onClick={() => {
+                setSortBy('rating')
+                setPage(1)
+              }}
+            >
+              RATING
             </PixelButton>
             <PixelButton
               variant={sortBy === 'avgPosition' ? 'solid' : 'ghost'}
@@ -150,8 +181,8 @@ export function LeaderboardPage() {
         <PixelEmptyState title="Error loading leaderboard" description={error} />
       ) : entries.length === 0 ? (
         <PixelEmptyState
-          title="No drivers found"
-          description="No competitor match the search or filter criteria."
+          title="No participants found"
+          description="No participants match the search or filter criteria."
         />
       ) : (
         <PixelStack gap={6}>
@@ -160,8 +191,24 @@ export function LeaderboardPage() {
               <thead>
                 <tr className="border-b-2 border-retro-border font-pixel text-xs text-retro-muted bg-retro-bg/60">
                   <th className="p-3 w-20 text-center">RANK</th>
-                  <th className="p-3">DRIVER</th>
+                  <th className="p-3">PARTICIPANT</th>
                   <th className="p-3 w-24 text-center">TIER</th>
+                  <th className="p-3 text-right">
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      <span>RATING</span>
+                      <span
+                        className="relative group inline-flex items-center justify-center w-4 h-4 rounded-full border border-retro-border text-[10px] text-retro-muted hover:text-retro-primary hover:border-retro-primary cursor-help"
+                        tabIndex={0}
+                        aria-label="We use Glicko-2 to calculate your rankings"
+                        title="We use Glicko-2 to calculate your rankings"
+                      >
+                        ?
+                        <span className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity absolute right-0 top-full mt-2 z-20 w-56 p-2 rounded border-2 border-retro-border-strong bg-retro-bg text-retro-text font-sans text-xs font-normal text-left shadow-lg normal-case">
+                          We use Glicko-2 to calculate your rankings.
+                        </span>
+                      </span>
+                    </span>
+                  </th>
                   <th className="p-3 text-right">TOTAL POINTS</th>
                   <th className="p-3 text-right">AVG POSITION</th>
                   <th className="p-3 text-right">AVG PTS / SEASON</th>
@@ -173,6 +220,9 @@ export function LeaderboardPage() {
                 {entries.map((e: LeaderboardEntry, idx: number) => {
                   const displayRank = e.rank || (page - 1) * pageSize + idx + 1
                   const targetSlug = e.slug || e.userId
+                  const ratingValue = e.rating ?? 1500
+                  const rdValue = e.ratingDeviation ?? 350
+                  const seasonDelta = e.seasonRatingDelta ?? 0
 
                   return (
                     <tr
@@ -219,6 +269,30 @@ export function LeaderboardPage() {
                         ) : (
                           <span className="text-xs text-retro-muted font-pixel">OPEN</span>
                         )}
+                      </td>
+
+                      <td className="p-3 text-right">
+                        <div className="inline-flex items-baseline justify-end gap-1">
+                          <span className="font-pixel text-base text-retro-primary font-bold">
+                            {ratingValue}
+                          </span>
+                          {e.isProvisional && (
+                            <span
+                              className="font-pixel text-[9px] text-retro-muted"
+                              title="Provisional rating (fewer than 5 rated races or high RD)"
+                            >
+                              ?
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-mono text-[11px] text-retro-muted flex items-center justify-end gap-1.5">
+                          <span>±{rdValue}</span>
+                          {seasonDelta !== 0 && (
+                            <span className={seasonDelta > 0 ? 'text-retro-green font-semibold' : 'text-retro-pink font-semibold'}>
+                              {seasonDelta > 0 ? `+${seasonDelta}` : seasonDelta}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-3 text-right font-pixel text-base text-retro-gold font-bold">

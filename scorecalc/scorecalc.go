@@ -231,11 +231,14 @@ func HandleScoreCalcCompleted(ctx context.Context, event ScoreCalcCompleted) err
 		return err
 	}
 
-	// Post-commit cache invalidation + status publish.
+	// Post-commit cache invalidation + ratings refresh + status publish.
 	if eventDetailCache != nil {
 		_, _ = eventDetailCache.Delete(ctx, eventDetailKey{ID: event.EventID})
 	}
-	InvalidateLeaderboardCache(ctx)
+	if _, rerr := RecalculateAllRatings(ctx); rerr != nil {
+		rlog.Warn("Failed to recalculate Glicko-2 ratings after score calc completion", "eventId", event.EventID, "err", rerr)
+		InvalidateLeaderboardCache(ctx)
+	}
 	if _, err := ScoreCalcStatusTopic.Publish(ctx, ScoreCalcStatusEvent{
 		EventID: event.EventID, UserIDs: userIDs,
 		Status: "completed", Timestamp: time.Now().UTC().Format(time.RFC3339Nano),

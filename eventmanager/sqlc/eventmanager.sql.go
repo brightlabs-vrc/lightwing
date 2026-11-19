@@ -674,16 +674,66 @@ func (q *Queries) GetRaceEventRow(ctx context.Context, id string) (GetRaceEventR
 	return i, err
 }
 
-const getUserClassTier = `-- name: GetUserClassTier :one
-SELECT "classTier" FROM "user" WHERE id = $1
+const getOrgUserClassTier = `-- name: GetOrgUserClassTier :one
+SELECT "classTier" FROM "org_class_tier" WHERE "organizationId" = $1 AND "userId" = $2
 `
 
-// User class tier lookup (used by AddRaceEventMember, JoinRaceEvent).
-func (q *Queries) GetUserClassTier(ctx context.Context, id string) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getUserClassTier, id)
+type GetOrgUserClassTierParams struct {
+	OrganizationId string
+	UserId         string
+}
+
+// Org-scoped user class tier lookup (used by AddRaceEventMember, JoinRaceEvent, AddEventMember, JoinEvent).
+func (q *Queries) GetOrgUserClassTier(ctx context.Context, arg GetOrgUserClassTierParams) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getOrgUserClassTier, arg.OrganizationId, arg.UserId)
 	var classTier interface{}
 	err := row.Scan(&classTier)
 	return classTier, err
+}
+
+const listUserOrgClassTiers = `-- name: ListUserOrgClassTiers :many
+SELECT oct."organizationId", o.name AS "organizationName", o.slug AS "organizationSlug", oct."classTier", oct."updatedAt"
+FROM "org_class_tier" oct
+JOIN "organization" o ON o.id = oct."organizationId"
+WHERE oct."userId" = $1
+ORDER BY o.name ASC
+`
+
+type ListUserOrgClassTiersRow struct {
+	OrganizationId   string
+	OrganizationName string
+	OrganizationSlug string
+	ClassTier        interface{}
+	UpdatedAt        time.Time
+}
+
+func (q *Queries) ListUserOrgClassTiers(ctx context.Context, userId string) ([]ListUserOrgClassTiersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUserOrgClassTiers, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserOrgClassTiersRow
+	for rows.Next() {
+		var i ListUserOrgClassTiersRow
+		if err := rows.Scan(
+			&i.OrganizationId,
+			&i.OrganizationName,
+			&i.OrganizationSlug,
+			&i.ClassTier,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertDeferredResult = `-- name: InsertDeferredResult :exec
@@ -1010,10 +1060,12 @@ func (q *Queries) ListAllEligibleRaces(ctx context.Context) ([]ListAllEligibleRa
 
 const listAutoDeferralInputs = `-- name: ListAutoDeferralInputs :many
 SELECT res.id, res."raceEventId", r.grade, res."userId", res.position,
-       res.points, res."resultStatus", u."classTier"
+       res.points, res."resultStatus", oct."classTier"
 FROM "race_result" res
 JOIN "race_event" r ON r.id = res."raceEventId"
+JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = res."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = res."userId"
 WHERE r."eventId" = $1
 `
 
@@ -1245,8 +1297,11 @@ func (q *Queries) ListEventMemberIDs(ctx context.Context, eventid string) ([]str
 }
 
 const listEventMembersByEvent = `-- name: ListEventMembersByEvent :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
-FROM "event_member" m JOIN "user" u ON u.id = m."userId"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+FROM "event_member" m
+JOIN "event" e ON e.id = m."eventId"
+JOIN "user" u ON u.id = m."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
 WHERE m."eventId" = $1
 `
 
@@ -1670,8 +1725,12 @@ func (q *Queries) ListPublicEvents(ctx context.Context, arg ListPublicEventsPara
 }
 
 const listRaceEventMembers = `-- name: ListRaceEventMembers :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
-FROM "race_event_member" m JOIN "user" u ON u.id = m."userId"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+FROM "race_event_member" m
+JOIN "race_event" r ON r.id = m."raceEventId"
+JOIN "event" e ON e.id = r."eventId"
+JOIN "user" u ON u.id = m."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
 WHERE m."raceEventId" = $1
 `
 
@@ -1864,10 +1923,12 @@ func (q *Queries) ListRaceMemberPairs(ctx context.Context, eventid string) ([]Li
 }
 
 const listRaceMembersByEvent = `-- name: ListRaceMembersByEvent :many
-SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), u."classTier"
+SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
 FROM "race_event_member" m
 JOIN "race_event" r ON r.id = m."raceEventId"
+JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = m."userId"
+LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
 WHERE r."eventId" = $1
 `
 
@@ -2422,19 +2483,133 @@ func (q *Queries) UpdateRaceSequencesBatch(ctx context.Context, arg UpdateRaceSe
 	return err
 }
 
-const updateUserClassTier = `-- name: UpdateUserClassTier :exec
-UPDATE "user" SET "classTier" = $1 WHERE id = $2
+const upsertOrgUserClassTier = `-- name: UpsertOrgUserClassTier :exec
+INSERT INTO "org_class_tier" (id, "organizationId", "userId", "classTier", "updatedByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+ON CONFLICT ("organizationId", "userId") DO UPDATE SET
+  "classTier" = EXCLUDED."classTier",
+  "updatedByUserId" = EXCLUDED."updatedByUserId",
+  "updatedAt" = NOW()
 `
 
-type UpdateUserClassTierParams struct {
-	ClassTier interface{}
-	ID        string
+type UpsertOrgUserClassTierParams struct {
+	ID              string
+	OrganizationId  string
+	UserId          string
+	ClassTier       interface{}
+	UpdatedByUserId sql.NullString
 }
 
-// User class tier assignment.
-func (q *Queries) UpdateUserClassTier(ctx context.Context, arg UpdateUserClassTierParams) error {
-	_, err := q.db.ExecContext(ctx, updateUserClassTier, arg.ClassTier, arg.ID)
+func (q *Queries) UpsertOrgUserClassTier(ctx context.Context, arg UpsertOrgUserClassTierParams) error {
+	_, err := q.db.ExecContext(ctx, upsertOrgUserClassTier,
+		arg.ID,
+		arg.OrganizationId,
+		arg.UserId,
+		arg.ClassTier,
+		arg.UpdatedByUserId,
+	)
 	return err
+}
+
+const deleteOrgUserClassTier = `-- name: DeleteOrgUserClassTier :exec
+DELETE FROM "org_class_tier" WHERE "organizationId" = $1 AND "userId" = $2
+`
+
+type DeleteOrgUserClassTierParams struct {
+	OrganizationId string
+	UserId         string
+}
+
+func (q *Queries) DeleteOrgUserClassTier(ctx context.Context, arg DeleteOrgUserClassTierParams) error {
+	_, err := q.db.ExecContext(ctx, deleteOrgUserClassTier, arg.OrganizationId, arg.UserId)
+	return err
+}
+
+const listOrgClassTiers = `-- name: ListOrgClassTiers :many
+SELECT
+  oct."userId",
+  COALESCE(u."vrchatUsername", u.name) AS name,
+  u.slug,
+  u.image,
+  oct."classTier",
+  oct."updatedAt"
+FROM "org_class_tier" oct
+JOIN "user" u ON u.id = oct."userId"
+WHERE oct."organizationId" = $1
+  AND ($2::text = '' OR u.name ILIKE $2 ESCAPE '\' OR u."vrchatUsername" ILIKE $2 ESCAPE '\' OR u.slug ILIKE $2 ESCAPE '\')
+ORDER BY oct."updatedAt" DESC
+LIMIT $3 OFFSET $4
+`
+
+type ListOrgClassTiersParams struct {
+	OrganizationId string
+	Column2        string
+	Limit          int32
+	Offset         int32
+}
+
+type ListOrgClassTiersRow struct {
+	UserId    string
+	Name      string
+	Slug      sql.NullString
+	Image     sql.NullString
+	ClassTier interface{}
+	UpdatedAt time.Time
+}
+
+func (q *Queries) ListOrgClassTiers(ctx context.Context, arg ListOrgClassTiersParams) ([]ListOrgClassTiersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listOrgClassTiers,
+		arg.OrganizationId,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOrgClassTiersRow
+	for rows.Next() {
+		var i ListOrgClassTiersRow
+		if err := rows.Scan(
+			&i.UserId,
+			&i.Name,
+			&i.Slug,
+			&i.Image,
+			&i.ClassTier,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countOrgClassTiers = `-- name: CountOrgClassTiers :one
+SELECT COUNT(*)
+FROM "org_class_tier" oct
+JOIN "user" u ON u.id = oct."userId"
+WHERE oct."organizationId" = $1
+  AND ($2::text = '' OR u.name ILIKE $2 ESCAPE '\' OR u."vrchatUsername" ILIKE $2 ESCAPE '\' OR u.slug ILIKE $2 ESCAPE '\')
+`
+
+type CountOrgClassTiersParams struct {
+	OrganizationId string
+	Column2        string
+}
+
+func (q *Queries) CountOrgClassTiers(ctx context.Context, arg CountOrgClassTiersParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countOrgClassTiers, arg.OrganizationId, arg.Column2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const upsertEventPointsEntry = `-- name: UpsertEventPointsEntry :exec

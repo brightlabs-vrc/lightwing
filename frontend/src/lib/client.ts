@@ -993,6 +993,10 @@ export namespace eventmanager {
         finishTime?: string | null
         resultStatus?: string | null
         resultCreatedAt: string
+        ratingBefore?: number | null
+        ratingAfter?: number | null
+        ratingDelta?: number | null
+        rdAfter?: number | null
         raceId: string
         raceName: string
         raceSequence: number
@@ -1120,7 +1124,7 @@ export namespace eventmanager {
         userId: string
         Authorization: string
         organizationId: string
-        classTier: string
+        classTier: string | null
     }
 
     /**
@@ -1128,7 +1132,45 @@ export namespace eventmanager {
      */
     export interface SetUserClassResponse {
         userId: string
-        classTier: string
+        organizationId: string
+        classTier: string | null
+    }
+
+    export interface OrgClassEntry {
+        userId: string
+        name: string
+        slug: string | null
+        image: string | null
+        classTier: string | null
+        updatedAt: string
+    }
+
+    export interface ListOrgClassesQuery {
+        OrganizationID: string
+        Search?: string
+        Limit?: number
+        Offset?: number
+    }
+
+    export interface ListOrgClassesResponse {
+        entries: OrgClassEntry[]
+        total: number
+    }
+
+    export interface UserOrgClassEntry {
+        organizationId: string
+        organizationName: string
+        organizationSlug: string
+        classTier: string | null
+        updatedAt: string
+    }
+
+    export interface ListUserOrgClassesQuery {
+        UserID: string
+    }
+
+    export interface ListUserOrgClassesResponse {
+        classes: UserOrgClassEntry[]
     }
 
     /**
@@ -1234,6 +1276,8 @@ export namespace eventmanager {
             this.SetEventSignupsLocked = this.SetEventSignupsLocked.bind(this)
             this.SetEventStatus = this.SetEventStatus.bind(this)
             this.SetUserClass = this.SetUserClass.bind(this)
+            this.ListOrgClasses = this.ListOrgClasses.bind(this)
+            this.ListUserOrgClasses = this.ListUserOrgClasses.bind(this)
             this.UpdateDatasetStatus = this.UpdateDatasetStatus.bind(this)
             this.UpdateEvent = this.UpdateEvent.bind(this)
             this.UpdateRaceEvent = this.UpdateRaceEvent.bind(this)
@@ -1874,6 +1918,25 @@ export namespace eventmanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("PUT", `/api/user-class`, JSON.stringify(body), {headers})
             return await resp.json() as SetUserClassResponse
+        }
+
+        public async ListOrgClasses(params: ListOrgClassesQuery): Promise<ListOrgClassesResponse> {
+            const query = makeRecord<string, string | string[]>({
+                organizationId: params.OrganizationID,
+                search:         params.Search,
+                limit:          params.Limit !== undefined ? String(params.Limit) : undefined,
+                offset:         params.Offset !== undefined ? String(params.Offset) : undefined,
+            })
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/org-classes`, undefined, {query})
+            return await resp.json() as ListOrgClassesResponse
+        }
+
+        public async ListUserOrgClasses(params: ListUserOrgClassesQuery): Promise<ListUserOrgClassesResponse> {
+            const query = makeRecord<string, string | string[]>({
+                userId: params.UserID,
+            })
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/user-org-classes`, undefined, {query})
+            return await resp.json() as ListUserOrgClassesResponse
         }
 
         public async UpdateDatasetStatus(params: UpdateDatasetStatusRequest): Promise<DatasetView> {
@@ -2765,11 +2828,19 @@ export namespace scorecalc {
         eventsParticipated: number
         racesParticipated: number
         wins: number
+        rating: number
+        ratingDeviation: number
+        ratingVolatility: number
+        peakRating: number
+        seasonRatingDelta: number
+        isProvisional: boolean
     }
 
     export interface LeaderboardResponse {
         entries: LeaderboardEntry[]
         total: number
+        year: number
+        availableYears: number[]
         calculatedAt: string
     }
 
@@ -2777,8 +2848,17 @@ export namespace scorecalc {
         SortBy?: string
         Search?: string
         ClassTier?: string
+        Year?: number
         Limit?: number
         Offset?: number
+    }
+
+    export interface RecalculateRatingsResponse {
+        racesProcessed: number
+        resultsUpdated: number
+        usersRated: number
+        yearsProcessed: number[]
+        calculatedAt: string
     }
 
     export class ServiceClient {
@@ -2787,6 +2867,7 @@ export namespace scorecalc {
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
             this.GetLeaderboard = this.GetLeaderboard.bind(this)
+            this.RecalculateRatings = this.RecalculateRatings.bind(this)
         }
 
         public async GetLeaderboard(params: GetLeaderboardParams): Promise<LeaderboardResponse> {
@@ -2794,12 +2875,22 @@ export namespace scorecalc {
                 sortBy: params.SortBy,
                 search: params.Search,
                 classTier: params.ClassTier,
+                year: params.Year !== undefined ? String(params.Year) : undefined,
                 limit: params.Limit !== undefined ? String(params.Limit) : undefined,
                 offset: params.Offset !== undefined ? String(params.Offset) : undefined,
             })
 
             const resp = await this.baseClient.callTypedAPI("GET", `/api/leaderboard`, undefined, {query})
             return await resp.json() as LeaderboardResponse
+        }
+
+        public async RecalculateRatings(params?: { Authorization?: string }): Promise<RecalculateRatingsResponse> {
+            const headers: Record<string, string> = {}
+            if (params?.Authorization) {
+                headers["Authorization"] = params.Authorization
+            }
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/admin/ratings/recalculate`, undefined, {headers})
+            return await resp.json() as RecalculateRatingsResponse
         }
     }
 }
