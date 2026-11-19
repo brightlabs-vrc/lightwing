@@ -1,0 +1,3 @@
+{
+  "install": "sed -i '/case \\$- in/,/esac/d' \"$HOME/.bashrc\" 2>/dev/null || true; grep -qxF 'export ENCORE_INSTALL=\"$HOME/.encore\"' \"$HOME/.bashrc\" || echo 'export ENCORE_INSTALL=\"$HOME/.encore\"' >> \"$HOME/.bashrc\"; grep -qxF 'export PATH=\"$ENCORE_INSTALL/bin:$PATH\"' \"$HOME/.bashrc\" || echo 'export PATH=\"$ENCORE_INSTALL/bin:$PATH\"' >> \"$HOME/.bashrc\"; if ! command -v encore >/dev/null 2>&1 && [ ! -x \"$HOME/.encore/bin/encore\" ]; then sh install_encore.sh; fi; go mod download && pnpm --dir frontend install --frozen-lockfile"
+}
