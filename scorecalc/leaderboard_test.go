@@ -388,4 +388,43 @@ func TestLeaderboard(t *testing.T) {
 			t.Errorf("u1 not found in leaderboard after HandleScoreCalcCompleted")
 		}
 	})
+
+	t.Run("GetLeaderboard sorted by rating after backfill", func(t *testing.T) {
+		recalc, err := RecalculateAllRatings(ctx)
+		if err != nil {
+			t.Fatalf("RecalculateAllRatings failed: %v", err)
+		}
+		if recalc.RacesProcessed < 1 || recalc.UsersRated < 3 {
+			t.Errorf("unexpected recalc counts: %+v", recalc)
+		}
+
+		res, err := GetLeaderboard(ctx, &GetLeaderboardParams{
+			SortBy: "rating",
+		})
+		if err != nil {
+			t.Fatalf("GetLeaderboard(SortBy=rating) failed: %v", err)
+		}
+		if len(res.Entries) < 3 {
+			t.Fatalf("expected at least 3 entries, got %d", len(res.Entries))
+		}
+		for i := 1; i < len(res.Entries); i++ {
+			if res.Entries[i].Rating > res.Entries[i-1].Rating {
+				t.Errorf("entries not sorted by rating descending at idx %d: %d > %d",
+					i, res.Entries[i].Rating, res.Entries[i-1].Rating)
+			}
+		}
+		// u1 beat u2 and u3 in the 3-runner race, so u1 should outrank u3 by rating.
+		var u1Rating, u3Rating int
+		for _, e := range res.Entries {
+			if e.UserID == u1 {
+				u1Rating = e.Rating
+			}
+			if e.UserID == u3 {
+				u3Rating = e.Rating
+			}
+		}
+		if u1Rating <= u3Rating {
+			t.Errorf("expected winner u1 rating (%d) > 3rd-place u3 rating (%d)", u1Rating, u3Rating)
+		}
+	})
 }

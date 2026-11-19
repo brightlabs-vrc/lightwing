@@ -16,18 +16,24 @@ import (
 
 // LeaderboardEntry represents one row on the overall leaderboard.
 type LeaderboardEntry struct {
-	Rank                   int      `json:"rank"`
-	UserID                 string   `json:"userId"`
-	Name                   string   `json:"name"`
-	Slug                   *string  `json:"slug"`
-	Image                  *string  `json:"image"`
-	ClassTier              *string  `json:"classTier"`
-	TotalPoints            int      `json:"totalPoints"`
-	AveragePosition        float64  `json:"averagePosition"`
-	AveragePointsPerSeason float64  `json:"averagePointsPerSeason"`
-	EventsParticipated     int      `json:"eventsParticipated"`
-	RacesParticipated      int      `json:"racesParticipated"`
-	Wins                   int      `json:"wins"`
+	Rank                   int     `json:"rank"`
+	UserID                 string  `json:"userId"`
+	Name                   string  `json:"name"`
+	Slug                   *string `json:"slug"`
+	Image                  *string `json:"image"`
+	ClassTier              *string `json:"classTier"`
+	TotalPoints            int     `json:"totalPoints"`
+	AveragePosition        float64 `json:"averagePosition"`
+	AveragePointsPerSeason float64 `json:"averagePointsPerSeason"`
+	EventsParticipated     int     `json:"eventsParticipated"`
+	RacesParticipated      int     `json:"racesParticipated"`
+	Wins                   int     `json:"wins"`
+	Rating                 int     `json:"rating"`
+	RatingDeviation        int     `json:"ratingDeviation"`
+	RatingVolatility       float64 `json:"ratingVolatility"`
+	PeakRating             int     `json:"peakRating"`
+	SeasonRatingDelta      int     `json:"seasonRatingDelta"`
+	IsProvisional          bool    `json:"isProvisional"`
 }
 
 // LeaderboardResponse holds paginated leaderboard rows along with total count.
@@ -41,7 +47,7 @@ type LeaderboardResponse struct {
 
 // GetLeaderboardParams specifies sorting, filtering, and pagination query params.
 type GetLeaderboardParams struct {
-	SortBy    string `query:"sortBy"`    // "points", "avgPosition", "avgPointsPerSeason"
+	SortBy    string `query:"sortBy"`    // "points", "rating", "avgPosition", "avgPointsPerSeason"
 	Search    string `query:"search"`    // search participant name or @username
 	ClassTier string `query:"classTier"` // filter by class tier e.g. "G1", "G2", "G3", "OP"
 	Year      int    `query:"year"`      // calendar year cutoff (defaults to current UTC year)
@@ -105,6 +111,10 @@ func CalculateAndCacheLeaderboard(ctx context.Context) ([]LeaderboardEntry, time
 
 // CalculateAndCacheLeaderboardForYear performs full database aggregation for a given year and updates cache.
 func CalculateAndCacheLeaderboardForYear(ctx context.Context, year int) ([]LeaderboardEntry, time.Time, error) {
+	if err := EnsureRatingsBackfilled(ctx); err != nil {
+		rlog.Warn("Failed to ensure initial Glicko-2 ratings backfill", "err", err)
+	}
+
 	rows, err := q().CalculateLeaderboardStats(ctx, int32(year))
 	if err != nil {
 		return nil, time.Time{}, err
@@ -152,6 +162,12 @@ func CalculateAndCacheLeaderboardForYear(ctx context.Context, year int) ([]Leade
 			EventsParticipated:     int(r.EventsParticipated),
 			RacesParticipated:      int(r.RacesParticipated),
 			Wins:                   int(r.Wins),
+			Rating:                 int(r.Rating),
+			RatingDeviation:        int(r.RatingDeviation),
+			RatingVolatility:       r.RatingVolatility,
+			PeakRating:             int(r.PeakRating),
+			SeasonRatingDelta:      int(r.SeasonRatingDelta),
+			IsProvisional:          r.IsProvisional,
 		})
 	}
 
@@ -266,6 +282,16 @@ func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardR
 	// Sort all entries according to sortBy criteria
 	sortBy := strings.TrimSpace(p.SortBy)
 	switch sortBy {
+	case "rating":
+		sort.SliceStable(allEntries, func(i, j int) bool {
+			if allEntries[i].Rating != allEntries[j].Rating {
+				return allEntries[i].Rating > allEntries[j].Rating
+			}
+			if allEntries[i].RatingDeviation != allEntries[j].RatingDeviation {
+				return allEntries[i].RatingDeviation < allEntries[j].RatingDeviation
+			}
+			return allEntries[i].TotalPoints > allEntries[j].TotalPoints
+		})
 	case "avgPosition":
 		// Best average position first (1.0 is better than 2.0). 0 means unplaced.
 		sort.SliceStable(allEntries, func(i, j int) bool {

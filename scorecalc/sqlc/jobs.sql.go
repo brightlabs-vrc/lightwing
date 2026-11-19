@@ -76,7 +76,13 @@ SELECT
   CASE
     WHEN COALESCE(s.seasons_count, 1) > 0 THEN COALESCE(p.total_points, 0)::float8 / COALESCE(s.seasons_count, 1)
     ELSE COALESCE(p.total_points, 0)::float8
-  END AS avg_points_per_season
+  END AS avg_points_per_season,
+  COALESCE(urs.rating, 1500)::int AS rating,
+  COALESCE(urs."ratingDeviation", 350)::int AS rating_deviation,
+  COALESCE(urs."ratingVolatility", 0.06)::float8 AS rating_volatility,
+  COALESCE(urs."peakRating", 1500)::int AS peak_rating,
+  COALESCE(urs."seasonRatingDelta", 0)::int AS season_rating_delta,
+  COALESCE(urs."isProvisional", TRUE)::boolean AS is_provisional
 FROM "user" u
 LEFT JOIN (
   SELECT
@@ -136,6 +142,7 @@ LEFT JOIN (
   WHERE oct."classTier" IN ('G3', 'G2', 'G1')
   GROUP BY ev."userId"
 ) ct ON ct."userId" = u.id
+LEFT JOIN "user_rating_snapshot" urs ON urs."userId" = u.id AND urs."year" = $1::int
 WHERE (COALESCE(p.total_points, 0) > 0 OR COALESCE(r.races_participated, 0) > 0)
 ORDER BY total_points DESC
 `
@@ -154,6 +161,12 @@ type CalculateLeaderboardStatsRow struct {
 	EventsParticipated int32
 	SeasonsCount       int32
 	AvgPointsPerSeason float64
+	Rating             int32
+	RatingDeviation    int32
+	RatingVolatility   float64
+	PeakRating         int32
+	SeasonRatingDelta  int32
+	IsProvisional      bool
 }
 
 // Leaderboard aggregation.
@@ -180,6 +193,12 @@ func (q *Queries) CalculateLeaderboardStats(ctx context.Context, year int32) ([]
 			&i.EventsParticipated,
 			&i.SeasonsCount,
 			&i.AvgPointsPerSeason,
+			&i.Rating,
+			&i.RatingDeviation,
+			&i.RatingVolatility,
+			&i.PeakRating,
+			&i.SeasonRatingDelta,
+			&i.IsProvisional,
 		); err != nil {
 			return nil, err
 		}
@@ -384,6 +403,218 @@ func (q *Queries) UpsertPointsEntry(ctx context.Context, arg UpsertPointsEntryPa
 		arg.UserId,
 		arg.Points,
 		arg.CreatedAt,
+	)
+	return err
+}
+
+const listAllChronologicalRaceResults = `-- name: ListAllChronologicalRaceResults :many
+SELECT
+  rr.id AS result_id,
+  rr."raceEventId" AS race_event_id,
+  e.id AS event_id,
+  re.sequence AS race_sequence,
+  COALESCE(re."startsAt", e."scheduledAt", e."createdAt") AS occurred_at,
+  EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int AS event_year,
+  rr."userId" AS user_id,
+  rr.position AS position,
+  rr."resultStatus" AS result_status
+FROM "race_result" rr
+JOIN "race_event" re ON re.id = rr."raceEventId"
+JOIN "event" e ON e.id = re."eventId"
+WHERE e."deletedAt" IS NULL
+ORDER BY
+  COALESCE(re."startsAt", e."scheduledAt", e."createdAt") ASC,
+  e."createdAt" ASC,
+  e.id ASC,
+  re.sequence ASC,
+  re.id ASC,
+  rr.id ASC
+`
+
+type ListAllChronologicalRaceResultsRow struct {
+	ResultID     string
+	RaceEventID  string
+	EventID      string
+	RaceSequence int32
+	OccurredAt   time.Time
+	EventYear    int32
+	UserID       string
+	Position     sql.NullInt32
+	ResultStatus sql.NullString
+}
+
+func (q *Queries) ListAllChronologicalRaceResults(ctx context.Context) ([]ListAllChronologicalRaceResultsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllChronologicalRaceResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllChronologicalRaceResultsRow
+	for rows.Next() {
+		var i ListAllChronologicalRaceResultsRow
+		if err := rows.Scan(
+			&i.ResultID,
+			&i.RaceEventID,
+			&i.EventID,
+			&i.RaceSequence,
+			&i.OccurredAt,
+			&i.EventYear,
+			&i.UserID,
+			&i.Position,
+			&i.ResultStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countUserRatingSnapshots = `-- name: CountUserRatingSnapshots :one
+SELECT COUNT(*) FROM "user_rating_snapshot"
+`
+
+func (q *Queries) CountUserRatingSnapshots(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUserRatingSnapshots)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countRaceResults = `-- name: CountRaceResults :one
+SELECT COUNT(*) FROM "race_result"
+`
+
+func (q *Queries) CountRaceResults(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRaceResults)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const clearUserRatingSnapshots = `-- name: ClearUserRatingSnapshots :exec
+DELETE FROM "user_rating_snapshot"
+`
+
+func (q *Queries) ClearUserRatingSnapshots(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, clearUserRatingSnapshots)
+	return err
+}
+
+const batchUpsertUserRatingSnapshots = `-- name: BatchUpsertUserRatingSnapshots :exec
+INSERT INTO "user_rating_snapshot" (
+  "userId",
+  "year",
+  "rating",
+  "ratingDeviation",
+  "ratingVolatility",
+  "peakRating",
+  "seasonRatingDelta",
+  "ratedRaces",
+  "isProvisional",
+  "updatedAt"
+)
+SELECT
+  unnest($1::text[]),
+  unnest($2::int[]),
+  unnest($3::int[]),
+  unnest($4::int[]),
+  unnest($5::float8[]),
+  unnest($6::int[]),
+  unnest($7::int[]),
+  unnest($8::int[]),
+  unnest($9::boolean[]),
+  $10::timestamp
+ON CONFLICT ("userId", "year") DO UPDATE SET
+  "rating" = EXCLUDED."rating",
+  "ratingDeviation" = EXCLUDED."ratingDeviation",
+  "ratingVolatility" = EXCLUDED."ratingVolatility",
+  "peakRating" = EXCLUDED."peakRating",
+  "seasonRatingDelta" = EXCLUDED."seasonRatingDelta",
+  "ratedRaces" = EXCLUDED."ratedRaces",
+  "isProvisional" = EXCLUDED."isProvisional",
+  "updatedAt" = EXCLUDED."updatedAt"
+`
+
+type BatchUpsertUserRatingSnapshotsParams struct {
+	UserIds            []string
+	Years              []int32
+	Ratings            []int32
+	RatingDeviations   []int32
+	RatingVolatilities []float64
+	PeakRatings        []int32
+	SeasonRatingDeltas []int32
+	RatedRaces         []int32
+	IsProvisionals     []bool
+	UpdatedAt          time.Time
+}
+
+func (q *Queries) BatchUpsertUserRatingSnapshots(ctx context.Context, arg BatchUpsertUserRatingSnapshotsParams) error {
+	_, err := q.db.ExecContext(ctx, batchUpsertUserRatingSnapshots,
+		pq.Array(arg.UserIds),
+		pq.Array(arg.Years),
+		pq.Array(arg.Ratings),
+		pq.Array(arg.RatingDeviations),
+		pq.Array(arg.RatingVolatilities),
+		pq.Array(arg.PeakRatings),
+		pq.Array(arg.SeasonRatingDeltas),
+		pq.Array(arg.RatedRaces),
+		pq.Array(arg.IsProvisionals),
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const clearRaceResultRatings = `-- name: ClearRaceResultRatings :exec
+UPDATE "race_result"
+SET "ratingBefore" = NULL, "ratingAfter" = NULL, "ratingDelta" = NULL, "rdAfter" = NULL
+WHERE "ratingAfter" IS NOT NULL
+`
+
+func (q *Queries) ClearRaceResultRatings(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, clearRaceResultRatings)
+	return err
+}
+
+const batchUpdateRaceResultRatings = `-- name: BatchUpdateRaceResultRatings :exec
+UPDATE "race_result" rr
+SET
+  "ratingBefore" = data.rating_before,
+  "ratingAfter" = data.rating_after,
+  "ratingDelta" = data.rating_delta,
+  "rdAfter" = data.rd_after
+FROM (
+  SELECT
+    unnest($1::text[]) AS id,
+    unnest($2::int[]) AS rating_before,
+    unnest($3::int[]) AS rating_after,
+    unnest($4::int[]) AS rating_delta,
+    unnest($5::int[]) AS rd_after
+) data
+WHERE rr.id = data.id
+`
+
+type BatchUpdateRaceResultRatingsParams struct {
+	ResultIds     []string
+	RatingBefores []int32
+	RatingAfters  []int32
+	RatingDeltas  []int32
+	RdAfters      []int32
+}
+
+func (q *Queries) BatchUpdateRaceResultRatings(ctx context.Context, arg BatchUpdateRaceResultRatingsParams) error {
+	_, err := q.db.ExecContext(ctx, batchUpdateRaceResultRatings,
+		pq.Array(arg.ResultIds),
+		pq.Array(arg.RatingBefores),
+		pq.Array(arg.RatingAfters),
+		pq.Array(arg.RatingDeltas),
+		pq.Array(arg.RdAfters),
 	)
 	return err
 }

@@ -2364,3 +2364,24 @@ export async function removeAdminTeamMember(
 
   return team
 }
+
+export async function recalculateRatings(
+  authorization: string,
+): Promise<{
+  racesProcessed: number
+  resultsUpdated: number
+  usersRated: number
+  yearsProcessed: number[]
+  calculatedAt: string
+}> {
+  if (!MOCK_MODE) {
+    return appClient.scorecalc.RecalculateRatings({ Authorization: authorization })
+  }
+  return {
+    racesProcessed: 4,
+    resultsUpdated: 10,
+    usersRated: 3,
+    yearsProcessed: [new Date().getUTCFullYear()],
+    calculatedAt: new Date().toISOString(),
+  }
+}

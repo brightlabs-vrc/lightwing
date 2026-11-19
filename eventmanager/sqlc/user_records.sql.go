@@ -34,6 +34,10 @@ SELECT
     r."finishTime",
     r."resultStatus",
     r."createdAt" AS "resultCreatedAt",
+    r."ratingBefore",
+    r."ratingAfter",
+    r."ratingDelta",
+    r."rdAfter",
     re.id AS "raceId",
     re.name AS "raceName",
     re.sequence AS "raceSequence",
@@ -63,6 +67,10 @@ type ListUserRaceRecordsRow struct {
 	FinishTime       sql.NullString
 	ResultStatus     sql.NullString
 	ResultCreatedAt  time.Time
+	RatingBefore     sql.NullInt32
+	RatingAfter      sql.NullInt32
+	RatingDelta      sql.NullInt32
+	RdAfter          sql.NullInt32
 	RaceId           string
 	RaceName         string
 	RaceSequence     int32
@@ -90,6 +98,10 @@ func (q *Queries) ListUserRaceRecords(ctx context.Context, arg ListUserRaceRecor
 			&i.FinishTime,
 			&i.ResultStatus,
 			&i.ResultCreatedAt,
+			&i.RatingBefore,
+			&i.RatingAfter,
+			&i.RatingDelta,
+			&i.RdAfter,
 			&i.RaceId,
 			&i.RaceName,
 			&i.RaceSequence,

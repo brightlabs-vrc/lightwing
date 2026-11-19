@@ -993,6 +993,10 @@ export namespace eventmanager {
         finishTime?: string | null
         resultStatus?: string | null
         resultCreatedAt: string
+        ratingBefore?: number | null
+        ratingAfter?: number | null
+        ratingDelta?: number | null
+        rdAfter?: number | null
         raceId: string
         raceName: string
         raceSequence: number
@@ -2824,6 +2828,12 @@ export namespace scorecalc {
         eventsParticipated: number
         racesParticipated: number
         wins: number
+        rating: number
+        ratingDeviation: number
+        ratingVolatility: number
+        peakRating: number
+        seasonRatingDelta: number
+        isProvisional: boolean
     }
 
     export interface LeaderboardResponse {
@@ -2843,12 +2853,21 @@ export namespace scorecalc {
         Offset?: number
     }
 
+    export interface RecalculateRatingsResponse {
+        racesProcessed: number
+        resultsUpdated: number
+        usersRated: number
+        yearsProcessed: number[]
+        calculatedAt: string
+    }
+
     export class ServiceClient {
         private baseClient: BaseClient
 
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
             this.GetLeaderboard = this.GetLeaderboard.bind(this)
+            this.RecalculateRatings = this.RecalculateRatings.bind(this)
         }
 
         public async GetLeaderboard(params: GetLeaderboardParams): Promise<LeaderboardResponse> {
@@ -2863,6 +2882,15 @@ export namespace scorecalc {
 
             const resp = await this.baseClient.callTypedAPI("GET", `/api/leaderboard`, undefined, {query})
             return await resp.json() as LeaderboardResponse
+        }
+
+        public async RecalculateRatings(params?: { Authorization?: string }): Promise<RecalculateRatingsResponse> {
+            const headers: Record<string, string> = {}
+            if (params?.Authorization) {
+                headers["Authorization"] = params.Authorization
+            }
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/admin/ratings/recalculate`, undefined, {headers})
+            return await resp.json() as RecalculateRatingsResponse
         }
     }
 }

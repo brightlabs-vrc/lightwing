@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { requireAdminPanel } from '../../lib/auth-guard'
+import { recalculateRatings } from '../../lib/admin-api'
 import { AdminLayout } from './-AdminLayout'
 
 export const Route = createFileRoute('/admin/')({
@@ -12,6 +14,27 @@ export const Route = createFileRoute('/admin/')({
 
 function AdminPage() {
   const { session } = useAuth()
+  const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
+  const [recalcLoading, setRecalcLoading] = useState(false)
+  const [recalcMessage, setRecalcMessage] = useState<string | null>(null)
+  const [recalcError, setRecalcError] = useState<string | null>(null)
+
+  const handleRecalculateRatings = async () => {
+    if (!session?.session.token) return
+    try {
+      setRecalcLoading(true)
+      setRecalcMessage(null)
+      setRecalcError(null)
+      const res = await recalculateRatings(`Bearer ${session.session.token}`)
+      setRecalcMessage(
+        `Backfill complete: ${res.racesProcessed} races processed, ${res.resultsUpdated} results updated across ${res.usersRated} users.`,
+      )
+    } catch (err: any) {
+      setRecalcError(err?.message || 'Failed to recalculate ratings')
+    } finally {
+      setRecalcLoading(false)
+    }
+  }
 
   return (
     <AdminLayout
@@ -169,6 +192,53 @@ function AdminPage() {
             </footer>
           </article>
         </div>
+
+        {isSiteAdmin && (
+          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
+            <article className="slds-card" style={{ height: '100%', border: '1px solid #dddbda', display: 'flex', flexDirection: 'column' }}>
+              <div className="slds-card__header slds-grid">
+                <header className="slds-media slds-media_center slds-has-flexi-truncate">
+                  <div className="slds-media__figure" style={{ marginRight: '0.75rem' }}>
+                    <span className="slds-icon_container slds-icon-standard-metrics" style={{ fontSize: '20px' }}>📊</span>
+                  </div>
+                  <div className="slds-media__body">
+                    <h2 className="slds-card__header-title">
+                      <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                        Rating System Backfill
+                      </span>
+                    </h2>
+                  </div>
+                </header>
+              </div>
+              <div className="slds-card__body slds-card__body_inner" style={{ flexGrow: 1 }}>
+                <p className="slds-text-body_regular slds-m-bottom_small" style={{ color: '#514f4d' }}>
+                  Replay all historical race results chronologically using Glicko-2 to compute and persist participant ratings and per-race rating deltas.
+                </p>
+                {recalcMessage && (
+                  <div className="slds-box slds-box_x-small slds-theme_success slds-m-top_small" style={{ fontSize: '12px' }}>
+                    {recalcMessage}
+                  </div>
+                )}
+                {recalcError && (
+                  <div className="slds-box slds-box_x-small slds-theme_error slds-m-top_small" style={{ fontSize: '12px' }}>
+                    {recalcError}
+                  </div>
+                )}
+              </div>
+              <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '0.75rem 1rem' }}>
+                <button
+                  type="button"
+                  onClick={handleRecalculateRatings}
+                  disabled={recalcLoading}
+                  className="slds-button slds-button_brand"
+                  style={{ width: '100%' }}
+                >
+                  {recalcLoading ? 'Recalculating Ratings...' : 'Recalculate All Ratings'}
+                </button>
+              </footer>
+            </article>
+          </div>
+        )}
       </div>
     </AdminLayout>
   )

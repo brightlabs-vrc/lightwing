@@ -467,6 +467,10 @@ type UserRaceRecordView struct {
 	FinishTime       *string `json:"finishTime"`
 	ResultStatus     *string `json:"resultStatus"`
 	ResultCreatedAt  string  `json:"resultCreatedAt"`
+	RatingBefore     *int    `json:"ratingBefore"`
+	RatingAfter      *int    `json:"ratingAfter"`
+	RatingDelta      *int    `json:"ratingDelta"`
+	RDAfter          *int    `json:"rdAfter"`
 	RaceID           string  `json:"raceId"`
 	RaceName         string  `json:"raceName"`
 	RaceSequence     int     `json:"raceSequence"`
@@ -520,6 +524,10 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 			FinishTime:       nullString(r.FinishTime),
 			ResultStatus:     nullString(r.ResultStatus),
 			ResultCreatedAt:  isoTime(r.ResultCreatedAt),
+			RatingBefore:     nullInt(sql.NullInt64{Int64: int64(r.RatingBefore.Int32), Valid: r.RatingBefore.Valid}),
+			RatingAfter:      nullInt(sql.NullInt64{Int64: int64(r.RatingAfter.Int32), Valid: r.RatingAfter.Valid}),
+			RatingDelta:      nullInt(sql.NullInt64{Int64: int64(r.RatingDelta.Int32), Valid: r.RatingDelta.Valid}),
+			RDAfter:          nullInt(sql.NullInt64{Int64: int64(r.RdAfter.Int32), Valid: r.RdAfter.Valid}),
 			RaceID:           r.RaceId,
 			RaceName:         r.RaceName,
 			RaceSequence:     int(r.RaceSequence),

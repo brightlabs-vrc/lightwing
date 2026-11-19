@@ -223,7 +223,9 @@ func SetEventStatusCore(ctx context.Context, actor *auth.Actor, p *SetEventStatu
 			}
 		}
 		if st == "CONCLUDED" {
-			scorecalc.InvalidateLeaderboardCache(ctx)
+			if _, rerr := scorecalc.RecalculateAllRatings(ctx); rerr != nil {
+				scorecalc.InvalidateLeaderboardCache(ctx)
+			}
 		}
 	}
 

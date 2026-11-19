@@ -712,6 +712,12 @@ export async function getLeaderboard(
       eventsParticipated: 2,
       racesParticipated: 4,
       wins: 3,
+      rating: 1648,
+      ratingDeviation: 142,
+      ratingVolatility: 0.059,
+      peakRating: 1662,
+      seasonRatingDelta: 148,
+      isProvisional: true,
     },
     {
       rank: 2,
@@ -726,6 +732,12 @@ export async function getLeaderboard(
       eventsParticipated: 2,
       racesParticipated: 4,
       wins: 1,
+      rating: 1532,
+      ratingDeviation: 155,
+      ratingVolatility: 0.06,
+      peakRating: 1550,
+      seasonRatingDelta: 32,
+      isProvisional: true,
     },
     {
       rank: 3,
@@ -740,6 +752,12 @@ export async function getLeaderboard(
       eventsParticipated: 1,
       racesParticipated: 2,
       wins: 0,
+      rating: 1418,
+      ratingDeviation: 215,
+      ratingVolatility: 0.061,
+      peakRating: 1500,
+      seasonRatingDelta: -82,
+      isProvisional: true,
     },
   ]
 
@@ -760,7 +778,9 @@ export async function getLeaderboard(
     )
   }
 
-  if (params.SortBy === 'avgPosition') {
+  if (params.SortBy === 'rating') {
+    filtered.sort((a, b) => b.rating - a.rating)
+  } else if (params.SortBy === 'avgPosition') {
     filtered.sort((a, b) => a.averagePosition - b.averagePosition)
   } else if (params.SortBy === 'avgPointsPerSeason') {
     filtered.sort((a, b) => b.averagePointsPerSeason - a.averagePointsPerSeason)
@@ -852,6 +872,10 @@ export async function getUserRaceRecords(
       finishTime: '1:08.5',
       resultStatus: null,
       resultCreatedAt: now,
+      ratingBefore: 1612,
+      ratingAfter: 1648,
+      ratingDelta: 36,
+      rdAfter: 142,
       raceId: 'race_mock_001',
       raceName: 'Summer Sprint Turf',
       raceSequence: 1,
@@ -868,6 +892,10 @@ export async function getUserRaceRecords(
       finishTime: null,
       resultStatus: 'DEFERRED',
       resultCreatedAt: now,
+      ratingBefore: null,
+      ratingAfter: null,
+      ratingDelta: null,
+      rdAfter: null,
       raceId: 'race_mock_002',
       raceName: 'Summer Sprint Dirt',
       raceSequence: 2,
