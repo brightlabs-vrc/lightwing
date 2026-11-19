@@ -37,6 +37,17 @@ describe('TeamProfileView', () => {
     primaryOrganizationId: 'org_1',
     isOrganization: true,
     organizations: [],
+    teams: [
+      {
+        id: 'team_spica',
+        name: 'Team Spica',
+        slug: 'team-spica',
+        logo: null,
+        status: 'APPROVED',
+        isPrimary: true,
+        memberCount: 7,
+      },
+    ],
     stats: {
       rankingAverage: 0,
       pointsAverage: 0,
@@ -69,14 +80,24 @@ describe('TeamProfileView', () => {
     status: 'APPROVED',
     primaryOrganizationId: '',
     isOrganization: false,
-    organizations: [],
+    organizations: [
+      {
+        id: 'org_1',
+        name: 'Twilight Festival',
+        slug: 'twfs',
+        logo: null,
+        orgType: 'ORGANIZATION',
+        status: 'APPROVED',
+        isPrimary: true,
+      },
+    ],
     stats: {
       rankingAverage: 1.5,
       pointsAverage: 45.0,
       seasonRank: 1,
       averagePointsPerEvent: 15.0,
     },
-    administratorSlotsRemaining: 3,
+    administratorSlotsRemaining: 2,
     members: [
       {
         userId: 'u3',
@@ -87,17 +108,23 @@ describe('TeamProfileView', () => {
     ],
   }
 
-  it('renders organization details with ORGANIZATION badge and STAFF header without team stats', () => {
+  it('renders organization details with ORGANIZATION badge, tight avatar cluster, STAFF header, and AFFILIATED TEAMS without team stats', () => {
     render(<TeamProfileView team={mockOrg} />)
 
     expect(screen.getByText('Twilight Festival')).not.toBeNull()
     expect(screen.getByText('ORGANIZATION')).not.toBeNull()
     expect(screen.getByText('MANAGE ORG')).not.toBeNull()
     expect(screen.getByText('STAFF')).not.toBeNull()
+    expect(screen.getByText('AFFILIATED TEAMS (1)')).not.toBeNull()
+    expect(screen.getByText('Team Spica')).not.toBeNull()
     expect(screen.queryByText('TEAM STATISTICS')).toBeNull()
+
+    const avatarCluster = screen.getByTestId('members-avatar-cluster')
+    expect(avatarCluster.className).toContain('flex-wrap')
+    expect(avatarCluster.className).toContain('gap-1.5')
   })
 
-  it('renders competitive team details with TEAM badge, STAFF & MEMBERS header, and TEAM STATISTICS', () => {
+  it('renders competitive team details with TEAM badge, STAFF & MEMBERS header, AFFILIATED ORGANIZATIONS, and calculated TEAM STATISTICS', () => {
     render(<TeamProfileView team={mockIndependentTeam} />)
 
     expect(screen.getByText('Apex Racing Syndicate')).not.toBeNull()
@@ -105,7 +132,10 @@ describe('TeamProfileView', () => {
     expect(screen.getByText('MANAGE TEAM')).not.toBeNull()
     expect(screen.getByText('STAFF & MEMBERS')).not.toBeNull()
     expect(screen.getByText('TEAM STATISTICS')).not.toBeNull()
+    expect(screen.getByText('AFFILIATED ORGANIZATIONS (1)')).not.toBeNull()
     expect(screen.getByText('#1')).not.toBeNull()
     expect(screen.getByText('1.5')).not.toBeNull()
+    expect(screen.getByText('15.0')).not.toBeNull()
+    expect(screen.getByText('45.0')).not.toBeNull()
   })
 })

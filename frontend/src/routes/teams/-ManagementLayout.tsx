@@ -29,7 +29,9 @@ export function ManagementLayout({ children }: ManagementLayoutProps) {
         const list: Array<{ id: string; name: string; slug: string }> = []
         if (session?.user?.teams) {
           for (const t of session.user.teams) {
-            list.push({ id: t.organizationId, name: t.name, slug: t.slug })
+            if (!list.some((x) => x.id === t.organizationId)) {
+              list.push({ id: t.organizationId, name: t.name, slug: t.slug })
+            }
           }
         }
         const orgsRes = await listApprovedOrganizations()
@@ -62,7 +64,7 @@ export function ManagementLayout({ children }: ManagementLayoutProps) {
 
               {isManagePage && userManagedOrgs.length > 0 && (
                 <div className="flex items-center gap-2 pl-4 border-l-2 border-retro-border">
-                  <span className="font-pixel text-xs text-retro-muted font-bold">ORG:</span>
+                  <span className="font-pixel text-xs text-retro-muted font-bold">ENTITY:</span>
                   <select
                     value={currentTeamId || ''}
                     onChange={(e) => {
@@ -77,11 +79,16 @@ export function ManagementLayout({ children }: ManagementLayoutProps) {
                     {loadingOrgs ? (
                       <option value="">LOADING...</option>
                     ) : (
-                      userManagedOrgs.map((org) => (
-                        <option key={org.id} value={org.id}>
-                          {org.name.toUpperCase()} (@{org.slug})
-                        </option>
-                      ))
+                      <>
+                        {currentTeamId && !userManagedOrgs.some((o) => o.id === currentTeamId) && (
+                          <option value={currentTeamId}>CURRENT ({currentTeamId})</option>
+                        )}
+                        {userManagedOrgs.map((org) => (
+                          <option key={org.id} value={org.id}>
+                            {org.name.toUpperCase()} (@{org.slug})
+                          </option>
+                        ))}
+                      </>
                     )}
                   </select>
                 </div>

@@ -31,8 +31,14 @@ func updateTeamStats(ctx context.Context, actor *auth.Actor, id string, p *TeamS
 		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
-		if _, _, err := auth.RequirePermission(ctx, actor, id, "organization", "update"); err != nil {
-			return nil, err
+		allowed, pErr := hasTeamAdminPermission(ctx, actor, id)
+		if pErr != nil {
+			return nil, pErr
+		}
+		if !allowed {
+			if _, _, err := auth.RequirePermission(ctx, actor, id, "organization", "update"); err != nil {
+				return nil, err
+			}
 		}
 	}
 	targetOrgID := id

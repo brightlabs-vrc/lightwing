@@ -81,13 +81,25 @@ SELECT id, name, email, image, slug, biography, "careerOverview",
        "vrchatUsername", "classTier", "siteRole"::text, "createdAt", "updatedAt"
 FROM "user" WHERE id = $1;
 
--- Team affiliations for a batch of users (includes organization logo).
+-- Team affiliations for a batch of users (includes organization and team memberships).
 -- name: ListTeamAffiliations :many
-SELECT m."userId", o.id, o.name, o.slug, o.logo, m.role
-FROM "member" m
-JOIN "organization" o ON o.id = m."organizationId"
-WHERE m."userId" = ANY($1::text[])
-ORDER BY o."createdAt" ASC;
+SELECT "userId", id, name, slug, logo, role FROM (
+  SELECT m."userId", o.id, o.name, o.slug, o.logo, m.role, o."createdAt"
+  FROM "member" m
+  JOIN "organization" o ON o.id = m."organizationId"
+  WHERE m."userId" = ANY($1::text[])
+  UNION ALL
+  SELECT tm."userId", t.id, t.name, t.slug, t.logo, COALESCE(tm.role, 'member') AS role, t."createdAt"
+  FROM "teamMember" tm
+  JOIN "team" t ON t.id = tm."teamId"
+  WHERE tm."userId" = ANY($1::text[])
+    AND t.status = 'APPROVED'
+    AND NOT EXISTS (
+      SELECT 1 FROM "member" m2
+      WHERE m2."organizationId" = t.id AND m2."userId" = tm."userId"
+    )
+) affils
+ORDER BY "createdAt" ASC;
 
 -- Discord callback login upsert (used by the OAuth callback tx).
 

@@ -226,30 +226,19 @@ func updateTeam(ctx context.Context, actor *auth.Actor, id string, p *UpdateTeam
 		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 
-	// Try resolving primary org for team
-	primOrg, err := q().GetPrimaryOrgForTeam(ctx, id)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	allowed, err := hasTeamAdminPermission(ctx, actor, id)
+	if err != nil {
 		return nil, err
 	}
-
-	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
-		if primOrg.ID != "" {
-			role, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
-				OrganizationId: primOrg.ID,
-				UserId:         actor.UserID,
-			})
-			if err != nil || role != auth.AdministratorRole {
-				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
-			}
-		} else {
-			if _, _, err := auth.RequirePermission(ctx, actor, id, "organization", "update"); err != nil {
-				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
-			}
-		}
+	if !allowed {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team metadata"}
 	}
 
-	// Check if in `team` table
+	// Check if in `team` table (by ID or slug)
 	existingTeam, err := q().GetTeamByID(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		existingTeam, err = q().GetTeamBySlug(ctx, id)
+	}
 	if err == nil {
 		nextSlug := existingTeam.Slug
 		if p.Slug != nil && *p.Slug != existingTeam.Slug {
@@ -281,7 +270,7 @@ func updateTeam(ctx context.Context, actor *auth.Actor, id string, p *UpdateTeam
 			Description:      desc,
 			ClearLogo:        p.ClearLogo,
 			Logo:             logo,
-			ID:               id,
+			ID:               existingTeam.ID,
 		})
 		if isUniqueViolation(err) {
 			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "team slug is already in use"}
@@ -290,7 +279,65 @@ func updateTeam(ctx context.Context, actor *auth.Actor, id string, p *UpdateTeam
 			return nil, err
 		}
 		invalidateTeamCache(ctx, id)
-		return loadTeam(ctx, id)
+		invalidateTeamCache(ctx, existingTeam.ID)
+		invalidateTeamCache(ctx, existingTeam.Slug)
+		invalidateTeamCache(ctx, nextSlug)
+		return loadTeam(ctx, existingTeam.ID)
+	}
+
+	// Fallback: check if in `organization` table (by ID or slug)
+	var existingOrgID, existingOrgSlug string
+	if orgRow, oErr := q().GetOrgByID(ctx, id); oErr == nil {
+		existingOrgID = orgRow.ID
+		existingOrgSlug = orgRow.Slug
+	} else if slugRow, sErr := q().GetOrgBySlug(ctx, id); sErr == nil {
+		existingOrgID = slugRow.ID
+		existingOrgSlug = slugRow.Slug
+	}
+	if existingOrgID != "" {
+		nextSlug := existingOrgSlug
+		if p.Slug != nil && *p.Slug != existingOrgSlug {
+			if !auth.IsValidSlug(*p.Slug) {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "invalid slug format or length"}
+			}
+			if _, err := q().OrgIDBySlug(ctx, *p.Slug); err == nil {
+				return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization slug is already in use"}
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return nil, err
+			}
+			nextSlug = *p.Slug
+		}
+		var name, logo, desc sql.NullString
+		if p.Name != nil {
+			name = sql.NullString{String: *p.Name, Valid: true}
+		}
+		if p.Logo != nil {
+			logo = sql.NullString{String: *p.Logo, Valid: true}
+		}
+		if p.Description != nil {
+			desc = sql.NullString{String: *p.Description, Valid: true}
+		}
+		err = q().UpdateOrg(ctx, sqlc.UpdateOrgParams{
+			Slug:             nextSlug,
+			UpdatedAt:        sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			Name:             name,
+			ClearDescription: p.ClearDescription,
+			Description:      desc,
+			ClearLogo:        p.ClearLogo,
+			Logo:             logo,
+			ID:               existingOrgID,
+		})
+		if isUniqueViolation(err) {
+			return nil, &errs.Error{Code: errs.AlreadyExists, Message: "organization slug is already in use"}
+		}
+		if err != nil {
+			return nil, err
+		}
+		invalidateTeamCache(ctx, id)
+		invalidateTeamCache(ctx, existingOrgID)
+		invalidateTeamCache(ctx, existingOrgSlug)
+		invalidateTeamCache(ctx, nextSlug)
+		return loadTeam(ctx, existingOrgID)
 	}
 
 	return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}

@@ -17,6 +17,7 @@ import (
 
 	"encore.app/auth"
 	"encore.app/shared"
+	"encore.app/teammanager/sqlc"
 )
 
 // TestMain sets up a single shared test database for all tests in this package.
@@ -845,3 +846,95 @@ func TestTeamLookups(t *testing.T) {
 		}
 	})
 }
+
+func TestTeamAdminDescriptionAndRosterEditing(t *testing.T) {
+	ctx := context.Background()
+
+	orgAdmin := nextTeamID("org-only-admin")
+	teamAdmin := nextTeamID("team-only-admin")
+	regularMember := nextTeamID("team-regular-member")
+	newRecruit := nextTeamID("team-new-recruit")
+	insertTestUser(t, ctx, newRecruit, "New Recruit", "USER")
+
+	orgID := createOrgWithMembers(t, ctx, nextTeamID("parent-org"), "Parent Governing Org", nextTeamID("parent-org-slug"), []memberSpec{
+		{userID: orgAdmin, role: "administrator", name: "Org Admin"},
+	})
+
+	teamID := createTeamWithRoster(t, ctx, nextTeamID("comp-team"), "Twilight Festival", nextTeamID("twifest-slug"), []memberSpec{
+		{userID: teamAdmin, role: "administrator", name: "Team Admin"},
+		{userID: regularMember, role: "member", name: "Regular Member"},
+	})
+	_, err := db.Exec(ctx, `INSERT INTO "teamOrganization" ("teamId", "organizationId", "isPrimary", "createdAt") VALUES ($1, $2, true, CURRENT_TIMESTAMP)`, teamID, orgID)
+	if err != nil {
+		t.Fatalf("failed to link primary org: %v", err)
+	}
+
+	// Team admin (who is NOT an admin of parent org and NOT site admin) can update description
+	updated, err := updateTeam(ctx, testActor(teamAdmin, "USER"), teamID, &UpdateTeamParams{
+		Description: sptr("# Welcome to Twilight Festival\nCompetitive racing team."),
+	})
+	if err != nil {
+		t.Fatalf("team admin should be able to update team description, got err: %v", err)
+	}
+	if updated.Description == nil || *updated.Description != "# Welcome to Twilight Festival\nCompetitive racing team." {
+		t.Errorf("updated.Description = %v, want markdown description", updated.Description)
+	}
+
+	// Team admin can also clear description
+	cleared, err := updateTeam(ctx, testActor(teamAdmin, "USER"), teamID, &UpdateTeamParams{
+		ClearDescription: true,
+	})
+	if err != nil {
+		t.Fatalf("team admin should be able to clear team description, got err: %v", err)
+	}
+	if cleared.Description != nil {
+		t.Errorf("expected nil description after ClearDescription, got %v", *cleared.Description)
+	}
+
+	// Regular team member cannot update team description
+	if _, err := updateTeam(ctx, testActor(regularMember, "USER"), teamID, &UpdateTeamParams{
+		Description: sptr("Unauthorized edit"),
+	}); err == nil {
+		t.Fatal("expected permission error for regular team member")
+	} else if errs.Code(err) != errs.PermissionDenied {
+		t.Errorf("code = %v, want permission_denied", errs.Code(err))
+	}
+
+	// Team admin can add, update role, and remove a member on their team
+	withRecruit, err := addTeamMember(ctx, testActor(teamAdmin, "USER"), teamID, newRecruit, "member")
+	if err != nil {
+		t.Fatalf("team admin should be able to add team member, got err: %v", err)
+	}
+	if !hasMemberWithRole(withRecruit, newRecruit, "member") {
+		t.Errorf("expected newRecruit in team members: %+v", withRecruit.Members)
+	}
+
+	afterRemove, err := removeTeamMember(ctx, testActor(teamAdmin, "USER"), teamID, newRecruit)
+	if err != nil {
+		t.Fatalf("team admin should be able to remove team member, got err: %v", err)
+	}
+	if hasMember(afterRemove, newRecruit) {
+		t.Errorf("expected newRecruit to be removed: %+v", afterRemove.Members)
+	}
+}
+
+func TestAggregateRowsToTeamStats(t *testing.T) {
+	rows := []sqlc.GetTeamMembersLeaderboardStatsRow{
+		{UserId: "u1", TotalPoints: 60, AvgPosition: 1.5, EventsParticipated: 2},
+		{UserId: "u2", TotalPoints: 30, AvgPosition: 2.5, EventsParticipated: 3},
+		{UserId: "u3", TotalPoints: 0, AvgPosition: 0, EventsParticipated: 0}, // inactive member on roster
+	}
+
+	stats := aggregateRowsToTeamStats(rows)
+	if stats.PointsAverage == nil || *stats.PointsAverage != 45.0 {
+		t.Errorf("PointsAverage = %v, want 45.0", stats.PointsAverage)
+	}
+	if stats.RankingAverage == nil || *stats.RankingAverage != 2.0 {
+		t.Errorf("RankingAverage = %v, want 2.0", stats.RankingAverage)
+	}
+	// u1: 60/2 = 30.0, u2: 30/3 = 10.0 -> average across participating members = 20.0
+	if stats.AveragePointsPerEvent == nil || *stats.AveragePointsPerEvent != 20.0 {
+		t.Errorf("AveragePointsPerEvent = %v, want 20.0", stats.AveragePointsPerEvent)
+	}
+}
+

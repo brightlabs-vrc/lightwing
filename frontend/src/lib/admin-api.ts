@@ -2047,7 +2047,9 @@ export async function updateAdminTeam(
     name?: string
     slug?: string
     logo?: string | null
+    clearLogo?: boolean
     description?: string | null
+    clearDescription?: boolean
   },
   authorization: string,
 ): Promise<teammanager.Team> {
@@ -2055,7 +2057,12 @@ export async function updateAdminTeam(
     return appClient.teammanager.UpdateTeam({
       id,
       Authorization: authorization,
-      ...params,
+      name: params.name,
+      slug: params.slug,
+      logo: params.logo ?? undefined,
+      clearLogo: params.clearLogo,
+      description: params.description ?? undefined,
+      clearDescription: params.clearDescription,
     } as unknown as teammanager.UpdateTeamRequest)
   }
 
@@ -2065,8 +2072,14 @@ export async function updateAdminTeam(
 
   team.name = params.name ?? team.name
   team.slug = params.slug ?? team.slug
-  team.logo = params.logo ?? team.logo
-  if (params.description !== undefined) {
+  if (params.clearLogo) {
+    team.logo = null as any
+  } else if (params.logo !== undefined) {
+    team.logo = (params.logo ?? team.logo) as any
+  }
+  if (params.clearDescription) {
+    team.description = null
+  } else if (params.description !== undefined) {
     team.description = params.description
   }
 

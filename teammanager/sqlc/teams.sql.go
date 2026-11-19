@@ -1745,3 +1745,36 @@ func (q *Queries) UserIDByID(ctx context.Context, id string) (string, error) {
 	err := row.Scan(&id)
 	return id, err
 }
+
+const teamMemberRoleByTeamAndUser = `-- name: TeamMemberRoleByTeamAndUser :one
+SELECT role FROM "teamMember" WHERE "teamId" = $1 AND "userId" = $2
+`
+
+type TeamMemberRoleByTeamAndUserParams struct {
+	TeamId string
+	UserId string
+}
+
+func (q *Queries) TeamMemberRoleByTeamAndUser(ctx context.Context, arg TeamMemberRoleByTeamAndUserParams) (sql.NullString, error) {
+	row := q.db.QueryRowContext(ctx, teamMemberRoleByTeamAndUser, arg.TeamId, arg.UserId)
+	var role sql.NullString
+	err := row.Scan(&role)
+	return role, err
+}
+
+const countTeamAdmins = `-- name: CountTeamAdmins :one
+SELECT COUNT(*) FROM "teamMember" WHERE "teamId" = $1 AND role = $2
+`
+
+type CountTeamAdminsParams struct {
+	TeamId string
+	Role   sql.NullString
+}
+
+func (q *Queries) CountTeamAdmins(ctx context.Context, arg CountTeamAdminsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countTeamAdmins, arg.TeamId, arg.Role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
