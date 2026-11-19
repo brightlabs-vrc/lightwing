@@ -478,6 +478,7 @@ export namespace eventmanager {
         Authorization: string
         name: string
         description: string
+        bannerUrl?: string | null
         ownerType: string
         organizationId: string
         ownerUserId: string
@@ -641,6 +642,7 @@ export namespace eventmanager {
         id: string
         name: string
         description: string
+        bannerUrl?: string | null
         ownerType: string
         organizationId: string
         ownerUserId: string
@@ -676,6 +678,7 @@ export namespace eventmanager {
         id: string
         name: string
         description: string
+        bannerUrl?: string | null
         ownerType: string
         organizationId: string
         ownerUserId: string
@@ -1196,6 +1199,7 @@ export namespace eventmanager {
         Authorization: string
         name: string
         description: OptString
+        bannerUrl?: OptString
         tag: string
         scoringRulesMode: string
         customScoringTables: JSONValue
@@ -1410,6 +1414,7 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
+                bannerUrl:                       params.bannerUrl,
                 classRestriction:                params.classRestriction,
                 customScoringTables:             params.customScoringTables,
                 description:                     params.description,
@@ -1965,6 +1970,7 @@ export namespace eventmanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
+                bannerUrl:                       params.bannerUrl,
                 classRestriction:                params.classRestriction,
                 customScoringTables:             params.customScoringTables,
                 description:                     params.description,

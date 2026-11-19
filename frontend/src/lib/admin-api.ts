@@ -589,6 +589,7 @@ export async function updateAdminEvent(
   params: {
     name?: string
     description?: string | null
+    bannerUrl?: string | null
     classRestriction?: ClassTier | null
     scoringRulesMode?: string | null
     customScoringTables?: any | null
@@ -604,6 +605,7 @@ export async function updateAdminEvent(
       Authorization: authorization,
       name: params.name,
       description: params.description,
+      bannerUrl: params.bannerUrl,
       classRestriction: params.classRestriction,
       scoringRulesMode: params.scoringRulesMode,
       customScoringTables: params.customScoringTables,
@@ -619,6 +621,7 @@ export async function updateAdminEvent(
         ...evt,
         name: params.name ?? evt.name,
         description: params.description !== undefined ? params.description : evt.description,
+        bannerUrl: params.bannerUrl !== undefined ? params.bannerUrl : evt.bannerUrl,
         classRestriction: params.classRestriction !== undefined ? params.classRestriction : evt.classRestriction,
         scoringRulesMode: params.scoringRulesMode !== undefined ? params.scoringRulesMode : evt.scoringRulesMode,
         customScoringTables: params.customScoringTables !== undefined ? params.customScoringTables : evt.customScoringTables,
@@ -666,6 +669,7 @@ export async function createAdminEvent(
   params: {
     name: string
     description?: string | null
+    bannerUrl?: string | null
     ownerType: EventOwnerType
     organizationId?: string | null
     ownerUserId?: string | null
@@ -686,6 +690,7 @@ export async function createAdminEvent(
       Authorization: authorization,
       name: params.name,
       description: params.description ?? null,
+      bannerUrl: params.bannerUrl ?? null,
       ownerType: params.ownerType,
       organizationId: params.organizationId ?? null,
       ownerUserId: params.ownerUserId ?? null,

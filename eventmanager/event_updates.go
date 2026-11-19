@@ -26,6 +26,7 @@ type UpdateEventRequest struct {
 	ID                              string          `json:"id"`
 	Name                            *string         `json:"name,omitempty"`
 	Description                     OptString       `json:"description,omitempty"`
+	BannerURL                       OptString       `json:"bannerUrl,omitempty"`
 	Tag                             *string         `json:"tag,omitempty"`
 	ScoringRulesMode                *string         `json:"scoringRulesMode,omitempty"`
 	CustomScoringTables             json.RawMessage `json:"customScoringTables,omitempty"`
@@ -210,6 +211,11 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 	if p.Description.Set {
 		params.DescSet = true
 		params.DescVal = nullStringFromPtr(p.Description.Value)
+		hasUpdate = true
+	}
+	if p.BannerURL.Set {
+		params.BannerSet = true
+		params.BannerVal = nullStringFromPtr(p.BannerURL.Value)
 		hasUpdate = true
 	}
 	if updatedScoringRulesMode != nil {

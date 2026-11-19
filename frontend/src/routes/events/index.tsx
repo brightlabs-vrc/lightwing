@@ -212,7 +212,19 @@ function EventsPage() {
                   params={{ eventId: event.id }}
                   className="block"
                 >
-                  <PixelCard className="hover:border-retro-primary transition-all duration-150">
+                  <PixelCard className="hover:border-retro-primary transition-all duration-150 overflow-hidden">
+                    {event.bannerUrl && (
+                      <div className="-mx-4 -mt-4 mb-4 border-b-2 border-retro-border bg-retro-bg">
+                        <img
+                          src={event.bannerUrl}
+                          alt={event.name}
+                          className="w-full h-40 object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      </div>
+                    )}
                     <PixelStack gap={4}>
                       <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
                         <PixelStack gap={2}>

@@ -142,7 +142,7 @@ SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1);
 
 -- Full event row (replaces eventColumns scans).
 -- name: GetEventRow :one
-SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -176,11 +176,11 @@ SELECT EXISTS(SELECT 1 FROM "organization" WHERE id = $1);
 
 -- Event create.
 -- name: CreateEvent :exec
-INSERT INTO "event" (id, name, description, "ownerType", "organizationId", "ownerUserId",
+INSERT INTO "event" (id, name, description, "bannerUrl", "ownerType", "organizationId", "ownerUserId",
   status, tag, "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction",
   "granularParticipation", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations",
   "createdAt", "updatedAt")
-VALUES ($1,$2,$3,$4,$5,$6,'DRAFT',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16);
+VALUES ($1,$2,$3,$4,$5,$6,$7,'DRAFT',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17);
 
 -- Purge long-deleted events.
 -- name: PurgeExpiredDeletedEvents :exec
@@ -197,7 +197,7 @@ WHERE ($1::text = '' OR e."organizationId" = $1)
 
 -- Event list page with optional filters (empty means absent).
 -- name: ListEvents :many
-SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
@@ -223,7 +223,7 @@ SELECT COUNT(*) FROM "event" e WHERE e.status IN ('PENDING','ONGOING','CONCLUDED
 
 -- Public event list page.
 -- name: ListPublicEvents :many
-SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
@@ -425,6 +425,7 @@ UPDATE "event" SET
   name = COALESCE(sqlc.narg('name'), name),
   tag = COALESCE(sqlc.narg('tag'), tag),
   description = CASE WHEN sqlc.arg('desc_set')::boolean THEN sqlc.narg('desc_val') ELSE description END,
+  "bannerUrl" = CASE WHEN sqlc.arg('banner_set')::boolean THEN sqlc.narg('banner_val') ELSE "bannerUrl" END,
   "scoringRulesMode" = COALESCE(sqlc.narg('mode'), "scoringRulesMode"),
   "customScoringTables" = CASE WHEN sqlc.arg('ct_clear')::boolean THEN NULL WHEN sqlc.arg('ct_set')::boolean THEN sqlc.arg('ct_val') ELSE "customScoringTables" END,
   "classRestriction" = CASE WHEN sqlc.arg('class_set')::boolean THEN sqlc.narg('class_val') ELSE "classRestriction" END,

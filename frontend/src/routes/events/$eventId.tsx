@@ -79,6 +79,7 @@ function EventDetailPage() {
   usePageHead({
     title: event ? event.name : 'Event',
     description: event?.description || (event ? `Event details for ${event.name} on UmaKeiba.` : undefined),
+    image: event?.bannerUrl || undefined,
     type: 'website',
   })
 
@@ -224,7 +225,19 @@ function EventDetailPage() {
       </PixelButton>
 
       {/* Main Info Card */}
-      <PixelCard className="mb-6">
+      <PixelCard className="mb-6 overflow-hidden">
+        {event.bannerUrl && (
+          <div className="-mx-4 -mt-4 mb-5 border-b-2 border-retro-border-strong bg-retro-bg">
+            <img
+              src={event.bannerUrl}
+              alt={event.name}
+              className="w-full max-h-72 object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          </div>
+        )}
         <PixelStack gap={4}>
           <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
             <PixelStack gap={1}>

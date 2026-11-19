@@ -127,17 +127,18 @@ func (q *Queries) CreateDataset(ctx context.Context, arg CreateDatasetParams) (D
 }
 
 const createEvent = `-- name: CreateEvent :exec
-INSERT INTO "event" (id, name, description, "ownerType", "organizationId", "ownerUserId",
+INSERT INTO "event" (id, name, description, "bannerUrl", "ownerType", "organizationId", "ownerUserId",
   status, tag, "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction",
   "granularParticipation", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations",
   "createdAt", "updatedAt")
-VALUES ($1,$2,$3,$4,$5,$6,'DRAFT',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)
+VALUES ($1,$2,$3,$4,$5,$6,$7,'DRAFT',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17)
 `
 
 type CreateEventParams struct {
 	ID                              string
 	Name                            string
 	Description                     sql.NullString
+	BannerUrl                       sql.NullString
 	OwnerType                       interface{}
 	OrganizationId                  sql.NullString
 	OwnerUserId                     sql.NullString
@@ -159,6 +160,7 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) error 
 		arg.ID,
 		arg.Name,
 		arg.Description,
+		arg.BannerUrl,
 		arg.OwnerType,
 		arg.OrganizationId,
 		arg.OwnerUserId,
@@ -451,7 +453,7 @@ func (q *Queries) GetEventMemberCount(ctx context.Context, eventid string) (int6
 }
 
 const getEventRow = `-- name: GetEventRow :one
-SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -465,6 +467,7 @@ type GetEventRowRow struct {
 	ID                              string
 	Name                            string
 	Description                     sql.NullString
+	BannerUrl                       sql.NullString
 	OwnerType                       interface{}
 	OrganizationId                  sql.NullString
 	OwnerUserId                     sql.NullString
@@ -495,6 +498,7 @@ func (q *Queries) GetEventRow(ctx context.Context, id string) (GetEventRowRow, e
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.BannerUrl,
 		&i.OwnerType,
 		&i.OrganizationId,
 		&i.OwnerUserId,
@@ -1436,7 +1440,7 @@ func (q *Queries) ListEventSchedules(ctx context.Context, eventid string) ([]Lis
 }
 
 const listEvents = `-- name: ListEvents :many
-SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
@@ -1471,6 +1475,7 @@ type ListEventsRow struct {
 	ID                              string
 	Name                            string
 	Description                     sql.NullString
+	BannerUrl                       sql.NullString
 	OwnerType                       interface{}
 	OrganizationId                  sql.NullString
 	OwnerUserId                     sql.NullString
@@ -1515,6 +1520,7 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListE
 			&i.ID,
 			&i.Name,
 			&i.Description,
+			&i.BannerUrl,
 			&i.OwnerType,
 			&i.OrganizationId,
 			&i.OwnerUserId,
@@ -1629,7 +1635,7 @@ func (q *Queries) ListPointsOverview(ctx context.Context, eventid string) ([]Lis
 }
 
 const listPublicEvents = `-- name: ListPublicEvents :many
-SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
 e."createdAt", e."updatedAt",
@@ -1654,6 +1660,7 @@ type ListPublicEventsRow struct {
 	ID                              string
 	Name                            string
 	Description                     sql.NullString
+	BannerUrl                       sql.NullString
 	OwnerType                       interface{}
 	OrganizationId                  sql.NullString
 	OwnerUserId                     sql.NullString
@@ -1690,6 +1697,7 @@ func (q *Queries) ListPublicEvents(ctx context.Context, arg ListPublicEventsPara
 			&i.ID,
 			&i.Name,
 			&i.Description,
+			&i.BannerUrl,
 			&i.OwnerType,
 			&i.OrganizationId,
 			&i.OwnerUserId,
@@ -2274,6 +2282,7 @@ UPDATE "event" SET
   name = COALESCE($2, name),
   tag = COALESCE($3, tag),
   description = CASE WHEN $4::boolean THEN $5 ELSE description END,
+  "bannerUrl" = CASE WHEN $19::boolean THEN $20 ELSE "bannerUrl" END,
   "scoringRulesMode" = COALESCE($6, "scoringRulesMode"),
   "customScoringTables" = CASE WHEN $7::boolean THEN NULL WHEN $8::boolean THEN $9 ELSE "customScoringTables" END,
   "classRestriction" = CASE WHEN $10::boolean THEN $11 ELSE "classRestriction" END,
@@ -2289,6 +2298,8 @@ type UpdateEventParams struct {
 	Tag       sql.NullString
 	DescSet   bool
 	DescVal   sql.NullString
+	BannerSet bool
+	BannerVal sql.NullString
 	Mode      sql.NullString
 	CtClear   bool
 	CtSet     bool
@@ -2326,6 +2337,8 @@ func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) error 
 		arg.McClear,
 		arg.McVal,
 		arg.ID,
+		arg.BannerSet,
+		arg.BannerVal,
 	)
 	return err
 }

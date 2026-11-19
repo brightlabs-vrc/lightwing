@@ -144,6 +144,7 @@ export function useEventDetail(eventId: string) {
     async (params: {
       name: string
       description: string | null
+      bannerUrl?: string | null
       classRestriction: ClassTier | null
       scoringRulesMode?: string | null
       customScoringTables?: any | null

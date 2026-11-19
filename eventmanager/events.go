@@ -61,6 +61,7 @@ type EventListItem struct {
 	ID                              string  `json:"id"`
 	Name                            string  `json:"name"`
 	Description                     *string `json:"description"`
+	BannerURL                       *string `json:"bannerUrl,omitempty"`
 	OwnerType                       string  `json:"ownerType"`
 	OrganizationID                  *string `json:"organizationId"`
 	OwnerUserID                     *string `json:"ownerUserId"`
@@ -148,6 +149,7 @@ type EventDetail struct {
 	ID                              string              `json:"id"`
 	Name                            string              `json:"name"`
 	Description                     *string             `json:"description"`
+	BannerURL                       *string             `json:"bannerUrl,omitempty"`
 	OwnerType                       string              `json:"ownerType"`
 	OrganizationID                  *string             `json:"organizationId"`
 	OwnerUserID                     *string             `json:"ownerUserId"`
@@ -227,6 +229,7 @@ type eventRow struct {
 	ID                              string
 	Name                            string
 	Description                     sql.NullString
+	BannerURL                       sql.NullString
 	OwnerType                       string
 	OrganizationID                  sql.NullString
 	OwnerUserID                     sql.NullString
@@ -256,7 +259,7 @@ func toEventRow(r sqlc.GetEventRowRow) *eventRow {
 		customTables = r.CustomScoringTables.RawMessage
 	}
 	return &eventRow{
-		ID: r.ID, Name: r.Name, Description: r.Description,
+		ID: r.ID, Name: r.Name, Description: r.Description, BannerURL: r.BannerUrl,
 		OwnerType:      stringFromAny(r.OwnerType),
 		OrganizationID: r.OrganizationId, OwnerUserID: r.OwnerUserId,
 		OwnerName: sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""},
@@ -424,7 +427,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 	}
 
 	return &EventDetail{
-		ID: e.ID, Name: e.Name, Description: nullString(e.Description),
+		ID: e.ID, Name: e.Name, Description: nullString(e.Description), BannerURL: nullString(e.BannerURL),
 		OwnerType: e.OwnerType, OrganizationID: nullString(e.OrganizationID),
 		OwnerUserID: nullString(e.OwnerUserID), OwnerName: nullString(e.OwnerName),
 		OwnerSlug: nullString(e.OwnerSlug), OwnerLogo: nullString(e.OwnerLogo),
@@ -466,6 +469,7 @@ func EnsureEventStandingsRow(ctx context.Context, eventID, userID string, scorin
 type CreateEventRequest struct {
 	Name                            string          `json:"name"`
 	Description                     *string         `json:"description,omitempty"`
+	BannerURL                       *string         `json:"bannerUrl,omitempty"`
 	OwnerType                       string          `json:"ownerType"`
 	OrganizationID                  *string         `json:"organizationId,omitempty"`
 	OwnerUserID                     *string         `json:"ownerUserId,omitempty"`
@@ -648,6 +652,7 @@ func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventReque
 	}
 	if err := q().CreateEvent(ctx, sqlc.CreateEventParams{
 		ID: id, Name: truncate(p.Name, 255), Description: nullStringFromPtr(description),
+		BannerUrl: nullStringFromPtr(p.BannerURL),
 		OwnerType: p.OwnerType, OrganizationId: nullStringFromPtr(organizationID),
 		OwnerUserId: nullStringFromPtr(ownerUserID), Tag: tag,
 		ScoringType: int16(p.ScoringType), ScoringRulesMode: nullStringFromPtr(scoringRulesMode),
@@ -706,7 +711,7 @@ type ListEventsResponse struct {
 // toListItem maps a sqlc list row onto the public EventListItem.
 func toListItem(r sqlc.ListEventsRow) EventListItem {
 	return EventListItem{
-		ID: r.ID, Name: r.Name, Description: nullString(r.Description),
+		ID: r.ID, Name: r.Name, Description: nullString(r.Description), BannerURL: nullString(r.BannerUrl),
 		OwnerType:      stringFromAny(r.OwnerType),
 		OrganizationID: nullString(r.OrganizationId),
 		OwnerUserID:    nullString(r.OwnerUserId),
@@ -729,7 +734,7 @@ func toListItem(r sqlc.ListEventsRow) EventListItem {
 // shared list-row shape.
 func toPublicListItem(r sqlc.ListPublicEventsRow) sqlc.ListEventsRow {
 	return sqlc.ListEventsRow{
-		ID: r.ID, Name: r.Name, Description: r.Description, OwnerType: r.OwnerType,
+		ID: r.ID, Name: r.Name, Description: r.Description, BannerUrl: r.BannerUrl, OwnerType: r.OwnerType,
 		OrganizationId: r.OrganizationId, OwnerUserId: r.OwnerUserId,
 		Status: r.Status, Tag: r.Tag, DeletedAt: r.DeletedAt,
 		ScoringType: r.ScoringType, ClassRestriction: r.ClassRestriction,

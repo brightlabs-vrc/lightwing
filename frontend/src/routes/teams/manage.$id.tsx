@@ -153,6 +153,7 @@ function ManageOrgPage() {
   // Event form state
   const [eventName, setEventName] = useState('')
   const [eventDescription, setEventDescription] = useState('')
+  const [eventBannerUrl, setEventBannerUrl] = useState('')
   const eventTag: EventTag = 'OFFICIAL'
   const [eventScoringType, setEventScoringType] = useState<number>(1)
   const [eventClassRestriction, setEventClassRestriction] = useState<string>('')
@@ -386,6 +387,7 @@ function ManageOrgPage() {
         {
           name: eventName,
           description: eventDescription || null,
+          bannerUrl: eventBannerUrl.trim() || null,
           ownerType: 'ORGANIZATION',
           organizationId: teamId,
           tag: eventTag,
@@ -403,6 +405,7 @@ function ManageOrgPage() {
       setIsCreateEventModalOpen(false)
       setEventName('')
       setEventDescription('')
+      setEventBannerUrl('')
       setEventClassRestriction('')
       setEventScheduledAt('')
       setEventParticipantLimit('')
@@ -1288,6 +1291,14 @@ function ManageOrgPage() {
                   onChange={(e) => setEventName(e.target.value)}
                 />
 
+                <PixelInput
+                  label="BANNER IMAGE URL (OPTIONAL)"
+                  type="url"
+                  value={eventBannerUrl}
+                  onChange={(e) => setEventBannerUrl(e.target.value)}
+                  placeholder="https://example.com/event-banner.png"
+                />
+
                 <MarkdownEditor
                   label="DESCRIPTION"
                   value={eventDescription}
@@ -1542,6 +1553,7 @@ function OrgEventDetailView({
   const [showEditModal, setShowEditModal] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
+  const [editBannerUrl, setEditBannerUrl] = useState('')
   const [editClassRestriction, setEditClassRestriction] = useState('')
   const [editScheduledAt, setEditScheduledAt] = useState('')
   const [editParticipantLimit, setEditParticipantLimit] = useState('')
@@ -1589,6 +1601,7 @@ function OrgEventDetailView({
     if (selectedEvent) {
       setEditName(selectedEvent.name)
       setEditDescription(selectedEvent.description ?? '')
+      setEditBannerUrl(selectedEvent.bannerUrl ?? '')
       setEditClassRestriction(selectedEvent.classRestriction ?? '')
       setEditScheduledAt(selectedEvent.scheduledAt ? toLocalISOString(selectedEvent.scheduledAt) : '')
       setEditParticipantLimit(selectedEvent.participantLimit !== null ? String(selectedEvent.participantLimit) : '')
@@ -1663,6 +1676,7 @@ function OrgEventDetailView({
     await handleUpdateEventDetails({
       name: editName,
       description: editDescription || null,
+      bannerUrl: editBannerUrl.trim() || null,
       classRestriction: (editClassRestriction as any) || null,
       scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
       participantLimit: limitNum,
@@ -2460,6 +2474,14 @@ function OrgEventDetailView({
         <PixelModal open={showEditModal} onClose={() => setShowEditModal(false)} title="EDIT EVENT DETAILS">
           <form onSubmit={onSaveEditDetails} className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
             <PixelInput label="EVENT NAME" required value={editName} onChange={(e) => setEditName(e.target.value)} />
+
+            <PixelInput
+              label="BANNER IMAGE URL (OPTIONAL)"
+              type="url"
+              value={editBannerUrl}
+              onChange={(e) => setEditBannerUrl(e.target.value)}
+              placeholder="https://example.com/event-banner.png"
+            />
 
             <MarkdownEditor
               label="DESCRIPTION"
