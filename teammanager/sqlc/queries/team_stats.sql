@@ -1,16 +1,77 @@
--- Query member leaderboard stats for a team (cut off by current year).
+-- Query member leaderboard stats for a single team (parameterized by team_id and year; year = 0 means all-time).
 -- name: GetTeamMembersLeaderboardStats :many
+WITH team_users AS (
+    SELECT tm."userId" FROM "teamMember" tm WHERE tm."teamId" = $1::text
+    UNION
+    SELECT m."userId" FROM "member" m WHERE m."organizationId" = $1::text
+),
+user_points AS (
+    SELECT
+        epe."userId",
+        COALESCE(SUM(epe.points), 0)::bigint AS total_points,
+        COUNT(DISTINCT epe."eventId")::bigint AS events_participated
+    FROM "event_points_entry" epe
+    JOIN "event" e ON e.id = epe."eventId"
+    WHERE e."deletedAt" IS NULL
+      AND ($2::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $2::int)
+    GROUP BY epe."userId"
+),
+user_races AS (
+    SELECT
+        rr."userId",
+        COALESCE(AVG(rr.position) FILTER (WHERE rr.position IS NOT NULL AND rr.position > 0), 0)::double precision AS avg_position,
+        COALESCE(SUM(rr.points), 0)::bigint AS race_points,
+        COUNT(DISTINCT re."eventId")::bigint AS race_events_participated
+    FROM "race_result" rr
+    JOIN "race_event" re ON re.id = rr."raceEventId"
+    JOIN "event" e ON e.id = re."eventId"
+    WHERE e."deletedAt" IS NULL
+      AND ($2::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $2::int)
+    GROUP BY rr."userId"
+)
 SELECT
-    m."userId",
-    COALESCE(SUM(epe.points), 0)::bigint AS total_points,
-    COALESCE(AVG(rr.position), 0)::double precision AS avg_position,
-    COUNT(DISTINCT epe."eventId")::bigint AS events_participated
-FROM "member" m
-LEFT JOIN "event_points_entry" epe ON epe."userId" = m."userId"
-LEFT JOIN "event" e ON e.id = epe."eventId"
-    AND EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt")) = EXTRACT(YEAR FROM NOW() AT TIME ZONE 'UTC')
-LEFT JOIN "race_event" re ON re."eventId" = e.id
-LEFT JOIN "race_result" rr ON rr."raceEventId" = re.id AND rr."userId" = m."userId" AND rr.position IS NOT NULL
-WHERE m."organizationId" = $1
-  AND (epe.id IS NULL OR e.id IS NOT NULL)
-GROUP BY m."userId";
+    tu."userId",
+    GREATEST(COALESCE(up.total_points, 0), COALESCE(ur.race_points, 0))::bigint AS total_points,
+    COALESCE(ur.avg_position, 0)::double precision AS avg_position,
+    GREATEST(COALESCE(up.events_participated, 0), COALESCE(ur.race_events_participated, 0))::bigint AS events_participated
+FROM team_users tu
+LEFT JOIN user_points up ON up."userId" = tu."userId"
+LEFT JOIN user_races ur ON ur."userId" = tu."userId";
+
+-- Query member leaderboard stats across all approved teams for season rank calculation.
+-- name: GetAllApprovedTeamsMembersLeaderboardStats :many
+WITH user_points AS (
+    SELECT
+        epe."userId",
+        COALESCE(SUM(epe.points), 0)::bigint AS total_points,
+        COUNT(DISTINCT epe."eventId")::bigint AS events_participated
+    FROM "event_points_entry" epe
+    JOIN "event" e ON e.id = epe."eventId"
+    WHERE e."deletedAt" IS NULL
+      AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
+    GROUP BY epe."userId"
+),
+user_races AS (
+    SELECT
+        rr."userId",
+        COALESCE(AVG(rr.position) FILTER (WHERE rr.position IS NOT NULL AND rr.position > 0), 0)::double precision AS avg_position,
+        COALESCE(SUM(rr.points), 0)::bigint AS race_points,
+        COUNT(DISTINCT re."eventId")::bigint AS race_events_participated
+    FROM "race_result" rr
+    JOIN "race_event" re ON re.id = rr."raceEventId"
+    JOIN "event" e ON e.id = re."eventId"
+    WHERE e."deletedAt" IS NULL
+      AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
+    GROUP BY rr."userId"
+)
+SELECT
+    t.id AS team_id,
+    tm."userId",
+    GREATEST(COALESCE(up.total_points, 0), COALESCE(ur.race_points, 0))::bigint AS total_points,
+    COALESCE(ur.avg_position, 0)::double precision AS avg_position,
+    GREATEST(COALESCE(up.events_participated, 0), COALESCE(ur.race_events_participated, 0))::bigint AS events_participated
+FROM "team" t
+JOIN "teamMember" tm ON tm."teamId" = t.id
+LEFT JOIN user_points up ON up."userId" = tm."userId"
+LEFT JOIN user_races ur ON ur."userId" = tm."userId"
+WHERE t.status = 'APPROVED';

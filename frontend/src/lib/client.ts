@@ -2103,6 +2103,17 @@ export namespace teammanager {
         memberCount?: number
     }
 
+    export interface LinkedTeam {
+        id: string
+        name: string
+        slug: string
+        logo?: string | null
+        description?: string | null
+        status: string
+        isPrimary: boolean
+        memberCount?: number
+    }
+
     export interface OrgApplicationView {
         id: string
         name: string
@@ -2340,6 +2351,7 @@ export namespace teammanager {
         primaryOrganizationId?: string
         isOrganization?: boolean
         organizations?: LinkedOrganization[]
+        teams?: LinkedTeam[]
         stats: TeamStats
         administratorSlotsRemaining: number
         members: TeamMemberSummary[]
@@ -2400,10 +2412,12 @@ export namespace teammanager {
     export interface UpdateTeamRequest {
         id: string
         Authorization: string
-        name: string
-        slug: string
-        logo: string
-        clearLogo: boolean
+        name?: string
+        slug?: string
+        logo?: string
+        clearLogo?: boolean
+        description?: string
+        clearDescription?: boolean
     }
 
     /**

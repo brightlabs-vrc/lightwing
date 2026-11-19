@@ -285,6 +285,12 @@ WHERE tm."teamId" = ANY($1::text[]) ORDER BY tm."createdAt" ASC;
 -- name: CountRosterForTeam :one
 SELECT COUNT(*) FROM "teamMember" WHERE "teamId" = $1;
 
+-- name: TeamMemberRoleByTeamAndUser :one
+SELECT role FROM "teamMember" WHERE "teamId" = $1 AND "userId" = $2;
+
+-- name: CountTeamAdmins :one
+SELECT COUNT(*) FROM "teamMember" WHERE "teamId" = $1 AND role = $2;
+
 -- Team stats update
 -- name: UpdateTeamStats :exec
 UPDATE "organization"

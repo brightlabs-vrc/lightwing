@@ -270,38 +270,38 @@ function ManageOrgPage() {
     setUpdatingTeam(true)
     setTeamError(null)
     try {
+      const payload = {
+        name: teamName.trim() || undefined,
+        slug: teamSlug.trim() || undefined,
+        logo: teamLogo.trim() || null,
+        clearLogo: !teamLogo.trim(),
+        description: teamDescription.trim() || null,
+        clearDescription: !teamDescription.trim(),
+      }
+      const targetId = team?.id || teamId
       let updated: teammanager.Team
-      try {
-        await updateAdminOrganization(
-          teamId,
-          {
-            name: teamName.trim() || undefined,
-            slug: teamSlug.trim() || undefined,
-            logo: teamLogo.trim() || null,
-            clearLogo: !teamLogo.trim(),
-            description: teamDescription.trim() || null,
-            clearDescription: !teamDescription.trim(),
-          },
-          authHeader
-        )
-        updated = await getAdminTeam(teamId)
-      } catch {
-        updated = await updateAdminTeam(
-          teamId,
-          {
-            name: teamName.trim() || undefined,
-            slug: teamSlug.trim() || undefined,
-            logo: teamLogo.trim() || null,
-            description: teamDescription.trim() || null,
-          },
-          authHeader
-        )
+      if (isOrg) {
+        try {
+          await updateAdminOrganization(targetId, payload, authHeader)
+          updated = await getAdminTeam(targetId)
+        } catch {
+          updated = await updateAdminTeam(targetId, payload, authHeader)
+        }
+      } else {
+        updated = await updateAdminTeam(targetId, payload, authHeader)
       }
 
       setTeam(updated)
+      setTeamName(updated.name || '')
+      setTeamSlug(updated.slug || '')
+      setTeamLogo(updated.logo || '')
+      setTeamDescription(updated.description || '')
       setIsTeamModalOpen(false)
-      setSuccess('Organization details updated successfully.')
-      toast({ tone: 'green', title: 'Organization details updated successfully.' })
+      const msg = isOrg
+        ? 'Organization details updated successfully.'
+        : 'Team details updated successfully.'
+      setSuccess(msg)
+      toast({ tone: 'green', title: msg })
     } catch (cause) {
       setTeamError(cause instanceof Error ? cause.message : 'Failed to update metadata')
     } finally {

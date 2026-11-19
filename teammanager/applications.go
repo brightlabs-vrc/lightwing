@@ -518,9 +518,14 @@ func submitTeamApplication(ctx context.Context, actor *auth.Actor, p *SubmitTeam
 		}
 	}
 
-	// Insert preliminary roster members
+	// Insert creator as team administrator and preliminary roster members as members
+	_ = q().InsertTeamMemberRow(ctx, sqlc.InsertTeamMemberRowParams{
+		TeamId: teamID,
+		UserId: actor.UserID,
+		Role:   sql.NullString{String: auth.AdministratorRole, Valid: true},
+	})
 	for _, uid := range p.InitialRoster {
-		if uid == "" {
+		if uid == "" || uid == actor.UserID {
 			continue
 		}
 		_ = q().InsertTeamMemberRow(ctx, sqlc.InsertTeamMemberRowParams{
@@ -670,11 +675,14 @@ func linkSecondaryOrganization(ctx context.Context, actor *auth.Actor, p *LinkSe
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "target organization must be approved"}
 	}
 
-	// Check permissions: caller must be administrator on primary org AND target org (unless site admin)
+	// Check permissions: caller must be administrator on team/primary org AND target org (unless site admin)
 	if !auth.IsSiteAdmin(actor.SiteRole) {
-		primRole, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{OrganizationId: primOrg.ID, UserId: actor.UserID})
-		if err != nil || primRole != auth.AdministratorRole {
-			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "must be an administrator of the primary organization"}
+		hasTeamAdmin, _ := hasTeamAdminPermission(ctx, actor, p.TeamID)
+		if !hasTeamAdmin {
+			primRole, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{OrganizationId: primOrg.ID, UserId: actor.UserID})
+			if err != nil || primRole != auth.AdministratorRole {
+				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "must be an administrator of the team or primary organization"}
+			}
 		}
 
 		targetRole, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{OrganizationId: targetOrg.ID, UserId: actor.UserID})
@@ -719,9 +727,12 @@ func unlinkSecondaryOrganization(ctx context.Context, actor *auth.Actor, p *Unli
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) {
-		primRole, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{OrganizationId: primOrg.ID, UserId: actor.UserID})
-		if err != nil || primRole != auth.AdministratorRole {
-			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "must be an administrator of the primary organization"}
+		hasTeamAdmin, _ := hasTeamAdminPermission(ctx, actor, p.TeamID)
+		if !hasTeamAdmin {
+			primRole, err := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{OrganizationId: primOrg.ID, UserId: actor.UserID})
+			if err != nil || primRole != auth.AdministratorRole {
+				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "must be an administrator of the team or primary organization"}
+			}
 		}
 	}
 

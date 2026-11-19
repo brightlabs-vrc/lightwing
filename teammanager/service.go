@@ -10,6 +10,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -42,6 +44,18 @@ type TeamMemberSummary struct {
 	Image  *string `json:"image,omitempty"`
 }
 
+// LinkedTeam represents an approved competitive team affiliated with an organization.
+type LinkedTeam struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	Logo        *string `json:"logo"`
+	Description *string `json:"description,omitempty"`
+	Status      string  `json:"status"`
+	IsPrimary   bool    `json:"isPrimary"`
+	MemberCount int     `json:"memberCount,omitempty"`
+}
+
 // Team is a team with its members and aggregate statistics.
 type Team struct {
 	ID                          string               `json:"id"`
@@ -51,6 +65,7 @@ type Team struct {
 	Description                 *string              `json:"description,omitempty"`
 	Status                      string               `json:"status"`
 	Organizations               []LinkedOrganization `json:"organizations"`
+	Teams                       []LinkedTeam         `json:"teams,omitempty"`
 	PrimaryOrganizationID       string               `json:"primaryOrganizationId"`
 	IsOrganization              bool                 `json:"isOrganization"`
 	Stats                       TeamStats            `json:"stats"`
@@ -93,7 +108,88 @@ var teamCache = cache.NewStructKeyspace[teamCacheKey, Team](shared.Cache, cache.
 })
 
 func invalidateTeamCache(ctx context.Context, id string) {
+	if id == "" {
+		return
+	}
 	_, _ = teamCache.Delete(ctx, teamCacheKey{ID: id})
+}
+
+// hasTeamAdminPermission checks whether the caller is authorized to manage a
+// team (or organization fallback). Grants access to:
+//  1. Global SITE_ADMIN or EVENT_ADMIN
+//  2. Team administrators in `teamMember` (or team submitter if not demoted)
+//  3. Primary organization administrators in `member`
+//  4. Direct organization administrators in `member`
+func hasTeamAdminPermission(ctx context.Context, actor *auth.Actor, idOrSlug string) (bool, error) {
+	if actor == nil {
+		return false, nil
+	}
+	if auth.IsSiteAdmin(actor.SiteRole) || auth.IsEventAdmin(actor.SiteRole) {
+		return true, nil
+	}
+
+	// Check if target exists in `team` table by ID or slug
+	teamRow, err := q().GetTeamByID(ctx, idOrSlug)
+	if errors.Is(err, sql.ErrNoRows) {
+		teamRow, err = q().GetTeamBySlug(ctx, idOrSlug)
+	}
+	if err == nil {
+		// 1. Check `teamMember` table for administrator role
+		tmRole, tmErr := q().TeamMemberRoleByTeamAndUser(ctx, sqlc.TeamMemberRoleByTeamAndUserParams{
+			TeamId: teamRow.ID,
+			UserId: actor.UserID,
+		})
+		if tmErr == nil && tmRole.Valid {
+			r := strings.ToLower(strings.TrimSpace(tmRole.String))
+			if r == strings.ToLower(auth.AdministratorRole) || r == "organizationadministrator" {
+				return true, nil
+			}
+		} else if errors.Is(tmErr, sql.ErrNoRows) {
+			// If submitter was not explicitly added to teamMember (legacy team application), allow submitter
+			if teamRow.SubmittedByUserId.Valid && teamRow.SubmittedByUserId.String == actor.UserID {
+				return true, nil
+			}
+		}
+
+		// 2. Check primary organization administrator role in `member`
+		if primOrg, pErr := q().GetPrimaryOrgForTeam(ctx, teamRow.ID); pErr == nil && primOrg.ID != "" {
+			if orgRole, rErr := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
+				OrganizationId: primOrg.ID,
+				UserId:         actor.UserID,
+			}); rErr == nil && strings.EqualFold(orgRole, auth.AdministratorRole) {
+				return true, nil
+			}
+		}
+
+		// 3. Check direct membership in `member` table under teamRow.ID
+		if orgRole, rErr := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
+			OrganizationId: teamRow.ID,
+			UserId:         actor.UserID,
+		}); rErr == nil && strings.EqualFold(orgRole, auth.AdministratorRole) {
+			return true, nil
+		}
+
+		return false, nil
+	}
+
+	// Fallback: check if target is an organization in `organization` table
+	targetOrgID := idOrSlug
+	if orgRow, oErr := q().GetOrgByID(ctx, idOrSlug); oErr == nil {
+		targetOrgID = orgRow.ID
+	} else if slugRow, sErr := q().GetOrgBySlug(ctx, idOrSlug); sErr == nil {
+		targetOrgID = slugRow.ID
+	}
+	if orgRole, rErr := q().MemberRoleByOrgAndUser(ctx, sqlc.MemberRoleByOrgAndUserParams{
+		OrganizationId: targetOrgID,
+		UserId:         actor.UserID,
+	}); rErr == nil && strings.EqualFold(orgRole, auth.AdministratorRole) {
+		return true, nil
+	}
+	if _, _, pErr := auth.RequirePermission(ctx, actor, targetOrgID, "organization", "update"); pErr == nil {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // --- Shared loaders ---
@@ -183,16 +279,17 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 		desc = &org.Description.String
 	}
 	return &Team{
-		ID:                          org.ID,
-		Name:                        org.Name,
-		Slug:                        org.Slug,
-		Logo:                        logo,
-		Description:                 desc,
-		Status:                      "APPROVED",
-		Organizations:               []LinkedOrganization{},
-		PrimaryOrganizationID:       org.ID,
-		IsOrganization:              true,
-		Stats:                       TeamStats{
+		ID:                    org.ID,
+		Name:                  org.Name,
+		Slug:                  org.Slug,
+		Logo:                  logo,
+		Description:           desc,
+		Status:                "APPROVED",
+		Organizations:         []LinkedOrganization{},
+		Teams:                 []LinkedTeam{},
+		PrimaryOrganizationID: org.ID,
+		IsOrganization:        true,
+		Stats: TeamStats{
 			RankingAverage:        nullFloatToPtr(org.RankingAverage),
 			PointsAverage:         nullFloatToPtr(org.PointsAverage),
 			SeasonRank:            nullInt32ToPtr(org.SeasonRank),
@@ -203,13 +300,9 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 	}
 }
 
-func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
-	stats, err := q().GetTeamMembersLeaderboardStats(ctx, teamID)
-	if err != nil {
-		return TeamStats{}, err
-	}
-	if len(stats) == 0 {
-		return TeamStats{}, nil
+func aggregateRowsToTeamStats(rows []sqlc.GetTeamMembersLeaderboardStatsRow) TeamStats {
+	if len(rows) == 0 {
+		return TeamStats{}
 	}
 
 	var totalPointsSum float64
@@ -219,7 +312,7 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 	activeMembersWithEvents := 0
 	validPosMembers := 0
 
-	for _, s := range stats {
+	for _, s := range rows {
 		if s.TotalPoints > 0 {
 			totalPointsSum += float64(s.TotalPoints)
 			activeMembersWithPoints++
@@ -228,17 +321,15 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 			avgPosSum += s.AvgPosition
 			validPosMembers++
 		}
-		if s.EventsParticipated > 0 {
+		if s.EventsParticipated > 0 && s.TotalPoints > 0 {
 			avgPtsPerEventSum += float64(s.TotalPoints) / float64(s.EventsParticipated)
 			activeMembersWithEvents++
 		}
 	}
 
-	memberCount := float64(len(stats))
-
 	var ptsAvg *float64
 	if activeMembersWithPoints > 0 {
-		avg := totalPointsSum / memberCount
+		avg := totalPointsSum / float64(activeMembersWithPoints)
 		ptsAvg = &avg
 	}
 
@@ -250,7 +341,7 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 
 	var ptsPerEventAvg *float64
 	if activeMembersWithEvents > 0 {
-		avg := avgPtsPerEventSum / memberCount
+		avg := avgPtsPerEventSum / float64(activeMembersWithEvents)
 		ptsPerEventAvg = &avg
 	}
 
@@ -259,7 +350,127 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 		PointsAverage:         ptsAvg,
 		SeasonRank:            nil,
 		AveragePointsPerEvent: ptsPerEventAvg,
-	}, nil
+	}
+}
+
+func hasAnyMemberActivity(rows []sqlc.GetTeamMembersLeaderboardStatsRow) bool {
+	for _, r := range rows {
+		if r.TotalPoints > 0 || r.AvgPosition > 0 || r.EventsParticipated > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
+	currentYear := int32(time.Now().UTC().Year())
+	targetYear := currentYear
+
+	stats, err := q().GetTeamMembersLeaderboardStats(ctx, sqlc.GetTeamMembersLeaderboardStatsParams{
+		TeamID: teamID,
+		Year:   currentYear,
+	})
+	if err != nil {
+		return TeamStats{}, err
+	}
+
+	// Fall back to all-time stats if no member has current-year activity
+	if len(stats) > 0 && !hasAnyMemberActivity(stats) {
+		allTimeStats, allErr := q().GetTeamMembersLeaderboardStats(ctx, sqlc.GetTeamMembersLeaderboardStatsParams{
+			TeamID: teamID,
+			Year:   0,
+		})
+		if allErr == nil && hasAnyMemberActivity(allTimeStats) {
+			stats = allTimeStats
+			targetYear = 0
+		}
+	}
+
+	if len(stats) == 0 {
+		return TeamStats{}, nil
+	}
+
+	result := aggregateRowsToTeamStats(stats)
+	if result.PointsAverage == nil && result.RankingAverage == nil && result.AveragePointsPerEvent == nil {
+		return result, nil
+	}
+
+	// Calculate SeasonRank across all approved teams for targetYear
+	allRows, allErr := q().GetAllApprovedTeamsMembersLeaderboardStats(ctx, targetYear)
+	if allErr == nil {
+		rowsByTeam := make(map[string][]sqlc.GetTeamMembersLeaderboardStatsRow)
+		for _, r := range allRows {
+			rowsByTeam[r.TeamID] = append(rowsByTeam[r.TeamID], sqlc.GetTeamMembersLeaderboardStatsRow{
+				UserId:             r.UserId,
+				TotalPoints:        r.TotalPoints,
+				AvgPosition:        r.AvgPosition,
+				EventsParticipated: r.EventsParticipated,
+			})
+		}
+		// Ensure target teamID is present in rowsByTeam
+		if _, exists := rowsByTeam[teamID]; !exists {
+			rowsByTeam[teamID] = stats
+		}
+
+		type teamStanding struct {
+			teamID string
+			stats  TeamStats
+		}
+		standings := make([]teamStanding, 0, len(rowsByTeam))
+		for tid, tRows := range rowsByTeam {
+			ts := aggregateRowsToTeamStats(tRows)
+			if ts.PointsAverage != nil || ts.RankingAverage != nil || ts.AveragePointsPerEvent != nil {
+				standings = append(standings, teamStanding{teamID: tid, stats: ts})
+			}
+		}
+
+		sort.Slice(standings, func(i, j int) bool {
+			pi, pj := 0.0, 0.0
+			if standings[i].stats.PointsAverage != nil {
+				pi = *standings[i].stats.PointsAverage
+			}
+			if standings[j].stats.PointsAverage != nil {
+				pj = *standings[j].stats.PointsAverage
+			}
+			if pi != pj {
+				return pi > pj
+			}
+
+			ri, rj := math.MaxFloat64, math.MaxFloat64
+			if standings[i].stats.RankingAverage != nil && *standings[i].stats.RankingAverage > 0 {
+				ri = *standings[i].stats.RankingAverage
+			}
+			if standings[j].stats.RankingAverage != nil && *standings[j].stats.RankingAverage > 0 {
+				rj = *standings[j].stats.RankingAverage
+			}
+			if ri != rj {
+				return ri < rj
+			}
+
+			ei, ej := 0.0, 0.0
+			if standings[i].stats.AveragePointsPerEvent != nil {
+				ei = *standings[i].stats.AveragePointsPerEvent
+			}
+			if standings[j].stats.AveragePointsPerEvent != nil {
+				ej = *standings[j].stats.AveragePointsPerEvent
+			}
+			if ei != ej {
+				return ei > ej
+			}
+
+			return standings[i].teamID < standings[j].teamID
+		})
+
+		for idx, st := range standings {
+			if st.teamID == teamID {
+				rank := int32(idx + 1)
+				result.SeasonRank = &rank
+				break
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func loadTeam(ctx context.Context, id string) (*Team, error) {
@@ -283,6 +494,11 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 				l := r.Logo.String
 				logo = &l
 			}
+			var orgDesc *string
+			if r.Description.Valid && r.Description.String != "" {
+				d := r.Description.String
+				orgDesc = &d
+			}
 			orgType := "ORGANIZATION"
 			if r.OrgType.Valid {
 				orgType = r.OrgType.String
@@ -295,13 +511,14 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 				primOrgID = r.ID
 			}
 			orgs = append(orgs, LinkedOrganization{
-				ID:        r.ID,
-				Name:      r.Name,
-				Slug:      r.Slug,
-				Logo:      logo,
-				OrgType:   orgType,
-				Status:    status,
-				IsPrimary: r.IsPrimary,
+				ID:          r.ID,
+				Name:        r.Name,
+				Slug:        r.Slug,
+				Logo:        logo,
+				Description: orgDesc,
+				OrgType:     orgType,
+				Status:      status,
+				IsPrimary:   r.IsPrimary,
 			})
 		}
 
@@ -309,6 +526,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 		if err != nil {
 			return nil, err
 		}
+		adminCount := 0
 		summaries := make([]TeamMemberSummary, 0, len(roster))
 		for _, m := range roster {
 			var slug *string
@@ -324,6 +542,9 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			role := "member"
 			if m.Role.Valid && m.Role.String != "" {
 				role = m.Role.String
+			}
+			if strings.EqualFold(role, auth.AdministratorRole) {
+				adminCount++
 			}
 			summaries = append(summaries, TeamMemberSummary{
 				UserID: m.UserId,
@@ -345,37 +566,44 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			desc = &d
 		}
 
-		// Add staff from associated organizations to team members if not already present
-		existingUserIDs := make(map[string]bool)
-		for _, m := range summaries {
-			existingUserIDs[m.UserID] = true
-		}
-		for _, org := range orgs {
-			orgStaff, sErr := loadMemberRows(ctx, org.ID)
-			if sErr == nil {
-				for _, m := range orgStaff {
-					if !existingUserIDs[m.UserId] {
-						existingUserIDs[m.UserId] = true
-						var slug *string
-						if m.Slug.Valid && m.Slug.String != "" {
-							s := m.Slug.String
-							slug = &s
+		// Only fall back to associated organization staff when the team's own roster is empty
+		if len(summaries) == 0 {
+			existingUserIDs := make(map[string]bool)
+			for _, org := range orgs {
+				orgStaff, sErr := loadMemberRows(ctx, org.ID)
+				if sErr == nil {
+					for _, m := range orgStaff {
+						if !existingUserIDs[m.UserId] {
+							existingUserIDs[m.UserId] = true
+							var slug *string
+							if m.Slug.Valid && m.Slug.String != "" {
+								s := m.Slug.String
+								slug = &s
+							}
+							var img *string
+							if m.Image.Valid && m.Image.String != "" {
+								i := m.Image.String
+								img = &i
+							}
+							if strings.EqualFold(m.Role, auth.AdministratorRole) {
+								adminCount++
+							}
+							summaries = append(summaries, TeamMemberSummary{
+								UserID: m.UserId,
+								Name:   displayName(m.Name, m.VrchatUsername),
+								Slug:   slug,
+								Role:   m.Role,
+								Image:  img,
+							})
 						}
-						var img *string
-						if m.Image.Valid && m.Image.String != "" {
-							i := m.Image.String
-							img = &i
-						}
-						summaries = append(summaries, TeamMemberSummary{
-							UserID: m.UserId,
-							Name:   displayName(m.Name, m.VrchatUsername),
-							Slug:   slug,
-							Role:   m.Role,
-							Image:  img,
-						})
 					}
 				}
 			}
+		}
+
+		slots := auth.AdministratorRoleLimit - adminCount
+		if slots < 0 {
+			slots = 0
 		}
 
 		t := &Team{
@@ -386,10 +614,11 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			Description:                 desc,
 			Status:                      teamRow.Status,
 			Organizations:               orgs,
+			Teams:                       []LinkedTeam{},
 			PrimaryOrganizationID:       primOrgID,
 			IsOrganization:              false,
 			Stats:                       TeamStats{},
-			AdministratorSlotsRemaining: 0,
+			AdministratorSlotsRemaining: slots,
 			Members:                     summaries,
 		}
 
@@ -401,12 +630,31 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			if computedStats.PointsAverage != nil {
 				t.Stats.PointsAverage = computedStats.PointsAverage
 			}
+			if computedStats.SeasonRank != nil {
+				t.Stats.SeasonRank = computedStats.SeasonRank
+			}
 			if computedStats.AveragePointsPerEvent != nil {
 				t.Stats.AveragePointsPerEvent = computedStats.AveragePointsPerEvent
 			}
 		}
 
 		if primOrgID != "" {
+			if t.Stats.RankingAverage == nil && t.Stats.PointsAverage == nil && len(roster) == 0 {
+				if fallbackStats, fErr := computeTeamStats(ctx, primOrgID); fErr == nil {
+					if t.Stats.RankingAverage == nil {
+						t.Stats.RankingAverage = fallbackStats.RankingAverage
+					}
+					if t.Stats.PointsAverage == nil {
+						t.Stats.PointsAverage = fallbackStats.PointsAverage
+					}
+					if t.Stats.SeasonRank == nil {
+						t.Stats.SeasonRank = fallbackStats.SeasonRank
+					}
+					if t.Stats.AveragePointsPerEvent == nil {
+						t.Stats.AveragePointsPerEvent = fallbackStats.AveragePointsPerEvent
+					}
+				}
+			}
 			if orgRow, err := q().GetOrgByID(ctx, primOrgID); err == nil {
 				if t.Stats.RankingAverage == nil {
 					t.Stats.RankingAverage = nullFloatToPtr(orgRow.RankingAverage)
@@ -456,13 +704,14 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 			// Organizations do not have ranking layer / team stats attached
 			t.Stats = TeamStats{}
 
-			// Aggregate members from all associated teams under this organization
+			// Aggregate affiliated teams and members under this organization
 			teamsForOrg, tErr := q().ListTeamsForOrg(ctx, orgRow.ID)
 			if tErr == nil && len(teamsForOrg) > 0 {
 				teamIDs := make([]string, len(teamsForOrg))
 				for i, team := range teamsForOrg {
 					teamIDs[i] = team.ID
 				}
+				rosterCounts := make(map[string]int)
 				rosterRows, rErr := q().ListRosterForTeamsBatch(ctx, teamIDs)
 				if rErr == nil {
 					existingUserIDs := make(map[string]bool)
@@ -470,6 +719,7 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 						existingUserIDs[m.UserID] = true
 					}
 					for _, r := range rosterRows {
+						rosterCounts[r.TeamId]++
 						if !existingUserIDs[r.UserId] {
 							existingUserIDs[r.UserId] = true
 							var slug *string
@@ -496,6 +746,34 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 						}
 					}
 				}
+
+				linkedTeams := make([]LinkedTeam, 0, len(teamsForOrg))
+				for _, tm := range teamsForOrg {
+					if tm.Status != "APPROVED" {
+						continue
+					}
+					var tmLogo *string
+					if tm.Logo.Valid && tm.Logo.String != "" {
+						l := tm.Logo.String
+						tmLogo = &l
+					}
+					var tmDesc *string
+					if tm.Description.Valid && tm.Description.String != "" {
+						d := tm.Description.String
+						tmDesc = &d
+					}
+					linkedTeams = append(linkedTeams, LinkedTeam{
+						ID:          tm.ID,
+						Name:        tm.Name,
+						Slug:        tm.Slug,
+						Logo:        tmLogo,
+						Description: tmDesc,
+						Status:      tm.Status,
+						IsPrimary:   tm.IsPrimary,
+						MemberCount: rosterCounts[tm.ID],
+					})
+				}
+				t.Teams = linkedTeams
 			}
 
 			return t, nil

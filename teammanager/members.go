@@ -21,9 +21,12 @@ type ListTeamMembersResponse struct {
 
 func listTeamMembers(ctx context.Context, id, search string, limit, offset int) (*ListTeamMembersResponse, error) {
 	// Try roster for team first
-	_, teamErr := q().GetTeamByID(ctx, id)
+	teamRow, teamErr := q().GetTeamByID(ctx, id)
+	if errors.Is(teamErr, sql.ErrNoRows) {
+		teamRow, teamErr = q().GetTeamBySlug(ctx, id)
+	}
 	if teamErr == nil {
-		roster, err := q().ListRosterForTeam(ctx, id)
+		roster, err := q().ListRosterForTeam(ctx, teamRow.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -33,6 +36,11 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 			if m.Slug.Valid && m.Slug.String != "" {
 				s := m.Slug.String
 				slug = &s
+			}
+			var img *string
+			if m.Image.Valid && m.Image.String != "" {
+				i := m.Image.String
+				img = &i
 			}
 			role := "member"
 			if m.Role.Valid && m.Role.String != "" {
@@ -52,6 +60,7 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 				Name:   mName,
 				Slug:   slug,
 				Role:   role,
+				Image:  img,
 			})
 		}
 		total := len(members)
@@ -88,7 +97,7 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 		for _, r := range rows {
 			stubs = append(stubs, memberStub{
 				UserID: r.UserId, Role: r.Role, Name: r.Name,
-				VrchatUsername: r.VrchatUsername, Slug: r.Slug,
+				VrchatUsername: r.VrchatUsername, Slug: r.Slug, Image: r.Image,
 			})
 		}
 	} else {
@@ -111,7 +120,7 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 		for _, r := range rows {
 			stubs = append(stubs, memberStub{
 				UserID: r.UserId, Role: r.Role, Name: r.Name,
-				VrchatUsername: r.VrchatUsername, Slug: r.Slug,
+				VrchatUsername: r.VrchatUsername, Slug: r.Slug, Image: r.Image,
 			})
 		}
 	}
@@ -119,13 +128,20 @@ func listTeamMembers(ctx context.Context, id, search string, limit, offset int) 
 	for _, m := range stubs {
 		var slug *string
 		if m.Slug.Valid {
-			slug = &m.Slug.String
+			s := m.Slug.String
+			slug = &s
+		}
+		var img *string
+		if m.Image.Valid && m.Image.String != "" {
+			i := m.Image.String
+			img = &i
 		}
 		members = append(members, MemberListItem{
 			UserID: m.UserID,
 			Name:   displayName(m.Name, m.VrchatUsername),
 			Slug:   slug,
 			Role:   m.Role,
+			Image:  img,
 		})
 	}
 	return &ListTeamMembersResponse{Members: members, Total: int(total)}, nil
@@ -138,6 +154,7 @@ type memberStub struct {
 	Name           string
 	VrchatUsername sql.NullString
 	Slug           sql.NullString
+	Image          sql.NullString
 }
 
 func resolvePrimaryOrgOrTarget(ctx context.Context, id string) (string, error) {
@@ -164,13 +181,19 @@ func addTeamMember(ctx context.Context, actor *auth.Actor, id, userID, role stri
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
-		targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
-		if err != nil {
-			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		allowed, pErr := hasTeamAdminPermission(ctx, actor, id)
+		if pErr != nil {
+			return nil, pErr
 		}
+		if !allowed {
+			targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+			if err != nil {
+				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+			}
 
-		if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "create"); err != nil {
-			return nil, err
+			if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "create"); err != nil {
+				return nil, err
+			}
 		}
 	}
 	targetRole := role
@@ -184,8 +207,11 @@ func addTeamMember(ctx context.Context, actor *auth.Actor, id, userID, role stri
 		return nil, err
 	}
 
-	// Check if this is a team
+	// Check if this is a team (by ID or slug)
 	teamRow, teamErr := q().GetTeamByID(ctx, id)
+	if errors.Is(teamErr, sql.ErrNoRows) {
+		teamRow, teamErr = q().GetTeamBySlug(ctx, id)
+	}
 	if teamErr == nil {
 		if err := q().InsertTeamMemberRow(ctx, sqlc.InsertTeamMemberRowParams{
 			TeamId: teamRow.ID,
@@ -197,7 +223,9 @@ func addTeamMember(ctx context.Context, actor *auth.Actor, id, userID, role stri
 			return nil, err
 		}
 		invalidateTeamCache(ctx, id)
-		return loadTeam(ctx, id)
+		invalidateTeamCache(ctx, teamRow.ID)
+		invalidateTeamCache(ctx, teamRow.Slug)
+		return loadTeam(ctx, teamRow.ID)
 	}
 
 	// Else organization fallback
@@ -258,18 +286,27 @@ func updateTeamMemberRole(ctx context.Context, actor *auth.Actor, id, userID, ro
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
-		targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
-		if err != nil {
-			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		allowed, pErr := hasTeamAdminPermission(ctx, actor, id)
+		if pErr != nil {
+			return nil, pErr
 		}
+		if !allowed {
+			targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+			if err != nil {
+				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+			}
 
-		if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "update"); err != nil {
-			return nil, err
+			if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "update"); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	// Check if this is a team
+	// Check if this is a team (by ID or slug)
 	teamRow, teamErr := q().GetTeamByID(ctx, id)
+	if errors.Is(teamErr, sql.ErrNoRows) {
+		teamRow, teamErr = q().GetTeamBySlug(ctx, id)
+	}
 	if teamErr == nil {
 		if err := q().UpdateTeamMemberRoleRow(ctx, sqlc.UpdateTeamMemberRoleRowParams{
 			Role:   sql.NullString{String: role, Valid: true},
@@ -279,7 +316,9 @@ func updateTeamMemberRole(ctx context.Context, actor *auth.Actor, id, userID, ro
 			return nil, err
 		}
 		invalidateTeamCache(ctx, id)
-		return loadTeam(ctx, id)
+		invalidateTeamCache(ctx, teamRow.ID)
+		invalidateTeamCache(ctx, teamRow.Slug)
+		return loadTeam(ctx, teamRow.ID)
 	}
 
 	// Org fallback
@@ -339,18 +378,27 @@ func removeTeamMember(ctx context.Context, actor *auth.Actor, id, userID string)
 	}
 
 	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
-		targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
-		if err != nil {
-			return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+		allowed, pErr := hasTeamAdminPermission(ctx, actor, id)
+		if pErr != nil {
+			return nil, pErr
 		}
+		if !allowed {
+			targetOrgID, err := resolvePrimaryOrgOrTarget(ctx, id)
+			if err != nil {
+				return nil, &errs.Error{Code: errs.PermissionDenied, Message: "cannot update team roster"}
+			}
 
-		if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "delete"); err != nil {
-			return nil, err
+			if _, _, err := auth.RequirePermission(ctx, actor, targetOrgID, "member", "delete"); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	// Check if this is a team
+	// Check if this is a team (by ID or slug)
 	teamRow, teamErr := q().GetTeamByID(ctx, id)
+	if errors.Is(teamErr, sql.ErrNoRows) {
+		teamRow, teamErr = q().GetTeamBySlug(ctx, id)
+	}
 	if teamErr == nil {
 		if err := q().DeleteTeamMemberRow(ctx, sqlc.DeleteTeamMemberRowParams{
 			TeamId: teamRow.ID,
@@ -359,7 +407,9 @@ func removeTeamMember(ctx context.Context, actor *auth.Actor, id, userID string)
 			return nil, err
 		}
 		invalidateTeamCache(ctx, id)
-		return loadTeam(ctx, id)
+		invalidateTeamCache(ctx, teamRow.ID)
+		invalidateTeamCache(ctx, teamRow.Slug)
+		return loadTeam(ctx, teamRow.ID)
 	}
 
 	// Org fallback
