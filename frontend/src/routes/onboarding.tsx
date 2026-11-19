@@ -24,7 +24,7 @@ export const Route = createFileRoute('/onboarding')({
 function OnboardingPage() {
   usePageHead({
     title: 'Onboarding',
-    description: 'Complete your driver onboarding on UmaKeiba.',
+    description: 'Complete your participant onboarding on UmaKeiba.',
   })
 
   const { session } = useAuth()

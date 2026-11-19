@@ -32,6 +32,7 @@ type fixtures struct {
 	users  []string
 	tokens []string
 	events []string
+	orgs   []string
 }
 
 func newFixtures(tb testing.TB) *fixtures {
@@ -56,10 +57,16 @@ func (f *fixtures) cleanup() {
 		_, _ = db.Exec(ctx, `DELETE FROM "event_schedule" WHERE "eventId" = ANY($1)`, f.events)
 		_, _ = db.Exec(ctx, `DELETE FROM "event" WHERE id = ANY($1)`, f.events)
 	}
+	if len(f.orgs) > 0 {
+		_, _ = db.Exec(ctx, `DELETE FROM "org_class_tier" WHERE "organizationId" = ANY($1)`, f.orgs)
+		_, _ = db.Exec(ctx, `DELETE FROM "member" WHERE "organizationId" = ANY($1)`, f.orgs)
+		_, _ = db.Exec(ctx, `DELETE FROM "organization" WHERE id = ANY($1)`, f.orgs)
+	}
 	if len(f.tokens) > 0 {
 		_, _ = db.Exec(ctx, `DELETE FROM "session" WHERE token = ANY($1)`, f.tokens)
 	}
 	if len(f.users) > 0 {
+		_, _ = db.Exec(ctx, `DELETE FROM "org_class_tier" WHERE "userId" = ANY($1)`, f.users)
 		_, _ = db.Exec(ctx, `DELETE FROM "user" WHERE id = ANY($1)`, f.users)
 	}
 }
@@ -243,14 +250,126 @@ func Test_JoinRejectedOnDraftOrConcluded(t *testing.T) {
 	requireErrCode(t, err, errs.FailedPrecondition, "not open for public signup")
 }
 
+// createOrg inserts an organization row and returns its id.
+func (f *fixtures) createOrg(name string) string {
+	f.tb.Helper()
+	id := "org-" + newID()[:8]
+	now := time.Now().UTC()
+	_, err := db.Exec(f.ctx,
+		`INSERT INTO "organization" (id, name, slug, "createdAt")
+		 VALUES ($1, $2, $3, $4)`,
+		id, name, "slug-"+id, now)
+	if err != nil {
+		f.tb.Fatalf("insert organization: %v", err)
+	}
+	f.orgs = append(f.orgs, id)
+	return id
+}
+
+// addOrgMember adds a user to an organization with the given role.
+func (f *fixtures) addOrgMember(orgID, userID, role string) {
+	f.tb.Helper()
+	now := time.Now().UTC()
+	_, err := db.Exec(f.ctx,
+		`INSERT INTO "member" (id, "organizationId", "userId", role, "createdAt")
+		 VALUES (gen_random_uuid()::text, $1, $2, $3, $4)`,
+		orgID, userID, role, now)
+	if err != nil {
+		f.tb.Fatalf("insert member: %v", err)
+	}
+}
+
+// createOrgEventDirect inserts an organization-owned event row.
+func (f *fixtures) createOrgEventDirect(orgID, name, status string, restriction *string) string {
+	f.tb.Helper()
+	id := "event-" + newID()[:8]
+	now := time.Now().UTC()
+	var r any
+	if restriction != nil {
+		r = *restriction
+	}
+	st := status
+	if st == "UNOFFICIAL" || st == "OFFICIAL" {
+		st = "PENDING"
+	}
+	tag := "OFFICIAL"
+	if status == "UNOFFICIAL" {
+		tag = "COMMUNITY"
+	}
+	_, err := db.Exec(f.ctx,
+		`INSERT INTO "event" (id, name, "ownerType", "ownerOrganizationId", status, tag, "scoringType",
+		  "classRestriction", "granularParticipation", "createdAt", "updatedAt")
+		 VALUES ($1, $2, 'ORG', $3, $4, $5, 1, $6, false, $7, $7)`,
+		id, name, orgID, st, tag, r, now)
+	if err != nil {
+		f.tb.Fatalf("insert org event: %v", err)
+	}
+	f.events = append(f.events, id)
+	return id
+}
+
 func Test_JoinRejectedOnClassTierMismatch(t *testing.T) {
 	f := newFixtures(t)
-	creatorID := f.createUser("creator", "Creator User", nil, "USER")
-	userID := f.createUser("participant-low", "Low Tier Participant", strptr("G1"), "USER")
-	eventID := f.createEventDirect(creatorID, "Elite G3 Championship", "OFFICIAL", strptr("G3"), false)
+	adminID := f.createUser("org-admin", "Org Admin", nil, "USER")
+	userID := f.createUser("participant-low", "Low Tier Participant", nil, "USER")
+	orgID := f.createOrg("Apex League")
+	f.addOrgMember(orgID, adminID, "admin")
+	eventID := f.createOrgEventDirect(orgID, "Elite G3 Championship", "OFFICIAL", strptr("G3"))
+
+	// Assign user G1 in this org via SetUserClassCore
+	adminActor := testActor(adminID, "USER")
+	if _, err := SetUserClassCore(f.ctx, adminActor, &SetUserClassRequest{
+		UserID:         userID,
+		OrganizationID: strptr(orgID),
+		ClassTier:      strptr("G1"),
+	}); err != nil {
+		t.Fatalf("SetUserClassCore: %v", err)
+	}
 
 	actor := testActor(userID, "USER")
 	_, err := JoinEventCore(f.ctx, actor, &JoinEventRequest{EventID: eventID})
+	requireErrCode(t, err, errs.FailedPrecondition, "class tier does not satisfy")
+}
+
+func Test_OrgScopedClassTierIsolation(t *testing.T) {
+	f := newFixtures(t)
+	adminA := f.createUser("admin-a", "Admin A", nil, "USER")
+	adminB := f.createUser("admin-b", "Admin B", nil, "USER")
+	userID := f.createUser("racer", "Multi-Org Participant", nil, "USER")
+
+	orgA := f.createOrg("League Alpha")
+	orgB := f.createOrg("League Beta")
+	f.addOrgMember(orgA, adminA, "admin")
+	f.addOrgMember(orgB, adminB, "owner")
+
+	eventA := f.createOrgEventDirect(orgA, "Alpha G3 Cup", "OFFICIAL", strptr("G3"))
+	eventB := f.createOrgEventDirect(orgB, "Beta G3 Cup", "OFFICIAL", strptr("G3"))
+
+	// Assign G3 in Org A, G1 in Org B
+	if _, err := SetUserClassCore(f.ctx, testActor(adminA, "USER"), &SetUserClassRequest{
+		UserID: userID, OrganizationID: strptr(orgA), ClassTier: strptr("G3"),
+	}); err != nil {
+		t.Fatalf("SetUserClassCore orgA: %v", err)
+	}
+	if _, err := SetUserClassCore(f.ctx, testActor(adminB, "USER"), &SetUserClassRequest{
+		UserID: userID, OrganizationID: strptr(orgB), ClassTier: strptr("G1"),
+	}); err != nil {
+		t.Fatalf("SetUserClassCore orgB: %v", err)
+	}
+
+	// Non-admin cannot assign in Org A
+	if _, err := SetUserClassCore(f.ctx, testActor(userID, "USER"), &SetUserClassRequest{
+		UserID: userID, OrganizationID: strptr(orgA), ClassTier: strptr("G3"),
+	}); err == nil {
+		t.Fatalf("expected permission denied for non-admin")
+	}
+
+	// Can join Org A's G3 event, rejected from Org B's G3 event
+	userActor := testActor(userID, "USER")
+	if _, err := JoinEventCore(f.ctx, userActor, &JoinEventRequest{EventID: eventA}); err != nil {
+		t.Fatalf("expected join to succeed for orgA G3 event: %v", err)
+	}
+	_, err := JoinEventCore(f.ctx, userActor, &JoinEventRequest{EventID: eventB})
 	requireErrCode(t, err, errs.FailedPrecondition, "class tier does not satisfy")
 }
 

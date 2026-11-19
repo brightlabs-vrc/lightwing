@@ -28,7 +28,7 @@ export const Route = createFileRoute('/profile/')({
 function ProfilePage() {
   usePageHead({
     title: 'Edit Profile',
-    description: 'Manage your UmaKeiba driver profile details.',
+    description: 'Manage your UmaKeiba participant profile details.',
   })
 
   const { session } = useAuth()
@@ -89,9 +89,9 @@ function ProfilePage() {
           <PixelInput label="NAME" value={profile?.name ?? ''} disabled />
 
           <PixelInput
-            label="HANDLE"
-            placeholder="e.g. competitorhandle"
-            hint="Your unique Handle must be between 4 and 24 characters (lowercase letters, numbers, periods, dashes, and underscores)."
+            label="@USERNAME"
+            placeholder="e.g. participantname"
+            hint="Your unique @username must be between 4 and 24 characters (lowercase letters, numbers, periods, dashes, and underscores)."
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
           />
@@ -120,11 +120,11 @@ function ProfilePage() {
             onClick={() => {
               const trimmedSlug = slug.trim()
               if (trimmedSlug && (trimmedSlug.length < 4 || trimmedSlug.length > 24)) {
-                toast({ tone: 'red', title: 'Slug must be between 4 and 24 characters.' })
+                toast({ tone: 'red', title: '@username must be between 4 and 24 characters.' })
                 return
               }
               if (trimmedSlug && !isValidUserSlug(trimmedSlug)) {
-                toast({ tone: 'red', title: 'Slug must contain only lowercase letters, numbers, periods, dashes, and underscores.' })
+                toast({ tone: 'red', title: '@username must contain only lowercase letters, numbers, periods, dashes, and underscores.' })
                 return
               }
               updateMutation.mutate({ biography, vrchatUsername, slug: trimmedSlug })

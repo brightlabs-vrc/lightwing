@@ -32,16 +32,19 @@ type LeaderboardEntry struct {
 
 // LeaderboardResponse holds paginated leaderboard rows along with total count.
 type LeaderboardResponse struct {
-	Entries      []LeaderboardEntry `json:"entries"`
-	Total        int                `json:"total"`
-	CalculatedAt string             `json:"calculatedAt"`
+	Entries        []LeaderboardEntry `json:"entries"`
+	Total          int                `json:"total"`
+	Year           int                `json:"year"`
+	AvailableYears []int              `json:"availableYears"`
+	CalculatedAt   string             `json:"calculatedAt"`
 }
 
 // GetLeaderboardParams specifies sorting, filtering, and pagination query params.
 type GetLeaderboardParams struct {
 	SortBy    string `query:"sortBy"`    // "points", "avgPosition", "avgPointsPerSeason"
-	Search    string `query:"search"`    // search driver name or slug
+	Search    string `query:"search"`    // search participant name or @username
 	ClassTier string `query:"classTier"` // filter by class tier e.g. "G1", "G2", "G3", "OP"
+	Year      int    `query:"year"`      // calendar year cutoff (defaults to current UTC year)
 	Limit     int    `query:"limit"`     // pagination limit
 	Offset    int    `query:"offset"`    // pagination offset
 }
@@ -67,25 +70,42 @@ var (
 	})
 
 	inMemoryLeaderboardMu sync.RWMutex
-	inMemoryLeaderboard   *cachedLeaderboardData
+	inMemoryLeaderboards  = make(map[int]*cachedLeaderboardData)
 
 	recomputeMu sync.Mutex
 )
 
+func yearCacheID(year int) string {
+	return "global:" + string(rune('0'+year/1000)) + string(rune('0'+(year/100)%10)) + string(rune('0'+(year/10)%10)) + string(rune('0'+year%10))
+}
+
 // InvalidateLeaderboardCache clears cached leaderboard calculation so the next query re-aggregates.
 func InvalidateLeaderboardCache(ctx context.Context) {
 	inMemoryLeaderboardMu.Lock()
-	inMemoryLeaderboard = nil
+	years := make([]int, 0, len(inMemoryLeaderboards))
+	for y := range inMemoryLeaderboards {
+		years = append(years, y)
+	}
+	inMemoryLeaderboards = make(map[int]*cachedLeaderboardData)
 	inMemoryLeaderboardMu.Unlock()
 
 	if leaderboardCache != nil {
 		_, _ = leaderboardCache.Delete(ctx, leaderboardCacheKey{ID: "global"})
+		_, _ = leaderboardCache.Delete(ctx, leaderboardCacheKey{ID: yearCacheID(time.Now().UTC().Year())})
+		for _, y := range years {
+			_, _ = leaderboardCache.Delete(ctx, leaderboardCacheKey{ID: yearCacheID(y)})
+		}
 	}
 }
 
-// CalculateAndCacheLeaderboard performs full database aggregation and updates cache.
+// CalculateAndCacheLeaderboard performs full database aggregation for the current year and updates cache.
 func CalculateAndCacheLeaderboard(ctx context.Context) ([]LeaderboardEntry, time.Time, error) {
-	rows, err := q().CalculateLeaderboardStats(ctx)
+	return CalculateAndCacheLeaderboardForYear(ctx, time.Now().UTC().Year())
+}
+
+// CalculateAndCacheLeaderboardForYear performs full database aggregation for a given year and updates cache.
+func CalculateAndCacheLeaderboardForYear(ctx context.Context, year int) ([]LeaderboardEntry, time.Time, error) {
+	rows, err := q().CalculateLeaderboardStats(ctx, int32(year))
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -141,35 +161,36 @@ func CalculateAndCacheLeaderboard(ctx context.Context) ([]LeaderboardEntry, time
 	}
 
 	inMemoryLeaderboardMu.Lock()
-	inMemoryLeaderboard = data
+	inMemoryLeaderboards[year] = data
 	inMemoryLeaderboardMu.Unlock()
 
 	if leaderboardCache != nil {
 		if b, err := json.Marshal(data); err == nil {
-			_ = leaderboardCache.Set(ctx, leaderboardCacheKey{ID: "global"}, leaderboardCacheValue{DataJSON: string(b)})
+			_ = leaderboardCache.Set(ctx, leaderboardCacheKey{ID: yearCacheID(year)}, leaderboardCacheValue{DataJSON: string(b)})
 		}
 	}
 
-	rlog.Info("Successfully calculated and cached global leaderboard")
+	rlog.Info("Successfully calculated and cached global leaderboard", "year", year)
 	return entries, now, nil
 }
 
-func getLeaderboardData(ctx context.Context) ([]LeaderboardEntry, time.Time, error) {
+func getLeaderboardData(ctx context.Context, year int) ([]LeaderboardEntry, time.Time, error) {
 	inMemoryLeaderboardMu.RLock()
-	if inMemoryLeaderboard != nil && time.Since(inMemoryLeaderboard.CalculatedAt) < 10*time.Minute {
-		entries := inMemoryLeaderboard.Entries
-		ts := inMemoryLeaderboard.CalculatedAt
+	if cached, ok := inMemoryLeaderboards[year]; ok && cached != nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
+		entries := cached.Entries
+		ts := cached.CalculatedAt
 		inMemoryLeaderboardMu.RUnlock()
 		return entries, ts, nil
 	}
 	inMemoryLeaderboardMu.RUnlock()
 
+	cacheID := yearCacheID(year)
 	if leaderboardCache != nil {
-		if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: "global"}); err == nil && val.DataJSON != "" {
+		if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: cacheID}); err == nil && val.DataJSON != "" {
 			var cached cachedLeaderboardData
 			if err := json.Unmarshal([]byte(val.DataJSON), &cached); err == nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
 				inMemoryLeaderboardMu.Lock()
-				inMemoryLeaderboard = &cached
+				inMemoryLeaderboards[year] = &cached
 				inMemoryLeaderboardMu.Unlock()
 				return cached.Entries, cached.CalculatedAt, nil
 			}
@@ -180,35 +201,60 @@ func getLeaderboardData(ctx context.Context) ([]LeaderboardEntry, time.Time, err
 	defer recomputeMu.Unlock()
 
 	inMemoryLeaderboardMu.RLock()
-	if inMemoryLeaderboard != nil && time.Since(inMemoryLeaderboard.CalculatedAt) < 10*time.Minute {
-		entries := inMemoryLeaderboard.Entries
-		ts := inMemoryLeaderboard.CalculatedAt
+	if cached, ok := inMemoryLeaderboards[year]; ok && cached != nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
+		entries := cached.Entries
+		ts := cached.CalculatedAt
 		inMemoryLeaderboardMu.RUnlock()
 		return entries, ts, nil
 	}
 	inMemoryLeaderboardMu.RUnlock()
 
 	if leaderboardCache != nil {
-		if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: "global"}); err == nil && val.DataJSON != "" {
+		if val, err := leaderboardCache.Get(ctx, leaderboardCacheKey{ID: cacheID}); err == nil && val.DataJSON != "" {
 			var cached cachedLeaderboardData
 			if err := json.Unmarshal([]byte(val.DataJSON), &cached); err == nil && time.Since(cached.CalculatedAt) < 10*time.Minute {
 				inMemoryLeaderboardMu.Lock()
-				inMemoryLeaderboard = &cached
+				inMemoryLeaderboards[year] = &cached
 				inMemoryLeaderboardMu.Unlock()
 				return cached.Entries, cached.CalculatedAt, nil
 			}
 		}
 	}
 
-	return CalculateAndCacheLeaderboard(ctx)
+	return CalculateAndCacheLeaderboardForYear(ctx, year)
+}
+
+func getAvailableYears(ctx context.Context, currentYear int) []int {
+	years32, err := q().ListLeaderboardYears(ctx)
+	if err != nil {
+		return []int{currentYear}
+	}
+	seen := make(map[int]bool, len(years32)+1)
+	years := make([]int, 0, len(years32)+1)
+	for _, y := range years32 {
+		yi := int(y)
+		if !seen[yi] {
+			seen[yi] = true
+			years = append(years, yi)
+		}
+	}
+	if !seen[currentYear] {
+		years = append(years, currentYear)
+	}
+	sort.Slice(years, func(i, j int) bool { return years[i] > years[j] })
+	return years
 }
 
 // GetLeaderboard returns global leaderboard rankings with filtering, sorting, and pagination.
-// Results are cached by scorecalc for 10 minutes or until recalculated after an event's conclusion.
+// Results are cut off by calendar year (defaulting to current UTC year) and cached for 10 minutes.
 //
 //encore:api public method=GET path=/api/leaderboard
 func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardResponse, error) {
-	entries, calculatedAt, err := getLeaderboardData(ctx)
+	year := p.Year
+	if year <= 0 {
+		year = time.Now().UTC().Year()
+	}
+	entries, calculatedAt, err := getLeaderboardData(ctx, year)
 	if err != nil {
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to calculate leaderboard"}
 	}
@@ -302,8 +348,10 @@ func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardR
 	pageEntries := filtered[offset:end]
 
 	return &LeaderboardResponse{
-		Entries:      pageEntries,
-		Total:        total,
-		CalculatedAt: calculatedAt.Format(time.RFC3339),
+		Entries:        pageEntries,
+		Total:          total,
+		Year:           year,
+		AvailableYears: getAvailableYears(ctx, time.Now().UTC().Year()),
+		CalculatedAt:   calculatedAt.Format(time.RFC3339),
 	}, nil
 }

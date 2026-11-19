@@ -55,7 +55,7 @@ function AdminUsersPage() {
   return (
     <AdminLayout
       title="User Account Directory"
-      subtitle="Verify system competitor profiles, review site role authorization levels, and manage global system privileges."
+      subtitle="Verify system participant profiles, review site role authorization levels, and manage global system privileges."
     >
       <div className="slds-grid slds-wrap slds-gutters">
         <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
@@ -65,7 +65,7 @@ function AdminUsersPage() {
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
                     <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Registered System Competitors
+                      Registered System Participants
                     </span>
                   </h2>
                 </div>
@@ -83,7 +83,7 @@ function AdminUsersPage() {
                     id="user-search-input"
                     value={search}
                     onChange={(evt) => setSearch(evt.target.value)}
-                    placeholder="Search competitors..."
+                    placeholder="Search participants..."
                     className="slds-input"
                     style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
                   />
@@ -98,27 +98,24 @@ function AdminUsersPage() {
 
               {loading ? (
                 <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-                  <p>Loading competitor records...</p>
+                  <p>Loading participant records...</p>
                 </div>
               ) : users.length > 0 ? (
                 <>
                   <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Competitors Directory Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '800px' }}>
+                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Participants Directory Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '800px' }}>
                       <thead>
                         <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '22%', minWidth: '160px' }}>
+                          <th scope="col" style={{ width: '24%', minWidth: '160px' }}>
                             <div className="slds-truncate font-bold" title="VRChat Username" style={{ fontWeight: 'bold' }}>VRChat Username</div>
                           </th>
-                          <th scope="col" style={{ width: '20%', minWidth: '150px' }}>
+                          <th scope="col" style={{ width: '22%', minWidth: '150px' }}>
                             <div className="slds-truncate font-bold" title="Discord Name" style={{ fontWeight: 'bold' }}>Discord Name</div>
                           </th>
                           <th scope="col" style={{ width: '120px' }}>
                             <div className="slds-truncate font-bold" title="Site Role" style={{ fontWeight: 'bold' }}>Site Role</div>
                           </th>
-                          <th scope="col" style={{ width: '110px' }}>
-                            <div className="slds-truncate font-bold" title="Class Tier" style={{ fontWeight: 'bold' }}>Class Tier</div>
-                          </th>
-                          <th scope="col" style={{ minWidth: '200px' }}>
+                          <th scope="col" style={{ minWidth: '220px' }}>
                             <div className="slds-truncate font-bold" title="Team Affiliations" style={{ fontWeight: 'bold' }}>Team Affiliations</div>
                           </th>
                           <th scope="col" style={{ width: '100px' }}>
@@ -148,11 +145,6 @@ function AdminUsersPage() {
                               <span className={`slds-badge ${user.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
                                 {user.siteRole}
                               </span>
-                            </td>
-                            <td>
-                              <div className="slds-truncate" title={!user.classTier || user.classTier === 'PRE_OP' || user.classTier === 'OP' ? 'None' : user.classTier}>
-                                {!user.classTier || user.classTier === 'PRE_OP' || user.classTier === 'OP' ? 'None' : user.classTier}
-                              </div>
                             </td>
                             <td>
                               {user.teams.length > 0 ? (
@@ -193,7 +185,7 @@ function AdminUsersPage() {
                 </>
               ) : (
                 <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                  <p>No competitor accounts match the current query filter.</p>
+                  <p>No participant accounts match the current query filter.</p>
                 </div>
               )}
             </div>

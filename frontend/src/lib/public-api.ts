@@ -689,10 +689,14 @@ export async function getLeaderboard(
       SortBy: params.SortBy,
       Search: params.Search,
       ClassTier: params.ClassTier,
+      Year: params.Year,
       Limit: params.Limit,
       Offset: params.Offset,
     })
   }
+
+  const currentYear = new Date().getUTCFullYear()
+  const selectedYear = params.Year && params.Year > 0 ? params.Year : currentYear
 
   const mockEntries: LeaderboardEntry[] = [
     {
@@ -701,7 +705,7 @@ export async function getLeaderboard(
       name: 'Thunder Bolt',
       slug: 'thunder-bolt',
       image: null,
-      classTier: 'OP',
+      classTier: 'G1',
       totalPoints: 120,
       averagePosition: 1.2,
       averagePointsPerSeason: 60.0,
@@ -739,7 +743,7 @@ export async function getLeaderboard(
     },
   ]
 
-  let filtered = [...mockEntries]
+  let filtered = selectedYear === currentYear ? [...mockEntries] : []
   if (params.Search) {
     const s = params.Search.toLowerCase()
     filtered = filtered.filter(
@@ -771,6 +775,8 @@ export async function getLeaderboard(
   return {
     entries: pageEntries,
     total: filtered.length,
+    year: selectedYear,
+    availableYears: [currentYear],
     calculatedAt: new Date().toISOString(),
   }
 }

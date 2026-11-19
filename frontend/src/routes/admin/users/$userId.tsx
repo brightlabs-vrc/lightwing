@@ -2,11 +2,18 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireAdminPanel } from '../../../lib/auth-guard'
-import { getAdminUserProfile, updateAdminUserSiteRole, updateAdminUserProfile, updateAdminUserClass } from '../../../lib/admin-api'
+import {
+  getAdminUserProfile,
+  updateAdminUserSiteRole,
+  updateAdminUserProfile,
+  updateAdminUserClass,
+  listUserOrgClassGrades,
+  listApprovedOrganizations,
+} from '../../../lib/admin-api'
 import { isValidUserSlug } from '../../../lib/slugs'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
-import type { auth, eventmanager } from '../../../lib/client'
+import type { auth, eventmanager, teammanager } from '../../../lib/client'
 import type { ClassTier, SiteRole } from '../../../types'
 
 export const Route = createFileRoute('/admin/users/$userId')({
@@ -27,6 +34,13 @@ function AdminUserDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // Org-scoped class grades
+  const [orgClasses, setOrgClasses] = useState<eventmanager.UserOrgClassEntry[]>([])
+  const [orgs, setOrgs] = useState<teammanager.LinkedOrganization[]>([])
+  const [newGradeOrgId, setNewGradeOrgId] = useState('')
+  const [newGradeTier, setNewGradeTier] = useState<ClassTier>('G3')
+  const [savingOrgGrade, setSavingOrgGrade] = useState(false)
+
   // Mode state: false = Details view, true = Edit view
   const [isEditing, setIsEditing] = useState(false)
 
@@ -36,12 +50,24 @@ function AdminUserDetailPage() {
   const [biography, setBiography] = useState('')
   const [vrchatUsername, setVrchatUsername] = useState('')
   const [image, setImage] = useState('')
-  const [classTier, setClassTier] = useState<string>('')
 
   const authHeader = useMemo(() => {
     const token = session?.session.token
     return token ? `Bearer ${token}` : null
   }, [session?.session.token])
+
+  async function loadOrgClasses() {
+    try {
+      const [classesRes, orgsRes] = await Promise.all([
+        listUserOrgClassGrades(userId),
+        listApprovedOrganizations(),
+      ])
+      setOrgClasses(classesRes.classes ?? [])
+      setOrgs(orgsRes.organizations ?? [])
+    } catch {
+      // ignore non-fatal load errors
+    }
+  }
 
   async function loadProfile() {
     setLoading(true)
@@ -49,19 +75,15 @@ function AdminUserDetailPage() {
     setSuccess(null)
     try {
       const loaded = await getAdminUserProfile(userId)
-      const normalizedProfile = {
-        ...loaded,
-        classTier: ((loaded.classTier === 'PRE_OP' || loaded.classTier === 'OP') ? null : loaded.classTier) as string,
-      }
-      setProfile(normalizedProfile)
+      setProfile(loaded)
       setName(loaded.name || '')
       setSlug(loaded.slug || '')
       setBiography(loaded.biography || '')
       setVrchatUsername(loaded.vrchatUsername || '')
       setImage(loaded.image || '')
-      setClassTier(normalizedProfile.classTier || '')
+      await loadOrgClasses()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load competitor profile')
+      setError(cause instanceof Error ? cause.message : 'Unable to load participant profile')
     } finally {
       setLoading(false)
     }
@@ -78,11 +100,26 @@ function AdminUserDetailPage() {
       setBiography(profile.biography || '')
       setVrchatUsername(profile.vrchatUsername || '')
       setImage(profile.image || '')
-      setClassTier(profile.classTier || '')
     }
     setError(null)
     setSuccess(null)
     setIsEditing(false)
+  }
+
+  async function handleSaveOrgClass(organizationId: string, tier: ClassTier | null) {
+    if (!profile || !authHeader || !organizationId) return
+    setSavingOrgGrade(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await updateAdminUserClass(profile.id, organizationId, tier, authHeader)
+      await loadOrgClasses()
+      setSuccess(tier ? 'Updated organization class grade.' : 'Cleared organization class grade.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update organization class grade.')
+    } finally {
+      setSavingOrgGrade(false)
+    }
   }
 
   async function handleSaveChanges() {
@@ -93,11 +130,11 @@ function AdminUserDetailPage() {
 
     const trimmedSlug = slug.trim()
     if (trimmedSlug && (trimmedSlug.length < 4 || trimmedSlug.length > 24)) {
-      setError('Slug must be between 4 and 24 characters.')
+      setError('@username must be between 4 and 24 characters.')
       return
     }
     if (trimmedSlug && !isValidUserSlug(trimmedSlug)) {
-      setError('Slug must contain only lowercase letters, numbers, periods, dashes, and underscores.')
+      setError('@username must contain only lowercase letters, numbers, periods, dashes, and underscores.')
       return
     }
 
@@ -108,7 +145,6 @@ function AdminUserDetailPage() {
     try {
       let currentProfile = profile
 
-      // 1. Update Profile Fields if changed
       const profileChanged =
         name !== (profile.name || '') ||
         trimmedSlug !== (profile.slug || '') ||
@@ -130,24 +166,11 @@ function AdminUserDetailPage() {
         )
       }
 
-      // 2. Update Class Tier if changed
-      const nextTier = classTier === '' ? null : (classTier as ClassTier)
-      const classTierChanged = nextTier !== profile.classTier
-
-      if (classTierChanged) {
-        await updateAdminUserClass(profile.id, nextTier, authHeader)
-        // Refresh profile state with the new class tier
-        currentProfile = {
-          ...currentProfile,
-          classTier: nextTier as string,
-        }
-      }
-
       setProfile(currentProfile)
-      setSuccess('Successfully updated competitor account details.')
+      setSuccess('Successfully updated participant account details.')
       setIsEditing(false)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to save competitor changes.')
+      setError(cause instanceof Error ? cause.message : 'Unable to save participant changes.')
     } finally {
       setSaving(false)
     }
@@ -231,9 +254,9 @@ function AdminUserDetailPage() {
                             </div>
                           </div>
 
-                          {/* Slug Input */}
+                          {/* @username Input */}
                           <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="user-slug">Slug (Handle)</label>
+                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="user-slug">@username</label>
                             <div className="slds-form-element__control slds-m-top_xx-small">
                               <input
                                 id="user-slug"
@@ -246,7 +269,7 @@ function AdminUserDetailPage() {
                               />
                             </div>
                             <div className="slds-m-top_xx-small text-slate-400" style={{ fontSize: '11px' }}>
-                              Slugs must be between 4 and 24 lowercase alphanumeric characters, periods, dashes, or underscores.
+                              @usernames must be between 4 and 24 lowercase alphanumeric characters, periods, dashes, or underscores.
                             </div>
                           </div>
 
@@ -279,25 +302,6 @@ function AdminUserDetailPage() {
                                 style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
                                 placeholder="e.g. https://example.com/image.png"
                               />
-                            </div>
-                          </div>
-
-                          {/* Skill Class Tier Dropdown Selector */}
-                          <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                            <label className="slds-form-element__label text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }} htmlFor="skill-class-tier">Skill Class Tier</label>
-                            <div className="slds-form-element__control slds-m-top_xx-small">
-                              <select
-                                id="skill-class-tier"
-                                value={classTier || ''}
-                                onChange={(e) => setClassTier(e.target.value)}
-                                className="slds-select"
-                                style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                              >
-                                <option value="">None (Default)</option>
-                                <option value="G3">G3</option>
-                                <option value="G2">G2</option>
-                                <option value="G1">G1</option>
-                              </select>
                             </div>
                           </div>
                         </div>
@@ -395,9 +399,9 @@ function AdminUserDetailPage() {
                                 <p className="text-lg font-bold text-slate-800" style={{ fontWeight: 'bold' }}>{profile.name || 'None'}</p>
                               </div>
 
-                              {/* Slug */}
+                              {/* @username */}
                               <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Slug (Handle)</p>
+                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>@username</p>
                                 <p className="text-md font-semibold text-slate-700">@{profile.slug || 'None'}</p>
                               </div>
 
@@ -407,12 +411,105 @@ function AdminUserDetailPage() {
                                 <p className="text-md text-slate-700">{profile.vrchatUsername || 'None'}</p>
                               </div>
 
-                              {/* Skill Class Tier */}
-                              <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Skill Class Tier</p>
-                                <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', borderRadius: '4px', display: 'inline-block', marginTop: '2px' }}>
-                                  {profile.classTier || 'None / PRE_OP'}
-                                </span>
+                              {/* Organization Class Grades Summary */}
+                              <div className="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '6px' }}>
+                                  Organization Class Grades
+                                </p>
+                                {orgClasses.length > 0 ? (
+                                  <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ marginBottom: '12px' }}>
+                                    <thead>
+                                      <tr className="slds-line-height_reset">
+                                        <th scope="col">Organization</th>
+                                        <th scope="col">Class Grade</th>
+                                        <th scope="col" style={{ width: '100px' }}>Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {orgClasses.map((oc) => (
+                                        <tr key={oc.organizationId}>
+                                          <td>
+                                            <Link to="/admin/organizations/$orgId" params={{ orgId: oc.organizationId }} style={{ fontWeight: 600 }}>
+                                              {oc.organizationName}
+                                            </Link>{' '}
+                                            <span className="text-slate-500" style={{ fontSize: '11px' }}>(@{oc.organizationSlug})</span>
+                                          </td>
+                                          <td>
+                                            <select
+                                              value={oc.classTier || ''}
+                                              disabled={savingOrgGrade}
+                                              onChange={(e) => {
+                                                const v = e.target.value as ClassTier | ''
+                                                void handleSaveOrgClass(oc.organizationId, v === '' ? null : v)
+                                              }}
+                                              className="slds-select"
+                                              style={{ padding: '4px 8px', maxWidth: '140px' }}
+                                            >
+                                              <option value="">OPEN (Clear)</option>
+                                              <option value="G3">G3</option>
+                                              <option value="G2">G2</option>
+                                              <option value="G1">G1</option>
+                                            </select>
+                                          </td>
+                                          <td>
+                                            <button
+                                              type="button"
+                                              disabled={savingOrgGrade}
+                                              onClick={() => void handleSaveOrgClass(oc.organizationId, null)}
+                                              className="slds-button slds-button_destructive"
+                                              style={{ fontSize: '11px', padding: '2px 8px' }}
+                                            >
+                                              Clear
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <p className="text-slate-500" style={{ fontSize: '13px', marginBottom: '10px' }}>
+                                    No organization-scoped class grades assigned (defaults to OPEN).
+                                  </p>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <select
+                                    value={newGradeOrgId}
+                                    onChange={(e) => setNewGradeOrgId(e.target.value)}
+                                    className="slds-select"
+                                    style={{ padding: '6px 10px', maxWidth: '260px' }}
+                                  >
+                                    <option value="">Select organization...</option>
+                                    {orgs.map((o) => (
+                                      <option key={o.id} value={o.id}>
+                                        {o.name} (@{o.slug})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={newGradeTier}
+                                    onChange={(e) => setNewGradeTier(e.target.value as ClassTier)}
+                                    className="slds-select"
+                                    style={{ padding: '6px 10px', maxWidth: '120px' }}
+                                  >
+                                    <option value="G3">G3</option>
+                                    <option value="G2">G2</option>
+                                    <option value="G1">G1</option>
+                                  </select>
+                                  <button
+                                    type="button"
+                                    disabled={!newGradeOrgId || savingOrgGrade}
+                                    onClick={() => {
+                                      if (!newGradeOrgId) return
+                                      void handleSaveOrgClass(newGradeOrgId, newGradeTier)
+                                      setNewGradeOrgId('')
+                                    }}
+                                    className="slds-button slds-button_brand"
+                                    style={{ padding: '4px 12px' }}
+                                  >
+                                    Assign Grade
+                                  </button>
+                                </div>
                               </div>
 
                               {/* System Site Role */}

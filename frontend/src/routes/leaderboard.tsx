@@ -25,11 +25,13 @@ export const Route = createFileRoute('/leaderboard')({
 export function LeaderboardPage() {
   usePageHead({
     title: 'Leaderboard',
-    description: 'Global driver standings and ranking leaderboard on UmaKeiba.',
+    description: 'Global participant standings and ranking leaderboard on UmaKeiba.',
   })
+  const currentYear = new Date().getUTCFullYear()
   const [sortBy, setSortBy] = useState<'points' | 'avgPosition' | 'avgPointsPerSeason'>('points')
   const [search, setSearch] = useState('')
   const [classTier, setClassTier] = useState('')
+  const [year, setYear] = useState<number>(currentYear)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -44,6 +46,7 @@ export function LeaderboardPage() {
         SortBy: sortBy,
         Search: search.trim(),
         ClassTier: classTier,
+        Year: year,
         Limit: pageSize,
         Offset: (page - 1) * pageSize,
       })
@@ -58,10 +61,12 @@ export function LeaderboardPage() {
 
   useEffect(() => {
     void fetchLeaderboard()
-  }, [sortBy, search, classTier, page, pageSize])
+  }, [sortBy, search, classTier, year, page, pageSize])
 
   const entries: LeaderboardEntry[] = data?.entries ?? []
   const total = data?.total ?? 0
+  const availableYears: number[] =
+    data?.availableYears && data.availableYears.length > 0 ? data.availableYears : [year]
 
   return (
     <PixelContainer maxWidth="full" padding="md">
@@ -77,7 +82,7 @@ export function LeaderboardPage() {
           <PixelStack direction="row" gap={3} align="center" wrap>
             <input
               type="text"
-              placeholder="Search driver or slug..."
+              placeholder="Search participant or @username..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -98,7 +103,22 @@ export function LeaderboardPage() {
               <option value="G1">G1</option>
               <option value="G2">G2</option>
               <option value="G3">G3</option>
-              <option value="OP">OP / Unrated</option>
+            </select>
+
+            <select
+              aria-label="Season Year"
+              value={year}
+              onChange={(e) => {
+                setYear(Number(e.target.value))
+                setPage(1)
+              }}
+              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary"
+            >
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  {y} Season
+                </option>
+              ))}
             </select>
           </PixelStack>
 
@@ -150,8 +170,8 @@ export function LeaderboardPage() {
         <PixelEmptyState title="Error loading leaderboard" description={error} />
       ) : entries.length === 0 ? (
         <PixelEmptyState
-          title="No drivers found"
-          description="No competitor match the search or filter criteria."
+          title="No participants found"
+          description="No participants match the search or filter criteria."
         />
       ) : (
         <PixelStack gap={6}>
@@ -160,7 +180,7 @@ export function LeaderboardPage() {
               <thead>
                 <tr className="border-b-2 border-retro-border font-pixel text-xs text-retro-muted bg-retro-bg/60">
                   <th className="p-3 w-20 text-center">RANK</th>
-                  <th className="p-3">DRIVER</th>
+                  <th className="p-3">PARTICIPANT</th>
                   <th className="p-3 w-24 text-center">TIER</th>
                   <th className="p-3 text-right">TOTAL POINTS</th>
                   <th className="p-3 text-right">AVG POSITION</th>

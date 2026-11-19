@@ -61,7 +61,12 @@ SELECT
   u."vrchatUsername" AS vrchat_username,
   u.slug AS slug,
   u.image AS image,
-  COALESCE(u."classTier"::text, '') AS class_tier,
+  CASE ct.avg_tier_rank
+    WHEN 5 THEN 'G1'
+    WHEN 4 THEN 'G2'
+    WHEN 3 THEN 'G3'
+    ELSE ''
+  END AS class_tier,
   COALESCE(p.total_points, 0)::int AS total_points,
   COALESCE(r.avg_position, 0)::float8 AS avg_position,
   COALESCE(r.races_participated, 0)::int AS races_participated,
@@ -74,9 +79,14 @@ SELECT
   END AS avg_points_per_season
 FROM "user" u
 LEFT JOIN (
-  SELECT "userId", SUM(points) AS total_points, COUNT(DISTINCT "eventId") AS events_participated
-  FROM "event_points_entry"
-  GROUP BY "userId"
+  SELECT
+    epe."userId",
+    SUM(epe.points) AS total_points,
+    COUNT(DISTINCT epe."eventId") AS events_participated
+  FROM "event_points_entry" epe
+  JOIN "event" e ON e.id = epe."eventId"
+  WHERE EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+  GROUP BY epe."userId"
 ) p ON p."userId" = u.id
 LEFT JOIN (
   SELECT
@@ -85,6 +95,9 @@ LEFT JOIN (
     COUNT(DISTINCT rr."raceEventId") AS races_participated,
     COUNT(*) FILTER (WHERE rr.position = 1) AS wins
   FROM "race_result" rr
+  JOIN "race_event" re ON re.id = rr."raceEventId"
+  JOIN "event" e ON e.id = re."eventId"
+  WHERE EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
   GROUP BY rr."userId"
 ) r ON r."userId" = u.id
 LEFT JOIN (
@@ -93,8 +106,36 @@ LEFT JOIN (
     COUNT(DISTINCT EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))) AS seasons_count
   FROM "event_points_entry" epe
   JOIN "event" e ON e.id = epe."eventId"
+  WHERE EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
   GROUP BY epe."userId"
 ) s ON s."userId" = u.id
+LEFT JOIN (
+  SELECT
+    ev."userId",
+    ROUND(AVG(
+      CASE oct."classTier"::text
+        WHEN 'G3' THEN 3
+        WHEN 'G2' THEN 4
+        WHEN 'G1' THEN 5
+      END
+    ))::int AS avg_tier_rank
+  FROM (
+    SELECT DISTINCT em."userId", e.id AS "eventId", e."organizationId"
+    FROM "event_member" em
+    JOIN "event" e ON e.id = em."eventId"
+    WHERE e."organizationId" IS NOT NULL
+      AND EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+    UNION
+    SELECT DISTINCT epe."userId", e.id AS "eventId", e."organizationId"
+    FROM "event_points_entry" epe
+    JOIN "event" e ON e.id = epe."eventId"
+    WHERE e."organizationId" IS NOT NULL
+      AND EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+  ) ev
+  JOIN "org_class_tier" oct ON oct."organizationId" = ev."organizationId" AND oct."userId" = ev."userId"
+  WHERE oct."classTier" IN ('G3', 'G2', 'G1')
+  GROUP BY ev."userId"
+) ct ON ct."userId" = u.id
 WHERE (COALESCE(p.total_points, 0) > 0 OR COALESCE(r.races_participated, 0) > 0)
 ORDER BY total_points DESC
 `
@@ -116,8 +157,8 @@ type CalculateLeaderboardStatsRow struct {
 }
 
 // Leaderboard aggregation.
-func (q *Queries) CalculateLeaderboardStats(ctx context.Context) ([]CalculateLeaderboardStatsRow, error) {
-	rows, err := q.db.QueryContext(ctx, calculateLeaderboardStats)
+func (q *Queries) CalculateLeaderboardStats(ctx context.Context, year int32) ([]CalculateLeaderboardStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, calculateLeaderboardStats, year)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +184,36 @@ func (q *Queries) CalculateLeaderboardStats(ctx context.Context) ([]CalculateLea
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLeaderboardYears = `-- name: ListLeaderboardYears :many
+SELECT DISTINCT EXTRACT(YEAR FROM COALESCE("scheduledAt", "createdAt"))::int AS year
+FROM "event"
+WHERE "deletedAt" IS NULL
+ORDER BY year DESC
+`
+
+func (q *Queries) ListLeaderboardYears(ctx context.Context) ([]int32, error) {
+	rows, err := q.db.QueryContext(ctx, listLeaderboardYears)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int32
+	for rows.Next() {
+		var year int32
+		if err := rows.Scan(&year); err != nil {
+			return nil, err
+		}
+		items = append(items, year)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
