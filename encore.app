@@ -15,8 +15,9 @@
             "https://*.urs.deno.net",
             "https://lightwing.vignette.workers.dev",
             "https://*.vignette.pages.dev",
+            "https://*-lightwing.vignette.workers.dev",
             "https://comp.cosyne.jp.eu.org",
-            "https://comp-canary.cosyne.jp.eu.org"
+            "https://*.canary.cosyne.jp.eu.org"
         ],
         "allow_origins_without_credentials": [
             "http://localhost:3000",
