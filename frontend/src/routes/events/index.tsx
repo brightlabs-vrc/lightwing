@@ -19,6 +19,7 @@ import {
 } from '@pxlkit/ui-kit'
 import type { eventmanager } from '../../lib/client'
 import { PixelSkeletonList } from '../../components/LoadingSkeleton'
+import { EventBanner } from '../../components/EventBanner'
 import type { EventStatus, EventTag } from '../../types'
 
 const CLASS_TIER_LABELS: Record<string, string> = {
@@ -221,18 +222,18 @@ function EventsPage() {
                   className="block"
                 >
                   <PixelCard className="hover:border-retro-primary transition-all duration-150 overflow-hidden">
-                    {event.bannerUrl && (
-                      <div className="-mx-4 -mt-4 mb-4 border-b-2 border-retro-border bg-retro-bg">
-                        <img
-                          src={event.bannerUrl}
-                          alt={event.name}
-                          className="w-full h-40 object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                          }}
-                        />
-                      </div>
-                    )}
+                    <div className="-mx-4 -mt-4 mb-4 h-36 border-b-2 border-retro-border bg-retro-bg overflow-hidden">
+                      <EventBanner
+                        id={event.id}
+                        name={event.name}
+                        bannerUrl={event.bannerUrl}
+                        classRestriction={event.classRestriction}
+                        tag={event.tag}
+                        ownerName={event.ownerName}
+                        ownerLogo={event.ownerLogo}
+                        variant="card"
+                      />
+                    </div>
                     <PixelStack gap={4}>
                       <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
                         <PixelStack gap={2}>

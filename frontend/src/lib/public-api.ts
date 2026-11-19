@@ -307,6 +307,7 @@ export async function listPublicEvents(
     id: e.id,
     name: e.name,
     description: e.description,
+    bannerUrl: e.bannerUrl ?? null,
     ownerType: e.ownerType,
     organizationId: e.organizationId,
     ownerUserId: e.ownerUserId,
@@ -979,3 +980,80 @@ export async function getPublicNewsletter(idOrSlug: string): Promise<teammanager
   return found
 }
 
+const mockPublicOrganizations: teammanager.LinkedOrganization[] = [
+  {
+    id: 'org_mock_urs',
+    name: 'UMA Racing Society',
+    slug: 'uma-racing-society',
+    logo: 'https://placehold.co/120x120/2563eb/ffffff?text=UMA',
+    description: 'Premier competitive VR racing league organizing seasonal G1–G3 circuits.',
+    orgType: 'ORGANIZATION',
+    status: 'APPROVED',
+    isPrimary: true,
+    memberCount: 24,
+  },
+]
+
+const mockPublicTeams: teammanager.TeamListItem[] = [
+  {
+    id: 'team_mock_001',
+    name: 'Team Spica',
+    slug: 'team-spica',
+    logo: null,
+    description: 'High-speed turf specialists competing in the G1 Mile and Sprint circuits.',
+    status: 'APPROVED',
+    primaryOrganizationId: 'org_mock_urs',
+    organizations: mockPublicOrganizations,
+    administratorSlotsRemaining: 2,
+    memberCount: 7,
+  },
+  {
+    id: 'team_mock_002',
+    name: 'Team Rigil',
+    slug: 'team-rigil',
+    logo: null,
+    description: 'Veteran endurance and dirt-track squad.',
+    status: 'APPROVED',
+    primaryOrganizationId: 'org_mock_urs',
+    organizations: mockPublicOrganizations,
+    administratorSlotsRemaining: 1,
+    memberCount: 6,
+  },
+]
+
+export async function listPublicTeams(
+  search = '',
+  limit = 100,
+  offset = 0,
+): Promise<teammanager.ListTeamsResponse> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.ListTeams({
+      Search: search,
+      Limit: limit,
+      Offset: offset,
+    })
+  }
+
+  let items = [...mockPublicTeams]
+  const q = search.trim().toLowerCase()
+  if (q) {
+    items = items.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.slug.toLowerCase().includes(q) ||
+        (t.description ?? '').toLowerCase().includes(q),
+    )
+  }
+  const total = items.length
+  return {
+    teams: items.slice(offset, offset + limit),
+    total,
+  }
+}
+
+export async function listPublicOrganizations(): Promise<teammanager.ListOrganizationsResponse> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.ListApprovedOrganizations()
+  }
+  return { organizations: [...mockPublicOrganizations] }
+}

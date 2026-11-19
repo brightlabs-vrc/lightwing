@@ -2096,9 +2096,11 @@ export namespace teammanager {
         name: string
         slug: string
         logo?: string | null
+        description?: string | null
         orgType: string
         status: string
         isPrimary: boolean
+        memberCount?: number
     }
 
     export interface OrgApplicationView {
@@ -2350,7 +2352,8 @@ export namespace teammanager {
         id: string
         name: string
         slug: string
-        logo?: string
+        logo?: string | null
+        description?: string | null
         status?: string
         primaryOrganizationId?: string
         organizations?: LinkedOrganization[]
