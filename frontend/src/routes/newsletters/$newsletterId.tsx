@@ -9,19 +9,44 @@ import {
 } from '@pxlkit/ui-kit'
 import { getPublicNewsletter } from '../../lib/public-api'
 import { usePageHead } from '../../hooks/usePageHead'
+import { buildSeoMeta } from '../../lib/seo'
 import { NewsletterArticleView } from '../../components/NewsletterArticleView'
 
 export const Route = createFileRoute('/newsletters/$newsletterId')({
+  ssr: 'data-only',
+  loader: async ({ params }) => {
+    try {
+      const newsletter = await getPublicNewsletter(params.newsletterId)
+      return { newsletter }
+    } catch {
+      return { newsletter: null }
+    }
+  },
+  head: ({ loaderData }) => {
+    const newsletter = loaderData?.newsletter
+    return {
+      meta: buildSeoMeta({
+        title: newsletter
+          ? `${newsletter.title} — ${newsletter.organizationName}`
+          : 'Newsletter',
+        description: newsletter?.summary || 'Organization newsletter on UmaKeiba.',
+        image: newsletter?.thumbnailUrl || undefined,
+        type: 'article',
+      }),
+    }
+  },
   component: NewsletterDetailPage,
 })
 
 function NewsletterDetailPage() {
   const { newsletterId } = useParams({ from: '/newsletters/$newsletterId' })
+  const loaderData = Route.useLoaderData()
 
   const { data: newsletter, isLoading, error } = useQuery({
     queryKey: ['public-newsletter', newsletterId],
     queryFn: () => getPublicNewsletter(newsletterId),
     enabled: Boolean(newsletterId),
+    initialData: loaderData?.newsletter ?? undefined,
   })
 
   usePageHead({

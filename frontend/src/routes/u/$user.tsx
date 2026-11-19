@@ -8,20 +8,65 @@ import {
 } from '@pxlkit/ui-kit'
 import { getPublicUserProfile } from '../../lib/public-api'
 import type { auth } from '../../lib/client'
+import { buildSeoMeta } from '../../lib/seo'
 import { UserProfileView } from '../../components/UserProfileView'
 
 export const Route = createFileRoute('/u/$user')({
+  ssr: 'data-only',
+  loader: async ({ params }) => {
+    try {
+      const userProfile = await getPublicUserProfile(params.user)
+      return { userProfile }
+    } catch {
+      return { userProfile: null }
+    }
+  },
+  head: ({ loaderData, params }) => {
+    const user = loaderData?.userProfile
+    if (user) {
+      const displayName = user.vrchatUsername || user.name
+      return {
+        meta: buildSeoMeta({
+          title: displayName,
+          description:
+            user.biography || `User profile for ${displayName} on UmaKeiba.`,
+          image: user.image || undefined,
+          type: 'profile',
+        }),
+      }
+    }
+    return {
+      meta: buildSeoMeta({
+        title: `@${params.user}`,
+        description: `No user profile found for "@${params.user}".`,
+      }),
+    }
+  },
   component: UserProfilePage,
 })
 
 export function UserProfilePage() {
   const { user: userOrSlug } = useParams({ from: '/u/$user' })
+  const loaderData = Route.useLoaderData()
 
-  const [loading, setLoading] = useState(true)
-  const [userProfile, setUserProfile] = useState<auth.UserProfile | null>(null)
+  const [loading, setLoading] = useState(!loaderData?.userProfile)
+  const [userProfile, setUserProfile] = useState<auth.UserProfile | null>(
+    loaderData?.userProfile ?? null
+  )
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (
+      loaderData?.userProfile &&
+      (loaderData.userProfile.slug === userOrSlug ||
+        loaderData.userProfile.id === userOrSlug)
+    ) {
+      setUserProfile(loaderData.userProfile)
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     let active = true
 
     async function loadUser() {
@@ -48,7 +93,7 @@ export function UserProfilePage() {
     return () => {
       active = false
     }
-  }, [userOrSlug])
+  }, [userOrSlug, loaderData])
 
   if (loading) {
     return (

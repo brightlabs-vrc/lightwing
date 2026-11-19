@@ -117,3 +117,51 @@ export function updateHeadMetadata(options: PageHeadOptions): void {
   setMetaTag('name', 'twitter:description', descriptionText)
   if (currentImage) setMetaTag('name', 'twitter:image', currentImage)
 }
+
+export type SeoMetaDescriptor =
+  | { title: string }
+  | { name: string; content: string }
+  | { property: string; content: string }
+
+/**
+ * Builds an array of meta tag descriptors for TanStack Start route `head()`
+ * definitions so OpenGraph and Twitter cards are rendered in initial SSR HTML.
+ */
+export function buildSeoMeta(options: PageHeadOptions = {}): SeoMetaDescriptor[] {
+  const formattedTitle = formatPageTitle(options.title)
+  const descriptionText =
+    cleanDescription(options.description) ||
+    'UmaKeiba - Competitive VR Racing Platform'
+  const currentImage = options.image || '/favicon.png'
+  const pageType = options.type || 'website'
+  const twitterCard = options.image ? 'summary_large_image' : 'summary'
+
+  const meta: SeoMetaDescriptor[] = [
+    { title: formattedTitle },
+    { name: 'description', content: descriptionText },
+    { property: 'og:site_name', content: SITE_NAME },
+    { property: 'og:title', content: formattedTitle },
+    { property: 'og:description', content: descriptionText },
+    { property: 'og:type', content: pageType },
+  ]
+
+  if (options.url) {
+    meta.push({ property: 'og:url', content: options.url })
+  }
+
+  if (currentImage) {
+    meta.push({ property: 'og:image', content: currentImage })
+  }
+
+  meta.push(
+    { name: 'twitter:card', content: twitterCard },
+    { name: 'twitter:title', content: formattedTitle },
+    { name: 'twitter:description', content: descriptionText }
+  )
+
+  if (currentImage) {
+    meta.push({ name: 'twitter:image', content: currentImage })
+  }
+
+  return meta
+}
