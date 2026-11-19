@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.wrangler/
+.dev.vars
 
 # Local env overrides (must not be committed — would force mock mode in prod builds)
 .env

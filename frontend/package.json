@@ -8,6 +8,8 @@
     "dev:mock": "VITE_MOCK_MODE=true vite --host --port 5173",
     "build": "vite build",
     "preview": "vite preview --host --port 4173",
+    "pages:dev": "wrangler pages dev",
+    "pages:deploy": "wrangler pages deploy",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -50,6 +52,7 @@
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.3",
     "vite": "^8.1.4",
-    "vitest": "^1.6.1"
+    "vitest": "^1.6.1",
+    "wrangler": "^4.164.0"
   }
 }
