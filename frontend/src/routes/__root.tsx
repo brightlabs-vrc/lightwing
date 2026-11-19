@@ -102,22 +102,9 @@ function RootLayout() {
     )
   }
 
-  if (isAuthArea) {
-    return (
-      <>
-        <div className='min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_28%,_#f8fafc_62%,_#ffffff_100%)] text-slate-900'>
-          <Outlet />
-        </div>
-        <Suspense>
-          <TanStackRouterDevtools position='bottom-right' />
-        </Suspense>
-      </>
-    )
-  }
-
   return (
     <>
-      <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text">
+      <div className="min-h-screen bg-retro-bg text-retro-text font-sans selection:bg-retro-secondary selection:text-retro-text flex flex-col">
         <header className="border-b-2 border-retro-border-strong bg-retro-surface py-1">
           <PixelContainer maxWidth="full" padding="none" className="site-header-container px-4">
             <PixelStack direction="row" gap={3} align="center" justify="between" wrap className="site-header-inner">
@@ -155,7 +142,7 @@ function RootLayout() {
                   />
                 ) : null}
 
-                {!loading && !session ? (
+                {!loading && !session && !isAuthArea ? (
                   <PixelButton asChild variant="solid" tone="purple" size="sm">
                     <Link to="/auth">SIGN IN</Link>
                   </PixelButton>
@@ -165,7 +152,7 @@ function RootLayout() {
           </PixelContainer>
         </header>
 
-        <main className="w-full px-6 py-8">
+        <main className="w-full px-6 py-8 flex-1">
           <Outlet />
         </main>
 
