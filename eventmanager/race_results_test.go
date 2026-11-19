@@ -598,6 +598,65 @@ func Test_ManualDeferredStatus(t *testing.T) {
 	}
 }
 
+func Test_ManualDeferredPreservedWhenAutoDeferDisabled(t *testing.T) {
+	f := newFixtures(t)
+	ctx := context.Background()
+
+	admin := f.createUser("mdoffadmin", "Manual Defer Off Admin", nil, "SITE_ADMIN")
+	adminActor := testActor(admin, "SITE_ADMIN")
+	u1 := f.createUser("mdoffcomp1", "Manual Defer Off Comp 1", nil, "USER")
+	u2 := f.createUser("mdoffcomp2", "Manual Defer Off Comp 2", nil, "USER")
+
+	eventID := f.createEventDirect(admin, "Manual Defer Off Event", "UNOFFICIAL", nil, false)
+	if _, err := db.Exec(ctx,
+		`UPDATE "event" SET "scoringRulesMode" = 'CUSTOM', "customScoringTables" = '{"autoDeferEnabled":false}'::jsonb WHERE id = $1`,
+		eventID); err != nil {
+		t.Fatalf("set customScoringTables: %v", err)
+	}
+	f.addEventMemberDirect(eventID, u1)
+	f.addEventMemberDirect(eventID, u2)
+
+	race1, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 1 OP",
+		DistanceMeters: 1600, TrackType: "Turf", Location: "Tokyo", Grade: strptr("OP"),
+	})
+	if err != nil {
+		t.Fatalf("create race1: %v", err)
+	}
+	race2, err := CreateRaceEventCore(ctx, adminActor, &CreateRaceEventRequest{
+		EventID: eventID, Name: "Race 2 GIII",
+		DistanceMeters: 1600, TrackType: "Turf", Location: "Kyoto", Grade: strptr("GIII"),
+	})
+	if err != nil {
+		t.Fatalf("create race2: %v", err)
+	}
+
+	// Manually assign DEFERRED to u1 in Race 1
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race1.ID, UserID: u1,
+		Position: intptr(2), ResultStatus: strptr("DEFERRED"),
+	}); err != nil {
+		t.Fatalf("assign DEFERRED on race1: %v", err)
+	}
+
+	// Assign a normal result on Race 2; ApplyAutoDeferralsForEvent must NOT clear Race 1's manual DEFERRED
+	if _, err := AssignRaceResultCore(ctx, adminActor, &AssignRaceResultRequest{
+		EventID: eventID, RaceID: race2.ID, UserID: u2,
+		Position: intptr(1),
+	}); err != nil {
+		t.Fatalf("assign result on race2: %v", err)
+	}
+
+	fetched, err := ListRaceResultsCore(ctx, &RaceResultsQuery{EventID: eventID, RaceID: race1.ID})
+	if err != nil {
+		t.Fatalf("list race1: %v", err)
+	}
+	u1res := findResult(fetched.Results, u1)
+	if u1res == nil || u1res.ResultStatus == nil || *u1res.ResultStatus != "DEFERRED" || u1res.Points != 0 {
+		t.Errorf("race1 row after race2 update = %+v, want DEFERRED/0", u1res)
+	}
+}
+
 // --- datasets.test.ts ---
 
 func Test_DatasetCreateListUpdate(t *testing.T) {

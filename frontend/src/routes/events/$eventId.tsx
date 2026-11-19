@@ -632,7 +632,7 @@ function RaceStandingsTable({
         if (status === 'DSQ') return <span className="text-red-600 font-bold">DSQ</span>
         if (status === 'DNF') return <span className="text-orange-600 font-bold">DNF</span>
         if (status === 'DNS') return <span className="text-amber-600 font-bold">DNS</span>
-        if (status === 'DEFERRED') return <span className="text-slate-500 font-bold" title="Deferred - Already won an OP">DEFERRED</span>
+        if (status === 'DEFERRED') return <span className="text-slate-500 font-bold" title="Deferred">DEFERRED</span>
         if (status.startsWith('PEN (POS-') || status.startsWith('PEN (PTS-')) {
           return <span className="text-red-600 font-bold">{rawStatus}</span>
         }

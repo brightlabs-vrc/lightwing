@@ -904,6 +904,7 @@ function PenaltyDialogue({
                 { type: 'DSQ', label: 'Disqualification (DSQ)' },
                 { type: 'DNF', label: 'Did Not Finish (DNF)' },
                 { type: 'DNS', label: 'Did Not Start (DNS)' },
+                { type: 'DEFERRED', label: 'Deferred (DEFERRED)' },
                 { type: 'POS', label: 'Position Reduction' },
                 { type: 'PTS', label: 'Points Reduction' },
               ].map(({ type, label }) => (
@@ -1012,6 +1013,7 @@ function PenaltyDialogue({
                   { type: 'DSQ', label: 'Disqualification (DSQ)' },
                   { type: 'DNF', label: 'Did Not Finish (DNF)' },
                   { type: 'DNS', label: 'Did Not Start (DNS)' },
+                  { type: 'DEFERRED', label: 'Deferred (DEFERRED)' },
                   { type: 'POS', label: 'Position Reduction' },
                   { type: 'PTS', label: 'Points Reduction' },
                 ].map(({ type, label }) => (

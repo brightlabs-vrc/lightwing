@@ -632,25 +632,26 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 		raceSeqs[gr.ID] = int(gr.Sequence)
 	}
 
-	// Under standard scoring, deferrals should not kick in if every race in the event is OP.
-	skipStandardDeferrals := mode != "CUSTOM" && allOP
+	// If auto-deferral is disabled at the event level (or all races are OP under standard scoring),
+	// skip auto-deferral processing so manual DEFERRED statuses are preserved.
+	if !IsAutoDeferEnabled(mode, custom) || (mode != "CUSTOM" && allOP) {
+		return nil
+	}
 
 	// Qualification: 1st place in an auto-defer grade, ungraded, no terminal status.
 	// Find earliest (lowest race sequence) win for each user.
 	earliestWinSeq := map[string]int{}
-	if !skipStandardDeferrals {
-		for _, res := range results {
-			if !res.position.Valid || res.position.Int64 != 1 || isTerminal(res.resultStatus) {
-				continue
-			}
-			if !IsAutoDeferGrade(mode, custom, gradeStr(res.grade)) {
-				continue
-			}
-			if isUngraded(res.classTier) {
-				seq := raceSeqs[res.raceID]
-				if minSeq, ok := earliestWinSeq[res.userID]; !ok || seq < minSeq {
-					earliestWinSeq[res.userID] = seq
-				}
+	for _, res := range results {
+		if !res.position.Valid || res.position.Int64 != 1 || isTerminal(res.resultStatus) {
+			continue
+		}
+		if !IsAutoDeferGrade(mode, custom, gradeStr(res.grade)) {
+			continue
+		}
+		if isUngraded(res.classTier) {
+			seq := raceSeqs[res.raceID]
+			if minSeq, ok := earliestWinSeq[res.userID]; !ok || seq < minSeq {
+				earliestWinSeq[res.userID] = seq
 			}
 		}
 	}
