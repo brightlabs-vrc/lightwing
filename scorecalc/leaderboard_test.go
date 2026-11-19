@@ -49,9 +49,9 @@ func TestLeaderboard(t *testing.T) {
 	_, err = db.Exec(ctx,
 		`INSERT INTO "org_class_tier" ("organizationId", "userId", "classTier", "updatedAt")
 		 VALUES
-		 ($1, $3, 'G1', $5),
-		 ($1, $4, 'G2', $5)`,
-		org1, org2, u2, u3, now,
+		 ($1, $2, 'G1', $4),
+		 ($1, $3, 'G2', $4)`,
+		org1, u2, u3, now,
 	)
 	if err != nil {
 		t.Fatalf("failed to seed org_class_tier: %v", err)
