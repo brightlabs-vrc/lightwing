@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { usePageHead } from '../hooks/usePageHead'
 import { isMockMode } from '../lib/auth'
 
 interface AuthSearch {
@@ -26,6 +27,11 @@ function sanitizeRedirect(raw: string | undefined): string {
 }
 
 function AuthPage() {
+  usePageHead({
+    title: 'Sign In',
+    description: 'Sign in to your UmaKeiba account.',
+  })
+
   const { session, loading, startDiscordSignIn } = useAuth()
   const search = Route.useSearch()
   const navigate = useNavigate()
@@ -48,7 +54,7 @@ function AuthPage() {
     <div className='flex min-h-screen items-center justify-center px-4 py-10'>
       <div className='w-full max-w-lg overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-[0_24px_80px_rgba(15,23,42,0.14)] backdrop-blur'>
         <div className='flex flex-col gap-5 border-b border-slate-200/80 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e3a8a_100%)] px-8 py-10 text-white'>
-          <h1 className='text-5xl font-extrabold tracking-tight leading-none drop-shadow-sm sm:text-[3.4rem]'>Sign in to Lightwing</h1>
+          <h1 className='text-5xl font-extrabold tracking-tight leading-none drop-shadow-sm sm:text-[3.4rem]'>Sign in to UmaKeiba</h1>
           <p className='flex flex-wrap items-center gap-2 text-sm leading-6 text-sky-50/90'>
             <span>Continue to</span>
             <span className='inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-medium text-white'>

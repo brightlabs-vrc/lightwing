@@ -3,6 +3,7 @@ import { GradePointsPreview } from './GradePointsPreview'
 import styles from './EventSummaryTab.module.css'
 import { DEFAULT_SCORING_TABLES } from '../lib/scoringDefaults'
 import { UserLink } from './UserLink'
+import { MarkdownView } from './MarkdownView'
 
 interface EventSummaryTabProps {
   selectedEvent: eventmanager.EventDetail
@@ -24,11 +25,11 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
             </p>
           </div>
         )}
-        <div>
+        <div style={{ gridColumn: '1 / -1' }}>
           <p className={styles.titleCaps}>Description</p>
-          <p className={styles.bodyRegular}>
-            {selectedEvent.description ?? 'No description registered.'}
-          </p>
+          <div className="mt-1 bg-white p-3 rounded border border-slate-200">
+            <MarkdownView content={selectedEvent.description} fallbackText="No description registered." />
+          </div>
         </div>
         <div>
           <p className={styles.titleCaps}>Scoring Configuration</p>

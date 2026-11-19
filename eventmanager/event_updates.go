@@ -7,10 +7,11 @@ import (
 	"errors"
 	"time"
 
-	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/scorecalc"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 
 	"github.com/sqlc-dev/pqtype"
 )
@@ -23,7 +24,6 @@ import (
 // (PATCH /api/events/:id). Scoring type is immutable once set.
 type UpdateEventRequest struct {
 	ID                              string          `json:"id"`
-	Authorization                   string          `header:"Authorization"`
 	Name                            *string         `json:"name,omitempty"`
 	Description                     OptString       `json:"description,omitempty"`
 	Tag                             *string         `json:"tag,omitempty"`
@@ -59,12 +59,12 @@ func jsonEqual(a, b []byte) bool {
 }
 
 // UpdateEventCore updates an event's editable fields and returns its detail.
-func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, error) {
+func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventRequest) (*EventDetail, error) {
 	existing, err := requireEventRow(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 
@@ -148,33 +148,36 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 				}
 				updatedCustomTables = tables
 			} else {
-				clearCustomTables = true
+				if len(p.CustomScoringTables) > 0 && string(p.CustomScoringTables) != "null" {
+					var v any
+					if err := json.Unmarshal(p.CustomScoringTables, &v); err != nil {
+						return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables must be an object"}
+					}
+					if _, err := ValidateCustomScoringTables(v); err != nil {
+						return nil, err
+					}
+					updatedCustomTables = p.CustomScoringTables
+				} else {
+					clearCustomTables = true
+				}
 			}
 			updatedScoringRulesMode = &mode
 			if !existing.ScoringRulesMode.Valid || existing.ScoringRulesMode.String != mode {
 				triggerRecomputation = true
 			}
 		}
-		if len(p.CustomScoringTables) > 0 {
-			effectiveMode := ""
-			if updatedScoringRulesMode != nil {
-				effectiveMode = *updatedScoringRulesMode
-			} else if existing.ScoringRulesMode.Valid {
-				effectiveMode = existing.ScoringRulesMode.String
+		if len(p.CustomScoringTables) > 0 && updatedCustomTables == nil && !clearCustomTables {
+			var v any
+			if err := json.Unmarshal(p.CustomScoringTables, &v); err != nil {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables must be an object"}
 			}
-			if effectiveMode == "CUSTOM" {
-				var v any
-				if err := json.Unmarshal(p.CustomScoringTables, &v); err != nil {
-					return nil, &errs.Error{Code: errs.InvalidArgument, Message: "customScoringTables must be an object"}
-				}
-				if _, err := ValidateCustomScoringTables(v); err != nil {
-					return nil, err
-				}
-				updatedCustomTables = p.CustomScoringTables
-				clearCustomTables = false
-				if !jsonEqual(existing.CustomScoringTables, updatedCustomTables) {
-					triggerRecomputation = true
-				}
+			if _, err := ValidateCustomScoringTables(v); err != nil {
+				return nil, err
+			}
+			updatedCustomTables = p.CustomScoringTables
+			clearCustomTables = false
+			if !jsonEqual(existing.CustomScoringTables, updatedCustomTables) {
+				triggerRecomputation = true
 			}
 		}
 	}
@@ -193,8 +196,10 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 			tag = "COMMUNITY"
 		}
 		if tag == "OFFICIAL" {
-			if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
-				return nil, err
+			if existing.OwnerType != "ORGANIZATION" {
+				if _, err := auth.RequireSiteAdmin(actor); err != nil {
+					return nil, err
+				}
 			}
 		} else if tag != "COMMUNITY" {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "tag must be OFFICIAL or COMMUNITY"}
@@ -263,6 +268,9 @@ func UpdateEventCore(ctx context.Context, p *UpdateEventRequest) (*EventDetail, 
 		if err := recomputeEventPoints(ctx, p.ID); err != nil {
 			return nil, err
 		}
+		if err := ApplyAutoDeferralsForEvent(ctx, p.ID, nil); err != nil {
+			return nil, err
+		}
 	}
 	return LoadEvent(ctx, p.ID)
 }
@@ -328,26 +336,54 @@ func recomputeEventPoints(ctx context.Context, eventID string) error {
 	if err != nil {
 		return err
 	}
-	affected := map[string]bool{}
-	var stale []storedResultRow
+
+	// Group stored result rows by raceEventId
+	raceGroupMap := make(map[string][]sqlc.ListStoredResultRowsRow)
 	for _, sr := range rows {
-		r := storedResultRow{
-			ID: sr.ID, UserID: sr.UserId,
-			Position: sql.NullInt64{Int64: int64(sr.Position.Int32), Valid: sr.Position.Valid},
-			Points:   int(sr.Points), ResultStatus: sr.ResultStatus, Grade: sr.Grade,
-		}
-		calculated := resolveResultPoints(mode, custom, &r)
-		if r.Points != calculated {
-			stale = append(stale, r)
-		}
-		affected[r.UserID] = true
+		raceGroupMap[sr.RaceEventId] = append(raceGroupMap[sr.RaceEventId], sr)
 	}
-	for _, r := range stale {
-		calculated := resolveResultPoints(mode, custom, &r)
-		if err := q().UpdateRaceResultPoints(ctx, sqlc.UpdateRaceResultPointsParams{
-			Points: int32(calculated), ID: r.ID,
-		}); err != nil {
-			return err
+
+	affected := map[string]bool{}
+
+	for _, group := range raceGroupMap {
+		if len(group) == 0 {
+			continue
+		}
+		grade := ""
+		if group[0].Grade.Valid {
+			grade = group[0].Grade.String
+		}
+
+		items := make([]*RaceResultItem, len(group))
+		for i, sr := range group {
+			var pos *int
+			if sr.Position.Valid {
+				p := int(sr.Position.Int32)
+				pos = &p
+			}
+			status := ""
+			if sr.ResultStatus.Valid {
+				status = sr.ResultStatus.String
+			}
+			items[i] = &RaceResultItem{
+				UserID:       sr.UserId,
+				Position:     pos,
+				ResultStatus: status,
+			}
+		}
+
+		pointsMap := ResolveRacePoints(mode, custom, grade, items)
+
+		for _, sr := range group {
+			calculated := pointsMap[sr.UserId]
+			if int(sr.Points) != calculated {
+				if err := q().UpdateRaceResultPoints(ctx, sqlc.UpdateRaceResultPointsParams{
+					Points: int32(calculated), ID: sr.ID,
+				}); err != nil {
+					return err
+				}
+			}
+			affected[sr.UserId] = true
 		}
 	}
 	if len(affected) > 0 {
@@ -364,7 +400,8 @@ func recomputeEventPoints(ctx context.Context, eventID string) error {
 	return nil
 }
 
-//encore:api public method=PATCH path=/api/events
+//encore:api auth method=PATCH path=/api/events
 func UpdateEvent(ctx context.Context, p *UpdateEventRequest) (*EventDetail, error) {
-	return UpdateEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return UpdateEventCore(ctx, actor, p)
 }

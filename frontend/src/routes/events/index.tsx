@@ -1,4 +1,5 @@
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
@@ -63,6 +64,11 @@ export const Route = createFileRoute('/events/')({
 })
 
 function EventsPage() {
+  usePageHead({
+    title: 'Competitive Events',
+    description: 'Explore competitive racing events on UmaKeiba.',
+  })
+
   const queryClient = useQueryClient()
   const { session } = useAuth()
   const [page, setPage] = useState(1)

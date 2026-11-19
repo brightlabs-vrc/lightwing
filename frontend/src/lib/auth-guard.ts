@@ -43,6 +43,25 @@ export async function requireAuth(location: RouteLocation): Promise<AuthSession>
 }
 
 /**
+ * Ensures the caller is an authenticated SITE_ADMIN or EVENT_ADMIN.
+ */
+export async function requireAdminPanel(location: RouteLocation): Promise<AuthSession> {
+	const authSession = await requireAuth(location)
+
+	if (authSession.user.siteRole !== 'SITE_ADMIN' && authSession.user.siteRole !== 'EVENT_ADMIN') {
+		throw redirect({
+			to: '/auth',
+			search: {
+				redirect: buildRedirectPath(location),
+				error: 'forbidden',
+			},
+		})
+	}
+
+	return authSession
+}
+
+/**
  * Ensures the caller is an authenticated SITE_ADMIN. Non-admins are sent to
  * `/auth` with a `forbidden` error so the page can explain the situation.
  */

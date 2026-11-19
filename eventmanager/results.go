@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"time"
 
-	"encore.dev/beta/errs"
-	"encore.dev/storage/cache"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/scorecalc"
 	"encore.app/shared"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
+	"encore.dev/storage/cache"
 )
 
 type userRaceRecordsCacheKey struct {
@@ -135,8 +136,8 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 func newRaceResultRow(id, raceEventID, userID string, position sql.NullInt32, points int32, gateNumber sql.NullInt16, finishTime, margin, passingOrder, final3F, resultStatus sql.NullString, createdAt, updatedAt time.Time) *raceResultRow {
 	return &raceResultRow{
 		ID: id, RaceEventID: raceEventID, UserID: userID,
-		Position: sql.NullInt64{Int64: int64(position.Int32), Valid: position.Valid},
-		Points:   int(points),
+		Position:   sql.NullInt64{Int64: int64(position.Int32), Valid: position.Valid},
+		Points:     int(points),
 		GateNumber: sql.NullInt64{Int64: int64(gateNumber.Int16), Valid: gateNumber.Valid},
 		FinishTime: finishTime, Margin: margin, PassingOrder: passingOrder,
 		Final3F: final3F, ResultStatus: resultStatus,
@@ -229,12 +230,12 @@ func upsertRaceResult(ctx context.Context, raceID string, entry *RaceResultInput
 	upserted, err := q().UpsertRaceResult(ctx, sqlc.UpsertRaceResultParams{
 		ID: id, RaceEventId: raceID, UserId: entry.UserID, Position: position,
 		Points: int32(points), GateNumber: gateNumber,
-		FinishTime: nullStringFromPtr(entry.FinishTime),
-		Margin:     nullStringFromPtr(entry.Margin),
+		FinishTime:   nullStringFromPtr(entry.FinishTime),
+		Margin:       nullStringFromPtr(entry.Margin),
 		PassingOrder: nullStringFromPtr(entry.PassingOrder),
 		Final3F:      nullStringFromPtr(entry.Final3F),
 		ResultStatus: nullStringFromPtr(entry.ResultStatus),
-		CreatedAt: now,
+		CreatedAt:    now,
 	})
 	if err != nil {
 		return nil, err
@@ -284,7 +285,6 @@ type AssignRaceResultRequest struct {
 	EventID       string  `json:"eventId"`
 	RaceID        string  `json:"raceId"`
 	UserID        string  `json:"userId"`
-	Authorization string  `header:"Authorization"`
 	Position      *int    `json:"position,omitempty"`
 	Points        *int    `json:"points,omitempty"`
 	GateNumber    *int    `json:"gateNumber,omitempty"`
@@ -315,8 +315,8 @@ func (p *AssignRaceResultRequest) toResultInput() RaceResultInput {
 }
 
 // AssignRaceResultCore assigns (or updates) a participant's result on a race.
-func AssignRaceResultCore(ctx context.Context, p *AssignRaceResultRequest) (*RaceResultView, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func AssignRaceResultCore(ctx context.Context, actor *auth.Actor, p *AssignRaceResultRequest) (*RaceResultView, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	e, err := requireEventRow(ctx, p.EventID)
@@ -353,28 +353,39 @@ func AssignRaceResultCore(ctx context.Context, p *AssignRaceResultRequest) (*Rac
 	if err != nil {
 		return nil, err
 	}
+	if err := SyncRacePoints(ctx, p.EventID, p.RaceID); err != nil {
+		return nil, err
+	}
 	if err := ApplyAutoDeferralsForEvent(ctx, p.EventID, &p.RaceID); err != nil {
 		return nil, err
 	}
 	if err := submitCalcForUsers(ctx, p.EventID, []string{p.UserID}); err != nil {
 		return nil, err
 	}
+	updatedRows, err := ListResultsCore(ctx, p.RaceID)
+	if err == nil {
+		for _, ur := range updatedRows {
+			if ur.UserID == p.UserID {
+				return ur, nil
+			}
+		}
+	}
 	return toRaceResultView(result), nil
 }
 
-//encore:api public method=PUT path=/api/race-results
+//encore:api auth method=PUT path=/api/race-results
 func AssignRaceResult(ctx context.Context, p *AssignRaceResultRequest) (*RaceResultView, error) {
-	return AssignRaceResultCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return AssignRaceResultCore(ctx, actor, p)
 }
 
 // --- Delete ---
 
 // DeleteRaceResultRequest mirrors DeleteRaceResultParams.
 type DeleteRaceResultRequest struct {
-	EventID       string `json:"eventId"`
-	RaceID        string `json:"raceId"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	RaceID  string `json:"raceId"`
+	UserID  string `json:"userId"`
 }
 
 // DeleteRaceResultResponse reports deletion.
@@ -383,8 +394,8 @@ type DeleteRaceResultResponse struct {
 }
 
 // DeleteRaceResultCore removes a participant's result from a race.
-func DeleteRaceResultCore(ctx context.Context, p *DeleteRaceResultRequest) (*DeleteRaceResultResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func DeleteRaceResultCore(ctx context.Context, actor *auth.Actor, p *DeleteRaceResultRequest) (*DeleteRaceResultResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if _, err := RequireRace(ctx, p.EventID, p.RaceID); err != nil {
@@ -400,6 +411,9 @@ func DeleteRaceResultCore(ctx context.Context, p *DeleteRaceResultRequest) (*Del
 	if affected == 0 {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "result not found"}
 	}
+	if err := SyncRacePoints(ctx, p.EventID, p.RaceID); err != nil {
+		return nil, err
+	}
 	if err := ApplyAutoDeferralsForEvent(ctx, p.EventID, &p.RaceID); err != nil {
 		return nil, err
 	}
@@ -409,9 +423,10 @@ func DeleteRaceResultCore(ctx context.Context, p *DeleteRaceResultRequest) (*Del
 	return &DeleteRaceResultResponse{Deleted: true}, nil
 }
 
-//encore:api public method=DELETE path=/api/race-results
+//encore:api auth method=DELETE path=/api/race-results
 func DeleteRaceResult(ctx context.Context, p *DeleteRaceResultRequest) (*DeleteRaceResultResponse, error) {
-	return DeleteRaceResultCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return DeleteRaceResultCore(ctx, actor, p)
 }
 
 // --- List ---
@@ -446,19 +461,19 @@ func ListRaceResults(ctx context.Context, q *RaceResultsQuery) (*RaceResultsResp
 
 // UserRaceRecordView represents a single race result entry in a user's career records.
 type UserRaceRecordView struct {
-	ResultID        string  `json:"resultId"`
-	Position        *int    `json:"position"`
-	Points          int     `json:"points"`
-	FinishTime      *string `json:"finishTime"`
-	ResultStatus    *string `json:"resultStatus"`
-	ResultCreatedAt string  `json:"resultCreatedAt"`
-	RaceID          string  `json:"raceId"`
-	RaceName        string  `json:"raceName"`
-	RaceSequence    int     `json:"raceSequence"`
-	RaceGrade       *string `json:"raceGrade"`
-	EventID         string  `json:"eventId"`
-	EventName       string  `json:"eventName"`
-	EventTag        string  `json:"eventTag"`
+	ResultID         string  `json:"resultId"`
+	Position         *int    `json:"position"`
+	Points           int     `json:"points"`
+	FinishTime       *string `json:"finishTime"`
+	ResultStatus     *string `json:"resultStatus"`
+	ResultCreatedAt  string  `json:"resultCreatedAt"`
+	RaceID           string  `json:"raceId"`
+	RaceName         string  `json:"raceName"`
+	RaceSequence     int     `json:"raceSequence"`
+	RaceGrade        *string `json:"raceGrade"`
+	EventID          string  `json:"eventId"`
+	EventName        string  `json:"eventName"`
+	EventTag         string  `json:"eventTag"`
 	EventScheduledAt *string `json:"eventScheduledAt"`
 }
 
@@ -499,19 +514,19 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 	records := make([]UserRaceRecordView, 0, len(rows))
 	for _, r := range rows {
 		records = append(records, UserRaceRecordView{
-			ResultID:        r.ResultId,
-			Position:        nullInt(sql.NullInt64{Int64: int64(r.Position.Int32), Valid: r.Position.Valid}),
-			Points:          int(r.Points),
-			FinishTime:      nullString(r.FinishTime),
-			ResultStatus:    nullString(r.ResultStatus),
-			ResultCreatedAt: isoTime(r.ResultCreatedAt),
-			RaceID:          r.RaceId,
-			RaceName:        r.RaceName,
-			RaceSequence:    int(r.RaceSequence),
-			RaceGrade:       nullString(r.RaceGrade),
-			EventID:         r.EventId,
-			EventName:       r.EventName,
-			EventTag:        r.EventTag,
+			ResultID:         r.ResultId,
+			Position:         nullInt(sql.NullInt64{Int64: int64(r.Position.Int32), Valid: r.Position.Valid}),
+			Points:           int(r.Points),
+			FinishTime:       nullString(r.FinishTime),
+			ResultStatus:     nullString(r.ResultStatus),
+			ResultCreatedAt:  isoTime(r.ResultCreatedAt),
+			RaceID:           r.RaceId,
+			RaceName:         r.RaceName,
+			RaceSequence:     int(r.RaceSequence),
+			RaceGrade:        nullString(r.RaceGrade),
+			EventID:          r.EventId,
+			EventName:        r.EventName,
+			EventTag:         r.EventTag,
 			EventScheduledAt: nullTime(timePtrFromNull(r.EventScheduledAt)),
 		})
 	}
@@ -604,27 +619,38 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 	if err != nil {
 		return err
 	}
+	allOP := len(grows) > 0
 	for _, gr := range grows {
+		g := ""
 		if gr.Grade.Valid {
-			raceGrades[gr.ID] = gr.Grade.String
+			g = gr.Grade.String
+			raceGrades[gr.ID] = g
+		}
+		if g != string(RaceGradeOP) {
+			allOP = false
 		}
 		raceSeqs[gr.ID] = int(gr.Sequence)
 	}
 
+	// Under standard scoring, deferrals should not kick in if every race in the event is OP.
+	skipStandardDeferrals := mode != "CUSTOM" && allOP
+
 	// Qualification: 1st place in an auto-defer grade, ungraded, no terminal status.
 	// Find earliest (lowest race sequence) win for each user.
 	earliestWinSeq := map[string]int{}
-	for _, res := range results {
-		if !res.position.Valid || res.position.Int64 != 1 || isTerminal(res.resultStatus) {
-			continue
-		}
-		if !IsAutoDeferGrade(mode, custom, gradeStr(res.grade)) {
-			continue
-		}
-		if isUngraded(res.classTier) {
-			seq := raceSeqs[res.raceID]
-			if minSeq, ok := earliestWinSeq[res.userID]; !ok || seq < minSeq {
-				earliestWinSeq[res.userID] = seq
+	if !skipStandardDeferrals {
+		for _, res := range results {
+			if !res.position.Valid || res.position.Int64 != 1 || isTerminal(res.resultStatus) {
+				continue
+			}
+			if !IsAutoDeferGrade(mode, custom, gradeStr(res.grade)) {
+				continue
+			}
+			if isUngraded(res.classTier) {
+				seq := raceSeqs[res.raceID]
+				if minSeq, ok := earliestWinSeq[res.userID]; !ok || seq < minSeq {
+					earliestWinSeq[res.userID] = seq
+				}
 			}
 		}
 	}
@@ -728,6 +754,59 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 			CreatedAt: now,
 		}); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// SyncRacePoints re-calculates effective points for all participants in a race
+// accounting for position demotion penalties and promotions.
+func SyncRacePoints(ctx context.Context, eventID, raceID string) error {
+	scoringType, mode, custom, err := eventScoringRules(ctx, eventID)
+	if err != nil || scoringType != ScoringPoints {
+		return nil
+	}
+	race, err := RequireRace(ctx, eventID, raceID)
+	if err != nil {
+		return err
+	}
+	grade := ""
+	if race.Grade.Valid {
+		grade = race.Grade.String
+	}
+	rows, err := q().ListRaceResults(ctx, raceID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	items := make([]*RaceResultItem, len(rows))
+	for i, r := range rows {
+		var pos *int
+		if r.Position.Valid {
+			p := int(r.Position.Int32)
+			pos = &p
+		}
+		status := ""
+		if r.ResultStatus.Valid {
+			status = r.ResultStatus.String
+		}
+		items[i] = &RaceResultItem{
+			UserID:       r.UserId,
+			Position:     pos,
+			ResultStatus: status,
+		}
+	}
+	pointsMap := ResolveRacePoints(mode, custom, grade, items)
+	for _, r := range rows {
+		calculated := pointsMap[r.UserId]
+		if int(r.Points) != calculated {
+			if err := q().UpdateRaceResultPoints(ctx, sqlc.UpdateRaceResultPointsParams{
+				Points: int32(calculated), ID: r.ID,
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

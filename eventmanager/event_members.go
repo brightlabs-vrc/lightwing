@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
@@ -18,14 +19,13 @@ import (
 // Mirrors ts-legacy/eventmanager/event-members.ts AddMemberParams
 // (POST /api/events/:id/members).
 type AddEventMemberRequest struct {
-	EventID       string `json:"eventId"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	UserID  string `json:"userId"`
 }
 
 // AddEventMemberCore registers a participant, enforcing the event's class
 // restriction and seeding the scoring record. Idempotent for existing members.
-func AddEventMemberCore(ctx context.Context, p *AddEventMemberRequest) (*EventDetail, error) {
+func AddEventMemberCore(ctx context.Context, actor *auth.Actor, p *AddEventMemberRequest) (*EventDetail, error) {
 	tier, err := q().GetUserClassTier(ctx, p.UserID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
@@ -38,7 +38,7 @@ func AddEventMemberCore(ctx context.Context, p *AddEventMemberRequest) (*EventDe
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if !IsEligible(toClassTier(classTierPtr(userTier)), toClassTier(classTierPtr(event.ClassRestriction))) {
@@ -82,9 +82,10 @@ func AddEventMemberCore(ctx context.Context, p *AddEventMemberRequest) (*EventDe
 	return LoadEvent(ctx, p.EventID)
 }
 
-//encore:api public method=POST path=/api/event-members
+//encore:api auth method=POST path=/api/event-members
 func AddEventMember(ctx context.Context, p *AddEventMemberRequest) (*EventDetail, error) {
-	return AddEventMemberCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return AddEventMemberCore(ctx, actor, p)
 }
 
 // RemoveMemberFromEvent deletes a member plus all associated standings and
@@ -128,13 +129,12 @@ func RemoveMemberFromEvent(ctx context.Context, eventID, userID string) error {
 // Mirrors ts-legacy/eventmanager/event-members.ts RemoveMemberParams
 // (DELETE /api/events/:id/members/:userId).
 type RemoveEventMemberRequest struct {
-	EventID       string `query:"eventId"`
-	UserID        string `query:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `query:"eventId"`
+	UserID  string `query:"userId"`
 }
 
 // RemoveEventMemberCore removes a participant from an event.
-func RemoveEventMemberCore(ctx context.Context, p *RemoveEventMemberRequest) (*EventDetail, error) {
+func RemoveEventMemberCore(ctx context.Context, actor *auth.Actor, p *RemoveEventMemberRequest) (*EventDetail, error) {
 	exists, err := q().EventExists(ctx, p.EventID)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func RemoveEventMemberCore(ctx context.Context, p *RemoveEventMemberRequest) (*E
 	if !exists {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if err := RemoveMemberFromEvent(ctx, p.EventID, p.UserID); err != nil {
@@ -151,9 +151,10 @@ func RemoveEventMemberCore(ctx context.Context, p *RemoveEventMemberRequest) (*E
 	return LoadEvent(ctx, p.EventID)
 }
 
-//encore:api public method=DELETE path=/api/event-members
+//encore:api auth method=DELETE path=/api/event-members
 func RemoveEventMember(ctx context.Context, p *RemoveEventMemberRequest) (*EventDetail, error) {
-	return RemoveEventMemberCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RemoveEventMemberCore(ctx, actor, p)
 }
 
 // --- Join (self-service) ---
@@ -163,17 +164,15 @@ func RemoveEventMember(ctx context.Context, p *RemoveEventMemberRequest) (*Event
 // Mirrors ts-legacy/eventmanager/event-members.ts JoinEventParams
 // (POST /api/events/:id/join).
 type JoinEventRequest struct {
-	EventID       string `json:"eventId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
 }
 
 // JoinEventCore lets an authenticated user join a PENDING or ONGOING
 // event. No event permission required; class restriction, signup lock, and
 // capacity are enforced.
-func JoinEventCore(ctx context.Context, p *JoinEventRequest) (*EventDetail, error) {
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
+func JoinEventCore(ctx context.Context, actor *auth.Actor, p *JoinEventRequest) (*EventDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
 	userID := actor.UserID
 
@@ -236,25 +235,27 @@ func JoinEventCore(ctx context.Context, p *JoinEventRequest) (*EventDetail, erro
 	return LoadEvent(ctx, p.EventID)
 }
 
-//encore:api public method=POST path=/api/event-join
+//encore:api auth method=POST path=/api/event-join
 func JoinEvent(ctx context.Context, p *JoinEventRequest) (*EventDetail, error) {
-	return JoinEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return JoinEventCore(ctx, actor, p)
 }
 
 // --- Leave (self-service) ---
 
-// LeaveEventRequest carries the event id plus the auth header (DELETE
-// decodes the struct from query params).
+// LeaveEventRequest carries the event id.
 //
 // Mirrors ts-legacy/eventmanager/event-members.ts LeaveEventParams
 // (DELETE /api/events/:id/join).
 type LeaveEventRequest struct {
-	EventID       string `query:"eventId"`
-	Authorization string `header:"Authorization"`
+	EventID string `query:"eventId"`
 }
 
 // LeaveEventCore lets an authenticated user withdraw from an event.
-func LeaveEventCore(ctx context.Context, p *LeaveEventRequest) (*EventDetail, error) {
+func LeaveEventCore(ctx context.Context, actor *auth.Actor, p *LeaveEventRequest) (*EventDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
+	}
 	event, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
 		return nil, err
@@ -262,19 +263,16 @@ func LeaveEventCore(ctx context.Context, p *LeaveEventRequest) (*EventDetail, er
 	if event.SignupsLocked {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "signups are locked for this event"}
 	}
-	actor, err := auth.ResolveActor(ctx, p.Authorization)
-	if err != nil {
-		return nil, err
-	}
 	if err := RemoveMemberFromEvent(ctx, p.EventID, actor.UserID); err != nil {
 		return nil, err
 	}
 	return LoadEvent(ctx, p.EventID)
 }
 
-//encore:api public method=DELETE path=/api/event-join
+//encore:api auth method=DELETE path=/api/event-join
 func LeaveEvent(ctx context.Context, p *LeaveEventRequest) (*EventDetail, error) {
-	return LeaveEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return LeaveEventCore(ctx, actor, p)
 }
 
 // --- Signups lock ---
@@ -284,14 +282,13 @@ func LeaveEvent(ctx context.Context, p *LeaveEventRequest) (*EventDetail, error)
 // Mirrors ts-legacy/eventmanager/event-members.ts SetSignupsLockedParams
 // (PUT /api/events/:id/signups-lock).
 type SetEventSignupsLockedRequest struct {
-	EventID       string `json:"eventId"`
-	Locked        bool   `json:"locked"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	Locked  bool   `json:"locked"`
 }
 
 // SetEventSignupsLockedCore toggles an event's signup lock. Gated by
 // event-update permission.
-func SetEventSignupsLockedCore(ctx context.Context, p *SetEventSignupsLockedRequest) (*EventDetail, error) {
+func SetEventSignupsLockedCore(ctx context.Context, actor *auth.Actor, p *SetEventSignupsLockedRequest) (*EventDetail, error) {
 	exists, err := q().EventExists(ctx, p.EventID)
 	if err != nil {
 		return nil, err
@@ -299,7 +296,7 @@ func SetEventSignupsLockedCore(ctx context.Context, p *SetEventSignupsLockedRequ
 	if !exists {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if err := q().UpdateEventSignupsLocked(ctx, sqlc.UpdateEventSignupsLockedParams{
@@ -310,7 +307,8 @@ func SetEventSignupsLockedCore(ctx context.Context, p *SetEventSignupsLockedRequ
 	return LoadEvent(ctx, p.EventID)
 }
 
-//encore:api public method=PUT path=/api/event-signups-lock
+//encore:api auth method=PUT path=/api/event-signups-lock
 func SetEventSignupsLocked(ctx context.Context, p *SetEventSignupsLockedRequest) (*EventDetail, error) {
-	return SetEventSignupsLockedCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return SetEventSignupsLockedCore(ctx, actor, p)
 }

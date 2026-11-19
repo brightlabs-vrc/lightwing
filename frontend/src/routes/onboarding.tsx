@@ -1,4 +1,5 @@
 import { useAuth } from '../hooks/useAuth'
+import { usePageHead } from '../hooks/usePageHead'
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
@@ -21,6 +22,11 @@ export const Route = createFileRoute('/onboarding')({
 })
 
 function OnboardingPage() {
+  usePageHead({
+    title: 'Onboarding',
+    description: 'Complete your driver onboarding on UmaKeiba.',
+  })
+
   const { session } = useAuth()
   const [vrchatUsername, setVrchatUsername] = useState('')
 
@@ -47,7 +53,7 @@ function OnboardingPage() {
       <PixelCard className="w-full">
         <PixelStack gap={4}>
           <PixelSectionHeader
-            title="WELCOME TO LIGHTWING!"
+            title="WELCOME TO UMAKEIBA!"
             titleTone="purple"
             size="md"
             description="Please set your VRChat username to complete your profile."

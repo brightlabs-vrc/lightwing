@@ -327,5 +327,6 @@ export function useEventDetail(eventId: string) {
     handleCancelStandingsEdit: resultsHook.handleCancelStandingsEdit,
     handleUnifiedSave: resultsHook.handleUnifiedSave,
     handleReorderRaces: racesHook.handleReorderRaces,
+    reloadCurrentEvent,
   }
 }

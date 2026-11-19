@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.app/auth"
 	"encore.app/teammanager/sqlc"
@@ -25,12 +26,22 @@ type TeamStatsUpdate struct {
 	AveragePointsPerEvent *float64
 }
 
-func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStatsUpdate) (*Team, error) {
-	if _, _, err := auth.RequirePermission(ctx, authorization, id, "organization", "update"); err != nil {
-		return nil, err
+func updateTeamStats(ctx context.Context, actor *auth.Actor, id string, p *TeamStatsUpdate) (*Team, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
+	if !auth.IsSiteAdmin(actor.SiteRole) && !auth.IsEventAdmin(actor.SiteRole) {
+		if _, _, err := auth.RequirePermission(ctx, actor, id, "organization", "update"); err != nil {
+			return nil, err
+		}
+	}
+	targetOrgID := id
 	if _, err := q().OrgIDByID(ctx, id); errors.Is(err, sql.ErrNoRows) {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
+		if primOrg, errPrim := q().GetPrimaryOrgForTeam(ctx, id); errPrim == nil && primOrg.ID != "" {
+			targetOrgID = primOrg.ID
+		} else {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
+		}
 	} else if err != nil {
 		return nil, err
 	}
@@ -56,12 +67,41 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 		PointsAverage:         pointsAverage,
 		SeasonRank:            seasonRank,
 		AveragePointsPerEvent: averagePointsPerEvent,
-		ID:                    id,
+		ID:                    targetOrgID,
 	}); err != nil {
 		return nil, err
 	}
 	invalidateTeamCache(ctx, id)
-	return loadTeam(ctx, id)
+	invalidateTeamCache(ctx, targetOrgID)
+	if loaded, err := loadTeam(ctx, id); err == nil {
+		return loaded, nil
+	}
+	orgDetail, orgErr := getAdminOrganization(ctx, id)
+	if orgErr == nil {
+		var stats TeamStats
+		if row, err := q().GetOrgByID(ctx, id); err == nil {
+			stats = TeamStats{
+				RankingAverage:        nullFloatToPtr(row.RankingAverage),
+				PointsAverage:         nullFloatToPtr(row.PointsAverage),
+				SeasonRank:            nullInt32ToPtr(row.SeasonRank),
+				AveragePointsPerEvent: nullFloatToPtr(row.AveragePointsPerEvent),
+			}
+		}
+		return &Team{
+			ID:                          orgDetail.ID,
+			Name:                        orgDetail.Name,
+			Slug:                        orgDetail.Slug,
+			Logo:                        orgDetail.Logo,
+			Status:                      orgDetail.Status,
+			PrimaryOrganizationID:       orgDetail.ID,
+			IsOrganization:              true,
+			Organizations:               []LinkedOrganization{},
+			Stats:                       stats,
+			AdministratorSlotsRemaining: orgDetail.AdministratorSlotsRemaining,
+			Members:                     orgDetail.Members,
+		}, nil
+	}
+	return nil, orgErr
 }
 
 // --- HTTP endpoint (thin wrapper over the core above) ---
@@ -69,16 +109,16 @@ func updateTeamStats(ctx context.Context, authorization, id string, p *TeamStats
 // UpdateTeamStatsRequest carries the team id, auth header, and stat values.
 type UpdateTeamStatsRequest struct {
 	ID                    string   `json:"id"`
-	Authorization         string   `header:"Authorization"`
 	RankingAverage        *float64 `json:"rankingAverage,omitempty"`
 	PointsAverage         *float64 `json:"pointsAverage,omitempty"`
 	SeasonRank            *int32   `json:"seasonRank,omitempty"`
 	AveragePointsPerEvent *float64 `json:"averagePointsPerEvent,omitempty"`
 }
 
-//encore:api public method=PATCH path=/api/team-stats
+//encore:api auth method=PATCH path=/api/team-stats
 func (s *Service) UpdateTeamStats(ctx context.Context, p *UpdateTeamStatsRequest) (*Team, error) {
-	return updateTeamStats(ctx, p.Authorization, p.ID, &TeamStatsUpdate{
+	actor := encoreauth.Data().(*auth.Actor)
+	return updateTeamStats(ctx, actor, p.ID, &TeamStatsUpdate{
 		RankingAverage:        p.RankingAverage,
 		PointsAverage:         p.PointsAverage,
 		SeasonRank:            p.SeasonRank,

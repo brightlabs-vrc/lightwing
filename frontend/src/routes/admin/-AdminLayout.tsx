@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 
 // Import Salesforce Lightning Design System CSS directly from node_modules
 import '@salesforce-ux/design-system/assets/styles/salesforce-lightning-design-system.min.css'
@@ -13,6 +14,11 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutProps) {
+  usePageHead({
+    title: title ? `Admin - ${title}` : 'Admin',
+    description: 'UmaKeiba Site & Event Administration.',
+  })
+
   const { session, signOutUser } = useAuth()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
 
@@ -82,9 +88,19 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
                   <span className="slds-truncate">Users</span>
                 </Link>
               </li>
+              <li className={`slds-context-bar__item ${isCurrent('/admin/organizations') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
+                <Link to="/admin/organizations" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
+                  <span className="slds-truncate">Organizations</span>
+                </Link>
+              </li>
               <li className={`slds-context-bar__item ${isCurrent('/admin/teams') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
                 <Link to="/admin/teams" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
                   <span className="slds-truncate">Teams</span>
+                </Link>
+              </li>
+              <li className={`slds-context-bar__item ${isCurrent('/admin/approvals') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
+                <Link to="/admin/approvals" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
+                  <span className="slds-truncate">Approvals</span>
                 </Link>
               </li>
               <li className="slds-context-bar__item" style={{ display: 'inline-flex', marginLeft: 'auto' }}>

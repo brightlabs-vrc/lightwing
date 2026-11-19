@@ -56,6 +56,11 @@ jobs:
       - name: Disable Encore telemetry
         run: encore telemetry disable
 
+      - name: Start Encore daemon
+        run: |
+          encore daemon &
+          sleep 3
+
       - name: Build backend
         run: |
           go build ./...

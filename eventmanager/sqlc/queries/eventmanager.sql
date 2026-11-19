@@ -12,6 +12,15 @@ SELECT COALESCE(MAX(sequence), 0)::integer FROM "race_event" WHERE "eventId" = $
 -- name: UpdateRaceSequence :exec
 UPDATE "race_event" SET sequence = $1 WHERE id = $2;
 
+-- Batch update race event sequences (used by ReorderRaceEvents).
+-- name: UpdateRaceSequencesBatch :exec
+UPDATE "race_event" r
+SET sequence = batch.sequence
+FROM (
+    SELECT unnest($1::text[]) AS id, unnest($2::int[]) AS sequence
+) AS batch
+WHERE r.id = batch.id;
+
 -- Create race event row.
 -- name: InsertRaceEvent :exec
 INSERT INTO "race_event" (id, "eventId", name, sequence, "distanceMeters", "trackType",
@@ -122,7 +131,9 @@ SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1);
 -- Full event row (replaces eventColumns scans).
 -- name: GetEventRow :one
 SELECT e.id, e.name, e.description, e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
-COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
+COALESCE(o.slug, u.slug) AS "ownerSlug",
+COALESCE(o.logo, u.image) AS "ownerLogo"
 FROM "event" e
 LEFT JOIN "organization" o ON e."organizationId" = o.id
 LEFT JOIN "user" u ON e."ownerUserId" = u.id
@@ -180,7 +191,9 @@ e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRacePa
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
-COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
+COALESCE(o.slug, u.slug) AS "ownerSlug",
+COALESCE(o.logo, u.image) AS "ownerLogo"
 FROM "event" e
 LEFT JOIN "organization" o ON e."organizationId" = o.id
 LEFT JOIN "user" u ON e."ownerUserId" = u.id
@@ -204,7 +217,9 @@ e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRacePa
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
-COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName"
+COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
+COALESCE(o.slug, u.slug) AS "ownerSlug",
+COALESCE(o.logo, u.image) AS "ownerLogo"
 FROM "event" e
 LEFT JOIN "organization" o ON e."organizationId" = o.id
 LEFT JOIN "user" u ON e."ownerUserId" = u.id
@@ -367,7 +382,7 @@ UPDATE "race_result" SET "resultStatus" = NULL, points = $1 WHERE id = $2;
 
 -- Stored result rows for points recomputation.
 -- name: ListStoredResultRows :many
-SELECT res.id, res."userId", res.position, res.points, res."resultStatus", r.grade
+SELECT res.id, res."raceEventId", res."userId", res.position, res.points, res."resultStatus", r.grade
 FROM "race_result" res JOIN "race_event" r ON r.id = res."raceEventId"
 WHERE r."eventId" = $1;
 
@@ -464,6 +479,10 @@ SELECT id, name, "organizationId", "classRestriction" FROM "event" ORDER BY "cre
 -- Eligible races for one event (used by ListEligibleEvents).
 -- name: ListEligibleRaces :many
 SELECT id, name, sequence, grade, "classRestriction" FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC;
+
+-- Eligible races for all events (used by ListEligibleEvents).
+-- name: ListAllEligibleRaces :many
+SELECT id, "eventId", name, sequence, grade, "classRestriction" FROM "race_event" ORDER BY "eventId" ASC, sequence ASC;
 
 -- Datasets scoped by event.
 -- name: ListDatasetsByEvent :many

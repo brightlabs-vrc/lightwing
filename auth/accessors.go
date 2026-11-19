@@ -11,12 +11,15 @@ import (
 // AdministratorRole is the org-level role name for organization administrators.
 const AdministratorRole = administratorRole
 
+// MemberRole is the default org-level role name.
+const MemberRole = memberRole
+
 // AdministratorRoleLimit is the max number of administrators per organization.
 const AdministratorRoleLimit = administratorRoleLimit
 
 // RequireSiteAdmin asserts the caller holds the global SITE_ADMIN role.
-func RequireSiteAdmin(ctx context.Context, authorization string) (*Actor, error) {
-	return requireSiteAdmin(ctx, authorization)
+func RequireSiteAdmin(actor *Actor) (*Actor, error) {
+	return requireSiteAdmin(actor)
 }
 
 // InvalidateMemberRole drops the cached role for an org membership.

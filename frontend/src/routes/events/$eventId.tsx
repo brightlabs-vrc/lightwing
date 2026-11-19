@@ -1,8 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import { formatLocalDateTime } from '../../lib/datetime'
+import { computeRaceEffectiveResults } from '../../lib/standings'
+import { MarkdownView } from '../../components/MarkdownView'
 import {
   PixelContainer,
   PixelStack,
@@ -71,6 +74,12 @@ function EventDetailPage() {
   const { data: event, isLoading, error } = useQuery({
     queryKey: ['public-event', eventId],
     queryFn: () => getPublicEvent(eventId),
+  })
+
+  usePageHead({
+    title: event ? event.name : 'Event',
+    description: event?.description || (event ? `Event details for ${event.name} on UmaKeiba.` : undefined),
+    type: 'website',
   })
 
   const joinMutation = useMutation({
@@ -220,11 +229,6 @@ function EventDetailPage() {
           <PixelStack direction="row" gap={4} align="start" justify="between" wrap>
             <PixelStack gap={1}>
               <h1 className="text-2xl font-pixel tracking-wider text-retro-primary">{event.name}</h1>
-              {event.ownerName && (
-                <div className="font-pixel text-xs text-retro-primary">
-                  ORGANIZER: {event.ownerName.toUpperCase()}
-                </div>
-              )}
               {event.scheduledAt && (
                 <div className="font-pixel text-xs text-retro-gold">
                   SCHEDULED: <time dateTime={event.scheduledAt}>{formatLocalDateTime(event.scheduledAt)}</time>
@@ -240,10 +244,6 @@ function EventDetailPage() {
               </PixelBadge>
             </PixelStack>
           </PixelStack>
-
-          {event.description && (
-            <p className="text-retro-text font-sans leading-relaxed text-sm">{event.description}</p>
-          )}
 
           <PixelStack direction="row" gap={4} wrap>
             <PixelBadge tone="neutral">
@@ -295,7 +295,7 @@ function EventDetailPage() {
       </PixelCard>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        {/* Participants Panel */}
+        {/* Left Column: Participants Panel */}
         <div>
           <PixelSectionHeader
             title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
@@ -311,35 +311,114 @@ function EventDetailPage() {
           </div>
         </div>
 
-        {/* Schedule Panel */}
-        {event.schedules && event.schedules.length > 0 && (
-          <div>
-            <PixelSectionHeader title="SCHEDULE" size="sm" spacing="tight" />
-            <PixelCard className="">
-              <PixelStack gap={4}>
-                {event.schedules.map((schedule) => (
-                  <PixelStack
-                    key={schedule.id}
-                    gap={2}
-                    className="border-b-2 border-retro-border last:border-b-0 pb-3 last:pb-0"
-                  >
-                    <div className="font-pixel text-xs text-retro-primary">
-                      {schedule.title || 'UNTITLED'}
+        {/* Right Column: Event Description & Schedule Panel */}
+        <div className="flex flex-col gap-6">
+          {event.ownerName && (
+            <div>
+              <PixelSectionHeader title="ORGANIZER" size="sm" spacing="tight" />
+              <PixelCard className="bg-retro-surface">
+                {(() => {
+                  const targetSlug = event.ownerSlug || event.organizationId || event.ownerUserId || ''
+                  const ownerName = event.ownerName
+                  const ownerLogo = event.ownerLogo
+                  const ownerTypeLabel = event.ownerType === 'USER' ? 'ORGANIZER' : 'ORGANIZATION'
+
+                  const cardInner = (
+                    <PixelStack direction="row" justify="between" align="center">
+                      <div className="flex items-center gap-3">
+                        {ownerLogo ? (
+                          <img
+                            src={ownerLogo}
+                            alt={ownerName}
+                            onError={(e) => {
+                              e.currentTarget.src = '/fallback_avatar.jpg'
+                            }}
+                            className="w-10 h-10 rounded border border-retro-border bg-retro-bg object-cover shadow-sm flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded border border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {ownerName.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-pixel text-sm text-retro-text font-bold">
+                            {ownerName}
+                          </div>
+                          {(event.ownerSlug || targetSlug) && (
+                            <div className="font-sans text-xs text-retro-muted">
+                              @{event.ownerSlug || targetSlug}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <PixelBadge tone="purple">
+                        {ownerTypeLabel}
+                      </PixelBadge>
+                    </PixelStack>
+                  )
+
+                  if (targetSlug) {
+                    return (
+                      <Link
+                        to="/$user"
+                        params={{ user: targetSlug }}
+                        className="block p-3 border-2 border-retro-border rounded hover:border-retro-primary transition-colors bg-retro-bg"
+                      >
+                        {cardInner}
+                      </Link>
+                    )
+                  }
+
+                  return (
+                    <div className="p-3 border-2 border-retro-border rounded bg-retro-bg">
+                      {cardInner}
                     </div>
-                    <div className="text-xs text-retro-muted font-sans">
-                      {new Date(schedule.startsAt).toLocaleString()}
-                      {schedule.location && (
-                        <span className="block mt-1 font-pixel text-[11px] text-retro-text bg-retro-surface px-2 py-0.5 border border-retro-border pxl-corner-sm inline-block">
-                          📍 {schedule.location}
-                        </span>
-                      )}
-                    </div>
-                  </PixelStack>
-                ))}
-              </PixelStack>
-            </PixelCard>
-          </div>
-        )}
+                  )
+                })()}
+              </PixelCard>
+            </div>
+          )}
+
+          {event.description && (
+            <div>
+              <PixelSectionHeader title="ABOUT EVENT" size="sm" spacing="tight" />
+              <PixelCard>
+                <div className="text-sm text-retro-text leading-relaxed font-sans">
+                  <MarkdownView content={event.description} />
+                </div>
+              </PixelCard>
+            </div>
+          )}
+
+          {event.schedules && event.schedules.length > 0 && (
+            <div>
+              <PixelSectionHeader title="SCHEDULE" size="sm" spacing="tight" />
+              <PixelCard>
+                <PixelStack gap={4}>
+                  {event.schedules.map((schedule) => (
+                    <PixelStack
+                      key={schedule.id}
+                      gap={2}
+                      className="border-b-2 border-retro-border last:border-b-0 pb-3 last:pb-0"
+                    >
+                      <div className="font-pixel text-xs text-retro-primary">
+                        {schedule.title || 'UNTITLED'}
+                      </div>
+                      <div className="text-xs text-retro-muted font-sans">
+                        {new Date(schedule.startsAt).toLocaleString()}
+                        {schedule.location && (
+                          <span className="block mt-1 font-pixel text-[11px] text-retro-text bg-retro-surface px-2 py-0.5 border border-retro-border pxl-corner-sm inline-block">
+                            📍 {schedule.location}
+                          </span>
+                        )}
+                      </div>
+                    </PixelStack>
+                  ))}
+                </PixelStack>
+              </PixelCard>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Standings (Points) */}
@@ -405,10 +484,16 @@ function RaceStandingsTable({
   eventId,
   raceId,
   members,
+  raceGrade,
+  scoringRulesMode,
+  customScoringTables,
 }: {
   eventId: string
   raceId: string
   members: eventmanager.EventMemberView[]
+  raceGrade?: string | null
+  scoringRulesMode?: string | null
+  customScoringTables?: any | null
 }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-race-results', eventId, raceId],
@@ -431,14 +516,47 @@ function RaceStandingsTable({
     )
   }
 
-  const results = data.results
+  const rawResults = data.results
+  const detailsMap = computeRaceEffectiveResults(
+    rawResults,
+    raceGrade,
+    scoringRulesMode,
+    customScoringTables
+  )
+
+  const sortedResults = [...rawResults].sort((a, b) => {
+    const detailsA = detailsMap.get(a)
+    const detailsB = detailsMap.get(b)
+    const posA = detailsA?.effectivePosition
+    const posB = detailsB?.effectivePosition
+
+    if (posA !== null && posA !== undefined && posB !== null && posB !== undefined) {
+      return posA - posB
+    }
+    if (posA !== null && posA !== undefined) return -1
+    if (posB !== null && posB !== undefined) return 1
+
+    const physA = detailsA?.physicalPosition ?? 999
+    const physB = detailsB?.physicalPosition ?? 999
+    return physA - physB
+  })
 
   const columns: PixelTableColumn<eventmanager.RaceResultView>[] = [
     {
       key: 'position',
       header: 'POS',
-      width: 60,
-      render: (r) => <span className="font-pixel">{r.position ?? '-'}</span>,
+      width: 75,
+      render: (r) => {
+        const details = detailsMap.get(r)
+        if (details?.penaltyType === 'POS' && details.effectivePosition !== null) {
+          return (
+            <span className="font-pixel text-red-600 font-bold" title={`Original finish position: ${r.position}`}>
+              {details.effectivePosition} <span className="text-[10px] text-retro-muted font-normal">({r.position})</span>
+            </span>
+          )
+        }
+        return <span className="font-pixel">{details?.effectivePosition ?? r.position ?? '-'}</span>
+      },
     },
     {
       key: 'gateNumber',
@@ -464,8 +582,21 @@ function RaceStandingsTable({
       key: 'points',
       header: 'POINTS',
       align: 'right',
-      width: 80,
-      render: (r) => <span className="text-retro-primary">{r.points}</span>,
+      width: 110,
+      render: (r) => {
+        const details = detailsMap.get(r)
+        if (details?.hasPenalty && details.basePoints > 0 && details.basePoints !== r.points) {
+          return (
+            <div className="text-right">
+              <span className="text-retro-primary font-bold">{r.points}</span>{' '}
+              <span className="text-retro-muted text-[10px] font-normal" title={`Original base points: ${details.basePoints}`}>
+                ({details.basePoints})
+              </span>
+            </div>
+          )
+        }
+        return <span className="text-retro-primary font-bold">{r.points}</span>
+      },
     },
     {
       key: 'finishTime',
@@ -514,7 +645,7 @@ function RaceStandingsTable({
     <div className="public-table">
       <PixelTable
         columns={columns}
-        data={results}
+        data={sortedResults}
         emptyState={
           <span className="font-pixel text-xs text-retro-muted">NO STANDINGS RECORDED</span>
         }
@@ -677,7 +808,14 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
             {/* Standings Table */}
             <div className="mt-2">
               <div className="font-pixel text-[11px] text-retro-text mb-2">RACE STANDINGS</div>
-              <RaceStandingsTable eventId={event.id} raceId={race.id} members={event.members} />
+              <RaceStandingsTable
+                eventId={event.id}
+                raceId={race.id}
+                members={event.members}
+                raceGrade={race.grade}
+                scoringRulesMode={event.scoringRulesMode}
+                customScoringTables={event.customScoringTables}
+              />
             </div>
           </PixelStack>
         </PixelCard>

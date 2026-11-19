@@ -1,7 +1,7 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
-import { requireSiteAdmin } from '../../../lib/auth-guard'
+import { requireAdminPanel } from '../../../lib/auth-guard'
 import { listAdminUsers } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
@@ -11,7 +11,7 @@ import type { auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/')({
   beforeLoad: async ({ location }) => {
-    await requireSiteAdmin(location)
+    await requireAdminPanel(location)
   },
   component: AdminUsersPage,
 })

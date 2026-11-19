@@ -39,27 +39,37 @@ type TeamMemberSummary struct {
 	Name   string  `json:"name"`
 	Slug   *string `json:"slug"`
 	Role   string  `json:"role"`
+	Image  *string `json:"image,omitempty"`
 }
 
 // Team is a team with its members and aggregate statistics.
 type Team struct {
-	ID                          string              `json:"id"`
-	Name                        string              `json:"name"`
-	Slug                        string              `json:"slug"`
-	Logo                        *string             `json:"logo"`
-	Stats                       TeamStats           `json:"stats"`
-	AdministratorSlotsRemaining int                 `json:"administratorSlotsRemaining"`
-	Members                     []TeamMemberSummary `json:"members"`
+	ID                          string               `json:"id"`
+	Name                        string               `json:"name"`
+	Slug                        string               `json:"slug"`
+	Logo                        *string              `json:"logo"`
+	Description                 *string              `json:"description,omitempty"`
+	Status                      string               `json:"status"`
+	Organizations               []LinkedOrganization `json:"organizations"`
+	PrimaryOrganizationID       string               `json:"primaryOrganizationId"`
+	IsOrganization              bool                 `json:"isOrganization"`
+	Stats                       TeamStats            `json:"stats"`
+	AdministratorSlotsRemaining int                  `json:"administratorSlotsRemaining"`
+	Members                     []TeamMemberSummary  `json:"members"`
 }
 
 // TeamListItem is a team row for list views.
 type TeamListItem struct {
-	ID                          string  `json:"id"`
-	Name                        string  `json:"name"`
-	Slug                        string  `json:"slug"`
-	Logo                        *string `json:"logo"`
-	AdministratorSlotsRemaining int     `json:"administratorSlotsRemaining"`
-	MemberCount                 int     `json:"memberCount"`
+	ID                          string               `json:"id"`
+	Name                        string               `json:"name"`
+	Slug                        string               `json:"slug"`
+	Logo                        *string              `json:"logo"`
+	Description                 *string              `json:"description,omitempty"`
+	Status                      string               `json:"status"`
+	PrimaryOrganizationID       string               `json:"primaryOrganizationId"`
+	Organizations               []LinkedOrganization `json:"organizations"`
+	AdministratorSlotsRemaining int                  `json:"administratorSlotsRemaining"`
+	MemberCount                 int                  `json:"memberCount"`
 }
 
 // MemberListItem is a membership row for member list views.
@@ -68,6 +78,7 @@ type MemberListItem struct {
 	Name   string  `json:"name"`
 	Slug   *string `json:"slug"`
 	Role   string  `json:"role"`
+	Image  *string `json:"image,omitempty"`
 }
 
 // --- Cache (mirrors teamCache in teams.ts) ---
@@ -117,7 +128,7 @@ func loadMemberRows(ctx context.Context, organizationID string) ([]sqlc.ListMemb
 // toOrg converts a GetOrgByID row to the shared Organization shape.
 func toOrg(r sqlc.GetOrgByIDRow) *sqlc.Organization {
 	return &sqlc.Organization{
-		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo,
+		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo, Description: r.Description,
 		RankingAverage: r.RankingAverage, PointsAverage: r.PointsAverage,
 		SeasonRank: r.SeasonRank, AveragePointsPerEvent: r.AveragePointsPerEvent,
 	}
@@ -126,7 +137,7 @@ func toOrg(r sqlc.GetOrgByIDRow) *sqlc.Organization {
 // toOrgBySlug converts a GetOrgBySlug row to the shared Organization shape.
 func toOrgBySlug(r sqlc.GetOrgBySlugRow) *sqlc.Organization {
 	return &sqlc.Organization{
-		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo,
+		ID: r.ID, Name: r.Name, Slug: r.Slug, Logo: r.Logo, Description: r.Description,
 		RankingAverage: r.RankingAverage, PointsAverage: r.PointsAverage,
 		SeasonRank: r.SeasonRank, AveragePointsPerEvent: r.AveragePointsPerEvent,
 	}
@@ -146,11 +157,17 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 			s := m.Slug.String
 			slug = &s
 		}
+		var img *string
+		if m.Image.Valid && m.Image.String != "" {
+			i := m.Image.String
+			img = &i
+		}
 		summaries = append(summaries, TeamMemberSummary{
 			UserID: m.UserId,
 			Name:   displayName(m.Name, m.VrchatUsername),
 			Slug:   slug,
 			Role:   m.Role,
+			Image:  img,
 		})
 	}
 	slots := auth.AdministratorRoleLimit - adminCount
@@ -158,15 +175,24 @@ func toTeam(org *sqlc.Organization, members []sqlc.ListMemberRowsRow) *Team {
 		slots = 0
 	}
 	var logo *string
-	if org.Logo.Valid {
+	if org.Logo.Valid && org.Logo.String != "" {
 		logo = &org.Logo.String
 	}
+	var desc *string
+	if org.Description.Valid && org.Description.String != "" {
+		desc = &org.Description.String
+	}
 	return &Team{
-		ID:   org.ID,
-		Name: org.Name,
-		Slug: org.Slug,
-		Logo: logo,
-		Stats: TeamStats{
+		ID:                          org.ID,
+		Name:                        org.Name,
+		Slug:                        org.Slug,
+		Logo:                        logo,
+		Description:                 desc,
+		Status:                      "APPROVED",
+		Organizations:               []LinkedOrganization{},
+		PrimaryOrganizationID:       org.ID,
+		IsOrganization:              true,
+		Stats:                       TeamStats{
 			RankingAverage:        nullFloatToPtr(org.RankingAverage),
 			PointsAverage:         nullFloatToPtr(org.PointsAverage),
 			SeasonRank:            nullInt32ToPtr(org.SeasonRank),
@@ -237,32 +263,249 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 }
 
 func loadTeam(ctx context.Context, id string) (*Team, error) {
-	row, err := q().GetOrgByID(ctx, id)
+	// Try loading from `team` table by ID first
+	teamRow, err := q().GetTeamByID(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Try loading from `team` table by slug
+		teamRow, err = q().GetTeamBySlug(ctx, id)
+	}
+
+	if err == nil {
+		orgRows, err := q().ListOrgsForTeam(ctx, teamRow.ID)
+		if err != nil {
+			return nil, err
+		}
+		orgs := make([]LinkedOrganization, 0, len(orgRows))
+		primOrgID := ""
+		for _, r := range orgRows {
+			var logo *string
+			if r.Logo.Valid && r.Logo.String != "" {
+				l := r.Logo.String
+				logo = &l
+			}
+			orgType := "ORGANIZATION"
+			if r.OrgType.Valid {
+				orgType = r.OrgType.String
+			}
+			status := "APPROVED"
+			if r.Status.Valid {
+				status = r.Status.String
+			}
+			if r.IsPrimary {
+				primOrgID = r.ID
+			}
+			orgs = append(orgs, LinkedOrganization{
+				ID:        r.ID,
+				Name:      r.Name,
+				Slug:      r.Slug,
+				Logo:      logo,
+				OrgType:   orgType,
+				Status:    status,
+				IsPrimary: r.IsPrimary,
+			})
+		}
+
+		roster, err := q().ListRosterForTeam(ctx, teamRow.ID)
+		if err != nil {
+			return nil, err
+		}
+		summaries := make([]TeamMemberSummary, 0, len(roster))
+		for _, m := range roster {
+			var slug *string
+			if m.Slug.Valid && m.Slug.String != "" {
+				s := m.Slug.String
+				slug = &s
+			}
+			var img *string
+			if m.Image.Valid && m.Image.String != "" {
+				i := m.Image.String
+				img = &i
+			}
+			role := "member"
+			if m.Role.Valid && m.Role.String != "" {
+				role = m.Role.String
+			}
+			summaries = append(summaries, TeamMemberSummary{
+				UserID: m.UserId,
+				Name:   displayName(m.Name, m.VrchatUsername),
+				Slug:   slug,
+				Role:   role,
+				Image:  img,
+			})
+		}
+
+		var logo *string
+		if teamRow.Logo.Valid && teamRow.Logo.String != "" {
+			l := teamRow.Logo.String
+			logo = &l
+		}
+		var desc *string
+		if teamRow.Description.Valid && teamRow.Description.String != "" {
+			d := teamRow.Description.String
+			desc = &d
+		}
+
+		// Add staff from associated organizations to team members if not already present
+		existingUserIDs := make(map[string]bool)
+		for _, m := range summaries {
+			existingUserIDs[m.UserID] = true
+		}
+		for _, org := range orgs {
+			orgStaff, sErr := loadMemberRows(ctx, org.ID)
+			if sErr == nil {
+				for _, m := range orgStaff {
+					if !existingUserIDs[m.UserId] {
+						existingUserIDs[m.UserId] = true
+						var slug *string
+						if m.Slug.Valid && m.Slug.String != "" {
+							s := m.Slug.String
+							slug = &s
+						}
+						var img *string
+						if m.Image.Valid && m.Image.String != "" {
+							i := m.Image.String
+							img = &i
+						}
+						summaries = append(summaries, TeamMemberSummary{
+							UserID: m.UserId,
+							Name:   displayName(m.Name, m.VrchatUsername),
+							Slug:   slug,
+							Role:   m.Role,
+							Image:  img,
+						})
+					}
+				}
+			}
+		}
+
+		t := &Team{
+			ID:                          teamRow.ID,
+			Name:                        teamRow.Name,
+			Slug:                        teamRow.Slug,
+			Logo:                        logo,
+			Description:                 desc,
+			Status:                      teamRow.Status,
+			Organizations:               orgs,
+			PrimaryOrganizationID:       primOrgID,
+			IsOrganization:              false,
+			Stats:                       TeamStats{},
+			AdministratorSlotsRemaining: 0,
+			Members:                     summaries,
+		}
+
+		computedStats, err := computeTeamStats(ctx, teamRow.ID)
+		if err == nil {
+			if computedStats.RankingAverage != nil {
+				t.Stats.RankingAverage = computedStats.RankingAverage
+			}
+			if computedStats.PointsAverage != nil {
+				t.Stats.PointsAverage = computedStats.PointsAverage
+			}
+			if computedStats.AveragePointsPerEvent != nil {
+				t.Stats.AveragePointsPerEvent = computedStats.AveragePointsPerEvent
+			}
+		}
+
+		if primOrgID != "" {
+			if orgRow, err := q().GetOrgByID(ctx, primOrgID); err == nil {
+				if t.Stats.RankingAverage == nil {
+					t.Stats.RankingAverage = nullFloatToPtr(orgRow.RankingAverage)
+				}
+				if t.Stats.PointsAverage == nil {
+					t.Stats.PointsAverage = nullFloatToPtr(orgRow.PointsAverage)
+				}
+				if t.Stats.SeasonRank == nil {
+					t.Stats.SeasonRank = nullInt32ToPtr(orgRow.SeasonRank)
+				}
+				if t.Stats.AveragePointsPerEvent == nil {
+					t.Stats.AveragePointsPerEvent = nullFloatToPtr(orgRow.AveragePointsPerEvent)
+				}
+			}
+		}
+		return t, nil
+	}
+
+	// If not found in `team` table, fall back to `organization` table (standalone / legacy governing organization)
+	if errors.Is(err, sql.ErrNoRows) {
+		var orgRow sqlc.GetOrgByIDRow
+		orgRow, err = q().GetOrgByID(ctx, id)
+		if errors.Is(err, sql.ErrNoRows) {
+			var slugRow sqlc.GetOrgBySlugRow
+			slugRow, err = q().GetOrgBySlug(ctx, id)
+			if err == nil {
+				orgRow = sqlc.GetOrgByIDRow{
+					ID: slugRow.ID, Name: slugRow.Name, Slug: slugRow.Slug, Logo: slugRow.Logo, Description: slugRow.Description,
+					OrgType: slugRow.OrgType, Status: slugRow.Status,
+					DiscordInvite: slugRow.DiscordInvite, VrchatGroupId: slugRow.VrchatGroupId,
+					SubmittedByUserId: slugRow.SubmittedByUserId, CreatedAt: slugRow.CreatedAt, UpdatedAt: slugRow.UpdatedAt,
+					RankingAverage: slugRow.RankingAverage, PointsAverage: slugRow.PointsAverage,
+					SeasonRank: slugRow.SeasonRank, AveragePointsPerEvent: slugRow.AveragePointsPerEvent,
+				}
+			}
+		}
+
+		if err == nil {
+			members, mErr := loadMemberRows(ctx, orgRow.ID)
+			if mErr != nil {
+				return nil, mErr
+			}
+			orgShape := &sqlc.Organization{
+				ID: orgRow.ID, Name: orgRow.Name, Slug: orgRow.Slug, Logo: orgRow.Logo, Description: orgRow.Description,
+			}
+			t := toTeam(orgShape, members)
+			// Organizations do not have ranking layer / team stats attached
+			t.Stats = TeamStats{}
+
+			// Aggregate members from all associated teams under this organization
+			teamsForOrg, tErr := q().ListTeamsForOrg(ctx, orgRow.ID)
+			if tErr == nil && len(teamsForOrg) > 0 {
+				teamIDs := make([]string, len(teamsForOrg))
+				for i, team := range teamsForOrg {
+					teamIDs[i] = team.ID
+				}
+				rosterRows, rErr := q().ListRosterForTeamsBatch(ctx, teamIDs)
+				if rErr == nil {
+					existingUserIDs := make(map[string]bool)
+					for _, m := range t.Members {
+						existingUserIDs[m.UserID] = true
+					}
+					for _, r := range rosterRows {
+						if !existingUserIDs[r.UserId] {
+							existingUserIDs[r.UserId] = true
+							var slug *string
+							if r.Slug.Valid && r.Slug.String != "" {
+								s := r.Slug.String
+								slug = &s
+							}
+							var img *string
+							if r.Image.Valid && r.Image.String != "" {
+								i := r.Image.String
+								img = &i
+							}
+							role := "member"
+							if r.Role.Valid && r.Role.String != "" {
+								role = r.Role.String
+							}
+							t.Members = append(t.Members, TeamMemberSummary{
+								UserID: r.UserId,
+								Name:   displayName(r.Name, r.VrchatUsername),
+								Slug:   slug,
+								Role:   role,
+								Image:  img,
+							})
+						}
+					}
+				}
+			}
+
+			return t, nil
+		}
+	}
+
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
 	}
-	if err != nil {
-		return nil, err
-	}
-	members, err := loadMemberRows(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	t := toTeam(toOrg(row), members)
-	computedStats, err := computeTeamStats(ctx, id)
-	if err == nil {
-		// Override stats with dynamically calculated averages
-		if computedStats.RankingAverage != nil {
-			t.Stats.RankingAverage = computedStats.RankingAverage
-		}
-		if computedStats.PointsAverage != nil {
-			t.Stats.PointsAverage = computedStats.PointsAverage
-		}
-		if computedStats.AveragePointsPerEvent != nil {
-			t.Stats.AveragePointsPerEvent = computedStats.AveragePointsPerEvent
-		}
-	}
-	return t, nil
+	return nil, err
 }
 
 func touchOrg(ctx context.Context, id string) error {

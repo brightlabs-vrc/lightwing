@@ -1,4 +1,5 @@
 import { useAuth } from '../../hooks/useAuth'
+import { usePageHead } from '../../hooks/usePageHead'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
@@ -25,6 +26,11 @@ export const Route = createFileRoute('/profile/')({
 })
 
 function ProfilePage() {
+  usePageHead({
+    title: 'Edit Profile',
+    description: 'Manage your UmaKeiba driver profile details.',
+  })
+
   const { session } = useAuth()
   const { toast } = useToast()
   const [biography, setBiography] = useState('')

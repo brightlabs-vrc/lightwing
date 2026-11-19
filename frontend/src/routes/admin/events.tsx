@@ -1,13 +1,13 @@
 import { Link, Outlet, createFileRoute, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { requireSiteAdmin } from '../../lib/auth-guard'
+import { requireAdminPanel } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
 import type { ClassTier, EventOwnerType, EventStatus, EventTag } from '../../types'
 import { AlertBanner } from '../../components/AlertBanner'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
-import { TeamSearchCombobox } from '../../components/TeamSearchCombobox'
+import { OrganizationSearchCombobox } from '../../components/OrganizationSearchCombobox'
 import { Pagination } from '../../components/Pagination'
 import { EventScoringTablesEditor } from '../../components/EventScoringTablesEditor'
 import type { eventmanager } from '../../lib/client'
@@ -17,7 +17,7 @@ import { SldsSkeletonList } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/admin/events')({
   beforeLoad: async ({ location }) => {
-    await requireSiteAdmin(location)
+    await requireAdminPanel(location)
   },
   component: AdminEventsListPage,
 })
@@ -627,7 +627,7 @@ function AdminEventsListPage() {
                             <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-org-id">
                               Owner Organization
                             </label>
-                            <TeamSearchCombobox
+                            <OrganizationSearchCombobox
                               value={formOrganizationId}
                               onChange={(val) => setFormOrganizationId(val)}
                             />

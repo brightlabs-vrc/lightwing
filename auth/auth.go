@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"encore.dev"
+	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/rlog"
 	"golang.org/x/oauth2"
@@ -426,27 +427,20 @@ func upsertUserAndSession(ctx context.Context, svc *Service, token *oauth2.Token
 
 // GetSession returns the session and user profile for the authenticated caller.
 //
-//encore:api public
+//encore:api auth
 func (s *Service) GetSession(ctx context.Context) (*GetSessionResponse, error) {
-	token := getAuthorizationToken(ctx)
+	actor := encoreauth.Data().(*Actor)
+	return getSessionData(ctx, actor)
+}
 
-	if token == "" {
+// getSessionData resolves an authenticated actor to the session + profile response.
+func getSessionData(ctx context.Context, actor *Actor) (*GetSessionResponse, error) {
+	if actor == nil {
 		getSessionOutcome.With(getSessionOutcomeLabels{}).Add(1)
 		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "not authenticated"}
 	}
-	return getSessionData(ctx, token, false)
-}
-
-// getSessionData resolves a session token to the session + profile response.
-// Split from the endpoint so tests can call it with an explicit token.
-func getSessionData(ctx context.Context, token string, hasCookie bool) (*GetSessionResponse, error) {
-	actor, err := resolveActor(ctx, "Bearer "+token)
-	if err != nil {
-		rlog.Error("resolveActor failed in GetSession", "err", err)
-		getSessionOutcome.With(getSessionOutcomeLabels{HasCookie: hasCookie, HasSession: false}).Add(1)
-		return nil, err
-	}
-	getSessionOutcome.With(getSessionOutcomeLabels{HasCookie: hasCookie, HasSession: true}).Add(1)
+	token := actor.Token
+	getSessionOutcome.With(getSessionOutcomeLabels{HasCookie: false, HasSession: true}).Add(1)
 
 	profile, err := getUserProfile(ctx, actor.UserID)
 	if err != nil {
@@ -478,14 +472,14 @@ func getSessionData(ctx context.Context, token string, hasCookie bool) (*GetSess
 
 // SignOut deletes the caller's session.
 //
-//encore:api public
+//encore:api auth
 func (s *Service) SignOut(ctx context.Context) error {
-	token := getAuthorizationToken(ctx)
-	if token == "" {
+	actor := encoreauth.Data().(*Actor)
+	if actor == nil {
 		return nil
 	}
 
-	if err := signOutSession(ctx, token); err != nil {
+	if err := signOutSession(ctx, actor); err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
 
@@ -493,25 +487,12 @@ func (s *Service) SignOut(ctx context.Context) error {
 }
 
 // signOutSession deletes a session row and drops its cached actor.
-func signOutSession(ctx context.Context, token string) error {
+func signOutSession(ctx context.Context, actor *Actor) error {
+	if actor == nil {
+		return nil
+	}
 	if actorCache != nil {
-		_, _ = actorCache.Delete(ctx, actorCacheKey{Token: token})
+		_, _ = actorCache.Delete(ctx, actorCacheKey{Token: actor.Token})
 	}
-	return q().DeleteSessionByToken(ctx, token)
-}
-
-// --- Token Extraction ---
-
-// getAuthorizationToken extracts the Bearer token from the current request's
-// Authorization header, available via encore.CurrentRequest().
-func getAuthorizationToken(ctx context.Context) string {
-	req := encore.CurrentRequest()
-	if req == nil {
-		return ""
-	}
-	h := req.Headers.Get("Authorization")
-	if h == "" {
-		return ""
-	}
-	return strings.TrimPrefix(strings.TrimSpace(h), "Bearer ")
+	return q().DeleteSessionByToken(ctx, actor.Token)
 }

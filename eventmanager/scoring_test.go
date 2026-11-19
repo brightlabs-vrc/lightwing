@@ -123,4 +123,25 @@ func Test_scoringResolvers(t *testing.T) {
 			t.Errorf("ResolvePoints custom GI first = %d, want 30", got)
 		}
 	})
+
+	t.Run("ResolveRacePoints reorders promoted participants when P1 gets POS-1 penalty", func(t *testing.T) {
+		// In GII: 1st=19 pts, 2nd=15 pts, 3rd=12 pts
+		items := []*RaceResultItem{
+			{UserID: "muzakii", Position: intptr(1), ResultStatus: "PEN (POS-1)"},
+			{UserID: "realmegu", Position: intptr(2), ResultStatus: ""},
+			{UserID: "orfevrefan", Position: intptr(3), ResultStatus: ""},
+		}
+
+		res := ResolveRacePoints("STANDARD", nil, "GII", items)
+
+		if got := res["realmegu"]; got != 19 {
+			t.Errorf("realmegu (promoted P2) points = %d, want 19", got)
+		}
+		if got := res["muzakii"]; got != 15 {
+			t.Errorf("muzakii (demoted P1) points = %d, want 15", got)
+		}
+		if got := res["orfevrefan"]; got != 12 {
+			t.Errorf("orfevrefan (P3) points = %d, want 12", got)
+		}
+	})
 }

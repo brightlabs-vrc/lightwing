@@ -1,7 +1,15 @@
 import { appClient, getStoredSessionToken, writeStoredSessionToken } from './api'
 import { MOCK_MODE } from './mock-mode'
 
-export type SiteRole = 'USER' | 'SITE_ADMIN'
+export type SiteRole = 'USER' | 'SITE_ADMIN' | 'EVENT_ADMIN'
+
+export interface AuthTeamAffiliation {
+  organizationId: string
+  name: string
+  slug: string
+  logo?: string | null
+  role: string
+}
 
 export interface AuthUser {
   id: string
@@ -10,6 +18,7 @@ export interface AuthUser {
   image?: string | null
   siteRole?: SiteRole
   vrchatUsername?: string | null
+  teams?: AuthTeamAffiliation[]
 }
 
 export interface AuthSession {

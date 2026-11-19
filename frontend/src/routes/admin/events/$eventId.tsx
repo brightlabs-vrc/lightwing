@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { requireSiteAdmin } from '../../../lib/auth-guard'
+import { requireAdminPanel } from '../../../lib/auth-guard'
 import { AdminLayout } from '../-AdminLayout'
 import { useEventDetail } from '../../../hooks/useEventDetail'
 import { AlertBanner } from '../../../components/AlertBanner'
@@ -22,7 +22,7 @@ import type { ClassTier, EventStatus, EventTag } from '../../../types'
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   beforeLoad: async ({ location }) => {
-    await requireSiteAdmin(location)
+    await requireAdminPanel(location)
   },
   component: AdminEventDetailPage,
 })

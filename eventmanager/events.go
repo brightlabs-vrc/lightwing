@@ -7,11 +7,12 @@ import (
 	"errors"
 	"time"
 
-	"encore.dev/beta/errs"
-	"encore.dev/cron"
 	"encore.app/auth"
 	"encore.app/eventmanager/sqlc"
 	"encore.app/shared"
+	encoreauth "encore.dev/beta/auth"
+	"encore.dev/beta/errs"
+	"encore.dev/cron"
 
 	"github.com/sqlc-dev/pqtype"
 )
@@ -64,6 +65,8 @@ type EventListItem struct {
 	OrganizationID                  *string `json:"organizationId"`
 	OwnerUserID                     *string `json:"ownerUserId"`
 	OwnerName                       *string `json:"ownerName"`
+	OwnerSlug                       *string `json:"ownerSlug,omitempty"`
+	OwnerLogo                       *string `json:"ownerLogo,omitempty"`
 	Status                          string  `json:"status"`
 	Tag                             string  `json:"tag"`
 	DeletedAt                       *string `json:"deletedAt,omitempty"`
@@ -142,33 +145,35 @@ type RaceEventView struct {
 //
 // Mirrors ts-legacy/eventmanager/events.ts EventDetail.
 type EventDetail struct {
-	ID                              string             `json:"id"`
-	Name                            string             `json:"name"`
-	Description                     *string            `json:"description"`
-	OwnerType                       string             `json:"ownerType"`
-	OrganizationID                  *string            `json:"organizationId"`
-	OwnerUserID                     *string            `json:"ownerUserId"`
-	OwnerName                       *string            `json:"ownerName"`
-	Status                          string             `json:"status"`
-	Tag                             string             `json:"tag"`
-	DeletedAt                       *string            `json:"deletedAt,omitempty"`
-	ScoringType                     int                `json:"scoringType"`
-	ScoringTypeLabel                string             `json:"scoringTypeLabel"`
-	ScoringRulesMode                *string            `json:"scoringRulesMode"`
-	CustomScoringTables             json.RawMessage    `json:"customScoringTables"`
-	ClassRestriction                *string            `json:"classRestriction"`
-	GranularParticipation           bool               `json:"granularParticipation"`
-	SignupsLocked                   bool               `json:"signupsLocked"`
-	ScheduledAt                     *string            `json:"scheduledAt"`
-	ParticipantLimit                *int               `json:"participantLimit"`
-	MaxConcurrentRaceParticipations *int               `json:"maxConcurrentRaceParticipations"`
-	RaceEvents                      []RaceEventView    `json:"raceEvents"`
-	Members                         []EventMemberView  `json:"members"`
+	ID                              string              `json:"id"`
+	Name                            string              `json:"name"`
+	Description                     *string             `json:"description"`
+	OwnerType                       string              `json:"ownerType"`
+	OrganizationID                  *string             `json:"organizationId"`
+	OwnerUserID                     *string             `json:"ownerUserId"`
+	OwnerName                       *string             `json:"ownerName"`
+	OwnerSlug                       *string             `json:"ownerSlug,omitempty"`
+	OwnerLogo                       *string             `json:"ownerLogo,omitempty"`
+	Status                          string              `json:"status"`
+	Tag                             string              `json:"tag"`
+	DeletedAt                       *string             `json:"deletedAt,omitempty"`
+	ScoringType                     int                 `json:"scoringType"`
+	ScoringTypeLabel                string              `json:"scoringTypeLabel"`
+	ScoringRulesMode                *string             `json:"scoringRulesMode"`
+	CustomScoringTables             json.RawMessage     `json:"customScoringTables"`
+	ClassRestriction                *string             `json:"classRestriction"`
+	GranularParticipation           bool                `json:"granularParticipation"`
+	SignupsLocked                   bool                `json:"signupsLocked"`
+	ScheduledAt                     *string             `json:"scheduledAt"`
+	ParticipantLimit                *int                `json:"participantLimit"`
+	MaxConcurrentRaceParticipations *int                `json:"maxConcurrentRaceParticipations"`
+	RaceEvents                      []RaceEventView     `json:"raceEvents"`
+	Members                         []EventMemberView   `json:"members"`
 	Schedules                       []EventScheduleView `json:"schedules"`
-	PointsOverview                  []PointsEntryView  `json:"pointsOverview"`
-	LadderOverview                  []LadderEntryView  `json:"ladderOverview"`
-	CreatedAt                       string             `json:"createdAt"`
-	UpdatedAt                       string             `json:"updatedAt"`
+	PointsOverview                  []PointsEntryView   `json:"pointsOverview"`
+	LadderOverview                  []LadderEntryView   `json:"ladderOverview"`
+	CreatedAt                       string              `json:"createdAt"`
+	UpdatedAt                       string              `json:"updatedAt"`
 }
 
 // nullString converts sql.NullString to *string.
@@ -226,6 +231,8 @@ type eventRow struct {
 	OrganizationID                  sql.NullString
 	OwnerUserID                     sql.NullString
 	OwnerName                       sql.NullString
+	OwnerSlug                       sql.NullString
+	OwnerLogo                       sql.NullString
 	Status                          string
 	Tag                             string
 	DeletedAt                       *time.Time
@@ -250,18 +257,20 @@ func toEventRow(r sqlc.GetEventRowRow) *eventRow {
 	}
 	return &eventRow{
 		ID: r.ID, Name: r.Name, Description: r.Description,
-		OwnerType: stringFromAny(r.OwnerType),
+		OwnerType:      stringFromAny(r.OwnerType),
 		OrganizationID: r.OrganizationId, OwnerUserID: r.OwnerUserId,
 		OwnerName: sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""},
-		Status: r.Status, Tag: r.Tag, DeletedAt: timePtrFromNull(r.DeletedAt),
+		OwnerSlug: sql.NullString{String: r.OwnerSlug, Valid: r.OwnerSlug != ""},
+		OwnerLogo: r.OwnerLogo,
+		Status:    r.Status, Tag: r.Tag, DeletedAt: timePtrFromNull(r.DeletedAt),
 		ScoringType: int(r.ScoringType), ScoringRulesMode: r.ScoringRulesMode,
-		CustomScoringTables: customTables,
-		ClassRestriction: nullStringFromAny(r.ClassRestriction),
+		CustomScoringTables:   customTables,
+		ClassRestriction:      nullStringFromAny(r.ClassRestriction),
 		GranularParticipation: r.GranularParticipation, SignupsLocked: r.SignupsLocked,
-		ScheduledAt: timePtrFromNull(r.ScheduledAt),
-		ParticipantLimit: sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
+		ScheduledAt:                     timePtrFromNull(r.ScheduledAt),
+		ParticipantLimit:                sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
 		MaxConcurrentRaceParticipations: sql.NullInt64{Int64: int64(r.MaxConcurrentRaceParticipations.Int32), Valid: r.MaxConcurrentRaceParticipations.Valid},
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		CreatedAt:                       r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
 
@@ -300,7 +309,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 			ID: rr.ID, Name: rr.Name, Sequence: int(rr.Sequence),
 			DistanceMeters: int(rr.DistanceMeters), TrackType: rr.TrackType, Location: rr.Location,
 			ScoringType: sql.NullInt64{Int64: int64(rr.ScoringType.Int16), Valid: rr.ScoringType.Valid},
-			Grade: rr.Grade, ClassRestriction: nullStringFromAny(rr.ClassRestriction),
+			Grade:       rr.Grade, ClassRestriction: nullStringFromAny(rr.ClassRestriction),
 			StartsAt: timePtrFromNull(rr.StartsAt), EndsAt: timePtrFromNull(rr.EndsAt),
 			ParticipantLimit: sql.NullInt64{Int64: int64(rr.ParticipantLimit.Int32), Valid: rr.ParticipantLimit.Valid},
 		})
@@ -418,16 +427,17 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		ID: e.ID, Name: e.Name, Description: nullString(e.Description),
 		OwnerType: e.OwnerType, OrganizationID: nullString(e.OrganizationID),
 		OwnerUserID: nullString(e.OwnerUserID), OwnerName: nullString(e.OwnerName),
+		OwnerSlug: nullString(e.OwnerSlug), OwnerLogo: nullString(e.OwnerLogo),
 		Status: e.Status, Tag: e.Tag,
-		DeletedAt: nullTime(e.DeletedAt),
+		DeletedAt:   nullTime(e.DeletedAt),
 		ScoringType: e.ScoringType, ScoringTypeLabel: scoringLabel(e.ScoringType),
 		ScoringRulesMode: nullString(e.ScoringRulesMode), CustomScoringTables: customTables,
-		ClassRestriction: classTierPtr(e.ClassRestriction),
+		ClassRestriction:      classTierPtr(e.ClassRestriction),
 		GranularParticipation: e.GranularParticipation, SignupsLocked: e.SignupsLocked,
-		ScheduledAt: nullTime(e.ScheduledAt),
-		ParticipantLimit: nullInt(e.ParticipantLimit),
+		ScheduledAt:                     nullTime(e.ScheduledAt),
+		ParticipantLimit:                nullInt(e.ParticipantLimit),
 		MaxConcurrentRaceParticipations: nullInt(e.MaxConcurrentRaceParticipations),
-		RaceEvents: raceViews, Members: memberViews, Schedules: schedules,
+		RaceEvents:                      raceViews, Members: memberViews, Schedules: schedules,
 		PointsOverview: pointsOverview, LadderOverview: ladderOverview,
 		CreatedAt: isoTime(e.CreatedAt), UpdatedAt: isoTime(e.UpdatedAt),
 	}, nil
@@ -454,25 +464,27 @@ func EnsureEventStandingsRow(ctx context.Context, eventID, userID string, scorin
 //
 // Mirrors ts-legacy/eventmanager/events.ts CreateEventParams (POST /api/events).
 type CreateEventRequest struct {
-	Authorization                     string          `header:"Authorization"`
-	Name                              string          `json:"name"`
-	Description                       *string         `json:"description,omitempty"`
-	OwnerType                         string          `json:"ownerType"`
-	OrganizationID                    *string         `json:"organizationId,omitempty"`
-	OwnerUserID                       *string         `json:"ownerUserId,omitempty"`
-	Tag                               *string         `json:"tag,omitempty"`
-	ScoringType                       int             `json:"scoringType"`
-	ScoringRulesMode                  *string         `json:"scoringRulesMode,omitempty"`
-	CustomScoringTables               json.RawMessage `json:"customScoringTables,omitempty"`
-	ClassRestriction                  *string         `json:"classRestriction,omitempty"`
-	GranularParticipation             bool            `json:"granularParticipation,omitempty"`
-	ScheduledAt                       *string         `json:"scheduledAt,omitempty"`
-	ParticipantLimit                  OptInt          `json:"participantLimit,omitempty"`
-	MaxConcurrentRaceParticipations   OptInt          `json:"maxConcurrentRaceParticipations,omitempty"`
+	Name                            string          `json:"name"`
+	Description                     *string         `json:"description,omitempty"`
+	OwnerType                       string          `json:"ownerType"`
+	OrganizationID                  *string         `json:"organizationId,omitempty"`
+	OwnerUserID                     *string         `json:"ownerUserId,omitempty"`
+	Tag                             *string         `json:"tag,omitempty"`
+	ScoringType                     int             `json:"scoringType"`
+	ScoringRulesMode                *string         `json:"scoringRulesMode,omitempty"`
+	CustomScoringTables             json.RawMessage `json:"customScoringTables,omitempty"`
+	ClassRestriction                *string         `json:"classRestriction,omitempty"`
+	GranularParticipation           bool            `json:"granularParticipation,omitempty"`
+	ScheduledAt                     *string         `json:"scheduledAt,omitempty"`
+	ParticipantLimit                OptInt          `json:"participantLimit,omitempty"`
+	MaxConcurrentRaceParticipations OptInt          `json:"maxConcurrentRaceParticipations,omitempty"`
 }
 
 // CreateEventCore creates an event and returns its detail.
-func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, error) {
+func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventRequest) (*EventDetail, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
+	}
 	if p.Name == "" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "name is required"}
 	}
@@ -485,7 +497,7 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 		if p.OrganizationID == nil || *p.OrganizationID == "" {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "organizationId is required for organization-owned events"}
 		}
-		if _, _, err := auth.RequirePermission(ctx, p.Authorization, *p.OrganizationID, auth.ResourceEvent, auth.ActionCreate); err != nil {
+		if _, _, err := auth.RequirePermission(ctx, actor, *p.OrganizationID, auth.ResourceEvent, auth.ActionCreate); err != nil {
 			return nil, err
 		}
 		orgExists, err := q().OrgExists(ctx, *p.OrganizationID)
@@ -497,10 +509,6 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 		}
 		organizationID = p.OrganizationID
 	} else {
-		actor, err := auth.ResolveActor(ctx, p.Authorization)
-		if err != nil {
-			return nil, err
-		}
 		owner := actor.UserID
 		if p.OwnerUserID != nil && *p.OwnerUserID != "" {
 			owner = *p.OwnerUserID
@@ -539,6 +547,14 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 			customTables = v
 		} else {
 			mode = "STANDARD"
+			if len(p.CustomScoringTables) > 0 && string(p.CustomScoringTables) != "null" {
+				var v any
+				if err := json.Unmarshal(p.CustomScoringTables, &v); err == nil {
+					if _, err := ValidateCustomScoringTables(v); err == nil {
+						customTables = v
+					}
+				}
+			}
 		}
 		scoringRulesMode = &mode
 	}
@@ -593,13 +609,19 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 	tag := "COMMUNITY"
 	if p.Tag != nil && *p.Tag != "" {
 		tag = *p.Tag
+	} else if p.OwnerType == "ORGANIZATION" {
+		tag = "OFFICIAL"
 	}
 	if tag == "UNOFFICIAL" {
 		tag = "COMMUNITY"
 	}
 	if tag == "OFFICIAL" {
-		if _, err := auth.RequireSiteAdmin(ctx, p.Authorization); err != nil {
-			return nil, err
+		if p.OwnerType == "ORGANIZATION" && organizationID != nil {
+			// Permission already verified above for OrganizationID with ResourceEvent, ActionCreate.
+		} else {
+			if _, err := auth.RequireSiteAdmin(actor); err != nil {
+				return nil, err
+			}
 		}
 	} else if tag != "COMMUNITY" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "tag must be OFFICIAL or COMMUNITY"}
@@ -639,9 +661,10 @@ func CreateEventCore(ctx context.Context, p *CreateEventRequest) (*EventDetail, 
 	return LoadEvent(ctx, id)
 }
 
-//encore:api public method=POST path=/api/events
+//encore:api auth method=POST path=/api/events
 func CreateEvent(ctx context.Context, p *CreateEventRequest) (*EventDetail, error) {
-	return CreateEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return CreateEventCore(ctx, actor, p)
 }
 
 // --- List ---
@@ -684,18 +707,20 @@ type ListEventsResponse struct {
 func toListItem(r sqlc.ListEventsRow) EventListItem {
 	return EventListItem{
 		ID: r.ID, Name: r.Name, Description: nullString(r.Description),
-		OwnerType: stringFromAny(r.OwnerType),
+		OwnerType:      stringFromAny(r.OwnerType),
 		OrganizationID: nullString(r.OrganizationId),
-		OwnerUserID: nullString(r.OwnerUserId),
-		OwnerName: nullString(sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""}),
-		Status: r.Status, Tag: r.Tag, DeletedAt: nullTime(timePtrFromNull(r.DeletedAt)),
+		OwnerUserID:    nullString(r.OwnerUserId),
+		OwnerName:      nullString(sql.NullString{String: r.OwnerName, Valid: r.OwnerName != ""}),
+		OwnerSlug:      nullString(sql.NullString{String: r.OwnerSlug, Valid: r.OwnerSlug != ""}),
+		OwnerLogo:      nullString(r.OwnerLogo),
+		Status:         r.Status, Tag: r.Tag, DeletedAt: nullTime(timePtrFromNull(r.DeletedAt)),
 		ScoringType: int(r.ScoringType), ScoringTypeLabel: scoringLabel(int(r.ScoringType)),
-		ClassRestriction: classTierPtr(nullStringFromAny(r.ClassRestriction)),
+		ClassRestriction:      classTierPtr(nullStringFromAny(r.ClassRestriction)),
 		GranularParticipation: r.GranularParticipation, SignupsLocked: r.SignupsLocked,
-		ScheduledAt: nullTime(timePtrFromNull(r.ScheduledAt)),
-		ParticipantLimit: nullInt(sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid}),
+		ScheduledAt:                     nullTime(timePtrFromNull(r.ScheduledAt)),
+		ParticipantLimit:                nullInt(sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid}),
 		MaxConcurrentRaceParticipations: nullInt(sql.NullInt64{Int64: int64(r.MaxConcurrentRaceParticipations.Int32), Valid: r.MaxConcurrentRaceParticipations.Valid}),
-		RaceCount: int(r.Count), MemberCount: int(r.Count_2),
+		RaceCount:                       int(r.Count), MemberCount: int(r.Count_2),
 		CreatedAt: isoTime(r.CreatedAt), UpdatedAt: isoTime(r.UpdatedAt),
 	}
 }
@@ -711,9 +736,9 @@ func toPublicListItem(r sqlc.ListPublicEventsRow) sqlc.ListEventsRow {
 		GranularParticipation: r.GranularParticipation, SignupsLocked: r.SignupsLocked,
 		ScheduledAt: r.ScheduledAt, ParticipantLimit: r.ParticipantLimit,
 		MaxConcurrentRaceParticipations: r.MaxConcurrentRaceParticipations,
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		CreatedAt:                       r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Count: r.Count, Count_2: r.Count_2,
-		OwnerName: r.OwnerName,
+		OwnerName: r.OwnerName, OwnerSlug: r.OwnerSlug, OwnerLogo: r.OwnerLogo,
 	}
 }
 
@@ -838,9 +863,8 @@ func ListEventAdmins(ctx context.Context, eventID string) (*ListEventAdminsRespo
 //
 // Mirrors ts-legacy/eventmanager/events.ts addEventAdmin (POST /api/events/:id/admins).
 type AddEventAdminRequest struct {
-	EventID       string `json:"eventId"`
-	UserID        string `json:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `json:"eventId"`
+	UserID  string `json:"userId"`
 }
 
 // AddEventAdminResponse reports success.
@@ -849,8 +873,8 @@ type AddEventAdminResponse struct {
 }
 
 // AddEventAdminCore adds an administrator to an event (idempotent).
-func AddEventAdminCore(ctx context.Context, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func AddEventAdminCore(ctx context.Context, actor *auth.Actor, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	userExists, err := q().UserExists(ctx, p.UserID)
@@ -869,24 +893,24 @@ func AddEventAdminCore(ctx context.Context, p *AddEventAdminRequest) (*AddEventA
 	return &AddEventAdminResponse{Success: true}, nil
 }
 
-//encore:api public method=POST path=/api/event-admins
+//encore:api auth method=POST path=/api/event-admins
 func AddEventAdmin(ctx context.Context, p *AddEventAdminRequest) (*AddEventAdminResponse, error) {
-	return AddEventAdminCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return AddEventAdminCore(ctx, actor, p)
 }
 
-// RemoveEventAdminRequest carries the event/user ids plus the auth header
+// RemoveEventAdminRequest carries the event/user ids
 // (DELETE decodes the struct from query params).
 //
 // Mirrors ts-legacy/eventmanager/events.ts removeEventAdmin.
 type RemoveEventAdminRequest struct {
-	EventID       string `query:"eventId"`
-	UserID        string `query:"userId"`
-	Authorization string `header:"Authorization"`
+	EventID string `query:"eventId"`
+	UserID  string `query:"userId"`
 }
 
 // RemoveEventAdminCore removes an administrator from an event.
-func RemoveEventAdminCore(ctx context.Context, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.EventID, auth.ActionUpdate); err != nil {
+func RemoveEventAdminCore(ctx context.Context, actor *auth.Actor, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if err := q().DeleteEventAdmin(ctx, sqlc.DeleteEventAdminParams{
@@ -898,19 +922,18 @@ func RemoveEventAdminCore(ctx context.Context, p *RemoveEventAdminRequest) (*Add
 	return &AddEventAdminResponse{Success: true}, nil
 }
 
-//encore:api public method=DELETE path=/api/event-admins
+//encore:api auth method=DELETE path=/api/event-admins
 func RemoveEventAdmin(ctx context.Context, p *RemoveEventAdminRequest) (*AddEventAdminResponse, error) {
-	return RemoveEventAdminCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RemoveEventAdminCore(ctx, actor, p)
 }
 
 // --- Delete ---
 
-// DeleteEventRequest carries the event id plus the auth header (DELETE
-// decodes the struct from query params).
+// DeleteEventRequest carries the event id (DELETE decodes the struct from query params).
 type DeleteEventRequest struct {
-	ID            string `query:"id"`
-	Authorization string `header:"Authorization"`
-	Permanent     bool   `query:"permanent"`
+	ID        string `query:"id"`
+	Permanent bool   `query:"permanent"`
 }
 
 // DeleteEventResponse reports deletion.
@@ -919,7 +942,7 @@ type DeleteEventResponse struct {
 }
 
 // DeleteEventCore soft-deletes an event (putting it into PENDING_DELETION) or permanently deletes it if specified/already pending.
-func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventResponse, error) {
+func DeleteEventCore(ctx context.Context, actor *auth.Actor, p *DeleteEventRequest) (*DeleteEventResponse, error) {
 	status, err := q().GetEventStatus(ctx, p.ID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
@@ -927,7 +950,7 @@ func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventRe
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionDelete); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionDelete); err != nil {
 		return nil, err
 	}
 	if p.Permanent || status == "PENDING_DELETION" {
@@ -945,19 +968,19 @@ func DeleteEventCore(ctx context.Context, p *DeleteEventRequest) (*DeleteEventRe
 	return &DeleteEventResponse{Deleted: true}, nil
 }
 
-//encore:api public method=DELETE path=/api/events
+//encore:api auth method=DELETE path=/api/events
 func DeleteEvent(ctx context.Context, p *DeleteEventRequest) (*DeleteEventResponse, error) {
-	return DeleteEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return DeleteEventCore(ctx, actor, p)
 }
 
-// RestoreEventRequest carries the event id plus the auth header.
+// RestoreEventRequest carries the event id.
 type RestoreEventRequest struct {
-	ID            string `json:"id"`
-	Authorization string `header:"Authorization"`
+	ID string `json:"id"`
 }
 
 // RestoreEventCore restores a soft-deleted event back to PENDING.
-func RestoreEventCore(ctx context.Context, p *RestoreEventRequest) (*EventDetail, error) {
+func RestoreEventCore(ctx context.Context, actor *auth.Actor, p *RestoreEventRequest) (*EventDetail, error) {
 	exists, err := q().EventExists(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -965,7 +988,7 @@ func RestoreEventCore(ctx context.Context, p *RestoreEventRequest) (*EventDetail
 	if !exists {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
 	}
-	if _, err := auth.RequireEventPermission(ctx, p.Authorization, p.ID, auth.ActionUpdate); err != nil {
+	if _, err := auth.RequireEventPermission(ctx, actor, p.ID, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
 	if err := q().RestoreEventStatus(ctx, p.ID); err != nil {
@@ -974,7 +997,8 @@ func RestoreEventCore(ctx context.Context, p *RestoreEventRequest) (*EventDetail
 	return LoadEvent(ctx, p.ID)
 }
 
-//encore:api public method=POST path=/api/event-restore
+//encore:api auth method=POST path=/api/event-restore
 func RestoreEvent(ctx context.Context, p *RestoreEventRequest) (*EventDetail, error) {
-	return RestoreEventCore(ctx, p)
+	actor := encoreauth.Data().(*auth.Actor)
+	return RestoreEventCore(ctx, actor, p)
 }

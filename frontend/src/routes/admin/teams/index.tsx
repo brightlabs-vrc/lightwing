@@ -2,7 +2,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
-import { listAdminTeams, createAdminTeam } from '../../../lib/admin-api'
+import { listAdminTeams, createAdminTeam, listApprovedOrganizations } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { Pagination } from '../../../components/Pagination'
@@ -27,9 +27,13 @@ function AdminTeamsPage() {
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
+  // Approved organizations state for primary org assignment
+  const [approvedOrgs, setApprovedOrgs] = useState<teammanager.LinkedOrganization[]>([])
+
   // Create team form state
   const [teamName, setTeamName] = useState('')
   const [teamLogo, setTeamLogo] = useState('')
+  const [primaryOrgId, setPrimaryOrgId] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -47,15 +51,28 @@ function AdminTeamsPage() {
       setTeams(response.teams)
       setTotalTeams(response.total)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load organization teams')
+      setError(cause instanceof Error ? cause.message : 'Unable to load competition teams')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchApprovedOrgs() {
+    try {
+      const res = await listApprovedOrganizations()
+      setApprovedOrgs(res.organizations || [])
+    } catch {
+      // ignore
     }
   }
 
   useEffect(() => {
     void fetchTeams()
   }, [page, pageSize, search])
+
+  useEffect(() => {
+    void fetchApprovedOrgs()
+  }, [])
 
   async function handleCreateTeam(evt: React.FormEvent) {
     evt.preventDefault()
@@ -72,16 +89,18 @@ function AdminTeamsPage() {
     setCreating(true)
     setCreateError(null)
     try {
-      const created = await createAdminTeam(
+      await createAdminTeam(
         {
           name: teamName.trim(),
           logo: teamLogo.trim() || null,
+          primaryOrganizationId: primaryOrgId.trim() || null,
         },
         authHeader,
       )
       setIsModalOpen(false)
       setTeamName('')
       setTeamLogo('')
+      setPrimaryOrgId('')
       // Reload list
       await fetchTeams()
     } catch (cause) {
@@ -107,7 +126,7 @@ function AdminTeamsPage() {
   return (
     <AdminLayout
       title="Team Directory"
-      subtitle="Oversee competition teams, review historical statistics, and manage organizational memberships."
+      subtitle="Oversee competition teams, review historical statistics, and manage team memberships."
       actions={actions}
     >
       <div className="slds-grid slds-wrap slds-gutters">
@@ -118,7 +137,7 @@ function AdminTeamsPage() {
                 <div className="slds-media__body">
                   <h2 className="slds-card__header-title">
                     <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Registered Organization Teams
+                      Registered Competition Teams
                     </span>
                   </h2>
                 </div>
@@ -159,17 +178,17 @@ function AdminTeamsPage() {
                     <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Teams Directory Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '700px' }}>
                       <thead>
                         <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '30%', minWidth: '180px' }}>
+                          <th scope="col" style={{ width: '25%', minWidth: '160px' }}>
                             <div className="slds-truncate font-bold" title="Team Name" style={{ fontWeight: 'bold' }}>Team Name</div>
                           </th>
-                          <th scope="col" style={{ width: '25%', minWidth: '150px' }}>
+                          <th scope="col" style={{ width: '20%', minWidth: '130px' }}>
                             <div className="slds-truncate font-bold" title="Unique Slug" style={{ fontWeight: 'bold' }}>Unique Slug</div>
                           </th>
-                          <th scope="col" style={{ width: '110px' }}>
-                            <div className="slds-truncate font-bold" title="Members Count" style={{ fontWeight: 'bold' }}>Members</div>
+                          <th scope="col" style={{ width: '25%', minWidth: '160px' }}>
+                            <div className="slds-truncate font-bold" title="Primary Organization" style={{ fontWeight: 'bold' }}>Primary Organization</div>
                           </th>
-                          <th scope="col" style={{ minWidth: '180px' }}>
-                            <div className="slds-truncate font-bold" title="Admin Slots" style={{ fontWeight: 'bold' }}>Admin Slots Remaining</div>
+                          <th scope="col" style={{ width: '100px' }}>
+                            <div className="slds-truncate font-bold" title="Members Count" style={{ fontWeight: 'bold' }}>Roster</div>
                           </th>
                           <th scope="col" style={{ width: '100px' }}>
                             <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
@@ -177,32 +196,44 @@ function AdminTeamsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {teams.map((team) => (
-                          <tr key={team.id} className="slds-hint-parent hover:bg-slate-50">
-                            <th scope="row">
-                              <div className="slds-truncate font-bold" title={team.name}>
-                                <Link
-                                  to="/admin/teams/$teamId"
-                                  params={{ teamId: team.id }}
-                                  className="text-blue-600 hover:underline font-bold"
-                                >
-                                  {team.name}
-                                </Link>
-                              </div>
-                            </th>
-                            <td>
-                              <div className="slds-truncate" title={team.slug}>{team.slug}</div>
-                            </td>
-                            <td>
-                              <div className="slds-truncate" title={String(team.memberCount)}>
-                                {team.memberCount}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`slds-badge ${team.administratorSlotsRemaining > 0 ? 'slds-theme_success' : 'slds-theme_error'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                                {team.administratorSlotsRemaining} / 3 slots remaining
-                              </span>
-                            </td>
+                        {teams.map((team) => {
+                          const primaryOrg = team.organizations?.find((o) => o.isPrimary)
+                          return (
+                            <tr key={team.id} className="slds-hint-parent hover:bg-slate-50">
+                              <th scope="row">
+                                <div className="slds-truncate font-bold" title={team.name}>
+                                  <Link
+                                    to="/admin/teams/$teamId"
+                                    params={{ teamId: team.id }}
+                                    className="text-blue-600 hover:underline font-bold"
+                                  >
+                                    {team.name}
+                                  </Link>
+                                </div>
+                              </th>
+                              <td>
+                                <div className="slds-truncate" title={team.slug}>@{team.slug}</div>
+                              </td>
+                              <td>
+                                <div className="slds-truncate" title={primaryOrg?.name || 'Independent'}>
+                                  {primaryOrg ? (
+                                    <Link
+                                      to="/admin/organizations/$orgId"
+                                      params={{ orgId: primaryOrg.id }}
+                                      className="text-slate-800 font-semibold hover:underline"
+                                    >
+                                      {primaryOrg.name}
+                                    </Link>
+                                  ) : (
+                                    <span className="text-slate-400 font-normal">Independent</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                <div className="slds-truncate" title={String(team.memberCount)}>
+                                  {team.memberCount} members
+                                </div>
+                              </td>
                             <td>
                               <button
                                 type="button"
@@ -214,7 +245,8 @@ function AdminTeamsPage() {
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -289,6 +321,28 @@ function AdminTeamsPage() {
                           className="slds-input"
                           style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
                         />
+                      </div>
+                    </div>
+
+                    <div className="slds-form-element slds-m-bottom_medium">
+                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="primary-org-select">
+                        Primary Parent Organization (Optional)
+                      </label>
+                      <div className="slds-form-element__control">
+                        <select
+                          id="primary-org-select"
+                          value={primaryOrgId}
+                          onChange={(e) => setPrimaryOrgId(e.target.value)}
+                          className="slds-select"
+                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
+                        >
+                          <option value="">-- Independent / None --</option>
+                          {approvedOrgs.map((org) => (
+                            <option key={org.id} value={org.id}>
+                              {org.name} (@{org.slug})
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 

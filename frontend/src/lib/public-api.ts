@@ -88,7 +88,7 @@ const mockRaceResults = {
       margin: null,
       passingOrder: '2-2-1',
       final3F: '34.2',
-      resultStatus: null,
+      resultStatus: 'PEN (POS-1)',
       createdAt: now,
       updatedAt: now,
     },
@@ -164,6 +164,8 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       organizationId: 'org_mock_urs',
       ownerUserId: null,
       ownerName: 'UMA Racing Society',
+      ownerSlug: 'uma-racing-society',
+      ownerLogo: 'https://placehold.co/120x120/2563eb/ffffff?text=UMA',
       status: 'PENDING',
       tag: 'OFFICIAL',
       scoringType: 1,
@@ -240,6 +242,8 @@ function loadMockEvents(): eventmanager.EventDetail[] {
       organizationId: null,
       ownerUserId: 'mock-user-2',
       ownerName: 'Shadow',
+      ownerSlug: 'usr_mock_shadow',
+      ownerLogo: '/fallback_avatar.jpg',
       status: 'CONCLUDED',
       scoringType: 2,
       scoringTypeLabel: 'ladder-elo',
@@ -307,6 +311,8 @@ export async function listPublicEvents(
     organizationId: e.organizationId,
     ownerUserId: e.ownerUserId,
     ownerName: e.ownerName ?? null,
+    ownerSlug: e.ownerSlug ?? null,
+    ownerLogo: e.ownerLogo ?? null,
     status: e.status,
     tag: e.tag ?? 'OFFICIAL',
     deletedAt: e.deletedAt ?? null,
@@ -800,6 +806,11 @@ export async function getPublicTeamProfile(teamOrSlug: string): Promise<teammana
     name: 'UMA Racing Society',
     slug: 'uma-racing-society',
     logo: 'https://placehold.co/120x120/2563eb/ffffff?text=UMA',
+    description: `Let's think with horses! Bright Labs is a group focusing more on Uma Musume/Keiba-style games. We're a group of artists and developers who loves the franchise who makes worlds!
+
+### Socials
+- [GitHub](https://github.com)
+- [VRChat](https://vrchat.com)`,
     administratorSlotsRemaining: 3,
     stats: {
       rankingAverage: 1.5,

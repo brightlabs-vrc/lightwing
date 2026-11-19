@@ -12,7 +12,7 @@ END $$;
 
 -- CreateEnum (idempotent, see 20260709120000).
 DO $$ BEGIN
-  CREATE TYPE "SiteRole" AS ENUM ('USER', 'SITE_ADMIN');
+  CREATE TYPE "SiteRole" AS ENUM ('USER', 'SITE_ADMIN', 'EVENT_ADMIN');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
