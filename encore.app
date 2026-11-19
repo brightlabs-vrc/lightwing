@@ -8,6 +8,7 @@
         "allow_origins_with_credentials": [
             "http://localhost:3000",
             "http://localhost:5173",
+            "http://localhost:8787",
             "http://localhost:8788",
             "https://lightwing.urs.deno.net",
             "https://lightwing-canary.urs.deno.net",
@@ -20,6 +21,7 @@
         "allow_origins_without_credentials": [
             "http://localhost:3000",
             "http://localhost:5173",
+            "http://localhost:8787",
             "http://localhost:8788",
             "https://lightwing.urs.deno.net",
             "https://lightwing-canary.urs.deno.net",

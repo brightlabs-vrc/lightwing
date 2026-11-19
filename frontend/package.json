@@ -8,8 +8,8 @@
     "dev:mock": "VITE_MOCK_MODE=true vite --host --port 5173",
     "build": "vite build",
     "preview": "vite preview --host --port 4173",
-    "pages:dev": "wrangler pages dev",
-    "pages:deploy": "wrangler pages deploy",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

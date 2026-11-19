@@ -110,17 +110,16 @@ encore gen client --lang typescript --output frontend/src/lib/client.ts
 Backend and frontend deploy separately:
 
 - **Backend**: push to Encore Cloud with `git push encore` (see the [self-hosting instructions](https://encore.dev/docs/go/self-host/docker-build) for `encore build docker`).
-- **Frontend (Cloudflare Pages)**: configured via `frontend/wrangler.jsonc`. Connect the repository in the Cloudflare Pages dashboard with:
-  - **Project name**: `lightwing`
+- **Frontend (Cloudflare Workers Static Assets)**: configured via `frontend/wrangler.jsonc`. Connect the repository in Cloudflare Workers & Pages with:
   - **Root directory**: `frontend`
-  - **Build command**: `pnpm install && pnpm build`
-  - **Build output directory**: `dist`
+  - **Build command**: `pnpm build`
+  - **Deploy command**: `npx wrangler deploy`
   - **Environment variables**: set `VITE_API_BASE_URL` to your Encore backend URL and `NODE_VERSION=24`.
 
 To preview the production build locally with Wrangler (SPA fallback + `_headers`):
 
 ```bash
-cd frontend && pnpm build && pnpm pages:dev
+cd frontend && pnpm build && pnpm cf:dev
 ```
 
 When cutting over production traffic to a new frontend origin, update `LIGHTWING_FRONTEND_URL` on the Encore backend so Discord OAuth callbacks redirect to the active frontend.
