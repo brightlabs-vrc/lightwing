@@ -14,6 +14,7 @@ const RESERVED_SLUGS = new Set([
   'help',
   'support',
   'status',
+  'newsletters',
 ]);
 
 /**

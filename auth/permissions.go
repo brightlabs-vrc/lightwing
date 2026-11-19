@@ -21,6 +21,7 @@ const (
 	ResourceEvent        Resource = "event"
 	ResourceRaceEvent    Resource = "raceEvent"
 	ResourceRaceResult   Resource = "raceResult"
+	ResourceNewsletter   Resource = "newsletter"
 )
 
 // Action is a CRUD action string.
@@ -79,6 +80,7 @@ var roleStatements = map[string]roleStatement{
 		ResourceEvent:        {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceEvent:    {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceResult:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
+		ResourceNewsletter:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 	},
 	"eventAdmin": {
 		ResourceOrganization: {ActionRead},
@@ -87,6 +89,7 @@ var roleStatements = map[string]roleStatement{
 		ResourceEvent:        {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceEvent:    {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceResult:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
+		ResourceNewsletter:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 	},
 	"event_admin": {
 		ResourceOrganization: {ActionRead},
@@ -95,6 +98,7 @@ var roleStatements = map[string]roleStatement{
 		ResourceEvent:        {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceEvent:    {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceResult:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
+		ResourceNewsletter:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 	},
 	"eventAdministrator": {
 		ResourceOrganization: {ActionRead},
@@ -103,6 +107,7 @@ var roleStatements = map[string]roleStatement{
 		ResourceEvent:        {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceEvent:    {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 		ResourceRaceResult:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
+		ResourceNewsletter:   {ActionRead, ActionCreate, ActionUpdate, ActionDelete},
 	},
 	memberRole: {
 		ResourceOrganization: {ActionRead},
@@ -111,6 +116,7 @@ var roleStatements = map[string]roleStatement{
 		ResourceEvent:        {ActionRead},
 		ResourceRaceEvent:    {ActionRead},
 		ResourceRaceResult:   {ActionRead},
+		ResourceNewsletter:   {ActionRead},
 	},
 }
 
@@ -162,6 +168,7 @@ var RESERVED_SLUGS = map[string]bool{
 	"help":        true,
 	"support":     true,
 	"status":      true,
+	"newsletters": true,
 }
 
 func isReservedSlug(slug string) bool {

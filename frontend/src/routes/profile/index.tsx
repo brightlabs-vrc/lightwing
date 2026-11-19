@@ -11,12 +11,12 @@ import {
   PixelStack,
   PixelCard,
   PixelInput,
-  PixelTextarea,
   PixelButton,
   PixelSectionHeader,
   PixelAlert,
   useToast,
 } from '@pxlkit/ui-kit'
+import { MarkdownEditor } from '../../components/MarkdownEditor'
 
 export const Route = createFileRoute('/profile/')({
   beforeLoad: async ({ location }) => {
@@ -96,11 +96,12 @@ function ProfilePage() {
             onChange={(e) => setSlug(e.target.value)}
           />
 
-          <PixelTextarea
+          <MarkdownEditor
             label="BIOGRAPHY"
-            rows={3}
             value={biography}
-            onChange={(e) => setBiography(e.target.value)}
+            onChange={setBiography}
+            minHeight="180px"
+            defaultMode="write"
             placeholder="Tell us about yourself..."
           />
 
