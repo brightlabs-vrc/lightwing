@@ -63,10 +63,10 @@ function formatClassBadge(classRestriction?: string | null): string | null {
 
 function selectFeaturedEvents(
   events: eventmanager.EventListItem[],
-): { items: eventmanager.EventListItem[]; mode: 'ACTIVE' | 'CONCLUDED' | 'EMPTY' } {
+): eventmanager.EventListItem[] {
   const active = events.filter((e) => e.status === 'ONGOING' || e.status === 'PENDING')
-  if (active.length > 0) {
-    const sorted = [...active].sort((a, b) => {
+  return [...active]
+    .sort((a, b) => {
       // 1. ONGOING before PENDING
       if (a.status !== b.status) {
         return a.status === 'ONGOING' ? -1 : 1
@@ -85,24 +85,7 @@ function selectFeaturedEvents(
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
-    return { items: sorted.slice(0, 5), mode: 'ACTIVE' }
-  }
-
-  const concluded = events.filter((e) => e.status === 'CONCLUDED')
-  if (concluded.length > 0) {
-    const sorted = [...concluded].sort((a, b) => {
-      const aOfficial = a.tag === 'OFFICIAL' ? 1 : 0
-      const bOfficial = b.tag === 'OFFICIAL' ? 1 : 0
-      if (aOfficial !== bOfficial) return bOfficial - aOfficial
-      const aHasBanner = a.bannerUrl ? 1 : 0
-      const bHasBanner = b.bannerUrl ? 1 : 0
-      if (aHasBanner !== bHasBanner) return bHasBanner - aHasBanner
-      return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
-    })
-    return { items: sorted.slice(0, 3), mode: 'CONCLUDED' }
-  }
-
-  return { items: [], mode: 'EMPTY' }
+    .slice(0, 5)
 }
 
 const NEWS_PAGE_SIZE = 5
@@ -173,7 +156,7 @@ function HomePage() {
     [visibleEvents],
   )
 
-  const slideCount = featured.items.length
+  const slideCount = featured.length
   const safeSlideIndex = slideCount > 0 ? slideIndex % slideCount : 0
 
   useEffect(() => {
@@ -184,7 +167,7 @@ function HomePage() {
     return () => clearInterval(timer)
   }, [slideCount, carouselPaused])
 
-  const activeSlide = featured.items[safeSlideIndex] ?? null
+  const activeSlide = featured[safeSlideIndex] ?? null
 
   const newsletters = newslettersData?.newsletters ?? []
   const newslettersTotal = newslettersData?.total ?? 0
@@ -301,9 +284,7 @@ function HomePage() {
                   <div className="shrink-0 flex flex-col items-start sm:items-end gap-3">
                     <PixelButton asChild variant="solid" tone="green" size="md">
                       <Link to="/events/$eventId" params={{ eventId: activeSlide.id }}>
-                        {featured.mode === 'CONCLUDED'
-                          ? 'VIEW RESULTS'
-                          : 'VIEW EVENT DETAILS'}
+                        VIEW EVENT DETAILS
                       </Link>
                     </PixelButton>
                   </div>
@@ -312,7 +293,7 @@ function HomePage() {
                 {/* Slide indicators */}
                 {slideCount > 1 && (
                   <div className="relative z-10 px-6 pb-4 flex items-center gap-2">
-                    {featured.items.map((slide, idx) => (
+                    {featured.map((slide, idx) => (
                       <button
                         key={slide.id}
                         type="button"
@@ -329,12 +310,12 @@ function HomePage() {
                 )}
               </>
             ) : (
-              /* Tier 3 Fallback: Empty platform welcome hero */
+              /* Off-Season Fallback Banner */
               <>
                 <div className="absolute inset-0">
                   <EventBanner
-                    id="umakeiba-welcome-hero"
-                    name="UmaKeiba"
+                    id="umakeiba-off-season"
+                    name="Off-Season"
                     classRestriction="G3"
                     tag="OFFICIAL"
                     variant="hero"
@@ -344,23 +325,19 @@ function HomePage() {
 
                 <div className="relative z-10 p-6 sm:p-8 flex flex-col justify-between h-full gap-6">
                   <div>
-                    <PixelBadge tone="green">COMPETITIVE VR RACING</PixelBadge>
+                    <PixelBadge tone="neutral">OFF-SEASON</PixelBadge>
                   </div>
                   <div className="max-w-xl">
                     <h1 className="font-pixel text-2xl sm:text-4xl font-bold text-white tracking-wide leading-tight">
-                      WELCOME TO UMAKEIBA
+                      OFF-SEASON
                     </h1>
                     <p className="font-sans text-sm sm:text-base text-gray-200 mt-3 leading-relaxed">
-                      No active racing events are scheduled right now. Explore seasonal standings,
-                      browse approved organizations &amp; teams, or register your own squad for the
-                      next circuit.
+                      Nothing is happening on the track right now. Check out past events and
+                      results while we gear up for the next circuit.
                     </p>
                     <div className="flex items-center gap-3 flex-wrap mt-5">
                       <PixelButton asChild variant="solid" tone="green" size="md">
-                        <Link to="/leaderboard">EXPLORE LEADERBOARD</Link>
-                      </PixelButton>
-                      <PixelButton asChild variant="soft" tone="purple" size="md">
-                        <Link to="/teams">BROWSE TEAMS</Link>
+                        <Link to="/events">CHECK PAST EVENTS</Link>
                       </PixelButton>
                     </div>
                   </div>
