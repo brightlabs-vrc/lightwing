@@ -23,6 +23,7 @@ import { Route as NewslettersIndexRouteImport } from './routes/newsletters/index
 import { Route as NewslettersNewsletterIdRouteImport } from './routes/newsletters/$newsletterId'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as TTeamRouteImport } from './routes/t/$team'
+import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as TeamsNewRouteImport } from './routes/teams/new'
 import { Route as UUserRouteImport } from './routes/u/$user'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events/$eventId'
@@ -104,6 +105,11 @@ const TTeamRoute = TTeamRouteImport.update({
   path: '/t/$team',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsIndexRoute = TeamsIndexRouteImport.update({
+  id: '/teams/',
+  path: '/teams/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsNewRoute = TeamsNewRouteImport.update({
   id: '/teams/new',
   path: '/teams/new',
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/events/': typeof EventsIndexRoute
   '/newsletters/': typeof NewslettersIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/teams/': typeof TeamsIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
@@ -198,6 +205,7 @@ export interface FileRoutesByTo {
   '/events': typeof EventsIndexRoute
   '/newsletters': typeof NewslettersIndexRoute
   '/profile': typeof ProfileIndexRoute
+  '/teams': typeof TeamsIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/events/': typeof EventsIndexRoute
   '/newsletters/': typeof NewslettersIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/teams/': typeof TeamsIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
   '/admin/teams/$teamId': typeof AdminTeamsTeamIdRoute
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/events/'
     | '/newsletters/'
     | '/profile/'
+    | '/teams/'
     | '/admin/events/$eventId'
     | '/admin/organizations/$orgId'
     | '/admin/teams/$teamId'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/events'
     | '/newsletters'
     | '/profile'
+    | '/teams'
     | '/admin/events/$eventId'
     | '/admin/organizations/$orgId'
     | '/admin/teams/$teamId'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/events/'
     | '/newsletters/'
     | '/profile/'
+    | '/teams/'
     | '/admin/events/$eventId'
     | '/admin/organizations/$orgId'
     | '/admin/teams/$teamId'
@@ -332,6 +344,7 @@ export interface RootRouteChildren {
   EventsIndexRoute: typeof EventsIndexRoute
   NewslettersIndexRoute: typeof NewslettersIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
+  TeamsIndexRoute: typeof TeamsIndexRoute
   AdminOrganizationsOrgIdRoute: typeof AdminOrganizationsOrgIdRoute
   AdminTeamsTeamIdRoute: typeof AdminTeamsTeamIdRoute
   AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
@@ -441,6 +454,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTeamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/': {
+      id: '/teams/'
+      path: '/teams'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof TeamsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/new': {
       id: '/teams/new'
       path: '/teams/new'
@@ -543,6 +563,7 @@ const rootRouteChildren: RootRouteChildren = {
   EventsIndexRoute: EventsIndexRoute,
   NewslettersIndexRoute: NewslettersIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
+  TeamsIndexRoute: TeamsIndexRoute,
   AdminOrganizationsOrgIdRoute: AdminOrganizationsOrgIdRoute,
   AdminTeamsTeamIdRoute: AdminTeamsTeamIdRoute,
   AdminUsersUserIdRoute: AdminUsersUserIdRoute,

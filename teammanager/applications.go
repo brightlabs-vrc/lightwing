@@ -52,13 +52,15 @@ type UnlinkSecondaryOrgRequest struct {
 }
 
 type LinkedOrganization struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Slug      string  `json:"slug"`
-	Logo      *string `json:"logo"`
-	OrgType   string  `json:"orgType"`
-	Status    string  `json:"status"`
-	IsPrimary bool    `json:"isPrimary"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	Logo        *string `json:"logo"`
+	Description *string `json:"description,omitempty"`
+	OrgType     string  `json:"orgType"`
+	Status      string  `json:"status"`
+	IsPrimary   bool    `json:"isPrimary"`
+	MemberCount int     `json:"memberCount,omitempty"`
 }
 
 type OrgApplicationView struct {
@@ -739,12 +741,34 @@ func listApprovedOrganizations(ctx context.Context) (*ListOrganizationsResponse,
 	if err != nil {
 		return nil, err
 	}
+
+	orgIDs := make([]string, 0, len(rows))
+	for _, r := range rows {
+		orgIDs = append(orgIDs, r.ID)
+	}
+
+	memberCounts := make(map[string]int, len(orgIDs))
+	if len(orgIDs) > 0 {
+		if countRows, countErr := q().BatchCountMembersAndAdmins(ctx, sqlc.BatchCountMembersAndAdminsParams{
+			Role:    auth.AdministratorRole,
+			Column2: orgIDs,
+		}); countErr == nil {
+			for _, cr := range countRows {
+				memberCounts[cr.OrganizationId] = int(cr.Count)
+			}
+		}
+	}
+
 	orgs := make([]LinkedOrganization, 0, len(rows))
 	for _, r := range rows {
-		var logo *string
+		var logo, desc *string
 		if r.Logo.Valid && r.Logo.String != "" {
 			l := r.Logo.String
 			logo = &l
+		}
+		if r.Description.Valid && r.Description.String != "" {
+			d := r.Description.String
+			desc = &d
 		}
 		orgType := "ORGANIZATION"
 		if r.OrgType.Valid {
@@ -755,13 +779,15 @@ func listApprovedOrganizations(ctx context.Context) (*ListOrganizationsResponse,
 			status = r.Status.String
 		}
 		orgs = append(orgs, LinkedOrganization{
-			ID:        r.ID,
-			Name:      r.Name,
-			Slug:      r.Slug,
-			Logo:      logo,
-			OrgType:   orgType,
-			Status:    status,
-			IsPrimary: false,
+			ID:          r.ID,
+			Name:        r.Name,
+			Slug:        r.Slug,
+			Logo:        logo,
+			Description: desc,
+			OrgType:     orgType,
+			Status:      status,
+			IsPrimary:   false,
+			MemberCount: memberCounts[r.ID],
 		})
 	}
 	return &ListOrganizationsResponse{Organizations: orgs}, nil
