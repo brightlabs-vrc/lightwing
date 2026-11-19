@@ -86,6 +86,9 @@ function RootLayout() {
                 <PixelButton asChild variant="ghost" tone="neutral" size="sm">
                   <Link to="/leaderboard">LEADERBOARD</Link>
                 </PixelButton>
+                <PixelButton asChild variant="ghost" tone="neutral" size="sm">
+                  <Link to="/newsletters">NEWSLETTERS</Link>
+                </PixelButton>
                 {isSiteAdmin ? (
                   <PixelButton asChild variant="soft" tone="gold" size="sm">
                     <Link to="/admin">ADMIN</Link>

@@ -2385,3 +2385,107 @@ export async function recalculateRatings(
     calculatedAt: new Date().toISOString(),
   }
 }
+
+let mockOrgNewsletters: teammanager.Newsletter[] = [
+  {
+    id: 'nl_mock_001',
+    organizationId: 'org_mock_urs',
+    organizationName: 'Uma Racing Society',
+    organizationSlug: 'urs',
+    organizationLogo: null,
+    authorId: 'mock-admin-1',
+    authorName: 'Mock Admin',
+    authorSlug: 'mock-admin',
+    authorImage: null,
+    title: 'Season 4 Grand Prix Schedule & Rule Updates',
+    slug: 'season-4-grand-prix-schedule',
+    summary: 'Key dates, track rotations, and class tier adjustments for the upcoming Season 4 Grand Prix.',
+    thumbnailUrl: null,
+    content: '# Season 4 Grand Prix\n\nWelcome racers! Here is everything you need to know for **Season 4**.',
+    status: 'PUBLISHED',
+    publishedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  },
+]
+
+export async function listOrgNewsletters(
+  organizationId: string,
+  limit = 50,
+  offset = 0,
+): Promise<teammanager.ListNewslettersResponse> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.ListOrgNewsletters({ organizationId, limit, offset })
+  }
+  const items = mockOrgNewsletters.filter((n) => n.organizationId === organizationId)
+  return {
+    newsletters: items.slice(offset, offset + limit),
+    total: items.length,
+  }
+}
+
+export async function createNewsletter(
+  params: teammanager.CreateNewsletterRequest,
+): Promise<teammanager.Newsletter> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.CreateNewsletter(params)
+  }
+  const timestamp = new Date().toISOString()
+  const item: teammanager.Newsletter = {
+    id: `nl_mock_${Date.now()}`,
+    organizationId: params.organizationId,
+    organizationName: 'Organization',
+    organizationSlug: params.organizationId,
+    organizationLogo: null,
+    authorId: 'mock-admin-1',
+    authorName: 'Mock Admin',
+    authorSlug: 'mock-admin',
+    authorImage: null,
+    title: params.title,
+    slug: params.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'newsletter',
+    summary: params.summary ?? null,
+    thumbnailUrl: params.thumbnailUrl ?? null,
+    content: params.content,
+    status: params.status || 'DRAFT',
+    publishedAt: params.status === 'PUBLISHED' ? timestamp : null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  mockOrgNewsletters = [item, ...mockOrgNewsletters]
+  return item
+}
+
+export async function updateNewsletter(
+  params: teammanager.UpdateNewsletterRequest,
+): Promise<teammanager.Newsletter> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.UpdateNewsletter(params)
+  }
+  const idx = mockOrgNewsletters.findIndex((n) => n.id === params.id)
+  if (idx === -1) {
+    throw new Error('Newsletter not found')
+  }
+  const existing = mockOrgNewsletters[idx]
+  const nextStatus = params.status ?? existing.status
+  const timestamp = new Date().toISOString()
+  const updated: teammanager.Newsletter = {
+    ...existing,
+    title: params.title ?? existing.title,
+    summary: params.clearSummary ? null : (params.summary !== undefined ? params.summary : existing.summary),
+    thumbnailUrl: params.clearThumbnail ? null : (params.thumbnailUrl !== undefined ? params.thumbnailUrl : existing.thumbnailUrl),
+    content: params.content ?? existing.content,
+    status: nextStatus,
+    publishedAt: nextStatus === 'PUBLISHED' ? (existing.publishedAt ?? timestamp) : null,
+    updatedAt: timestamp,
+  }
+  mockOrgNewsletters[idx] = updated
+  return updated
+}
+
+export async function deleteNewsletter(id: string): Promise<void> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.DeleteNewsletter(id)
+  }
+  mockOrgNewsletters = mockOrgNewsletters.filter((n) => n.id !== id)
+}
+

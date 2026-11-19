@@ -914,3 +914,68 @@ export async function getUserRaceRecords(
     total,
   }
 }
+
+const mockPublicNewsletters: teammanager.Newsletter[] = [
+  {
+    id: 'nl_mock_001',
+    organizationId: 'org_mock_urs',
+    organizationName: 'Uma Racing Society',
+    organizationSlug: 'urs',
+    organizationLogo: null,
+    authorId: 'mock-admin-1',
+    authorName: 'Mock Admin',
+    authorSlug: 'mock-admin',
+    authorImage: null,
+    title: 'Season 4 Grand Prix Schedule & Rule Updates',
+    slug: 'season-4-grand-prix-schedule',
+    summary: 'Key dates, track rotations, and class tier adjustments for the upcoming Season 4 Grand Prix.',
+    thumbnailUrl: null,
+    content: '# Season 4 Grand Prix\n\nWelcome racers! Here is everything you need to know for **Season 4**.\n\n## Key Dates\n- **Qualifiers:** Next Saturday at 20:00 UTC\n- **Finals:** End of month\n\n> Make sure your team rosters are finalized before lock-in!',
+    status: 'PUBLISHED',
+    publishedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  },
+]
+
+export async function listPublicNewsletters(
+  params: teammanager.ListPublicNewslettersRequest = {},
+): Promise<teammanager.ListNewslettersResponse> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.ListPublicNewsletters(params)
+  }
+
+  let items = mockPublicNewsletters.filter((n) => n.status === 'PUBLISHED')
+  if (params.organizationId) {
+    items = items.filter((n) => n.organizationId === params.organizationId || n.organizationSlug === params.organizationId)
+  }
+  if (params.search && params.search.trim()) {
+    const q = params.search.trim().toLowerCase()
+    items = items.filter(
+      (n) =>
+        n.title.toLowerCase().includes(q) ||
+        (n.summary ?? '').toLowerCase().includes(q) ||
+        n.organizationName.toLowerCase().includes(q),
+    )
+  }
+  const offset = params.offset ?? 0
+  const limit = params.limit ?? 20
+  return {
+    newsletters: items.slice(offset, offset + limit),
+    total: items.length,
+  }
+}
+
+export async function getPublicNewsletter(idOrSlug: string): Promise<teammanager.Newsletter> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.GetPublicNewsletter(idOrSlug)
+  }
+  const found = mockPublicNewsletters.find(
+    (n) => n.status === 'PUBLISHED' && (n.id === idOrSlug || n.slug === idOrSlug),
+  )
+  if (!found) {
+    throw new Error('Newsletter not found')
+  }
+  return found
+}
+

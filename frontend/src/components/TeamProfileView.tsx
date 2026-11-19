@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   PixelContainer,
@@ -9,6 +9,8 @@ import {
   PixelButton,
 } from '@pxlkit/ui-kit'
 import type { teammanager } from '../lib/client'
+import { listPublicNewsletters } from '../lib/public-api'
+import { formatLocalDateTime } from '../lib/datetime'
 import { UserLink } from './UserLink'
 import { MarkdownView } from './MarkdownView'
 import { useAuth } from '../hooks/useAuth'
@@ -24,6 +26,28 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
   const currentSiteRole = session?.user?.siteRole
 
   const isOrg = team.isOrganization ?? (!team.primaryOrganizationId || team.primaryOrganizationId === team.id)
+
+  const [orgNewsletters, setOrgNewsletters] = useState<teammanager.Newsletter[]>([])
+  const [loadingNewsletters, setLoadingNewsletters] = useState(false)
+
+  useEffect(() => {
+    if (!isOrg) return
+    let active = true
+    setLoadingNewsletters(true)
+    listPublicNewsletters({ organizationId: team.id, limit: 5, offset: 0 })
+      .then((res) => {
+        if (active) setOrgNewsletters(res.newsletters)
+      })
+      .catch(() => {
+        if (active) setOrgNewsletters([])
+      })
+      .finally(() => {
+        if (active) setLoadingNewsletters(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [isOrg, team.id])
 
   usePageHead({
     title: team.name,
@@ -252,6 +276,62 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                   </PixelCard>
                 ))}
               </div>
+            </PixelCard>
+          )}
+
+          {/* Organization Newsletters */}
+          {isOrg && (
+            <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
+              <div className="flex items-center justify-between gap-2">
+                <PixelSectionHeader title="NEWSLETTERS" titleTone="purple" size="sm" />
+                <PixelButton asChild variant="ghost" tone="cyan" size="sm">
+                  <Link to="/newsletters">ALL NEWSLETTERS</Link>
+                </PixelButton>
+              </div>
+              {loadingNewsletters ? (
+                <div className="mt-4 font-sans text-xs text-retro-muted">Loading newsletters...</div>
+              ) : orgNewsletters.length > 0 ? (
+                <div className="mt-4 flex flex-col gap-3">
+                  {orgNewsletters.map((nl) => (
+                    <Link
+                      key={nl.id}
+                      to="/newsletters/$newsletterId"
+                      params={{ newsletterId: nl.id }}
+                      className="block p-3 rounded bg-retro-bg/70 border border-retro-border hover:border-retro-primary transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        {nl.thumbnailUrl && (
+                          <img
+                            src={nl.thumbnailUrl}
+                            alt={nl.title}
+                            className="w-20 h-14 rounded border border-retro-border object-cover bg-retro-bg shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-pixel text-xs text-retro-text font-bold truncate">
+                            {nl.title}
+                          </div>
+                          {nl.summary && (
+                            <p className="font-sans text-xs text-retro-muted mt-1 line-clamp-2">
+                              {nl.summary}
+                            </p>
+                          )}
+                          <div className="font-sans text-[11px] text-retro-muted mt-1.5">
+                            By {nl.authorName} • {nl.publishedAt ? formatLocalDateTime(nl.publishedAt) : formatLocalDateTime(nl.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 font-sans text-xs text-retro-muted italic">
+                  No newsletters published yet.
+                </div>
+              )}
             </PixelCard>
           )}
 

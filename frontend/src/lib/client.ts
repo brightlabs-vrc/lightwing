@@ -2026,6 +2026,65 @@ export namespace eventmanager {
  * all state lives in the shared lightwing database (db).
  */
 export namespace teammanager {
+    export interface Newsletter {
+        id: string
+        organizationId: string
+        organizationName: string
+        organizationSlug: string
+        organizationLogo?: string | null
+        authorId: string
+        authorName: string
+        authorSlug?: string | null
+        authorImage?: string | null
+        title: string
+        slug: string
+        summary?: string | null
+        thumbnailUrl?: string | null
+        content: string
+        status: string
+        publishedAt?: string | null
+        createdAt: string
+        updatedAt: string
+    }
+
+    export interface ListNewslettersResponse {
+        newsletters: Newsletter[]
+        total: number
+    }
+
+    export interface ListPublicNewslettersRequest {
+        organizationId?: string
+        search?: string
+        limit?: number
+        offset?: number
+    }
+
+    export interface ListOrgNewslettersRequest {
+        organizationId: string
+        limit?: number
+        offset?: number
+    }
+
+    export interface CreateNewsletterRequest {
+        organizationId: string
+        title: string
+        summary?: string | null
+        thumbnailUrl?: string | null
+        content: string
+        status: string
+    }
+
+    export interface UpdateNewsletterRequest {
+        id: string
+        title?: string | null
+        summary?: string | null
+        clearSummary?: boolean
+        thumbnailUrl?: string | null
+        clearThumbnail?: boolean
+        content?: string | null
+        status?: string | null
+    }
+
     export interface LinkedOrganization {
         id: string
         name: string
@@ -2603,6 +2662,48 @@ export namespace teammanager {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("PATCH", `/api/team-stats`, JSON.stringify(body), {headers})
             return await resp.json() as Team
+        }
+
+        public async ListPublicNewsletters(params: ListPublicNewslettersRequest = {}): Promise<ListNewslettersResponse> {
+            const query = makeRecord<string, string | string[]>({
+                limit:          params.limit === undefined ? undefined : String(params.limit),
+                offset:         params.offset === undefined ? undefined : String(params.offset),
+                organizationId: params.organizationId,
+                search:         params.search,
+            })
+
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/newsletters`, undefined, {query})
+            return await resp.json() as ListNewslettersResponse
+        }
+
+        public async GetPublicNewsletter(id: string): Promise<Newsletter> {
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/newsletters/${encodeURIComponent(id)}`)
+            return await resp.json() as Newsletter
+        }
+
+        public async ListOrgNewsletters(params: ListOrgNewslettersRequest): Promise<ListNewslettersResponse> {
+            const query = makeRecord<string, string | string[]>({
+                limit:          params.limit === undefined ? undefined : String(params.limit),
+                offset:         params.offset === undefined ? undefined : String(params.offset),
+                organizationId: params.organizationId,
+            })
+
+            const resp = await this.baseClient.callTypedAPI("GET", `/api/org-newsletters`, undefined, {query})
+            return await resp.json() as ListNewslettersResponse
+        }
+
+        public async CreateNewsletter(params: CreateNewsletterRequest): Promise<Newsletter> {
+            const resp = await this.baseClient.callTypedAPI("POST", `/api/newsletters`, JSON.stringify(params))
+            return await resp.json() as Newsletter
+        }
+
+        public async UpdateNewsletter(params: UpdateNewsletterRequest): Promise<Newsletter> {
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/api/newsletters`, JSON.stringify(params))
+            return await resp.json() as Newsletter
+        }
+
+        public async DeleteNewsletter(id: string): Promise<void> {
+            await this.baseClient.callTypedAPI("DELETE", `/api/newsletters/${encodeURIComponent(id)}`)
         }
     }
 }

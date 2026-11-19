@@ -15,11 +15,13 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as UserRouteImport } from './routes/$user'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
+import { Route as NewslettersIndexRouteImport } from './routes/newsletters/index'
 import { Route as EventsIndexRouteImport } from './routes/events/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as UUserRouteImport } from './routes/u/$user'
 import { Route as TeamsNewRouteImport } from './routes/teams/new'
 import { Route as TTeamRouteImport } from './routes/t/$team'
+import { Route as NewslettersNewsletterIdRouteImport } from './routes/newsletters/$newsletterId'
 import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
 import { Route as AdminEventsRouteImport } from './routes/admin/events'
 import { Route as AdminApprovalsRouteImport } from './routes/admin/approvals'
@@ -62,6 +64,11 @@ const ProfileIndexRoute = ProfileIndexRouteImport.update({
   path: '/profile/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NewslettersIndexRoute = NewslettersIndexRouteImport.update({
+  id: '/newsletters/',
+  path: '/newsletters/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventsIndexRoute = EventsIndexRouteImport.update({
   id: '/events/',
   path: '/events/',
@@ -85,6 +92,11 @@ const TeamsNewRoute = TeamsNewRouteImport.update({
 const TTeamRoute = TTeamRouteImport.update({
   id: '/t/$team',
   path: '/t/$team',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewslettersNewsletterIdRoute = NewslettersNewsletterIdRouteImport.update({
+  id: '/newsletters/$newsletterId',
+  path: '/newsletters/$newsletterId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsEventIdRoute = EventsEventIdRouteImport.update({
@@ -152,11 +164,13 @@ export interface FileRoutesByFullPath {
   '/admin/approvals': typeof AdminApprovalsRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
+  '/newsletters/$newsletterId': typeof NewslettersNewsletterIdRoute
   '/t/$team': typeof TTeamRoute
   '/teams/new': typeof TeamsNewRoute
   '/u/$user': typeof UUserRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/newsletters/': typeof NewslettersIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
@@ -176,11 +190,13 @@ export interface FileRoutesByTo {
   '/admin/approvals': typeof AdminApprovalsRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
+  '/newsletters/$newsletterId': typeof NewslettersNewsletterIdRoute
   '/t/$team': typeof TTeamRoute
   '/teams/new': typeof TeamsNewRoute
   '/u/$user': typeof UUserRoute
   '/admin': typeof AdminIndexRoute
   '/events': typeof EventsIndexRoute
+  '/newsletters': typeof NewslettersIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
@@ -201,11 +217,13 @@ export interface FileRoutesById {
   '/admin/approvals': typeof AdminApprovalsRoute
   '/admin/events': typeof AdminEventsRouteWithChildren
   '/events/$eventId': typeof EventsEventIdRoute
+  '/newsletters/$newsletterId': typeof NewslettersNewsletterIdRoute
   '/t/$team': typeof TTeamRoute
   '/teams/new': typeof TeamsNewRoute
   '/u/$user': typeof UUserRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/newsletters/': typeof NewslettersIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/admin/organizations/$orgId': typeof AdminOrganizationsOrgIdRoute
@@ -227,11 +245,13 @@ export interface FileRouteTypes {
     | '/admin/approvals'
     | '/admin/events'
     | '/events/$eventId'
+    | '/newsletters/$newsletterId'
     | '/t/$team'
     | '/teams/new'
     | '/u/$user'
     | '/admin/'
     | '/events/'
+    | '/newsletters/'
     | '/profile/'
     | '/admin/events/$eventId'
     | '/admin/organizations/$orgId'
@@ -251,11 +271,13 @@ export interface FileRouteTypes {
     | '/admin/approvals'
     | '/admin/events'
     | '/events/$eventId'
+    | '/newsletters/$newsletterId'
     | '/t/$team'
     | '/teams/new'
     | '/u/$user'
     | '/admin'
     | '/events'
+    | '/newsletters'
     | '/profile'
     | '/admin/events/$eventId'
     | '/admin/organizations/$orgId'
@@ -275,11 +297,13 @@ export interface FileRouteTypes {
     | '/admin/approvals'
     | '/admin/events'
     | '/events/$eventId'
+    | '/newsletters/$newsletterId'
     | '/t/$team'
     | '/teams/new'
     | '/u/$user'
     | '/admin/'
     | '/events/'
+    | '/newsletters/'
     | '/profile/'
     | '/admin/events/$eventId'
     | '/admin/organizations/$orgId'
@@ -300,11 +324,13 @@ export interface RootRouteChildren {
   AdminApprovalsRoute: typeof AdminApprovalsRoute
   AdminEventsRoute: typeof AdminEventsRouteWithChildren
   EventsEventIdRoute: typeof EventsEventIdRoute
+  NewslettersNewsletterIdRoute: typeof NewslettersNewsletterIdRoute
   TTeamRoute: typeof TTeamRoute
   TeamsNewRoute: typeof TeamsNewRoute
   UUserRoute: typeof UUserRoute
   AdminIndexRoute: typeof AdminIndexRoute
   EventsIndexRoute: typeof EventsIndexRoute
+  NewslettersIndexRoute: typeof NewslettersIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
   AdminOrganizationsOrgIdRoute: typeof AdminOrganizationsOrgIdRoute
   AdminTeamsTeamIdRoute: typeof AdminTeamsTeamIdRoute
@@ -359,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/newsletters/': {
+      id: '/newsletters/'
+      path: '/newsletters'
+      fullPath: '/newsletters/'
+      preLoaderRoute: typeof NewslettersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/events/': {
       id: '/events/'
       path: '/events'
@@ -392,6 +425,13 @@ declare module '@tanstack/react-router' {
       path: '/t/$team'
       fullPath: '/t/$team'
       preLoaderRoute: typeof TTeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/newsletters/$newsletterId': {
+      id: '/newsletters/$newsletterId'
+      path: '/newsletters/$newsletterId'
+      fullPath: '/newsletters/$newsletterId'
+      preLoaderRoute: typeof NewslettersNewsletterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/$eventId': {
@@ -495,11 +535,13 @@ const rootRouteChildren: RootRouteChildren = {
   AdminApprovalsRoute: AdminApprovalsRoute,
   AdminEventsRoute: AdminEventsRouteWithChildren,
   EventsEventIdRoute: EventsEventIdRoute,
+  NewslettersNewsletterIdRoute: NewslettersNewsletterIdRoute,
   TTeamRoute: TTeamRoute,
   TeamsNewRoute: TeamsNewRoute,
   UUserRoute: UUserRoute,
   AdminIndexRoute: AdminIndexRoute,
   EventsIndexRoute: EventsIndexRoute,
+  NewslettersIndexRoute: NewslettersIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
   AdminOrganizationsOrgIdRoute: AdminOrganizationsOrgIdRoute,
   AdminTeamsTeamIdRoute: AdminTeamsTeamIdRoute,

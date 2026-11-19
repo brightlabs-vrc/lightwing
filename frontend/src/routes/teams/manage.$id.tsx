@@ -35,6 +35,8 @@ import { RaceMemberCombobox } from '../../components/RaceDetailPane'
 import { Pagination } from '../../components/Pagination'
 import { UserLink } from '../../components/UserLink'
 import { MarkdownView } from '../../components/MarkdownView'
+import { MarkdownEditor } from '../../components/MarkdownEditor'
+import { OrgNewslettersTab } from '../../components/OrgNewslettersTab'
 import type { teammanager, eventmanager } from '../../lib/client'
 import {
   PixelContainer,
@@ -45,7 +47,6 @@ import {
   PixelSectionHeader,
   PixelAlert,
   PixelInput,
-  PixelTextarea,
   PixelModal,
   PixelTable,
   PixelSpinner,
@@ -67,7 +68,7 @@ export const Route = createFileRoute('/teams/manage/$id')({
   component: ManageOrgPage,
 })
 
-type TabType = 'overview' | 'events' | 'approvals'
+type TabType = 'overview' | 'events' | 'approvals' | 'newsletters'
 
 function ManageOrgPage() {
   const { id: teamId } = Route.useParams()
@@ -671,6 +672,17 @@ function ManageOrgPage() {
                     >
                       TEAM APPROVALS {applications.length > 0 ? `(${applications.length})` : ''}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('newsletters')}
+                      className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                        activeTab === 'newsletters'
+                          ? 'border-retro-primary text-retro-primary bg-retro-bg'
+                          : 'border-transparent text-retro-muted hover:text-retro-text'
+                      }`}
+                    >
+                      NEWSLETTERS
+                    </button>
                   </>
                 )}
               </div>
@@ -1159,6 +1171,11 @@ function ManageOrgPage() {
                   </PixelStack>
                 </PixelCard>
               )}
+
+              {/* TAB 4: NEWSLETTERS */}
+              {activeTab === 'newsletters' && isOrg && (
+                <OrgNewslettersTab organizationId={team.id} organization={team} />
+              )}
             </>
           ) : null}
 
@@ -1192,11 +1209,12 @@ function ManageOrgPage() {
                   onChange={(e) => setTeamLogo(e.target.value)}
                 />
 
-                <PixelTextarea
+                <MarkdownEditor
                   label="DESCRIPTION (MARKDOWN SUPPORTED)"
                   value={teamDescription}
-                  onChange={(e) => setTeamDescription(e.target.value)}
-                  rows={4}
+                  onChange={setTeamDescription}
+                  minHeight="180px"
+                  defaultMode="write"
                 />
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
@@ -1270,11 +1288,12 @@ function ManageOrgPage() {
                   onChange={(e) => setEventName(e.target.value)}
                 />
 
-                <PixelTextarea
+                <MarkdownEditor
                   label="DESCRIPTION"
                   value={eventDescription}
-                  onChange={(e) => setEventDescription(e.target.value)}
-                  rows={3}
+                  onChange={setEventDescription}
+                  minHeight="180px"
+                  defaultMode="write"
                 />
 
                 <div>
@@ -2442,11 +2461,12 @@ function OrgEventDetailView({
           <form onSubmit={onSaveEditDetails} className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
             <PixelInput label="EVENT NAME" required value={editName} onChange={(e) => setEditName(e.target.value)} />
 
-            <PixelTextarea
+            <MarkdownEditor
               label="DESCRIPTION"
               value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-              rows={3}
+              onChange={setEditDescription}
+              minHeight="180px"
+              defaultMode="write"
             />
 
             <div>
