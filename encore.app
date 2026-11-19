@@ -13,8 +13,8 @@
             "https://lightwing.urs.deno.net",
             "https://lightwing-canary.urs.deno.net",
             "https://*.urs.deno.net",
-            "https://lightwing.pages.dev",
-            "https://*.lightwing.pages.dev",
+            "https://lightwing.vignette.workers.dev",
+            "https://*.vignette.pages.dev",
             "https://comp.cosyne.jp.eu.org",
             "https://comp-canary.cosyne.jp.eu.org"
         ],
