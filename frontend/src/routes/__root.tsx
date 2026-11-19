@@ -1,10 +1,27 @@
-import React, { Suspense } from 'react'
-import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { PixelContainer, PixelStack, PixelButton, PixelBadge } from '@pxlkit/ui-kit'
+import React, { Suspense, useState } from 'react'
+import {
+  createRootRoute,
+  HeadContent,
+  Link,
+  Outlet,
+  Scripts,
+  useRouterState,
+} from '@tanstack/react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  PixelContainer,
+  PixelStack,
+  PixelButton,
+  PixelBadge,
+  PxlKitSurfaceProvider,
+  PxlKitToastProvider,
+} from '@pxlkit/ui-kit'
 import { PxlKitIcon } from '@pxlkit/core'
 import { Trophy } from '@pxlkit/gamification'
-import { useAuth } from '../hooks/useAuth'
+import { AuthProvider, useAuth } from '../hooks/useAuth'
 import { UserHeaderDropdown } from '../components/UserHeaderDropdown'
+import { buildSeoMeta } from '../lib/seo'
+import appCss from '../styles.css?url'
 
 const TanStackRouterDevtools =
   import.meta.env.PROD
@@ -16,8 +33,45 @@ const TanStackRouterDevtools =
       )
 
 export const Route = createRootRoute({
+  ssr: 'data-only',
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1.0' },
+      ...buildSeoMeta({
+        description: 'UmaKeiba - Competitive VR Racing Platform',
+      }),
+    ],
+    links: [
+      { rel: 'icon', type: 'image/png', href: '/favicon.png' },
+      { rel: 'stylesheet', href: appCss },
+    ],
+  }),
+  shellComponent: RootDocument,
   component: RootLayout,
 })
+
+function RootDocument({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(() => new QueryClient())
+
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <QueryClientProvider client={queryClient}>
+          <PxlKitSurfaceProvider surface="pixel">
+            <PxlKitToastProvider>
+              <AuthProvider>{children}</AuthProvider>
+            </PxlKitToastProvider>
+          </PxlKitSurfaceProvider>
+        </QueryClientProvider>
+        <Scripts />
+      </body>
+    </html>
+  )
+}
 
 function RootLayout() {
   const { session, loading, signOutUser } = useAuth()

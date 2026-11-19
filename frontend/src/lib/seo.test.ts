@@ -4,6 +4,7 @@ import {
   formatPageTitle,
   cleanDescription,
   updateHeadMetadata,
+  buildSeoMeta,
   SITE_NAME,
 } from './seo'
 
@@ -89,6 +90,69 @@ describe('seo utility functions', () => {
 
       const twitterTitle = document.querySelector('meta[name="twitter:title"]')
       expect(twitterTitle?.getAttribute('content')).toBe('SpecialWeek | UmaKeiba')
+    })
+  })
+
+  describe('buildSeoMeta', () => {
+    it('builds SSR meta descriptors with formatted title, cleaned description, and custom image', () => {
+      const meta = buildSeoMeta({
+        title: 'Spring Grand Prix',
+        description: '# Welcome\nJoin the **Spring Grand Prix**!',
+        image: 'https://example.com/banner.png',
+        type: 'article',
+        url: 'https://umakeiba.example.com/events/evt_1',
+      })
+
+      expect(meta).toContainEqual({ title: 'Spring Grand Prix | UmaKeiba' })
+      expect(meta).toContainEqual({
+        name: 'description',
+        content: 'Welcome Join the Spring Grand Prix!',
+      })
+      expect(meta).toContainEqual({
+        property: 'og:site_name',
+        content: SITE_NAME,
+      })
+      expect(meta).toContainEqual({
+        property: 'og:title',
+        content: 'Spring Grand Prix | UmaKeiba',
+      })
+      expect(meta).toContainEqual({
+        property: 'og:description',
+        content: 'Welcome Join the Spring Grand Prix!',
+      })
+      expect(meta).toContainEqual({
+        property: 'og:type',
+        content: 'article',
+      })
+      expect(meta).toContainEqual({
+        property: 'og:url',
+        content: 'https://umakeiba.example.com/events/evt_1',
+      })
+      expect(meta).toContainEqual({
+        property: 'og:image',
+        content: 'https://example.com/banner.png',
+      })
+      expect(meta).toContainEqual({
+        name: 'twitter:card',
+        content: 'summary_large_image',
+      })
+      expect(meta).toContainEqual({
+        name: 'twitter:image',
+        content: 'https://example.com/banner.png',
+      })
+    })
+
+    it('falls back to default description, /favicon.png, and summary twitter card when omitted', () => {
+      const meta = buildSeoMeta({})
+      expect(meta).toContainEqual({ title: 'UmaKeiba' })
+      expect(meta).toContainEqual({
+        property: 'og:image',
+        content: '/favicon.png',
+      })
+      expect(meta).toContainEqual({
+        name: 'twitter:card',
+        content: 'summary',
+      })
     })
   })
 })

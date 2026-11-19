@@ -1,5 +1,6 @@
 import { useAuth } from '../../hooks/useAuth'
 import { usePageHead } from '../../hooks/usePageHead'
+import { buildSeoMeta } from '../../lib/seo'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
@@ -60,6 +61,13 @@ const TAG_TONE: Record<EventTag, 'purple' | 'cyan'> = {
 }
 
 export const Route = createFileRoute('/events/')({
+  ssr: 'data-only',
+  head: () => ({
+    meta: buildSeoMeta({
+      title: 'Competitive Events',
+      description: 'Explore competitive racing events on UmaKeiba.',
+    }),
+  }),
   component: EventsPage,
 })
 

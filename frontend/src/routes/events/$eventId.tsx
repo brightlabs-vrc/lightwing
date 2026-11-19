@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { usePageHead } from '../../hooks/usePageHead'
+import { buildSeoMeta } from '../../lib/seo'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
 import { formatLocalDateTime } from '../../lib/datetime'
@@ -63,17 +64,41 @@ const TAG_TONE: Record<EventTag, 'purple' | 'cyan'> = {
 }
 
 export const Route = createFileRoute('/events/$eventId')({
+  ssr: 'data-only',
+  loader: async ({ params }) => {
+    try {
+      const event = await getPublicEvent(params.eventId)
+      return { event }
+    } catch {
+      return { event: null }
+    }
+  },
+  head: ({ loaderData }) => {
+    const event = loaderData?.event
+    return {
+      meta: buildSeoMeta({
+        title: event ? event.name : 'Event',
+        description:
+          event?.description ||
+          (event ? `Event details for ${event.name} on UmaKeiba.` : undefined),
+        image: event?.bannerUrl || undefined,
+        type: 'website',
+      }),
+    }
+  },
   component: EventDetailPage,
 })
 
 function EventDetailPage() {
   const { eventId } = Route.useParams()
+  const loaderData = Route.useLoaderData()
   const queryClient = useQueryClient()
   const { session } = useAuth()
 
   const { data: event, isLoading, error } = useQuery({
     queryKey: ['public-event', eventId],
     queryFn: () => getPublicEvent(eventId),
+    initialData: loaderData?.event ?? undefined,
   })
 
   usePageHead({

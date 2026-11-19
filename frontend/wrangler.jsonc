@@ -1,11 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lightwing",
+  "main": "@tanstack/react-start/server-entry",
   "compatibility_date": "2026-01-01",
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  },
+  "compatibility_flags": ["nodejs_compat"],
   // thank you cloudflare for making everything so fucking complicated
   "previews": {}
 }

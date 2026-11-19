@@ -17,8 +17,16 @@ import {
 } from '../lib/public-api'
 import { Pagination } from '../components/Pagination'
 import { usePageHead } from '../hooks/usePageHead'
+import { buildSeoMeta } from '../lib/seo'
 
 export const Route = createFileRoute('/leaderboard')({
+  ssr: 'data-only',
+  head: () => ({
+    meta: buildSeoMeta({
+      title: 'Leaderboard',
+      description: 'Global participant standings and ranking leaderboard on UmaKeiba.',
+    }),
+  }),
   component: LeaderboardPage,
 })
 

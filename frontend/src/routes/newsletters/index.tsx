@@ -12,11 +12,19 @@ import {
 } from '@pxlkit/ui-kit'
 import { listPublicNewsletters } from '../../lib/public-api'
 import { usePageHead } from '../../hooks/usePageHead'
+import { buildSeoMeta } from '../../lib/seo'
 import { formatLocalDateTime } from '../../lib/datetime'
 import { Pagination } from '../../components/Pagination'
 import { PixelSkeletonList } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/newsletters/')({
+  ssr: 'data-only',
+  head: () => ({
+    meta: buildSeoMeta({
+      title: 'Community Newsletters',
+      description: 'Read announcements, updates, and dispatches from organizations on UmaKeiba.',
+    }),
+  }),
   component: NewslettersFeedPage,
 })
 

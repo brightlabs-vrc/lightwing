@@ -8,20 +8,68 @@ import {
 } from '@pxlkit/ui-kit'
 import { getPublicTeamProfile } from '../../lib/public-api'
 import type { teammanager } from '../../lib/client'
+import { buildSeoMeta } from '../../lib/seo'
 import { TeamProfileView } from '../../components/TeamProfileView'
 
 export const Route = createFileRoute('/t/$team')({
+  ssr: 'data-only',
+  loader: async ({ params }) => {
+    try {
+      const teamProfile = await getPublicTeamProfile(params.team)
+      return { teamProfile }
+    } catch {
+      return { teamProfile: null }
+    }
+  },
+  head: ({ loaderData, params }) => {
+    const team = loaderData?.teamProfile
+    if (team) {
+      const isOrg =
+        team.isOrganization ??
+        (!team.primaryOrganizationId || team.primaryOrganizationId === team.id)
+      return {
+        meta: buildSeoMeta({
+          title: team.name,
+          description:
+            team.description ||
+            `${isOrg ? 'Organization' : 'Team'} profile for ${team.name} on UmaKeiba.`,
+          image: team.logo || undefined,
+          type: 'website',
+        }),
+      }
+    }
+    return {
+      meta: buildSeoMeta({
+        title: `@${params.team}`,
+        description: `No team profile found for "@${params.team}".`,
+      }),
+    }
+  },
   component: TeamProfilePage,
 })
 
 export function TeamProfilePage() {
   const { team: teamOrSlug } = useParams({ from: '/t/$team' })
+  const loaderData = Route.useLoaderData()
 
-  const [loading, setLoading] = useState(true)
-  const [teamProfile, setTeamProfile] = useState<teammanager.Team | null>(null)
+  const [loading, setLoading] = useState(!loaderData?.teamProfile)
+  const [teamProfile, setTeamProfile] = useState<teammanager.Team | null>(
+    loaderData?.teamProfile ?? null
+  )
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (
+      loaderData?.teamProfile &&
+      (loaderData.teamProfile.slug === teamOrSlug ||
+        loaderData.teamProfile.id === teamOrSlug)
+    ) {
+      setTeamProfile(loaderData.teamProfile)
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     let active = true
 
     async function loadTeam() {
@@ -48,7 +96,7 @@ export function TeamProfilePage() {
     return () => {
       active = false
     }
-  }, [teamOrSlug])
+  }, [teamOrSlug, loaderData])
 
   if (loading) {
     return (

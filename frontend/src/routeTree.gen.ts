@@ -9,44 +9,34 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as LeaderboardRouteImport } from './routes/leaderboard'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as UserRouteImport } from './routes/$user'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ProfileIndexRouteImport } from './routes/profile/index'
-import { Route as NewslettersIndexRouteImport } from './routes/newsletters/index'
-import { Route as EventsIndexRouteImport } from './routes/events/index'
+import { Route as UserRouteImport } from './routes/$user'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as UUserRouteImport } from './routes/u/$user'
-import { Route as TeamsNewRouteImport } from './routes/teams/new'
-import { Route as TTeamRouteImport } from './routes/t/$team'
-import { Route as NewslettersNewsletterIdRouteImport } from './routes/newsletters/$newsletterId'
-import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
-import { Route as AdminEventsRouteImport } from './routes/admin/events'
 import { Route as AdminApprovalsRouteImport } from './routes/admin/approvals'
-import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
-import { Route as AdminTeamsIndexRouteImport } from './routes/admin/teams/index'
-import { Route as AdminOrganizationsIndexRouteImport } from './routes/admin/organizations/index'
-import { Route as TeamsManageIdRouteImport } from './routes/teams/manage.$id'
-import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
-import { Route as AdminTeamsTeamIdRouteImport } from './routes/admin/teams/$teamId'
-import { Route as AdminOrganizationsOrgIdRouteImport } from './routes/admin/organizations/$orgId'
+import { Route as AdminEventsRouteImport } from './routes/admin/events'
+import { Route as EventsIndexRouteImport } from './routes/events/index'
+import { Route as EventsEventIdRouteImport } from './routes/events/$eventId'
+import { Route as NewslettersIndexRouteImport } from './routes/newsletters/index'
+import { Route as NewslettersNewsletterIdRouteImport } from './routes/newsletters/$newsletterId'
+import { Route as ProfileIndexRouteImport } from './routes/profile/index'
+import { Route as TTeamRouteImport } from './routes/t/$team'
+import { Route as TeamsNewRouteImport } from './routes/teams/new'
+import { Route as UUserRouteImport } from './routes/u/$user'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events/$eventId'
+import { Route as AdminOrganizationsIndexRouteImport } from './routes/admin/organizations/index'
+import { Route as AdminOrganizationsOrgIdRouteImport } from './routes/admin/organizations/$orgId'
+import { Route as AdminTeamsIndexRouteImport } from './routes/admin/teams/index'
+import { Route as AdminTeamsTeamIdRouteImport } from './routes/admin/teams/$teamId'
+import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
+import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
+import { Route as TeamsManageIdRouteImport } from './routes/teams/manage.$id'
 
-const OnboardingRoute = OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LeaderboardRoute = LeaderboardRouteImport.update({
-  id: '/leaderboard',
-  path: '/leaderboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserRoute = UserRouteImport.update({
@@ -54,24 +44,19 @@ const UserRoute = UserRouteImport.update({
   path: '/$user',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProfileIndexRoute = ProfileIndexRouteImport.update({
-  id: '/profile/',
-  path: '/profile/',
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const NewslettersIndexRoute = NewslettersIndexRouteImport.update({
-  id: '/newsletters/',
-  path: '/newsletters/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EventsIndexRoute = EventsIndexRouteImport.update({
-  id: '/events/',
-  path: '/events/',
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -79,29 +64,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UUserRoute = UUserRouteImport.update({
-  id: '/u/$user',
-  path: '/u/$user',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TeamsNewRoute = TeamsNewRouteImport.update({
-  id: '/teams/new',
-  path: '/teams/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TTeamRoute = TTeamRouteImport.update({
-  id: '/t/$team',
-  path: '/t/$team',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewslettersNewsletterIdRoute = NewslettersNewsletterIdRouteImport.update({
-  id: '/newsletters/$newsletterId',
-  path: '/newsletters/$newsletterId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EventsEventIdRoute = EventsEventIdRouteImport.update({
-  id: '/events/$eventId',
-  path: '/events/$eventId',
+const AdminApprovalsRoute = AdminApprovalsRouteImport.update({
+  id: '/admin/approvals',
+  path: '/admin/approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminEventsRoute = AdminEventsRouteImport.update({
@@ -109,39 +74,54 @@ const AdminEventsRoute = AdminEventsRouteImport.update({
   path: '/admin/events',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminApprovalsRoute = AdminApprovalsRouteImport.update({
-  id: '/admin/approvals',
-  path: '/admin/approvals',
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
-  id: '/admin/users/',
-  path: '/admin/users/',
+const EventsEventIdRoute = EventsEventIdRouteImport.update({
+  id: '/events/$eventId',
+  path: '/events/$eventId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminTeamsIndexRoute = AdminTeamsIndexRouteImport.update({
-  id: '/admin/teams/',
-  path: '/admin/teams/',
+const NewslettersIndexRoute = NewslettersIndexRouteImport.update({
+  id: '/newsletters/',
+  path: '/newsletters/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const NewslettersNewsletterIdRoute = NewslettersNewsletterIdRouteImport.update({
+  id: '/newsletters/$newsletterId',
+  path: '/newsletters/$newsletterId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileIndexRoute = ProfileIndexRouteImport.update({
+  id: '/profile/',
+  path: '/profile/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TTeamRoute = TTeamRouteImport.update({
+  id: '/t/$team',
+  path: '/t/$team',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsNewRoute = TeamsNewRouteImport.update({
+  id: '/teams/new',
+  path: '/teams/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UUserRoute = UUserRouteImport.update({
+  id: '/u/$user',
+  path: '/u/$user',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
+  id: '/$eventId',
+  path: '/$eventId',
+  getParentRoute: () => AdminEventsRoute,
 } as any)
 const AdminOrganizationsIndexRoute = AdminOrganizationsIndexRouteImport.update({
   id: '/admin/organizations/',
   path: '/admin/organizations/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TeamsManageIdRoute = TeamsManageIdRouteImport.update({
-  id: '/teams/manage/$id',
-  path: '/teams/manage/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
-  id: '/admin/users/$userId',
-  path: '/admin/users/$userId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminTeamsTeamIdRoute = AdminTeamsTeamIdRouteImport.update({
-  id: '/admin/teams/$teamId',
-  path: '/admin/teams/$teamId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminOrganizationsOrgIdRoute = AdminOrganizationsOrgIdRouteImport.update({
@@ -149,10 +129,30 @@ const AdminOrganizationsOrgIdRoute = AdminOrganizationsOrgIdRouteImport.update({
   path: '/admin/organizations/$orgId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
-  id: '/$eventId',
-  path: '/$eventId',
-  getParentRoute: () => AdminEventsRoute,
+const AdminTeamsIndexRoute = AdminTeamsIndexRouteImport.update({
+  id: '/admin/teams/',
+  path: '/admin/teams/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminTeamsTeamIdRoute = AdminTeamsTeamIdRouteImport.update({
+  id: '/admin/teams/$teamId',
+  path: '/admin/teams/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
+  id: '/admin/users/',
+  path: '/admin/users/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
+  id: '/admin/users/$userId',
+  path: '/admin/users/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsManageIdRoute = TeamsManageIdRouteImport.update({
+  id: '/teams/manage/$id',
+  path: '/teams/manage/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -343,25 +343,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/leaderboard': {
-      id: '/leaderboard'
-      path: '/leaderboard'
-      fullPath: '/leaderboard'
-      preLoaderRoute: typeof LeaderboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$user': {
@@ -371,32 +357,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/profile/': {
-      id: '/profile/'
-      path: '/profile'
-      fullPath: '/profile/'
-      preLoaderRoute: typeof ProfileIndexRouteImport
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/newsletters/': {
-      id: '/newsletters/'
-      path: '/newsletters'
-      fullPath: '/newsletters/'
-      preLoaderRoute: typeof NewslettersIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/events/': {
-      id: '/events/'
-      path: '/events'
-      fullPath: '/events/'
-      preLoaderRoute: typeof EventsIndexRouteImport
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -406,39 +385,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/u/$user': {
-      id: '/u/$user'
-      path: '/u/$user'
-      fullPath: '/u/$user'
-      preLoaderRoute: typeof UUserRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/teams/new': {
-      id: '/teams/new'
-      path: '/teams/new'
-      fullPath: '/teams/new'
-      preLoaderRoute: typeof TeamsNewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/t/$team': {
-      id: '/t/$team'
-      path: '/t/$team'
-      fullPath: '/t/$team'
-      preLoaderRoute: typeof TTeamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/newsletters/$newsletterId': {
-      id: '/newsletters/$newsletterId'
-      path: '/newsletters/$newsletterId'
-      fullPath: '/newsletters/$newsletterId'
-      preLoaderRoute: typeof NewslettersNewsletterIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/events/$eventId': {
-      id: '/events/$eventId'
-      path: '/events/$eventId'
-      fullPath: '/events/$eventId'
-      preLoaderRoute: typeof EventsEventIdRouteImport
+    '/admin/approvals': {
+      id: '/admin/approvals'
+      path: '/admin/approvals'
+      fullPath: '/admin/approvals'
+      preLoaderRoute: typeof AdminApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/events': {
@@ -448,53 +399,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/approvals': {
-      id: '/admin/approvals'
-      path: '/admin/approvals'
-      fullPath: '/admin/approvals'
-      preLoaderRoute: typeof AdminApprovalsRouteImport
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/users/': {
-      id: '/admin/users/'
-      path: '/admin/users'
-      fullPath: '/admin/users/'
-      preLoaderRoute: typeof AdminUsersIndexRouteImport
+    '/events/$eventId': {
+      id: '/events/$eventId'
+      path: '/events/$eventId'
+      fullPath: '/events/$eventId'
+      preLoaderRoute: typeof EventsEventIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/teams/': {
-      id: '/admin/teams/'
-      path: '/admin/teams'
-      fullPath: '/admin/teams/'
-      preLoaderRoute: typeof AdminTeamsIndexRouteImport
+    '/newsletters/': {
+      id: '/newsletters/'
+      path: '/newsletters'
+      fullPath: '/newsletters/'
+      preLoaderRoute: typeof NewslettersIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/newsletters/$newsletterId': {
+      id: '/newsletters/$newsletterId'
+      path: '/newsletters/$newsletterId'
+      fullPath: '/newsletters/$newsletterId'
+      preLoaderRoute: typeof NewslettersNewsletterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/': {
+      id: '/profile/'
+      path: '/profile'
+      fullPath: '/profile/'
+      preLoaderRoute: typeof ProfileIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$team': {
+      id: '/t/$team'
+      path: '/t/$team'
+      fullPath: '/t/$team'
+      preLoaderRoute: typeof TTeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/new': {
+      id: '/teams/new'
+      path: '/teams/new'
+      fullPath: '/teams/new'
+      preLoaderRoute: typeof TeamsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$user': {
+      id: '/u/$user'
+      path: '/u/$user'
+      fullPath: '/u/$user'
+      preLoaderRoute: typeof UUserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/events/$eventId': {
+      id: '/admin/events/$eventId'
+      path: '/$eventId'
+      fullPath: '/admin/events/$eventId'
+      preLoaderRoute: typeof AdminEventsEventIdRouteImport
+      parentRoute: typeof AdminEventsRoute
     }
     '/admin/organizations/': {
       id: '/admin/organizations/'
       path: '/admin/organizations'
       fullPath: '/admin/organizations/'
       preLoaderRoute: typeof AdminOrganizationsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/teams/manage/$id': {
-      id: '/teams/manage/$id'
-      path: '/teams/manage/$id'
-      fullPath: '/teams/manage/$id'
-      preLoaderRoute: typeof TeamsManageIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/users/$userId': {
-      id: '/admin/users/$userId'
-      path: '/admin/users/$userId'
-      fullPath: '/admin/users/$userId'
-      preLoaderRoute: typeof AdminUsersUserIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/teams/$teamId': {
-      id: '/admin/teams/$teamId'
-      path: '/admin/teams/$teamId'
-      fullPath: '/admin/teams/$teamId'
-      preLoaderRoute: typeof AdminTeamsTeamIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/organizations/$orgId': {
@@ -504,12 +476,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrganizationsOrgIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/events/$eventId': {
-      id: '/admin/events/$eventId'
-      path: '/$eventId'
-      fullPath: '/admin/events/$eventId'
-      preLoaderRoute: typeof AdminEventsEventIdRouteImport
-      parentRoute: typeof AdminEventsRoute
+    '/admin/teams/': {
+      id: '/admin/teams/'
+      path: '/admin/teams'
+      fullPath: '/admin/teams/'
+      preLoaderRoute: typeof AdminTeamsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/teams/$teamId': {
+      id: '/admin/teams/$teamId'
+      path: '/admin/teams/$teamId'
+      fullPath: '/admin/teams/$teamId'
+      preLoaderRoute: typeof AdminTeamsTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users/': {
+      id: '/admin/users/'
+      path: '/admin/users'
+      fullPath: '/admin/users/'
+      preLoaderRoute: typeof AdminUsersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users/$userId': {
+      id: '/admin/users/$userId'
+      path: '/admin/users/$userId'
+      fullPath: '/admin/users/$userId'
+      preLoaderRoute: typeof AdminUsersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/manage/$id': {
+      id: '/teams/manage/$id'
+      path: '/teams/manage/$id'
+      fullPath: '/teams/manage/$id'
+      preLoaderRoute: typeof TeamsManageIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -554,3 +554,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
