@@ -313,7 +313,7 @@ func Test_JoinRejectedOnClassTierMismatch(t *testing.T) {
 	adminID := f.createUser("org-admin", "Org Admin", nil, "USER")
 	userID := f.createUser("participant-low", "Low Tier Participant", nil, "USER")
 	orgID := f.createOrg("Apex League")
-	f.addOrgMember(orgID, adminID, "admin")
+	f.addOrgMember(orgID, adminID, "administrator")
 	eventID := f.createOrgEventDirect(orgID, "Elite G3 Championship", "OFFICIAL", strptr("G3"))
 
 	// Assign user G1 in this org via SetUserClassCore
@@ -339,8 +339,8 @@ func Test_OrgScopedClassTierIsolation(t *testing.T) {
 
 	orgA := f.createOrg("League Alpha")
 	orgB := f.createOrg("League Beta")
-	f.addOrgMember(orgA, adminA, "admin")
-	f.addOrgMember(orgB, adminB, "owner")
+	f.addOrgMember(orgA, adminA, "administrator")
+	f.addOrgMember(orgB, adminB, "eventAdmin")
 
 	eventA := f.createOrgEventDirect(orgA, "Alpha G3 Cup", "OFFICIAL", strptr("G3"))
 	eventB := f.createOrgEventDirect(orgB, "Beta G3 Cup", "OFFICIAL", strptr("G3"))
