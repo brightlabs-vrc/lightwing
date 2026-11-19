@@ -297,9 +297,9 @@ func (f *fixtures) createOrgEventDirect(orgID, name, status string, restriction 
 		tag = "COMMUNITY"
 	}
 	_, err := db.Exec(f.ctx,
-		`INSERT INTO "event" (id, name, "ownerType", "ownerOrganizationId", status, tag, "scoringType",
+		`INSERT INTO "event" (id, name, "ownerType", "organizationId", status, tag, "scoringType",
 		  "classRestriction", "granularParticipation", "createdAt", "updatedAt")
-		 VALUES ($1, $2, 'ORG', $3, $4, $5, 1, $6, false, $7, $7)`,
+		 VALUES ($1, $2, 'ORGANIZATION', $3, $4, $5, 1, $6, false, $7, $7)`,
 		id, name, orgID, st, tag, r, now)
 	if err != nil {
 		f.tb.Fatalf("insert org event: %v", err)

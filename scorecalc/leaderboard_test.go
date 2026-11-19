@@ -62,8 +62,8 @@ func TestLeaderboard(t *testing.T) {
 	r1 := "lb-race1-" + scoreSeq()
 
 	_, err = db.Exec(ctx,
-		`INSERT INTO "event" (id, name, "ownerType", "ownerOrganizationId", "scoringType", status, "scheduledAt", "createdAt", "updatedAt")
-		 VALUES ($1, 'Leaderboard Event 1', 'ORG', $2, 1, 'CONCLUDED', $3, $3, $3)`,
+		`INSERT INTO "event" (id, name, "ownerType", "organizationId", "scoringType", status, "scheduledAt", "createdAt", "updatedAt")
+		 VALUES ($1, 'Leaderboard Event 1', 'ORGANIZATION', $2, 1, 'CONCLUDED', $3, $3, $3)`,
 		e1, org1, now,
 	)
 	if err != nil {
@@ -107,8 +107,8 @@ func TestLeaderboard(t *testing.T) {
 	ePrev := "lb-evt-prev-" + scoreSeq()
 	rPrev := "lb-race-prev-" + scoreSeq()
 	_, err = db.Exec(ctx,
-		`INSERT INTO "event" (id, name, "ownerType", "ownerOrganizationId", "scoringType", status, "scheduledAt", "createdAt", "updatedAt")
-		 VALUES ($1, 'Prev Year Event', 'ORG', $2, 1, 'CONCLUDED', $3, $3, $3)`,
+		`INSERT INTO "event" (id, name, "ownerType", "organizationId", "scoringType", status, "scheduledAt", "createdAt", "updatedAt")
+		 VALUES ($1, 'Prev Year Event', 'ORGANIZATION', $2, 1, 'CONCLUDED', $3, $3, $3)`,
 		ePrev, org1, prevYearTime,
 	)
 	if err != nil {
@@ -259,8 +259,8 @@ func TestLeaderboard(t *testing.T) {
 		for i := 0; i < 2; i++ {
 			eid := "lb-evt-org2-" + scoreSeq()
 			_, err := db.Exec(ctx,
-				`INSERT INTO "event" (id, name, "ownerType", "ownerOrganizationId", "scoringType", status, "scheduledAt", "createdAt", "updatedAt")
-				 VALUES ($1, 'Org2 Event', 'ORG', $2, 1, 'CONCLUDED', $3, $3, $3)`,
+				`INSERT INTO "event" (id, name, "ownerType", "organizationId", "scoringType", status, "scheduledAt", "createdAt", "updatedAt")
+				 VALUES ($1, 'Org2 Event', 'ORGANIZATION', $2, 1, 'CONCLUDED', $3, $3, $3)`,
 				eid, org2, now,
 			)
 			if err != nil {
