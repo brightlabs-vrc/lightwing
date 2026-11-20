@@ -1,3 +1,4 @@
+import '../../lib/ssr-dom-shim'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
