@@ -116,9 +116,9 @@ export const OrgNewslettersTab: React.FC<OrgNewslettersTabProps> = ({
         await updateNewsletter({
           id: editingNewsletter.id,
           title: trimmedTitle,
-          summary: summary.trim() || null,
+          summary: summary.trim(),
           clearSummary: !summary.trim(),
-          thumbnailUrl: thumbnailUrl.trim() || null,
+          thumbnailUrl: thumbnailUrl.trim(),
           clearThumbnail: !thumbnailUrl.trim(),
           content,
           status: finalStatus,
@@ -131,8 +131,8 @@ export const OrgNewslettersTab: React.FC<OrgNewslettersTabProps> = ({
         await createNewsletter({
           organizationId,
           title: trimmedTitle,
-          summary: summary.trim() || null,
-          thumbnailUrl: thumbnailUrl.trim() || null,
+          summary: summary.trim(),
+          thumbnailUrl: thumbnailUrl.trim(),
           content,
           status: finalStatus,
         })
@@ -153,7 +153,16 @@ export const OrgNewslettersTab: React.FC<OrgNewslettersTabProps> = ({
   const handleQuickToggleStatus = async (nl: teammanager.Newsletter) => {
     const nextStatus = nl.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED'
     try {
-      await updateNewsletter({ id: nl.id, status: nextStatus })
+      await updateNewsletter({
+        id: nl.id,
+        title: nl.title,
+        summary: nl.summary ?? '',
+        clearSummary: false,
+        thumbnailUrl: nl.thumbnailUrl ?? '',
+        clearThumbnail: false,
+        content: nl.content,
+        status: nextStatus,
+      })
       toast({
         tone: 'green',
         title: nextStatus === 'PUBLISHED' ? 'Newsletter published!' : 'Newsletter unpublished to draft.',

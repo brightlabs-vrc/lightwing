@@ -42,9 +42,10 @@ function NewslettersFeedPage() {
     queryKey: ['public-newsletters', search, page, pageSize],
     queryFn: () =>
       listPublicNewsletters({
-        search: search.trim() || undefined,
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
+        OrganizationID: '',
+        Search: search.trim(),
+        Limit: pageSize,
+        Offset: (page - 1) * pageSize,
       }),
   })
 

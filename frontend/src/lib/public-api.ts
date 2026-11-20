@@ -64,15 +64,15 @@ const mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
   [
     'race_mock_001',
     [
-      { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP' },
-      { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3' },
+      { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
+      { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
     ],
   ],
   [
     'race_mock_002',
     [
-      { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP' },
-      { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3' },
+      { userId: 'mock-user-1', name: 'Bolt', classTier: 'OP', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
+      { userId: 'mock-user-2', name: 'Shadow', classTier: 'G3', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
     ],
   ],
 ])
@@ -328,6 +328,10 @@ export async function listPublicEvents(
     scheduledAt: e.scheduledAt,
     participantLimit: e.participantLimit,
     maxConcurrentRaceParticipations: e.maxConcurrentRaceParticipations,
+    isTeamEvent: e.isTeamEvent ?? false,
+    maxPrimaryRosterSize: e.maxPrimaryRosterSize ?? 0,
+    maxBackupRosterSize: e.maxBackupRosterSize ?? 0,
+    teamCount: e.teams?.length ?? 0,
     raceCount: e.raceEvents.length,
     memberCount: e.members.length,
     createdAt: e.createdAt,
@@ -383,10 +387,10 @@ export async function getPublicEvent(eventId: string): Promise<eventmanager.Even
 
 export async function joinEvent(
   eventId: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.JoinEvent({ eventId, Authorization: authorization })
+    return appClient.eventmanager.JoinEvent({ eventId })
   }
 
   mockPublicEvents = loadMockEvents()
@@ -418,7 +422,18 @@ export async function joinEvent(
   if (!isAlreadyMember) {
     mockPublicEvents[eventIndex] = {
       ...event,
-      members: [...event.members, { userId, name: user.vrchatUsername ?? user.name, classTier: userTier }],
+      members: [
+        ...event.members,
+        {
+          userId,
+          name: user.vrchatUsername ?? user.name,
+          classTier: userTier,
+          teamId: '',
+          teamName: '',
+          teamSlug: '',
+          rosterRole: '',
+        },
+      ],
     }
   }
 
@@ -428,10 +443,10 @@ export async function joinEvent(
 
 export async function leaveEvent(
   eventId: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.LeaveEvent({ EventID: eventId, Authorization: authorization })
+    return appClient.eventmanager.LeaveEvent({ EventID: eventId })
   }
 
   mockPublicEvents = loadMockEvents()
@@ -577,10 +592,10 @@ export async function getPublicRaceEvent(
 export async function joinRaceEvent(
   eventId: string,
   raceId: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.JoinRaceEvent({ eventId, raceId, Authorization: authorization })
+    return appClient.eventmanager.JoinRaceEvent({ eventId, raceId })
   }
 
   mockPublicEvents = loadMockEvents()
@@ -608,7 +623,18 @@ export async function joinRaceEvent(
       throw new Error('User is not a member of this event')
     }
     // Auto-enroll user as event member
-    event.members = [...event.members, { userId, name: user.vrchatUsername ?? user.name, classTier: user.classTier }]
+    event.members = [
+      ...event.members,
+      {
+        userId,
+        name: user.vrchatUsername ?? user.name,
+        classTier: user.classTier,
+        teamId: '',
+        teamName: '',
+        teamSlug: '',
+        rosterRole: '',
+      },
+    ]
   }
 
   const targetRestriction = event.raceEvents[raceIndex].classRestriction ?? event.classRestriction
@@ -620,7 +646,18 @@ export async function joinRaceEvent(
 
   let raceMembers = mockRaceMembersMap.get(raceId) ?? []
   if (!raceMembers.some((m) => m.userId === userId)) {
-    raceMembers = [...raceMembers, { userId, name: user.vrchatUsername ?? user.name, classTier: userTier }]
+    raceMembers = [
+      ...raceMembers,
+      {
+        userId,
+        name: user.vrchatUsername ?? user.name,
+        classTier: userTier,
+        teamId: '',
+        teamName: '',
+        teamSlug: '',
+        rosterRole: '',
+      },
+    ]
     mockRaceMembersMap.set(raceId, raceMembers)
   }
 
@@ -638,10 +675,10 @@ export async function joinRaceEvent(
 export async function leaveRaceEvent(
   eventId: string,
   raceId: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.LeaveRaceEvent({ eventId, raceId, Authorization: authorization })
+    return appClient.eventmanager.LeaveRaceEvent({ eventId, raceId })
   }
 
   mockPublicEvents = loadMockEvents()
@@ -709,7 +746,7 @@ export async function getLeaderboard(
       userId: 'mock-user-1',
       name: 'Thunder Bolt',
       slug: 'thunder-bolt',
-      image: null,
+      image: '',
       classTier: 'G1',
       totalPoints: 120,
       averagePosition: 1.2,
@@ -729,7 +766,7 @@ export async function getLeaderboard(
       userId: 'mock-user-2',
       name: 'Shadow Runner',
       slug: 'shadow-runner',
-      image: null,
+      image: '',
       classTier: 'G3',
       totalPoints: 95,
       averagePosition: 2.1,
@@ -749,8 +786,8 @@ export async function getLeaderboard(
       userId: 'mock-admin-1',
       name: 'Mock Admin',
       slug: 'mock-admin',
-      image: null,
-      classTier: null,
+      image: '',
+      classTier: '',
       totalPoints: 40,
       averagePosition: 3.5,
       averagePointsPerSeason: 20.0,
@@ -842,16 +879,28 @@ export async function getPublicTeamProfile(teamOrSlug: string): Promise<teammana
 ### Socials
 - [GitHub](https://github.com)
 - [VRChat](https://vrchat.com)`,
+    status: 'APPROVED',
+    primaryOrganizationId: '',
+    isOrganization: false,
+    organizations: [],
+    teams: [],
     administratorSlotsRemaining: 3,
     stats: {
       rankingAverage: 1.5,
       pointsAverage: 88.5,
       seasonRank: 1,
       averagePointsPerEvent: 95.0,
+      teamEventsParticipated: 0,
+      teamTotalPoints: 0,
+      teamAveragePoints: 0,
+      teamEventRankAverage: 0,
+      seasonRankSource: 'MEMBER_AVERAGE',
+      year: new Date().getUTCFullYear(),
+      availableYears: [new Date().getUTCFullYear()],
     },
     members: [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', role: 'ADMINISTRATOR' },
-      { userId: 'mock-user-2', name: 'Shadow Runner', role: 'MEMBER' },
+      { userId: 'mock-user-1', name: 'Thunder Bolt', slug: 'thunder-bolt', image: '', role: 'ADMINISTRATOR' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', slug: 'shadow-runner', image: '', role: 'MEMBER' },
     ],
   }
 }
@@ -893,12 +942,15 @@ export async function getTeamStats(
   }
   const currentYear = new Date().getUTCFullYear()
   return {
-    rankingAverage: null,
-    pointsAverage: null,
-    seasonRank: null,
-    averagePointsPerEvent: null,
+    rankingAverage: 0,
+    pointsAverage: 0,
+    seasonRank: 0,
+    averagePointsPerEvent: 0,
     teamEventsParticipated: 0,
     teamTotalPoints: 0,
+    teamAveragePoints: 0,
+    teamEventRankAverage: 0,
+    seasonRankSource: 'MEMBER_AVERAGE',
     year: options.allTime ? 0 : (options.year ?? currentYear),
     availableYears: [currentYear],
   }
@@ -925,7 +977,7 @@ export async function getUserRaceRecords(
       position: 1,
       points: 10,
       finishTime: '1:08.5',
-      resultStatus: null,
+      resultStatus: '',
       resultCreatedAt: now,
       ratingBefore: 1612,
       ratingAfter: 1648,
@@ -942,15 +994,15 @@ export async function getUserRaceRecords(
     },
     {
       resultId: 'res_mock_004',
-      position: null,
+      position: 0,
       points: 0,
-      finishTime: null,
+      finishTime: '',
       resultStatus: 'DEFERRED',
       resultCreatedAt: now,
-      ratingBefore: null,
-      ratingAfter: null,
-      ratingDelta: null,
-      rdAfter: null,
+      ratingBefore: 0,
+      ratingAfter: 0,
+      ratingDelta: 0,
+      rdAfter: 0,
       raceId: 'race_mock_002',
       raceName: 'Summer Sprint Dirt',
       raceSequence: 2,
@@ -976,15 +1028,15 @@ const mockPublicNewsletters: teammanager.Newsletter[] = [
     organizationId: 'org_mock_urs',
     organizationName: 'Uma Racing Society',
     organizationSlug: 'urs',
-    organizationLogo: null,
+    organizationLogo: '',
     authorId: 'mock-admin-1',
     authorName: 'Mock Admin',
     authorSlug: 'mock-admin',
-    authorImage: null,
+    authorImage: '',
     title: 'Season 4 Grand Prix Schedule & Rule Updates',
     slug: 'season-4-grand-prix-schedule',
     summary: 'Key dates, track rotations, and class tier adjustments for the upcoming Season 4 Grand Prix.',
-    thumbnailUrl: null,
+    thumbnailUrl: '',
     content: '# Season 4 Grand Prix\n\nWelcome racers! Here is everything you need to know for **Season 4**.\n\n## Key Dates\n- **Qualifiers:** Next Saturday at 20:00 UTC\n- **Finals:** End of month\n\n> Make sure your team rosters are finalized before lock-in!',
     status: 'PUBLISHED',
     publishedAt: now,
@@ -994,18 +1046,24 @@ const mockPublicNewsletters: teammanager.Newsletter[] = [
 ]
 
 export async function listPublicNewsletters(
-  params: teammanager.ListPublicNewslettersRequest = {},
+  params: Partial<teammanager.ListPublicNewslettersRequest> = {},
 ): Promise<teammanager.ListNewslettersResponse> {
+  const req: teammanager.ListPublicNewslettersRequest = {
+    OrganizationID: params.OrganizationID ?? '',
+    Search: params.Search ?? '',
+    Limit: params.Limit ?? 20,
+    Offset: params.Offset ?? 0,
+  }
   if (!MOCK_MODE) {
-    return appClient.teammanager.ListPublicNewsletters(params)
+    return appClient.teammanager.ListPublicNewsletters(req)
   }
 
   let items = mockPublicNewsletters.filter((n) => n.status === 'PUBLISHED')
-  if (params.organizationId) {
-    items = items.filter((n) => n.organizationId === params.organizationId || n.organizationSlug === params.organizationId)
+  if (req.OrganizationID) {
+    items = items.filter((n) => n.organizationId === req.OrganizationID || n.organizationSlug === req.OrganizationID)
   }
-  if (params.search && params.search.trim()) {
-    const q = params.search.trim().toLowerCase()
+  if (req.Search && req.Search.trim()) {
+    const q = req.Search.trim().toLowerCase()
     items = items.filter(
       (n) =>
         n.title.toLowerCase().includes(q) ||
@@ -1013,8 +1071,8 @@ export async function listPublicNewsletters(
         n.organizationName.toLowerCase().includes(q),
     )
   }
-  const offset = params.offset ?? 0
-  const limit = params.limit ?? 20
+  const offset = req.Offset ?? 0
+  const limit = req.Limit ?? 20
   return {
     newsletters: items.slice(offset, offset + limit),
     total: items.length,
@@ -1053,7 +1111,7 @@ const mockPublicTeams: teammanager.TeamListItem[] = [
     id: 'team_mock_001',
     name: 'Team Spica',
     slug: 'team-spica',
-    logo: null,
+    logo: '',
     description: 'High-speed turf specialists competing in the G1 Mile and Sprint circuits.',
     status: 'APPROVED',
     primaryOrganizationId: 'org_mock_urs',
@@ -1065,7 +1123,7 @@ const mockPublicTeams: teammanager.TeamListItem[] = [
     id: 'team_mock_002',
     name: 'Team Rigil',
     slug: 'team-rigil',
-    logo: null,
+    logo: '',
     description: 'Veteran endurance and dirt-track squad.',
     status: 'APPROVED',
     primaryOrganizationId: 'org_mock_urs',

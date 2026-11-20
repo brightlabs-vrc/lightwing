@@ -64,7 +64,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
     if (!isOrg) return
     let active = true
     setLoadingNewsletters(true)
-    listPublicNewsletters({ organizationId: team.id, limit: 5, offset: 0 })
+    listPublicNewsletters({ OrganizationID: team.id, Search: '', Limit: 5, Offset: 0 })
       .then((res) => {
         if (active) setOrgNewsletters(res.newsletters)
       })

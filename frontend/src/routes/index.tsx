@@ -106,8 +106,10 @@ function HomePage() {
     queryKey: ['home-public-newsletters', newsPage],
     queryFn: () =>
       listPublicNewsletters({
-        limit: NEWS_PAGE_SIZE,
-        offset: (newsPage - 1) * NEWS_PAGE_SIZE,
+        OrganizationID: '',
+        Search: '',
+        Limit: NEWS_PAGE_SIZE,
+        Offset: (newsPage - 1) * NEWS_PAGE_SIZE,
       }),
   })
 

@@ -7,9 +7,9 @@ const now = new Date().toISOString()
 
 // Rich initial mock members
 const mockEventMembers: eventmanager.EventMemberView[] = [
-  { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-  { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
-  { userId: 'mock-user-3', name: 'Swift Galloper', classTier: 'G1' },
+  { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
+  { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
+  { userId: 'mock-user-3', name: 'Swift Galloper', classTier: 'G1', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
 ]
 
 // Rich initial mock race events
@@ -125,8 +125,8 @@ let mockRaceMembersMap = new Map<string, eventmanager.RaceEventMemberView[]>([
   [
     'race_mock_102',
     [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP' },
-      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3' },
+      { userId: 'mock-user-1', name: 'Thunder Bolt', classTier: 'OP', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', classTier: 'G3', teamId: '', teamName: '', teamSlug: '', rosterRole: '' },
     ],
   ],
 ])
@@ -353,24 +353,32 @@ export async function listAdminEvents(
     })
   }
 
-  let events = mockEvents.map((e) => ({
+  let events: eventmanager.EventListItem[] = mockEvents.map((e) => ({
     id: e.id,
     name: e.name,
-    description: e.description,
+    description: e.description ?? '',
+    bannerUrl: e.bannerUrl ?? '',
     ownerType: e.ownerType,
-    organizationId: e.organizationId,
-    ownerUserId: e.ownerUserId,
+    organizationId: e.organizationId ?? '',
+    ownerUserId: e.ownerUserId ?? '',
+    ownerName: e.ownerName ?? '',
+    ownerSlug: e.ownerSlug ?? '',
+    ownerLogo: e.ownerLogo ?? '',
     status: e.status,
     tag: e.tag ?? 'OFFICIAL',
-    deletedAt: e.deletedAt ?? null,
+    deletedAt: e.deletedAt ?? '',
     scoringType: e.scoringType,
     scoringTypeLabel: e.scoringTypeLabel,
-    classRestriction: e.classRestriction,
+    classRestriction: e.classRestriction ?? '',
     granularParticipation: e.granularParticipation,
     signupsLocked: e.signupsLocked,
-    scheduledAt: e.scheduledAt,
-    participantLimit: e.participantLimit,
-    maxConcurrentRaceParticipations: e.maxConcurrentRaceParticipations,
+    scheduledAt: e.scheduledAt ?? '',
+    participantLimit: e.participantLimit ?? 0,
+    maxConcurrentRaceParticipations: e.maxConcurrentRaceParticipations ?? 0,
+    isTeamEvent: e.isTeamEvent ?? false,
+    maxPrimaryRosterSize: e.maxPrimaryRosterSize ?? 0,
+    maxBackupRosterSize: e.maxBackupRosterSize ?? 0,
+    teamCount: e.teams?.length ?? 0,
     raceCount: e.raceEvents.length,
     memberCount: e.members.length,
     createdAt: e.createdAt,
@@ -437,7 +445,6 @@ export async function updateAdminEventStatus(
   if (!MOCK_MODE) {
     return appClient.eventmanager.SetEventStatus({
       id: eventId,
-      Authorization: authorization,
       status: params.status ?? '',
       tag: params.tag ?? '',
     })
@@ -475,7 +482,6 @@ export async function deleteAdminEvent(
   if (!MOCK_MODE) {
     return appClient.eventmanager.DeleteEvent({
       ID: eventId,
-      Authorization: authorization,
       Permanent: permanent ?? false,
     })
   }
@@ -510,7 +516,6 @@ export async function restoreAdminEvent(
   if (!MOCK_MODE) {
     return appClient.eventmanager.RestoreEvent({
       id: eventId,
-      Authorization: authorization,
     })
   }
 
@@ -542,7 +547,6 @@ export async function setEventSignupsLocked(
   if (!MOCK_MODE) {
     return appClient.eventmanager.SetEventSignupsLocked({
       eventId,
-      Authorization: authorization,
       locked,
     })
   }
@@ -604,7 +608,6 @@ export async function updateAdminEvent(
   if (!MOCK_MODE) {
     return appClient.eventmanager.UpdateEvent({
       id: eventId,
-      Authorization: authorization,
       name: params.name,
       description: params.description,
       bannerUrl: params.bannerUrl,
@@ -696,7 +699,6 @@ export async function createAdminEvent(
 ): Promise<eventmanager.EventDetail> {
   if (!MOCK_MODE) {
     return appClient.eventmanager.CreateEvent({
-      Authorization: authorization,
       name: params.name,
       description: params.description ?? null,
       bannerUrl: params.bannerUrl ?? null,
@@ -810,7 +812,6 @@ export async function createRaceEvent(
   if (!MOCK_MODE) {
     return appClient.eventmanager.CreateRaceEvent({
       eventId,
-      Authorization: authorization,
       name: params.name,
       sequence: params.sequence ?? null,
       distanceMeters: params.distanceMeters,
@@ -870,7 +871,6 @@ export async function reorderRaceEvents(
   if (!MOCK_MODE) {
     return appClient.eventmanager.ReorderRaceEvents({
       eventId,
-      Authorization: authorization,
       orderedRaceIds,
     })
   }
@@ -924,7 +924,6 @@ export async function updateRaceEvent(
     return appClient.eventmanager.UpdateRaceEvent({
       eventId,
       raceId,
-      Authorization: authorization,
       ...params,
     } as unknown as eventmanager.UpdateRaceEventRequest)
   }
@@ -996,7 +995,6 @@ export async function deleteRaceEvent(
     return appClient.eventmanager.DeleteRaceEvent({
       eventId,
       raceId,
-      Authorization: authorization,
     })
   }
 
@@ -1054,7 +1052,6 @@ export async function assignRaceResult(
       eventId,
       raceId,
       userId,
-      Authorization: authorization,
       position: params.position,
       points: params.points,
       gateNumber: params.gateNumber,
@@ -1107,7 +1104,6 @@ export async function replaceRaceResults(
     return appClient.eventmanager.ReplaceRaceResults({
       eventId,
       raceId,
-      Authorization: authorization,
       results,
     })
   }
@@ -1146,7 +1142,6 @@ export async function mergeRaceResults(
     return appClient.eventmanager.MergeRaceResults({
       eventId,
       raceId,
-      Authorization: authorization,
       results,
     })
   }
@@ -1198,7 +1193,6 @@ export async function deleteRaceResult(
       eventId,
       raceId,
       userId,
-      Authorization: authorization,
     })
   }
 
@@ -1225,7 +1219,6 @@ export async function addEventMember(
     return appClient.eventmanager.AddEventMember({
       eventId,
       userId,
-      Authorization: authorization,
     })
   }
 
@@ -1239,9 +1232,17 @@ export async function addEventMember(
       const alreadyMember = evt.members.some((m) => m.userId === userId)
       if (alreadyMember) return evt
 
-      const nextMembers = [
+      const nextMembers: eventmanager.EventMemberView[] = [
         ...evt.members,
-        { userId: userProfile.id, name: userProfile.name, classTier: userProfile.classTier },
+        {
+          userId: userProfile.id,
+          name: userProfile.name,
+          classTier: userProfile.classTier ?? '',
+          teamId: '',
+          teamName: '',
+          teamSlug: '',
+          rosterRole: '',
+        },
       ]
 
       return {
@@ -1265,7 +1266,6 @@ export async function removeEventMember(
     return appClient.eventmanager.RemoveEventMember({
       EventID: eventId,
       UserID: userId,
-      Authorization: authorization,
     })
   }
 
@@ -1314,7 +1314,7 @@ export async function substituteEventTeamMember(
       eventId,
       teamId,
       incomingUserId,
-      outgoingUserId: outgoingUserId ?? undefined,
+      outgoingUserId: outgoingUserId ?? '',
       replaceInUpcomingRaces,
     })
   }
@@ -1350,7 +1350,6 @@ export async function addRaceEventMember(
       eventId,
       raceId,
       userId,
-      Authorization: authorization,
     })
   }
 
@@ -1361,9 +1360,17 @@ export async function addRaceEventMember(
 
   const existing = mockRaceMembersMap.get(raceId) ?? []
   if (!existing.some((m) => m.userId === userId)) {
-    const nextMembers = [
+    const nextMembers: eventmanager.RaceEventMemberView[] = [
       ...existing,
-      { userId: userProfile.id, name: userProfile.name, classTier: userProfile.classTier },
+      {
+        userId: userProfile.id,
+        name: userProfile.name,
+        classTier: userProfile.classTier ?? '',
+        teamId: '',
+        teamName: '',
+        teamSlug: '',
+        rosterRole: '',
+      },
     ]
     mockRaceMembersMap.set(raceId, nextMembers)
   }
@@ -1391,7 +1398,6 @@ export async function removeRaceEventMember(
       eventId,
       raceId,
       userId,
-      Authorization: authorization,
     })
   }
 
@@ -1446,7 +1452,10 @@ function recomputeMockOverview(eventId: string) {
       userId: member.userId,
       name: member.name,
       points: pointsTotals[member.userId] ?? 0,
-      resultStatus: statusTotals[member.userId] ?? null,
+      teamId: member.teamId ?? '',
+      teamName: member.teamName ?? '',
+      teamSlug: member.teamSlug ?? '',
+      rosterRole: member.rosterRole ?? '',
     })).sort((a, b) => b.points - a.points)
   }
 }
@@ -1463,7 +1472,6 @@ export async function listAdminUsers(
 ): Promise<{ users: auth.UserProfile[]; total: number }> {
   if (!MOCK_MODE) {
     return appClient.auth.ListUsers({
-      Authorization: authorization,
       Search: search ?? '',
       Limit: limit ?? 0,
       Offset: offset ?? 0,
@@ -1510,7 +1518,6 @@ export async function updateAdminUserSiteRole(
   if (!MOCK_MODE) {
     return appClient.auth.SetUserSiteRole({
       id: userId,
-      Authorization: authorization,
       siteRole,
     })
   }
@@ -1546,7 +1553,6 @@ export async function updateAdminUserProfile(
   if (!MOCK_MODE) {
     return appClient.auth.UpdateUser({
       id: userId,
-      Authorization: authorization,
       ...params,
     } as unknown as auth.UpdateUserRequest)
   }
@@ -1577,19 +1583,18 @@ export async function updateAdminUserClass(
   userId: string,
   organizationId: string,
   classTier: ClassTier | null,
-  authorization: string,
+  _authorization: string,
 ): Promise<{ userId: string; organizationId: string; classTier: ClassTier | null }> {
   if (!MOCK_MODE) {
     const res = await appClient.eventmanager.SetUserClass({
       userId,
-      Authorization: authorization,
       organizationId,
-      classTier,
+      classTier: classTier ?? '',
     })
     return {
       userId: res.userId,
       organizationId: res.organizationId,
-      classTier: res.classTier as ClassTier | null,
+      classTier: (res.classTier || null) as ClassTier | null,
     }
   }
 
@@ -1616,7 +1621,7 @@ export async function listOrgClassGrades(
   if (!MOCK_MODE) {
     return appClient.eventmanager.ListOrgClasses({
       OrganizationID: organizationId,
-      Search: search || undefined,
+      Search: search,
       Limit: limit,
       Offset: offset,
     })
@@ -1627,7 +1632,7 @@ export async function listOrgClassGrades(
   for (const [uid, tier] of orgMap.entries()) {
     const u = mockUserProfiles.get(uid)
     const name = u?.vrchatUsername ?? u?.name ?? uid
-    const slug = u?.slug ?? null
+    const slug = u?.slug ?? ''
     if (search) {
       const lower = search.toLowerCase()
       if (!name.toLowerCase().includes(lower) && !(slug && slug.toLowerCase().includes(lower))) {
@@ -1638,7 +1643,7 @@ export async function listOrgClassGrades(
       userId: uid,
       name,
       slug,
-      image: u?.image ?? null,
+      image: u?.image ?? '',
       classTier: tier,
       updatedAt: new Date().toISOString(),
     })
@@ -1689,11 +1694,15 @@ export async function listAdminTeams(
     })
   }
 
-  let filtered = mockTeamsList.map((t) => ({
+  let filtered: teammanager.TeamListItem[] = mockTeamsList.map((t) => ({
     id: t.id,
     name: t.name,
     slug: t.slug,
-    logo: t.logo,
+    logo: t.logo ?? '',
+    description: t.description ?? '',
+    status: t.status ?? 'APPROVED',
+    primaryOrganizationId: t.primaryOrganizationId ?? '',
+    organizations: t.organizations ?? [],
     administratorSlotsRemaining: t.administratorSlotsRemaining,
     memberCount: t.members.length,
   }))
@@ -1728,7 +1737,7 @@ export async function getAdminTeam(id: string): Promise<teammanager.Team> {
 
 export async function listAdminOrganizations(search = '', limit = 10, offset = 0) {
   if (!MOCK_MODE) {
-    return appClient.teammanager.ListAdminOrganizations({ search, limit, offset })
+    return appClient.teammanager.ListAdminOrganizations({ Search: search, Limit: limit, Offset: offset })
   }
   return { organizations: [], total: 0 }
 }
@@ -1742,15 +1751,15 @@ export async function getAdminOrganization(id: string): Promise<teammanager.Admi
 
 export async function createAdminOrganization(
   params: { name: string; logo?: string | null; discordInvite?: string | null; vrchatGroupId?: string | null },
-  authHeader: string
+  _authHeader: string
 ): Promise<teammanager.AdminOrganizationDetail> {
   if (!MOCK_MODE) {
     return appClient.teammanager.CreateAdminOrganization({
-      Authorization: authHeader,
       name: params.name,
-      logo: params.logo ?? undefined,
-      discordInvite: params.discordInvite ?? undefined,
-      vrchatGroupId: params.vrchatGroupId ?? undefined,
+      logo: params.logo ?? '',
+      description: '',
+      discordInvite: params.discordInvite ?? '',
+      vrchatGroupId: params.vrchatGroupId ?? '',
     })
   }
   throw new Error('Not implemented in mock mode')
@@ -1759,20 +1768,19 @@ export async function createAdminOrganization(
 export async function updateAdminOrganization(
   id: string,
   params: { name?: string; slug?: string; logo?: string | null; clearLogo?: boolean; description?: string | null; clearDescription?: boolean; discordInvite?: string | null; vrchatGroupId?: string | null },
-  authHeader: string
+  _authHeader: string
 ): Promise<teammanager.AdminOrganizationDetail> {
   if (!MOCK_MODE) {
     return appClient.teammanager.UpdateAdminOrganization({
       id,
-      Authorization: authHeader,
-      name: params.name,
-      slug: params.slug,
-      logo: params.logo ?? undefined,
-      clearLogo: params.clearLogo,
-      description: params.description ?? undefined,
-      clearDescription: params.clearDescription,
-      discordInvite: params.discordInvite ?? undefined,
-      vrchatGroupId: params.vrchatGroupId ?? undefined,
+      name: params.name ?? '',
+      slug: params.slug ?? '',
+      logo: params.logo ?? '',
+      clearLogo: params.clearLogo ?? false,
+      description: params.description ?? '',
+      clearDescription: params.clearDescription ?? false,
+      discordInvite: params.discordInvite ?? '',
+      vrchatGroupId: params.vrchatGroupId ?? '',
     })
   }
   throw new Error('Not implemented in mock mode')
@@ -1786,12 +1794,11 @@ export async function updateAdminTeamStats(
     seasonRank?: number | null
     averagePointsPerEvent?: number | null
   },
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
     return appClient.teammanager.UpdateTeamStats({
       id,
-      Authorization: authorization,
       ...params,
     } as unknown as teammanager.UpdateTeamStatsRequest)
   }
@@ -1801,6 +1808,7 @@ export async function updateAdminTeamStats(
   const team = mockTeamsList[teamIndex]
 
   team.stats = {
+    ...team.stats,
     rankingAverage: params.rankingAverage ?? team.stats.rankingAverage,
     pointsAverage: params.pointsAverage ?? team.stats.pointsAverage,
     seasonRank: params.seasonRank ?? team.stats.seasonRank,
@@ -1819,7 +1827,7 @@ let mockOrgApplications: teammanager.OrgApplicationView[] = [
     id: 'app_org_001',
     name: 'Horizon Esports',
     slug: 'horizon-esports',
-    logo: null,
+    logo: '',
     orgType: 'ORGANIZATION',
     status: 'PENDING',
     discordInvite: 'https://discord.gg/horizon',
@@ -1828,7 +1836,7 @@ let mockOrgApplications: teammanager.OrgApplicationView[] = [
     createdAt: now,
     updatedAt: now,
     members: [
-      { userId: 'mock-user-1', name: 'Thunder Bolt', slug: 'thunder-bolt', role: 'administrator' },
+      { userId: 'mock-user-1', name: 'Thunder Bolt', slug: 'thunder-bolt', image: '', role: 'administrator' },
     ],
   },
 ]
@@ -1838,7 +1846,7 @@ let mockTeamApplications: teammanager.TeamApplicationView[] = [
     id: 'app_team_001',
     name: 'Velocity Red',
     slug: 'velocity-red',
-    logo: null,
+    logo: '',
     status: 'PENDING',
     submittedByUserId: 'mock-user-2',
     createdAt: now,
@@ -1847,14 +1855,16 @@ let mockTeamApplications: teammanager.TeamApplicationView[] = [
       id: 'org_mock_urs',
       name: 'URS Mock Team',
       slug: 'urs-mock-team',
-      logo: null,
+      logo: '',
+      description: '',
       orgType: 'ORGANIZATION',
       status: 'APPROVED',
       isPrimary: true,
+      memberCount: 2,
     },
     secondaryOrganizations: [],
     members: [
-      { userId: 'mock-user-2', name: 'Shadow Runner', slug: 'shadow-runner', role: 'member' },
+      { userId: 'mock-user-2', name: 'Shadow Runner', slug: 'shadow-runner', image: '', role: 'member' },
     ],
   },
 ]
@@ -1868,11 +1878,10 @@ export async function submitOrganizationApplication(
     vrchatGroupId: string
     initialRoster?: string[]
   },
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.OrgApplicationView> {
   if (!MOCK_MODE) {
     return appClient.teammanager.SubmitOrganizationApplication({
-      Authorization: authorization,
       name: params.name,
       slug: params.slug ?? null,
       logo: params.logo ?? null,
@@ -1888,7 +1897,7 @@ export async function submitOrganizationApplication(
     id,
     name: params.name,
     slug,
-    logo: params.logo ?? null,
+    logo: params.logo ?? '',
     orgType: 'ORGANIZATION',
     status: 'PENDING',
     discordInvite: params.discordInvite,
@@ -1898,7 +1907,7 @@ export async function submitOrganizationApplication(
     updatedAt: new Date().toISOString(),
     members: (params.initialRoster || []).map((uid) => {
       const u = mockUserProfiles.get(uid)
-      return { userId: uid, name: u ? u.name : uid, slug: u ? u.slug : null, role: 'administrator' }
+      return { userId: uid, name: u ? u.name : uid, slug: u?.slug ?? '', image: u?.image ?? '', role: 'administrator' }
     }),
   }
   mockOrgApplications.push(appView)
@@ -1907,12 +1916,11 @@ export async function submitOrganizationApplication(
 
 export async function convertAdminTeamToOrg(
   teamId: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.AdminOrganizationDetail> {
   if (!MOCK_MODE) {
     return appClient.teammanager.ConvertTeamToOrg({
       teamId,
-      Authorization: authorization,
     })
   }
 
@@ -1929,11 +1937,10 @@ export async function submitTeamApplication(
     secondaryOrganizationIds?: string[]
     initialRoster?: string[]
   },
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.TeamApplicationView> {
   if (!MOCK_MODE) {
     return appClient.teammanager.SubmitTeamApplication({
-      Authorization: authorization,
       teamId: params.teamId ?? null,
       name: params.name,
       slug: params.slug ?? null,
@@ -1950,7 +1957,7 @@ export async function submitTeamApplication(
     id,
     name: params.name,
     slug,
-    logo: params.logo ?? null,
+    logo: params.logo ?? '',
     status: 'PENDING',
     submittedByUserId: 'mock-admin-1',
     createdAt: new Date().toISOString(),
@@ -1959,23 +1966,27 @@ export async function submitTeamApplication(
       id: params.primaryOrganizationId,
       name: 'URS Mock Team',
       slug: 'urs-mock-team',
-      logo: null,
+      logo: '',
+      description: '',
       orgType: 'ORGANIZATION',
       status: 'APPROVED',
       isPrimary: true,
+      memberCount: 2,
     },
     secondaryOrganizations: (params.secondaryOrganizationIds || []).map((secId) => ({
       id: secId,
       name: `Secondary Org (${secId})`,
       slug: secId,
-      logo: null,
+      logo: '',
+      description: '',
       orgType: 'ORGANIZATION',
       status: 'APPROVED',
       isPrimary: false,
+      memberCount: 0,
     })),
     members: (params.initialRoster || []).map((uid) => {
       const u = mockUserProfiles.get(uid)
-      return { userId: uid, name: u ? u.name : uid, slug: u ? u.slug : null, role: 'member' }
+      return { userId: uid, name: u ? u.name : uid, slug: u?.slug ?? '', image: u?.image ?? '', role: 'member' }
     }),
   }
   mockTeamApplications.push(appView)
@@ -1983,10 +1994,10 @@ export async function submitTeamApplication(
 }
 
 export async function listAdminApplications(
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.ListApplicationsResponse> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.ListApplications({ Authorization: authorization })
+    return appClient.teammanager.ListApplications({})
   }
 
   return {
@@ -2006,7 +2017,6 @@ export async function reviewAdminApplication(
       id,
       type,
       action,
-      Authorization: authorization,
     })
     return
   }
@@ -2047,7 +2057,6 @@ export async function linkSecondaryOrganization(
     return appClient.teammanager.LinkSecondaryOrganization({
       teamId,
       organizationId,
-      Authorization: authorization,
     })
   }
 
@@ -2078,7 +2087,6 @@ export async function unlinkSecondaryOrganization(
     return appClient.teammanager.UnlinkSecondaryOrganization({
       teamId,
       organizationId,
-      Authorization: authorization,
     })
   }
 
@@ -2101,10 +2109,12 @@ export async function listApprovedOrganizations(): Promise<teammanager.ListOrgan
         id: 'org_mock_urs',
         name: 'URS Mock Team',
         slug: 'urs-mock-team',
-        logo: null,
+        logo: '',
+        description: '',
         orgType: 'ORGANIZATION',
         status: 'APPROVED',
         isPrimary: false,
+        memberCount: 2,
       },
     ],
   }
@@ -2120,12 +2130,11 @@ export async function updateAdminTeam(
     description?: string | null
     clearDescription?: boolean
   },
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
     return appClient.teammanager.UpdateTeam({
       id,
-      Authorization: authorization,
       name: params.name,
       slug: params.slug,
       logo: params.logo ?? undefined,
@@ -2142,14 +2151,14 @@ export async function updateAdminTeam(
   team.name = params.name ?? team.name
   team.slug = params.slug ?? team.slug
   if (params.clearLogo) {
-    team.logo = null as any
+    team.logo = ''
   } else if (params.logo !== undefined) {
-    team.logo = (params.logo ?? team.logo) as any
+    team.logo = params.logo ?? team.logo
   }
   if (params.clearDescription) {
-    team.description = null
+    team.description = ''
   } else if (params.description !== undefined) {
-    team.description = params.description
+    team.description = params.description ?? ''
   }
 
   return team
@@ -2207,10 +2216,10 @@ export async function listAdminTeamMembers(
 
 export async function recomputeEventPoints(
   eventId: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<{ success: boolean }> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.RecomputeEventPoints({ id: eventId, Authorization: authorization })
+    return appClient.eventmanager.RecomputeEventPoints({ id: eventId })
   }
   recomputeMockOverview(eventId)
   return { success: true }
@@ -2232,7 +2241,7 @@ export async function createAdminDataset(
   source: string,
   rows: number,
   status: string,
-  authHeader: string
+  _authHeader: string
 ): Promise<eventmanager.DatasetView> {
   if (!MOCK_MODE) {
     return appClient.eventmanager.CreateDataset({
@@ -2240,7 +2249,6 @@ export async function createAdminDataset(
       source,
       rows,
       status,
-      Authorization: authHeader,
     })
   }
   const id = `dataset_${Math.floor(Math.random() * 10000)}`
@@ -2260,14 +2268,13 @@ export async function updateAdminDatasetStatus(
   eventId: string,
   datasetId: string,
   status: string,
-  authHeader: string
+  _authHeader: string
 ): Promise<eventmanager.DatasetView> {
   if (!MOCK_MODE) {
     return appClient.eventmanager.UpdateDatasetStatus({
       eventId,
       datasetId,
       status,
-      Authorization: authHeader,
     })
   }
   return {
@@ -2284,11 +2291,10 @@ export async function updateAdminDatasetStatus(
 
 export async function createAdminTeam(
   params: { name: string; logo?: string | null; primaryOrganizationId?: string | null },
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
     return appClient.teammanager.CreateTeam({
-      Authorization: authorization,
       name: params.name,
       logo: params.logo ?? null,
       primaryOrganizationId: params.primaryOrganizationId ?? null,
@@ -2309,12 +2315,19 @@ export async function createAdminTeam(
     id,
     name: params.name,
     slug,
-    logo: params.logo ?? null,
+    logo: params.logo ?? '',
     stats: {
-      rankingAverage: null,
-      pointsAverage: null,
-      seasonRank: null,
-      averagePointsPerEvent: null,
+      rankingAverage: 0,
+      pointsAverage: 0,
+      seasonRank: 0,
+      averagePointsPerEvent: 0,
+      teamEventsParticipated: 0,
+      teamTotalPoints: 0,
+      teamAveragePoints: 0,
+      teamEventRankAverage: 0,
+      seasonRankSource: 'MEMBER_AVERAGE',
+      year: new Date().getUTCFullYear(),
+      availableYears: [new Date().getUTCFullYear()],
     },
     administratorSlotsRemaining: 3,
     members: [],
@@ -2327,12 +2340,11 @@ export async function createAdminTeam(
 export async function addAdminTeamMember(
   teamId: string,
   params: { userId: string; role?: string },
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
     return appClient.teammanager.AddTeamMember({
       id: teamId,
-      Authorization: authorization,
       userId: params.userId,
       role: params.role ?? 'member',
     })
@@ -2361,10 +2373,10 @@ export async function addAdminTeamMember(
     }
   }
 
-  team.members.push({ userId: user.id, name: user.name, role })
+  team.members.push({ userId: user.id, name: user.name, slug: user.slug ?? '', image: user.image ?? '', role })
   team.administratorSlotsRemaining = Math.max(3 - team.members.filter((m) => m.role === 'administrator').length, 0)
 
-  user.teams = [...user.teams, { organizationId: team.id, name: team.name, slug: team.slug, role }]
+  user.teams = [...user.teams, { organizationId: team.id, name: team.name, slug: team.slug, logo: team.logo ?? '', role }]
   mockUserProfiles.set(user.id, user)
 
   return team
@@ -2374,13 +2386,12 @@ export async function updateAdminTeamMemberRole(
   teamId: string,
   userId: string,
   role: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
     return appClient.teammanager.UpdateTeamMemberRole({
       id: teamId,
       userId,
-      Authorization: authorization,
       role,
     })
   }
@@ -2419,13 +2430,12 @@ export async function updateAdminTeamMemberRole(
 export async function removeAdminTeamMember(
   teamId: string,
   userId: string,
-  authorization: string,
+  _authorization: string,
 ): Promise<teammanager.Team> {
   if (!MOCK_MODE) {
     return appClient.teammanager.RemoveTeamMember({
       ID: teamId,
       UserID: userId,
-      Authorization: authorization,
     })
   }
 
@@ -2453,7 +2463,7 @@ export async function removeAdminTeamMember(
 }
 
 export async function recalculateRatings(
-  authorization: string,
+  _authorization: string,
 ): Promise<{
   racesProcessed: number
   resultsUpdated: number
@@ -2462,7 +2472,7 @@ export async function recalculateRatings(
   calculatedAt: string
 }> {
   if (!MOCK_MODE) {
-    return appClient.scorecalc.RecalculateRatings({ Authorization: authorization })
+    return appClient.scorecalc.RecalculateRatings()
   }
   return {
     racesProcessed: 4,
@@ -2479,15 +2489,15 @@ let mockOrgNewsletters: teammanager.Newsletter[] = [
     organizationId: 'org_mock_urs',
     organizationName: 'Uma Racing Society',
     organizationSlug: 'urs',
-    organizationLogo: null,
+    organizationLogo: '',
     authorId: 'mock-admin-1',
     authorName: 'Mock Admin',
     authorSlug: 'mock-admin',
-    authorImage: null,
+    authorImage: '',
     title: 'Season 4 Grand Prix Schedule & Rule Updates',
     slug: 'season-4-grand-prix-schedule',
     summary: 'Key dates, track rotations, and class tier adjustments for the upcoming Season 4 Grand Prix.',
-    thumbnailUrl: null,
+    thumbnailUrl: '',
     content: '# Season 4 Grand Prix\n\nWelcome racers! Here is everything you need to know for **Season 4**.',
     status: 'PUBLISHED',
     publishedAt: now,
@@ -2502,7 +2512,7 @@ export async function listOrgNewsletters(
   offset = 0,
 ): Promise<teammanager.ListNewslettersResponse> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.ListOrgNewsletters({ organizationId, limit, offset })
+    return appClient.teammanager.ListOrgNewsletters({ OrganizationID: organizationId, Limit: limit, Offset: offset })
   }
   const items = mockOrgNewsletters.filter((n) => n.organizationId === organizationId)
   return {
@@ -2523,18 +2533,18 @@ export async function createNewsletter(
     organizationId: params.organizationId,
     organizationName: 'Organization',
     organizationSlug: params.organizationId,
-    organizationLogo: null,
+    organizationLogo: '',
     authorId: 'mock-admin-1',
     authorName: 'Mock Admin',
     authorSlug: 'mock-admin',
-    authorImage: null,
+    authorImage: '',
     title: params.title,
     slug: params.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'newsletter',
-    summary: params.summary ?? null,
-    thumbnailUrl: params.thumbnailUrl ?? null,
+    summary: params.summary ?? '',
+    thumbnailUrl: params.thumbnailUrl ?? '',
     content: params.content,
     status: params.status || 'DRAFT',
-    publishedAt: params.status === 'PUBLISHED' ? timestamp : null,
+    publishedAt: params.status === 'PUBLISHED' ? timestamp : '',
     createdAt: timestamp,
     updatedAt: timestamp,
   }
@@ -2558,11 +2568,11 @@ export async function updateNewsletter(
   const updated: teammanager.Newsletter = {
     ...existing,
     title: params.title ?? existing.title,
-    summary: params.clearSummary ? null : (params.summary !== undefined ? params.summary : existing.summary),
-    thumbnailUrl: params.clearThumbnail ? null : (params.thumbnailUrl !== undefined ? params.thumbnailUrl : existing.thumbnailUrl),
+    summary: params.clearSummary ? '' : (params.summary !== undefined ? params.summary : existing.summary),
+    thumbnailUrl: params.clearThumbnail ? '' : (params.thumbnailUrl !== undefined ? params.thumbnailUrl : existing.thumbnailUrl),
     content: params.content ?? existing.content,
     status: nextStatus,
-    publishedAt: nextStatus === 'PUBLISHED' ? (existing.publishedAt ?? timestamp) : null,
+    publishedAt: nextStatus === 'PUBLISHED' ? (existing.publishedAt || timestamp) : '',
     updatedAt: timestamp,
   }
   mockOrgNewsletters[idx] = updated
@@ -2581,7 +2591,7 @@ export async function deleteAdminUser(
   authorization: string,
 ): Promise<{ deleted: boolean }> {
   if (!MOCK_MODE) {
-    return appClient.auth.DeleteUser(userId, { Authorization: authorization })
+    return appClient.auth.DeleteUser(userId)
   }
   if (!mockUserProfiles.has(userId)) {
     throw new Error('Mock user not found')
@@ -2595,7 +2605,7 @@ export async function deleteAdminOrganization(
   authorization: string,
 ): Promise<{ deleted: boolean }> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.DeleteAdminOrganization(orgId, { Authorization: authorization })
+    return appClient.teammanager.DeleteAdminOrganization(orgId)
   }
   const idx = mockTeamsList.findIndex((t) => t.id === orgId || t.slug === orgId)
   if (idx !== -1) {
@@ -2609,7 +2619,7 @@ export async function deleteAdminTeam(
   authorization: string,
 ): Promise<{ deleted: boolean }> {
   if (!MOCK_MODE) {
-    return appClient.teammanager.DeleteAdminTeam(teamId, { Authorization: authorization })
+    return appClient.teammanager.DeleteAdminTeam(teamId)
   }
   const idx = mockTeamsList.findIndex((t) => t.id === teamId || t.slug === teamId)
   if (idx === -1) {
