@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Search, X } from 'lucide-react'
 import { PixelBadge } from '@pxlkit/ui-kit'
 import {
   getLeaderboard,
@@ -114,7 +113,7 @@ export const HeaderQuickSearch: React.FC = () => {
   return (
     <div ref={containerRef} className="relative w-full sm:w-56 md:w-64">
       <div className="relative flex items-center">
-        <Search className="w-3.5 h-3.5 text-retro-muted absolute left-2.5 pointer-events-none" />
+        <i className="hn hn-search text-xs text-retro-muted absolute left-2.5 pointer-events-none" aria-hidden="true" />
         <input
           type="text"
           value={query}
@@ -137,7 +136,7 @@ export const HeaderQuickSearch: React.FC = () => {
             aria-label="Clear search"
             className="absolute right-2 text-retro-muted hover:text-retro-text cursor-pointer"
           >
-            <X className="w-3.5 h-3.5" />
+            <i className="hn hn-times text-xs" aria-hidden="true" />
           </button>
         )}
       </div>

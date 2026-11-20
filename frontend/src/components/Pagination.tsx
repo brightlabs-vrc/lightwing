@@ -85,8 +85,10 @@ export const Pagination: React.FC<PaginationProps> = ({
     <div
       style={{
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: '12px',
         padding: '8px 16px',
         background: '#f8fafc',
         border: '1px solid #e2e8f0',
@@ -103,7 +105,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
         {onPageSizeChange && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>Show:</span>

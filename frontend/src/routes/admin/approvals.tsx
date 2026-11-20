@@ -5,6 +5,7 @@ import { requireAdminPanel } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminApplications, reviewAdminApplication } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
+import { SldsSkeletonList } from '../../components/LoadingSkeleton'
 import type { teammanager } from '../../lib/client'
 
 export const Route = createFileRoute('/admin/approvals')({
@@ -89,7 +90,7 @@ function AdminApprovalsPage() {
       )}
 
       {loading ? (
-        <p className="text-slate-500">Loading pending applications queue...</p>
+        <SldsSkeletonList count={3} />
       ) : (
         <div className="slds-grid slds-wrap slds-gutters" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Organization Applications Section (SITE_ADMIN only) */}

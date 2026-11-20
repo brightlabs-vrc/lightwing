@@ -2,14 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ChevronLeft,
-  ChevronRight,
-  Newspaper,
-  Sparkles,
-  Star,
-  Trophy,
-} from 'lucide-react'
-import {
   PixelBadge,
   PixelButton,
   PixelCard,
@@ -27,6 +19,7 @@ import { formatLocalDateTime } from '../lib/datetime'
 import { usePageHead } from '../hooks/usePageHead'
 import { buildSeoMeta } from '../lib/seo'
 import { EventBanner } from '../components/EventBanner'
+import { PixelSkeletonInlineRows } from '../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/')({
   ssr: 'data-only',
@@ -246,7 +239,7 @@ function HomePage() {
                         }
                         className="w-8 h-8 rounded bg-black/60 hover:bg-black/80 border border-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <i className="hn hn-angle-left text-sm" aria-hidden="true" />
                       </button>
                       <button
                         type="button"
@@ -254,7 +247,7 @@ function HomePage() {
                         onClick={() => setSlideIndex((prev) => (prev + 1) % slideCount)}
                         className="w-8 h-8 rounded bg-black/60 hover:bg-black/80 border border-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <i className="hn hn-angle-right text-sm" aria-hidden="true" />
                       </button>
                     </div>
                   )}
@@ -371,7 +364,7 @@ function HomePage() {
                 </div>
 
                 {loadingEvents ? (
-                  <div className="py-4 text-xs font-pixel text-retro-muted">LOADING...</div>
+                  <PixelSkeletonInlineRows rows={3} />
                 ) : ongoingEvents.length === 0 ? (
                   <div className="py-2.5 px-3 rounded bg-retro-bg/60 border border-retro-border text-xs font-sans text-retro-muted">
                     No live events right now.
@@ -388,7 +381,7 @@ function HomePage() {
                           className="flex items-start justify-between gap-3 py-2.5 hover:bg-retro-bg/60 -mx-2 px-2 rounded transition-colors group"
                         >
                           <div className="flex items-start gap-2.5 min-w-0">
-                            <Star className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                            <i className="hn hn-star-solid text-sm text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
                             <div className="min-w-0">
                               <div className="font-sans text-sm font-semibold text-retro-text group-hover:text-retro-primary transition-colors truncate">
                                 {evt.name}
@@ -425,7 +418,7 @@ function HomePage() {
                 </div>
 
                 {loadingEvents ? (
-                  <div className="py-4 text-xs font-pixel text-retro-muted">LOADING...</div>
+                  <PixelSkeletonInlineRows rows={3} />
                 ) : upcomingEvents.length === 0 ? (
                   <div className="py-3 px-3 rounded bg-retro-bg/60 border border-retro-border text-xs font-sans text-retro-muted flex flex-col gap-2">
                     <span>No upcoming events scheduled yet.</span>
@@ -450,7 +443,7 @@ function HomePage() {
                           className="flex items-start justify-between gap-3 py-2.5 hover:bg-retro-bg/60 -mx-2 px-2 rounded transition-colors group"
                         >
                           <div className="flex items-start gap-2.5 min-w-0">
-                            <Sparkles className="w-4 h-4 text-retro-secondary shrink-0 mt-0.5" />
+                            <i className="hn hn-sparkles-solid text-sm text-retro-secondary shrink-0 mt-0.5" aria-hidden="true" />
                             <div className="min-w-0">
                               <div className="font-sans text-sm font-semibold text-retro-text group-hover:text-retro-primary transition-colors truncate">
                                 {evt.name}
@@ -490,7 +483,7 @@ function HomePage() {
                     Powered by Community Organizations
                   </div>
                   <h2 className="font-pixel text-base font-bold text-retro-text flex items-center gap-2 mt-0.5">
-                    <Newspaper className="w-4 h-4 text-retro-primary" />
+                    <i className="hn hn-newspaper-solid text-sm text-retro-primary" aria-hidden="true" />
                     LATEST NEWS
                   </h2>
                 </div>
@@ -500,9 +493,7 @@ function HomePage() {
               </div>
 
               {loadingNewsletters ? (
-                <div className="py-10 text-center font-pixel text-xs text-retro-muted">
-                  LOADING NEWSLETTERS...
-                </div>
+                <PixelSkeletonInlineRows rows={5} />
               ) : newsletters.length === 0 ? (
                 <div className="py-6">
                   <PixelEmptyState
@@ -517,10 +508,10 @@ function HomePage() {
                       key={nl.id}
                       to="/newsletters/$newsletterId"
                       params={{ newsletterId: nl.id }}
-                      className="flex items-start justify-between gap-3 py-3.5 hover:bg-retro-bg/60 -mx-2 px-2 rounded transition-colors group"
+                      className="flex flex-col sm:flex-row sm:items-start justify-between gap-1.5 sm:gap-3 py-3.5 hover:bg-retro-bg/60 -mx-2 px-2 rounded transition-colors group"
                     >
                       <div className="flex items-start gap-3 min-w-0">
-                        <Star className="w-4 h-4 text-retro-primary shrink-0 mt-1" />
+                        <i className="hn hn-star-solid text-sm text-retro-primary shrink-0 mt-1" aria-hidden="true" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-sans text-sm font-semibold text-retro-text group-hover:text-retro-primary transition-colors">
@@ -535,7 +526,7 @@ function HomePage() {
                           )}
                         </div>
                       </div>
-                      <span className="shrink-0 font-sans text-[11px] text-retro-muted whitespace-nowrap mt-0.5">
+                      <span className="shrink-0 font-sans text-[11px] text-retro-muted whitespace-nowrap pl-7 sm:pl-0 sm:mt-0.5">
                         {formatLocalDateTime(nl.publishedAt || nl.createdAt)}
                       </span>
                     </Link>
@@ -583,7 +574,7 @@ function HomePage() {
                     {currentYear} Season Standings
                   </div>
                   <h2 className="font-pixel text-base font-bold text-retro-text flex items-center gap-2 mt-0.5">
-                    <Trophy className="w-4 h-4 text-retro-gold" />
+                    <i className="hn hn-trophy-solid text-sm text-retro-gold" aria-hidden="true" />
                     TOP RACERS
                   </h2>
                 </div>
@@ -609,9 +600,7 @@ function HomePage() {
               </div>
 
               {loadingLeaderboard ? (
-                <div className="py-10 text-center font-pixel text-xs text-retro-muted">
-                  LOADING STANDINGS...
-                </div>
+                <PixelSkeletonInlineRows rows={5} />
               ) : topRacers.length === 0 ? (
                 <div className="py-6">
                   <PixelEmptyState

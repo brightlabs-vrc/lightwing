@@ -60,11 +60,23 @@ import { StandingsEditor } from '../../components/StandingsEditor'
 import { DEFAULT_SCORING_TABLES } from '../../lib/scoringDefaults'
 import { toLocalISOString } from '../../lib/datetime'
 import type { ClassTier, EventStatus, EventTag } from '../../types'
+import {
+  PixelSkeletonDetail,
+  PixelSkeletonList,
+  PixelSkeletonTable,
+} from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/teams/manage/$id')({
   beforeLoad: async ({ location }) => {
     await requireAuth(location)
   },
+  pendingComponent: () => (
+    <ManagementLayout>
+      <PixelContainer maxWidth="full" padding="md">
+        <PixelSkeletonDetail />
+      </PixelContainer>
+    </ManagementLayout>
+  ),
   component: ManageOrgPage,
 })
 
@@ -96,6 +108,7 @@ function ManageOrgPage() {
   // Roster state
   const [members, setMembers] = useState<Array<{ userId: string; name: string; slug: string | null; role: string }>>([])
   const [totalMembers, setTotalMembers] = useState(0)
+  const [loadingRoster, setLoadingRoster] = useState(true)
   const [memberPage, setMemberPage] = useState(1)
   const [memberPageSize, setMemberPageSize] = useState(10)
   const [memberSearch, setMemberSearch] = useState('')
@@ -103,6 +116,7 @@ function ManageOrgPage() {
   // Org Class Grades state
   const [classGrades, setClassGrades] = useState<eventmanager.OrgClassEntry[]>([])
   const [totalClassGrades, setTotalClassGrades] = useState(0)
+  const [loadingGrades, setLoadingGrades] = useState(true)
   const [gradePage, setGradePage] = useState(1)
   const [gradePageSize, setGradePageSize] = useState(10)
   const [gradeSearch, setGradeSearch] = useState('')
@@ -119,7 +133,7 @@ function ManageOrgPage() {
   const [applications, setApplications] = useState<teammanager.TeamApplicationView[]>([])
   const [loadingApplications, setLoadingApplications] = useState(false)
 
-  // Modals state
+  // Modals / Inline Editors state
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false)
   const [isLinkOrgModalOpen, setIsLinkOrgModalOpen] = useState(false)
@@ -193,6 +207,7 @@ function ManageOrgPage() {
   }
 
   async function fetchRoster() {
+    setLoadingRoster(true)
     try {
       const offset = (memberPage - 1) * memberPageSize
       const response = await listAdminTeamMembers(teamId, memberSearch, memberPageSize, offset)
@@ -200,6 +215,8 @@ function ManageOrgPage() {
       setTotalMembers(response.total)
     } catch (cause) {
       console.error('Failed to load roster', cause)
+    } finally {
+      setLoadingRoster(false)
     }
   }
 
@@ -229,7 +246,11 @@ function ManageOrgPage() {
   }
 
   async function fetchClassGrades() {
-    if (!isOrg) return
+    if (!isOrg) {
+      setLoadingGrades(false)
+      return
+    }
+    setLoadingGrades(true)
     try {
       const offset = (gradePage - 1) * gradePageSize
       const response = await listOrgClassGrades(teamId, gradeSearch, gradePageSize, offset)
@@ -237,6 +258,8 @@ function ManageOrgPage() {
       setTotalClassGrades(response.total)
     } catch (cause) {
       console.error('Failed to load org class grades', cause)
+    } finally {
+      setLoadingGrades(false)
     }
   }
 
@@ -588,15 +611,171 @@ function ManageOrgPage() {
 
   return (
     <ManagementLayout>
-      <PixelContainer maxWidth="full" padding="md">
+      <PixelContainer maxWidth="full" padding="none" className="max-w-7xl mx-auto">
+        {loading ? (
+          <PixelSkeletonDetail />
+        ) : isTeamModalOpen && team ? (
+          <PixelStack gap={6}>
+            <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <PixelSectionHeader
+                    title={isOrg ? 'EDIT ORGANIZATION PROFILE' : 'EDIT TEAM PROFILE'}
+                    titleTone="purple"
+                    size="sm"
+                  />
+                  <p className="font-sans text-xs text-retro-muted mt-1">
+                    Update your {isOrg ? 'organization' : 'team'} name, custom URL slug, logo, and Markdown description.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <PixelButton
+                    variant="outline"
+                    tone="cyan"
+                    size="sm"
+                    asChild
+                  >
+                    <Link to="/$user" params={{ user: team.slug || team.id }}>
+                      VIEW PUBLIC PAGE →
+                    </Link>
+                  </PixelButton>
+                  <PixelButton
+                    variant="ghost"
+                    tone="neutral"
+                    size="sm"
+                    onClick={() => setIsTeamModalOpen(false)}
+                  >
+                    ← BACK TO OVERVIEW
+                  </PixelButton>
+                </div>
+              </div>
+            </PixelCard>
+
+            {teamError && <PixelAlert tone="red" message={teamError} />}
+
+            <form onSubmit={handleUpdateTeam} className="flex flex-col gap-6">
+              {/* Identity & Branding + Live Preview */}
+              <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
+                <PixelStack gap={4}>
+                  <PixelSectionHeader title="IDENTITY & BRANDING" titleTone="cyan" size="sm" />
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 flex flex-col gap-4">
+                      <PixelInput
+                        label="NAME *"
+                        required
+                        value={teamName}
+                        onChange={(e) => setTeamName(e.target.value)}
+                      />
+
+                      <PixelInput
+                        label="CUSTOM @SLUG *"
+                        required
+                        hint={`Public URL: /@${teamSlug.trim() || 'slug'}`}
+                        value={teamSlug}
+                        onChange={(e) => setTeamSlug(e.target.value)}
+                      />
+
+                      <PixelInput
+                        label="LOGO IMAGE URL"
+                        type="url"
+                        placeholder="https://example.com/logo.png"
+                        value={teamLogo}
+                        onChange={(e) => setTeamLogo(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Live Branding Preview */}
+                    <div className="flex flex-col gap-2">
+                      <span className="font-pixel text-[11px] text-retro-muted uppercase tracking-wider">
+                        LIVE HEADER PREVIEW
+                      </span>
+                      <div className="flex-1 p-4 rounded border-2 border-retro-border bg-retro-bg flex flex-col justify-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {teamLogo.trim() ? (
+                            <img
+                              src={teamLogo.trim()}
+                              alt={teamName || 'Logo preview'}
+                              className="w-14 h-14 rounded border-2 border-retro-border bg-retro-surface object-cover shrink-0"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-lg font-bold flex items-center justify-center shrink-0">
+                              {(teamName || 'OR').slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-pixel text-sm font-bold text-retro-text truncate">
+                              {teamName.trim() || 'Entity Name'}
+                            </div>
+                            <div className="font-sans text-xs text-retro-muted font-semibold truncate">
+                              @{teamSlug.trim() || 'slug'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-retro-border flex items-center gap-2">
+                          <PixelBadge tone={isOrg ? 'purple' : 'cyan'}>
+                            {isOrg ? 'ORGANIZATION' : 'TEAM'}
+                          </PixelBadge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </PixelStack>
+              </PixelCard>
+
+              {/* Full-Width Split Markdown Description Editor */}
+              <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
+                <PixelStack gap={4}>
+                  <PixelSectionHeader
+                    title="ABOUT / DESCRIPTION & LIVE PREVIEW"
+                    titleTone="purple"
+                    size="sm"
+                  />
+                  <MarkdownEditor
+                    value={teamDescription}
+                    onChange={setTeamDescription}
+                    minHeight="340px"
+                    defaultMode="split"
+                    placeholder="Write about your organization or team in Markdown..."
+                    previewFallbackText="No description details set yet."
+                  />
+
+                  <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-retro-border">
+                    <PixelButton
+                      type="button"
+                      variant="ghost"
+                      tone="neutral"
+                      disabled={updatingTeam}
+                      onClick={() => setIsTeamModalOpen(false)}
+                    >
+                      CANCEL
+                    </PixelButton>
+                    <PixelButton
+                      variant="solid"
+                      tone="purple"
+                      type="submit"
+                      loading={updatingTeam}
+                      disabled={updatingTeam}
+                    >
+                      {updatingTeam ? 'SAVING...' : 'SAVE CHANGES'}
+                    </PixelButton>
+                  </div>
+                </PixelStack>
+              </PixelCard>
+            </form>
+          </PixelStack>
+        ) : (
         <PixelStack gap={6}>
           {/* Header Card & Navigation Tabs */}
           <PixelCard className="bg-retro-surface">
             <PixelStack gap={4}>
               <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
-                <PixelStack gap={1}>
+                <PixelStack gap={1} className="min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <h1 className="text-2xl font-pixel text-retro-text font-bold">
+                    <h1 className="text-xl sm:text-2xl font-pixel text-retro-text font-bold break-words">
                       {team ? team.name.toUpperCase() : 'MANAGEMENT CONSOLE'}
                     </h1>
                     {team && (
@@ -606,7 +785,7 @@ function ManageOrgPage() {
                     )}
                   </div>
                   {team && (
-                    <div className="text-xs font-pixel text-retro-muted">
+                    <div className="text-xs font-pixel text-retro-muted break-all">
                       SLUG: @{team.slug} | ID: {team.id}
                     </div>
                   )}
@@ -638,12 +817,12 @@ function ManageOrgPage() {
                 </PixelStack>
               </PixelStack>
 
-              {/* Management Tabs */}
-              <div className="flex items-center gap-2 border-b-2 border-retro-border pt-2">
+              {/* Management Tabs (Horizontally scrollable on mobile) */}
+              <div className="flex items-center gap-2 border-b-2 border-retro-border pt-2 overflow-x-auto no-scrollbar whitespace-nowrap">
                 <button
                   type="button"
                   onClick={() => setActiveTab('overview')}
-                  className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                  className={`px-3 sm:px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] shrink-0 ${
                     activeTab === 'overview'
                       ? 'border-retro-primary text-retro-primary bg-retro-bg'
                       : 'border-transparent text-retro-muted hover:text-retro-text'
@@ -656,7 +835,7 @@ function ManageOrgPage() {
                     <button
                       type="button"
                       onClick={() => setActiveTab('events')}
-                      className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                      className={`px-3 sm:px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] shrink-0 ${
                         activeTab === 'events'
                           ? 'border-retro-primary text-retro-primary bg-retro-bg'
                           : 'border-transparent text-retro-muted hover:text-retro-text'
@@ -667,7 +846,7 @@ function ManageOrgPage() {
                     <button
                       type="button"
                       onClick={() => setActiveTab('approvals')}
-                      className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                      className={`px-3 sm:px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] shrink-0 ${
                         activeTab === 'approvals'
                           ? 'border-retro-primary text-retro-primary bg-retro-bg'
                           : 'border-transparent text-retro-muted hover:text-retro-text'
@@ -678,7 +857,7 @@ function ManageOrgPage() {
                     <button
                       type="button"
                       onClick={() => setActiveTab('newsletters')}
-                      className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                      className={`px-3 sm:px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] shrink-0 ${
                         activeTab === 'newsletters'
                           ? 'border-retro-primary text-retro-primary bg-retro-bg'
                           : 'border-transparent text-retro-muted hover:text-retro-text'
@@ -695,9 +874,7 @@ function ManageOrgPage() {
           {error && <PixelAlert tone="red" message={error} />}
           {success && <PixelAlert tone="green" message={success} />}
 
-          {loading ? (
-            <div className="font-pixel text-xs text-retro-muted">LOADING DETAILS...</div>
-          ) : team ? (
+          {team ? (
             <>
               {/* TAB 1: OVERVIEW & ROSTER */}
               {activeTab === 'overview' && (
@@ -799,11 +976,13 @@ function ManageOrgPage() {
                               setMemberSearch(e.target.value)
                               setMemberPage(1)
                             }}
-                            className="px-3 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text focus:outline-none focus:border-retro-primary w-48"
+                            className="px-3 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text focus:outline-none focus:border-retro-primary w-full sm:w-48"
                           />
                         </PixelStack>
 
-                        {members.length > 0 ? (
+                        {loadingRoster ? (
+                          <PixelSkeletonTable rows={5} />
+                        ) : members.length > 0 ? (
                           <>
                             <div className="public-table">
                               <PixelTable
@@ -841,12 +1020,12 @@ function ManageOrgPage() {
                                 setGradeSearch(e.target.value)
                                 setGradePage(1)
                               }}
-                              className="px-3 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text focus:outline-none focus:border-retro-primary w-56"
+                              className="px-3 py-1 bg-retro-bg border border-retro-border rounded font-sans text-xs text-retro-text focus:outline-none focus:border-retro-primary w-full sm:w-56"
                             />
                           </PixelStack>
 
                           <div className="flex flex-wrap gap-2 items-center">
-                            <div className="flex-1 min-w-[220px]">
+                            <div className="flex-1 min-w-[200px]">
                               <UserSearchCombobox
                                 value={newGradeUserId}
                                 onChange={setNewGradeUserId}
@@ -889,7 +1068,9 @@ function ManageOrgPage() {
                             </PixelButton>
                           </div>
 
-                          {classGrades.length > 0 ? (
+                          {loadingGrades ? (
+                            <PixelSkeletonTable rows={4} />
+                          ) : classGrades.length > 0 ? (
                             <>
                               <div className="public-table">
                                 <PixelTable
@@ -1029,7 +1210,7 @@ function ManageOrgPage() {
                       </PixelStack>
 
                       {loadingEvents ? (
-                        <div className="font-pixel text-xs text-retro-muted py-4">LOADING EVENTS...</div>
+                        <PixelSkeletonList count={2} />
                       ) : events.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {events.map((evt) => (
@@ -1127,7 +1308,7 @@ function ManageOrgPage() {
                     <PixelSectionHeader title={`PENDING TEAM APPLICATIONS (${applications.length})`} size="sm" />
 
                     {loadingApplications ? (
-                      <div className="font-pixel text-xs text-retro-muted py-4">LOADING APPLICATIONS...</div>
+                      <PixelSkeletonList count={2} />
                     ) : applications.length > 0 ? (
                       <div className="space-y-4">
                         {applications.map((app) => (
@@ -1181,56 +1362,6 @@ function ManageOrgPage() {
               )}
             </>
           ) : null}
-
-          {/* EDIT METADATA MODAL */}
-          {isTeamModalOpen && (
-            <PixelModal
-              open={isTeamModalOpen}
-              onClose={() => setIsTeamModalOpen(false)}
-              title="EDIT METADATA"
-            >
-              <form onSubmit={handleUpdateTeam} className="space-y-4">
-                {teamError && <PixelAlert tone="red" message={teamError} />}
-
-                <PixelInput
-                  label="NAME"
-                  required
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                />
-
-                <PixelInput
-                  label="SLUG"
-                  required
-                  value={teamSlug}
-                  onChange={(e) => setTeamSlug(e.target.value)}
-                />
-
-                <PixelInput
-                  label="LOGO URL"
-                  value={teamLogo}
-                  onChange={(e) => setTeamLogo(e.target.value)}
-                />
-
-                <MarkdownEditor
-                  label="DESCRIPTION (MARKDOWN SUPPORTED)"
-                  value={teamDescription}
-                  onChange={setTeamDescription}
-                  minHeight="180px"
-                  defaultMode="write"
-                />
-
-                <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
-                  <PixelButton variant="ghost" tone="neutral" onClick={() => setIsTeamModalOpen(false)}>
-                    CANCEL
-                  </PixelButton>
-                  <PixelButton variant="solid" tone="purple" type="submit" loading={updatingTeam}>
-                    SAVE CHANGES
-                  </PixelButton>
-                </div>
-              </form>
-            </PixelModal>
-          )}
 
           {/* ADD MEMBER MODAL */}
           {isMemberModalOpen && (
@@ -1490,6 +1621,7 @@ function ManageOrgPage() {
             </PixelModal>
           )}
         </PixelStack>
+        )}
       </PixelContainer>
     </ManagementLayout>
   )
@@ -1963,7 +2095,7 @@ function OrgEventDetailView({
           </div>
 
           {/* Sub Navigation Tabs */}
-          <div className="flex items-center gap-2 border-b-2 border-retro-border pt-2">
+          <div className="flex items-center gap-2 border-b-2 border-retro-border pt-2 overflow-x-auto no-scrollbar whitespace-nowrap">
             {[
               { id: 'details', label: 'OVERVIEW & DETAILS' },
               { id: 'members', label: `MEMBERS (${selectedEvent.members.length})` },
@@ -1974,7 +2106,7 @@ function OrgEventDetailView({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] ${
+                className={`px-3 sm:px-4 py-2 font-pixel text-xs font-bold transition-colors border-b-2 -mb-[2px] shrink-0 ${
                   activeTab === tab.id
                     ? 'border-retro-primary text-retro-primary bg-retro-bg'
                     : 'border-transparent text-retro-muted hover:text-retro-text'
@@ -2094,8 +2226,8 @@ function OrgEventDetailView({
                 message="Granular Per-Race Participation Enabled. In granular events, competitors enroll directly into individual races on the Races & Tracks tab. Removing a participant below will un-enroll them from all registered races and remove them from the event."
               />
             ) : (
-              <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
-                <div className="flex-1">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
+                <div className="flex-1 min-w-0">
                   <UserSearchCombobox value={addMemberUserId} onChange={setAddMemberUserId} />
                 </div>
                 <PixelButton
@@ -2332,8 +2464,8 @@ function OrgEventDetailView({
                     })`}
                     size="sm"
                   />
-                  <div className="flex items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
-                    <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
+                    <div className="flex-1 min-w-0">
                       {selectedEvent.granularParticipation ? (
                         <UserSearchCombobox value={addRaceMemberUserId} onChange={setAddRaceMemberUserId} />
                       ) : (

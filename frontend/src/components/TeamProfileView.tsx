@@ -13,6 +13,7 @@ import { listPublicNewsletters } from '../lib/public-api'
 import { formatLocalDateTime } from '../lib/datetime'
 import { UserLink } from './UserLink'
 import { MarkdownView } from './MarkdownView'
+import { PixelSkeletonInlineRows } from './LoadingSkeleton'
 import { useAuth } from '../hooks/useAuth'
 import { usePageHead } from '../hooks/usePageHead'
 
@@ -79,56 +80,58 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
   const memberCount = team.members?.length || 0
 
   return (
-    <PixelContainer maxWidth="full" padding="md">
-      <div className="max-w-6xl mx-auto">
+    <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
+      <div>
         {/* Compact Hugging Face-Inspired Header Card */}
         <PixelCard className="bg-retro-surface mb-5 border-2 border-retro-border-strong">
-          <PixelStack direction="row" gap={4} align="center" wrap justify="between">
-            <PixelStack direction="row" gap={4} align="center" wrap>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
               {team.logo ? (
                 <img
                   src={team.logo}
                   alt={team.name}
-                  className="w-16 h-16 rounded border-2 border-retro-border bg-retro-bg object-cover shadow shrink-0"
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded border-2 border-retro-border bg-retro-bg object-cover shadow shrink-0"
                 />
               ) : (
-                <div className="w-16 h-16 rounded border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-xl font-bold flex items-center justify-center shrink-0">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded border-2 border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-lg sm:text-xl font-bold flex items-center justify-center shrink-0">
                   {team.name.slice(0, 2).toUpperCase()}
                 </div>
               )}
-              <PixelStack gap={1}>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-xl sm:text-2xl font-pixel text-retro-text tracking-wide font-bold">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                  <h1 className="text-lg sm:text-2xl font-pixel text-retro-text tracking-wide font-bold truncate max-w-full">
                     {team.name}
                   </h1>
                   <PixelBadge tone={isOrg ? 'purple' : 'cyan'}>
                     {isOrg ? 'ORGANIZATION' : 'TEAM'}
                   </PixelBadge>
                 </div>
-                <div className="flex items-center gap-2.5 flex-wrap font-sans text-xs sm:text-sm text-retro-muted font-semibold">
+                <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap font-sans text-xs sm:text-sm text-retro-muted font-semibold mt-0.5">
                   <span>@{team.slug}</span>
                   <span>•</span>
                   <span className="font-pixel text-[10px] text-retro-muted">
                     {memberCount} {memberCount === 1 ? 'MEMBER' : 'MEMBERS'}
                   </span>
                 </div>
-              </PixelStack>
-            </PixelStack>
+              </div>
+            </div>
 
             {isTeamAdmin && (
-              <PixelButton asChild variant="solid" tone="purple" size="sm">
-                <Link to="/teams/manage/$id" params={{ id: team.id }}>
-                  {isOrg ? 'MANAGE ORG' : 'MANAGE TEAM'}
-                </Link>
-              </PixelButton>
+              <div className="pt-3 sm:pt-0 border-t sm:border-t-0 border-retro-border w-full sm:w-auto shrink-0">
+                <PixelButton asChild variant="solid" tone="purple" size="sm" className="w-full sm:w-auto justify-center">
+                  <Link to="/teams/manage/$id" params={{ id: team.id }}>
+                    {isOrg ? 'MANAGE ORG' : 'MANAGE TEAM'}
+                  </Link>
+                </PixelButton>
+              </div>
             )}
-          </PixelStack>
+          </div>
         </PixelCard>
 
-        {/* Tight 2-Column Hugging Face Style Layout */}
+        {/* Tight 2-Column Hugging Face Style Layout (Content-first on mobile) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Left Sidebar: Compact Avatar Cluster & Staff / Member Directory */}
-          <div className="lg:col-span-4 xl:col-span-3 flex flex-col gap-4">
+          {/* Left Sidebar on Desktop / Second on Mobile: Compact Avatar Cluster & Staff Directory */}
+          <div className="order-2 lg:order-1 lg:col-span-4 xl:col-span-3 flex flex-col gap-4">
             {/* Compact Avatar Cluster (Hugging Face Organization Members style) */}
             <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
               <PixelSectionHeader
@@ -230,8 +233,8 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
             </PixelCard>
           </div>
 
-          {/* Right Main Content: About, Team Statistics, Affiliated Orgs/Teams, Newsletters */}
-          <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-5">
+          {/* Right Main Content on Desktop / First on Mobile: About, Team Statistics, Affiliated Orgs/Teams, Newsletters */}
+          <div className="order-1 lg:order-2 lg:col-span-8 xl:col-span-9 flex flex-col gap-5">
             {/* About / Description Card with GitHub Flavoured Markdown */}
             <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
               <PixelSectionHeader title="ABOUT" titleTone="cyan" size="sm" />
@@ -427,8 +430,8 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                   </PixelButton>
                 </div>
                 {loadingNewsletters ? (
-                  <div className="mt-3 font-sans text-xs text-retro-muted">
-                    Loading newsletters...
+                  <div className="mt-3">
+                    <PixelSkeletonInlineRows rows={3} />
                   </div>
                 ) : orgNewsletters.length > 0 ? (
                   <div className="mt-3 flex flex-col gap-3">

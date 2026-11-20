@@ -6,7 +6,6 @@ import {
   PixelCard,
   PixelBadge,
   PixelSectionHeader,
-  PixelSpinner,
   PixelButton,
 } from '@pxlkit/ui-kit'
 import type { auth, eventmanager } from '../lib/client'
@@ -14,6 +13,8 @@ import { getLeaderboard, getUserRaceRecords, LeaderboardEntry } from '../lib/pub
 import { useAuth } from '../hooks/useAuth'
 import { usePageHead } from '../hooks/usePageHead'
 import { Pagination } from './Pagination'
+import { MarkdownView } from './MarkdownView'
+import { PixelSkeletonTable } from './LoadingSkeleton'
 
 interface UserProfileViewProps {
   user: auth.UserProfile
@@ -42,58 +43,75 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
   const [loadingRecords, setLoadingRecords] = useState(true)
 
   useEffect(() => {
+    let active = true
     async function loadUserStats() {
       try {
         setLoadingStats(true)
+        setStats(null)
         const lb = await getLeaderboard({ Search: user.slug || user.name })
         const match = lb.entries.find((e) => e.userId === user.id || (user.slug && e.slug === user.slug))
-        if (match) {
+        if (active && match) {
           setStats(match)
         }
       } catch {
         // ignore
       } finally {
-        setLoadingStats(false)
+        if (active) {
+          setLoadingStats(false)
+        }
       }
     }
     void loadUserStats()
-  }, [user])
+    return () => {
+      active = false
+    }
+  }, [user.id, user.slug, user.name])
 
   useEffect(() => {
+    let active = true
     async function loadRaceRecords() {
       try {
         setLoadingRecords(true)
         const offset = (page - 1) * pageSize
         const res = await getUserRaceRecords(user.id, pageSize, offset)
-        setRecords(res.records)
-        setRecordsTotal(res.total)
+        if (active) {
+          setRecords(res.records)
+          setRecordsTotal(res.total)
+        }
       } catch {
-        setRecords([])
-        setRecordsTotal(0)
+        if (active) {
+          setRecords([])
+          setRecordsTotal(0)
+        }
       } finally {
-        setLoadingRecords(false)
+        if (active) {
+          setLoadingRecords(false)
+        }
       }
     }
     void loadRaceRecords()
+    return () => {
+      active = false
+    }
   }, [user.id, page, pageSize])
 
   return (
-    <PixelContainer maxWidth="full" padding="md">
-      {/* Header Banner & Profile Card */}
-      <PixelCard className="bg-retro-surface mb-8 border-2 border-retro-border-strong">
-        <PixelStack direction="row" gap={5} align="center" wrap justify="between">
-          <PixelStack direction="row" gap={5} align="center" wrap>
+    <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
+      {/* Header Banner & Profile Card (Hugging Face Mobile Style) */}
+      <PixelCard className="bg-retro-surface mb-6 sm:mb-8 border-2 border-retro-border-strong">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 sm:gap-5 min-w-0">
             <img
               src={user.image || '/fallback_avatar.jpg'}
               alt={displayName}
               onError={(e) => {
                 e.currentTarget.src = '/fallback_avatar.jpg'
               }}
-              className="w-20 h-20 rounded-full border-4 border-retro-border bg-retro-bg object-cover shadow-md"
+              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-4 border-retro-border bg-retro-bg object-cover shadow-md shrink-0"
             />
-            <PixelStack gap={1}>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-pixel text-retro-text tracking-wide font-bold">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <h1 className="text-lg sm:text-2xl font-pixel text-retro-text tracking-wide font-bold truncate max-w-full">
                   {displayName}
                 </h1>
                 {user.classTier && user.classTier !== 'PRE_OP' && user.classTier !== 'OP' ? (
@@ -106,17 +124,17 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
                 )}
               </div>
               {user.slug && (
-                <div className="font-sans text-sm text-retro-muted font-semibold">
+                <div className="font-sans text-xs sm:text-sm text-retro-muted font-semibold mt-0.5 truncate">
                   @{user.slug}
                 </div>
               )}
-            </PixelStack>
-          </PixelStack>
+            </div>
+          </div>
 
           {isSelf && (
-            <PixelStack direction="row" gap={2}>
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-3 sm:pt-0 border-t sm:border-t-0 border-retro-border w-full sm:w-auto shrink-0">
               {(session?.user.siteRole === 'SITE_ADMIN' || (user.teams && user.teams.length > 0)) && (
-                <PixelButton asChild variant="soft" tone="purple" size="sm">
+                <PixelButton asChild variant="soft" tone="purple" size="sm" className="flex-1 sm:flex-initial justify-center">
                   <Link
                     to="/teams/manage/$id"
                     params={{ id: user.teams && user.teams.length > 0 ? user.teams[0].organizationId : 'org_mock_urs' }}
@@ -125,12 +143,12 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
                   </Link>
                 </PixelButton>
               )}
-              <PixelButton asChild variant="solid" tone="purple" size="sm">
+              <PixelButton asChild variant="solid" tone="purple" size="sm" className="flex-1 sm:flex-initial justify-center">
                 <Link to="/profile">EDIT PROFILE</Link>
               </PixelButton>
-            </PixelStack>
+            </div>
           )}
-        </PixelStack>
+        </div>
       </PixelCard>
 
       {/* Performance Summary Grid */}
@@ -140,9 +158,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
         size="md"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4 mb-8">
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1 flex items-center justify-center gap-1.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mt-4 mb-6 sm:mb-8">
+        <PixelCard className="bg-retro-surface text-center py-3.5 sm:py-5">
+          <div className="font-pixel text-[10px] sm:text-xs text-retro-muted mb-1 flex items-center justify-center gap-1.5">
             <span>RATING</span>
             <span
               className="relative group inline-flex items-center justify-center w-4 h-4 rounded-full border border-retro-border text-[10px] text-retro-muted hover:text-retro-primary hover:border-retro-primary cursor-help"
@@ -151,69 +169,103 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
               title="We use Glicko-2 to calculate your rankings"
             >
               ?
-              <span className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 w-56 p-2 rounded border-2 border-retro-border-strong bg-retro-bg text-retro-text font-sans text-xs font-normal text-left shadow-lg">
+              <span className="pointer-events-none opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 z-20 w-52 p-2 rounded border-2 border-retro-border-strong bg-retro-bg text-retro-text font-sans text-xs font-normal text-left shadow-lg">
                 We use Glicko-2 to calculate your rankings.
               </span>
             </span>
           </div>
-          <div className="font-pixel text-3xl text-retro-primary font-bold">
-            {stats ? stats.rating : 1500}
-          </div>
-          <div className="font-mono text-xs text-retro-muted mt-1">
-            ±{stats ? stats.ratingDeviation : 350} RD
-            {stats && stats.peakRating > 0 && (
-              <span className="ml-2 text-retro-gold">PEAK {stats.peakRating}</span>
-            )}
-          </div>
+          {loadingStats ? (
+            <div className="animate-pulse space-y-1.5 py-1">
+              <div className="h-7 bg-retro-bg rounded w-16 mx-auto" />
+              <div className="h-3 bg-retro-bg rounded w-20 mx-auto" />
+            </div>
+          ) : (
+            <>
+              <div className="font-pixel text-2xl sm:text-3xl text-retro-primary font-bold">
+                {stats ? stats.rating : 1500}
+              </div>
+              <div className="font-mono text-[11px] sm:text-xs text-retro-muted mt-1">
+                ±{stats ? stats.ratingDeviation : 350} RD
+                {stats && stats.peakRating > 0 && (
+                  <span className="ml-2 text-retro-gold">PEAK {stats.peakRating}</span>
+                )}
+              </div>
+            </>
+          )}
         </PixelCard>
 
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">TOTAL POINTS</div>
-          <div className="font-pixel text-3xl text-retro-gold font-bold">
-            {stats ? stats.totalPoints.toLocaleString() : '0'}
-          </div>
+        <PixelCard className="bg-retro-surface text-center py-3.5 sm:py-5">
+          <div className="font-pixel text-[10px] sm:text-xs text-retro-muted mb-1">TOTAL POINTS</div>
+          {loadingStats ? (
+            <div className="animate-pulse py-1">
+              <div className="h-7 bg-retro-bg rounded w-14 mx-auto" />
+            </div>
+          ) : (
+            <div className="font-pixel text-2xl sm:text-3xl text-retro-gold font-bold">
+              {stats ? stats.totalPoints.toLocaleString() : '0'}
+            </div>
+          )}
         </PixelCard>
 
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">AVG POSITION</div>
-          <div className="font-mono text-3xl text-retro-text font-bold">
-            {stats && stats.averagePosition > 0 ? stats.averagePosition.toFixed(1) : '—'}
-          </div>
+        <PixelCard className="bg-retro-surface text-center py-3.5 sm:py-5">
+          <div className="font-pixel text-[10px] sm:text-xs text-retro-muted mb-1">AVG POSITION</div>
+          {loadingStats ? (
+            <div className="animate-pulse py-1">
+              <div className="h-7 bg-retro-bg rounded w-12 mx-auto" />
+            </div>
+          ) : (
+            <div className="font-mono text-2xl sm:text-3xl text-retro-text font-bold">
+              {stats && stats.averagePosition > 0 ? stats.averagePosition.toFixed(1) : '—'}
+            </div>
+          )}
         </PixelCard>
 
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">AVG PTS / SEASON</div>
-          <div className="font-mono text-3xl text-retro-text font-bold">
-            {stats ? stats.averagePointsPerSeason.toFixed(1) : '0.0'}
-          </div>
+        <PixelCard className="bg-retro-surface text-center py-3.5 sm:py-5">
+          <div className="font-pixel text-[10px] sm:text-xs text-retro-muted mb-1">AVG PTS / SEASON</div>
+          {loadingStats ? (
+            <div className="animate-pulse py-1">
+              <div className="h-7 bg-retro-bg rounded w-14 mx-auto" />
+            </div>
+          ) : (
+            <div className="font-mono text-2xl sm:text-3xl text-retro-text font-bold">
+              {stats ? stats.averagePointsPerSeason.toFixed(1) : '0.0'}
+            </div>
+          )}
         </PixelCard>
 
-        <PixelCard className="bg-retro-surface text-center py-5">
-          <div className="font-pixel text-xs text-retro-muted mb-1">VICTORIES</div>
-          <div className="font-pixel text-3xl text-retro-green font-bold">
-            {stats ? stats.wins : 0}
-          </div>
+        <PixelCard className="bg-retro-surface text-center py-3.5 sm:py-5 col-span-2 sm:col-span-1">
+          <div className="font-pixel text-[10px] sm:text-xs text-retro-muted mb-1">VICTORIES</div>
+          {loadingStats ? (
+            <div className="animate-pulse py-1">
+              <div className="h-7 bg-retro-bg rounded w-10 mx-auto" />
+            </div>
+          ) : (
+            <div className="font-pixel text-2xl sm:text-3xl text-retro-green font-bold">
+              {stats ? stats.wins : 0}
+            </div>
+          )}
         </PixelCard>
       </div>
 
       {/* Details & Teams */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Biography & Career Records */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 min-w-0">
           <PixelCard className="bg-retro-surface">
             <h3 className="font-pixel text-sm text-retro-primary mb-3">BIOGRAPHY</h3>
-            <p className="font-sans text-sm text-retro-muted leading-relaxed">
-              {user.biography || 'No biography details provided yet.'}
-            </p>
+            <div className="font-sans text-sm text-retro-text leading-relaxed break-words">
+              <MarkdownView
+                content={user.biography}
+                fallbackText="No biography details provided yet."
+              />
+            </div>
           </PixelCard>
 
           <PixelCard className="bg-retro-surface">
             <h3 className="font-pixel text-sm text-retro-primary mb-3">CAREER OVERVIEW</h3>
 
             {loadingRecords ? (
-              <div className="flex justify-center items-center py-8">
-                <PixelSpinner size="md" />
-              </div>
+              <PixelSkeletonTable rows={4} />
             ) : records.length > 0 ? (
               <>
                 <div className="overflow-x-auto border-2 border-retro-border rounded bg-retro-bg">
@@ -323,24 +375,24 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
                     params={{ user: t.slug }}
                     className="block p-3 border-2 border-retro-border rounded hover:border-retro-primary transition-colors bg-retro-bg"
                   >
-                    <PixelStack direction="row" justify="between" align="center">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         {t.logo ? (
                           <img
                             src={t.logo}
                             alt={t.name}
-                            className="w-10 h-10 rounded border border-retro-border bg-retro-bg object-cover shadow-sm flex-shrink-0"
+                            className="w-10 h-10 rounded border border-retro-border bg-retro-bg object-cover shadow-sm shrink-0"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded border border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-xs font-bold flex items-center justify-center flex-shrink-0">
+                          <div className="w-10 h-10 rounded border border-retro-border bg-retro-primary/20 text-retro-primary font-pixel text-xs font-bold flex items-center justify-center shrink-0">
                             {t.name.slice(0, 2).toUpperCase()}
                           </div>
                         )}
-                        <div>
-                          <div className="font-pixel text-sm text-retro-text font-bold">
+                        <div className="min-w-0">
+                          <div className="font-pixel text-sm text-retro-text font-bold truncate">
                             {t.name}
                           </div>
-                          <div className="font-sans text-xs text-retro-muted">
+                          <div className="font-sans text-xs text-retro-muted truncate">
                             @{t.slug}
                           </div>
                         </div>
@@ -348,7 +400,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
                       <PixelBadge tone={t.role === 'ADMINISTRATOR' ? 'purple' : 'neutral'}>
                         {t.role}
                       </PixelBadge>
-                    </PixelStack>
+                    </div>
                   </Link>
                 ))}
               </PixelStack>

@@ -169,7 +169,7 @@ function EventsPage() {
       </div>
 
       {/* Tab Filter Controls */}
-      <div className="flex justify-center items-center gap-2 mb-6">
+      <div className="flex flex-wrap justify-center items-center gap-2 mb-6">
         <PixelButton
           variant={activeTab === 'ACTIVE' ? 'solid' : 'ghost'}
           tone={activeTab === 'ACTIVE' ? 'purple' : 'neutral'}

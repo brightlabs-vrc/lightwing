@@ -18,6 +18,7 @@ import { AlertBanner } from '../../../components/AlertBanner'
 import { UserSearchCombobox } from '../../../components/UserSearchCombobox'
 import { Pagination } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
+import { SldsSkeletonDetail } from '../../../components/LoadingSkeleton'
 import type { teammanager, auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/teams/$teamId')({
@@ -318,8 +319,8 @@ function AdminTeamDetailPage() {
         )}
 
         {loading ? (
-          <div className="slds-col slds-size_1-of-1 slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-            <p>Loading team detail panel...</p>
+          <div className="slds-col slds-size_1-of-1">
+            <SldsSkeletonDetail />
           </div>
         ) : team ? (
           <>

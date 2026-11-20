@@ -17,11 +17,19 @@ import {
   PixelInput,
 } from '@pxlkit/ui-kit'
 import { ManagementLayout } from './-ManagementLayout'
+import { PixelSkeletonDetail } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/teams/new')({
   beforeLoad: async ({ location }) => {
     await requireAuth(location)
   },
+  pendingComponent: () => (
+    <ManagementLayout>
+      <PixelContainer maxWidth="md" padding="md">
+        <PixelSkeletonDetail />
+      </PixelContainer>
+    </ManagementLayout>
+  ),
   component: NewTeamWizardPage,
 })
 
@@ -200,7 +208,7 @@ function NewTeamWizardPage() {
       <PixelContainer maxWidth="md" padding="md">
         <PixelCard className="text-center py-8">
           <PixelStack gap={4} align="center">
-            <span className="text-4xl">✅</span>
+            <i className="hn hn-check-circle-solid text-4xl text-retro-green" aria-hidden="true" />
             <h2 className="text-xl font-pixel text-retro-text tracking-wide font-bold">
               APPLICATION SUBMITTED!
             </h2>
@@ -251,7 +259,7 @@ function NewTeamWizardPage() {
                   }`}
                 >
                   <PixelStack gap={2}>
-                    <span className="text-3xl">🏢</span>
+                    <i className="hn hn-users-solid text-3xl text-retro-primary" aria-hidden="true" />
                     <h2 className="font-pixel text-sm text-retro-text font-bold">
                       NEW ORGANIZATION
                     </h2>
@@ -270,7 +278,7 @@ function NewTeamWizardPage() {
                   }`}
                 >
                   <PixelStack gap={2}>
-                    <span className="text-3xl">🏁</span>
+                    <i className="hn hn-flag-checkered-solid text-3xl text-retro-cyan" aria-hidden="true" />
                     <h2 className="font-pixel text-sm text-retro-text font-bold">
                       NEW COMPETITIVE TEAM
                     </h2>
@@ -289,7 +297,7 @@ function NewTeamWizardPage() {
                   }`}
                 >
                   <PixelStack gap={2}>
-                    <span className="text-3xl">🏎️</span>
+                    <i className="hn hn-trophy-solid text-3xl text-retro-gold" aria-hidden="true" />
                     <h2 className="font-pixel text-sm text-retro-text font-bold">
                       EXISTING TEAM APP
                     </h2>

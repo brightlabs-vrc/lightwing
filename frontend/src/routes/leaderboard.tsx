@@ -18,6 +18,7 @@ import {
 import { Pagination } from '../components/Pagination'
 import { usePageHead } from '../hooks/usePageHead'
 import { buildSeoMeta } from '../lib/seo'
+import { PixelSkeletonTable } from '../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/leaderboard')({
   ssr: 'data-only',
@@ -87,7 +88,7 @@ export function LeaderboardPage() {
       {/* Filter Bar */}
       <PixelCard className="mt-6 mb-6 bg-retro-surface">
         <PixelStack direction="row" gap={4} align="center" justify="between" wrap>
-          <PixelStack direction="row" gap={3} align="center" wrap>
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             <input
               type="text"
               placeholder="Search participant or @username..."
@@ -96,7 +97,7 @@ export function LeaderboardPage() {
                 setSearch(e.target.value)
                 setPage(1)
               }}
-              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary min-w-[220px]"
+              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary w-full sm:w-64"
             />
 
             <select
@@ -105,7 +106,7 @@ export function LeaderboardPage() {
                 setClassTier(e.target.value)
                 setPage(1)
               }}
-              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary"
+              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary flex-1 sm:flex-initial"
             >
               <option value="">All Class Tiers</option>
               <option value="G1">G1</option>
@@ -120,7 +121,7 @@ export function LeaderboardPage() {
                 setYear(Number(e.target.value))
                 setPage(1)
               }}
-              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary"
+              className="px-3 py-1.5 bg-retro-bg border-2 border-retro-border rounded text-sm text-retro-text font-sans focus:outline-none focus:border-retro-primary flex-1 sm:flex-initial"
             >
               {availableYears.map((y) => (
                 <option key={y} value={y}>
@@ -128,7 +129,7 @@ export function LeaderboardPage() {
                 </option>
               ))}
             </select>
-          </PixelStack>
+          </div>
 
           <PixelStack direction="row" gap={2} align="center" wrap>
             <span className="font-pixel text-xs text-retro-muted uppercase">SORT BY:</span>
@@ -182,9 +183,7 @@ export function LeaderboardPage() {
 
       {/* Main Table */}
       {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <PixelSpinner size="lg" />
-        </div>
+        <PixelSkeletonTable rows={8} />
       ) : error ? (
         <PixelEmptyState title="Error loading leaderboard" description={error} />
       ) : entries.length === 0 ? (

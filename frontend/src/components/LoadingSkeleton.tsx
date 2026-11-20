@@ -144,3 +144,135 @@ export function PixelSkeletonDetail() {
     </div>
   )
 }
+
+/**
+ * Retro PixelKit styled profile skeleton loader for User / Team / Org profiles.
+ */
+export function PixelSkeletonProfile() {
+  return (
+    <div className="animate-pulse space-y-6 max-w-6xl mx-auto">
+      {/* Header card */}
+      <div className="border-2 border-retro-border-strong bg-retro-surface p-5 rounded">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-retro-bg border-2 border-retro-border shrink-0" />
+          <div className="flex-1 space-y-2.5">
+            <div className="h-6 bg-retro-bg rounded w-48 max-w-full" />
+            <div className="h-4 bg-retro-bg rounded w-32" />
+          </div>
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          <div
+            key={idx}
+            className={`border-2 border-retro-border bg-retro-surface p-4 rounded text-center space-y-2 ${
+              idx === 4 ? 'col-span-2 sm:col-span-1' : ''
+            }`}
+          >
+            <div className="h-3 bg-retro-bg rounded w-20 mx-auto" />
+            <div className="h-7 bg-retro-bg rounded w-16 mx-auto" />
+          </div>
+        ))}
+      </div>
+
+      {/* Content columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="border-2 border-retro-border bg-retro-surface p-5 rounded space-y-3">
+            <div className="h-4 bg-retro-bg rounded w-28" />
+            <div className="h-4 bg-retro-bg rounded w-full" />
+            <div className="h-4 bg-retro-bg rounded w-5/6" />
+          </div>
+          <div className="border-2 border-retro-border bg-retro-surface p-5 rounded space-y-3">
+            <div className="h-4 bg-retro-bg rounded w-36" />
+            <div className="h-10 bg-retro-bg rounded w-full" />
+            <div className="h-10 bg-retro-bg rounded w-full" />
+          </div>
+        </div>
+        <div className="border-2 border-retro-border bg-retro-surface p-5 rounded space-y-3 h-48">
+          <div className="h-4 bg-retro-bg rounded w-32" />
+          <div className="h-12 bg-retro-bg rounded w-full" />
+          <div className="h-12 bg-retro-bg rounded w-full" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Compact skeleton for retro table rows.
+ */
+export function PixelSkeletonTable({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="animate-pulse border-2 border-retro-border rounded bg-retro-bg divide-y divide-retro-border">
+      {Array.from({ length: rows }).map((_, idx) => (
+        <div key={idx} className="p-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="h-4 w-8 bg-retro-surface rounded shrink-0" />
+            <div className="h-4 bg-retro-surface rounded w-2/5" />
+          </div>
+          <div className="h-4 w-16 bg-retro-surface rounded shrink-0" />
+          <div className="h-4 w-12 bg-retro-surface rounded shrink-0" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Compact skeleton for inline list rows (Home page, Team newsletters).
+ */
+export function PixelSkeletonInlineRows({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="animate-pulse divide-y divide-retro-border">
+      {Array.from({ length: rows }).map((_, idx) => (
+        <div key={idx} className="py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-4 h-4 rounded bg-retro-bg shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3.5 bg-retro-bg rounded w-3/5" />
+              <div className="h-2.5 bg-retro-bg rounded w-2/5" />
+            </div>
+          </div>
+          <div className="h-4 w-14 bg-retro-bg rounded shrink-0" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Skeleton loader for Edit Profile / Settings form.
+ */
+export function PixelSkeletonForm() {
+  return (
+    <div className="animate-pulse max-w-6xl mx-auto space-y-6">
+      <div className="h-8 bg-retro-surface rounded w-48" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 border-2 border-retro-border bg-retro-surface p-6 rounded space-y-4">
+          <div className="h-4 bg-retro-bg rounded w-32" />
+          <div className="h-10 bg-retro-bg rounded w-full" />
+          <div className="h-10 bg-retro-bg rounded w-full" />
+          <div className="h-10 bg-retro-bg rounded w-full" />
+        </div>
+        <div className="border-2 border-retro-border bg-retro-surface p-6 rounded space-y-4">
+          <div className="h-4 bg-retro-bg rounded w-32" />
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-retro-bg shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-retro-bg rounded w-28" />
+              <div className="h-3 bg-retro-bg rounded w-20" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="border-2 border-retro-border bg-retro-surface p-6 rounded space-y-3 h-64">
+        <div className="h-4 bg-retro-bg rounded w-40" />
+        <div className="h-44 bg-retro-bg rounded w-full" />
+      </div>
+    </div>
+  )
+}
+

@@ -3,9 +3,6 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
 import { usePageHead } from '../../hooks/usePageHead'
 
-// Import Salesforce Lightning Design System CSS directly from node_modules
-import '@salesforce-ux/design-system/assets/styles/salesforce-lightning-design-system.min.css'
-
 interface AdminLayoutProps {
   children: React.ReactNode
   title: string
@@ -33,7 +30,17 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
     <div className="slds-scope bg-slate-100 min-h-screen font-sans" style={{ background: '#f3f2f1', minHeight: '100vh', paddingBottom: '3rem' }}>
       {/* Salesforce Global Header */}
       <header className="slds-global-header_container" style={{ position: 'static', marginBottom: '1.5rem' }}>
-        <div className="slds-global-header slds-grid slds-grid_align-spread slds-grid_vertical-align-center" style={{ height: '3.125rem', borderBottom: '1px solid #dddbda', background: '#ffffff', padding: '0 1.5rem' }}>
+        <div
+          className="slds-global-header slds-grid slds-grid_align-spread slds-grid_vertical-align-center"
+          style={{
+            minHeight: '3.125rem',
+            borderBottom: '1px solid #dddbda',
+            background: '#ffffff',
+            padding: '0.5rem 1rem',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
           <div className="slds-global-header__item slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center' }}>
             <div className="slds-p-right_small" style={{ display: 'flex', alignItems: 'center' }}>
               <span className="slds-icon_container slds-icon-utility-setup" style={{ background: '#0176d3', color: '#fff', borderRadius: '4px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', fontSize: '14px' }}>
@@ -50,8 +57,8 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
 
           <div className="slds-global-header__item slds-grid slds-grid_vertical-align-center">
             {session ? (
-              <div className="slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span className="slds-text-body_small slds-text-color_weak">
+              <div className="slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span className="slds-text-body_small slds-text-color_weak" style={{ fontSize: '12px' }}>
                   Signed in as <strong>{session.user.vrchatUsername ?? session.user.name}</strong> ({session.user.siteRole})
                 </span>
                 <button
@@ -70,9 +77,9 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
         </div>
 
         {/* Context Navigation Bar */}
-        <div className="slds-context-bar" style={{ borderBottom: '1px solid #dddbda', background: '#ffffff' }}>
-          <nav className="slds-context-bar__secondary" role="navigation" style={{ width: '100%' }}>
-            <ul className="slds-grid" style={{ display: 'flex', margin: 0, padding: 0, listStyle: 'none' }}>
+        <div className="slds-context-bar" style={{ borderBottom: '1px solid #dddbda', background: '#ffffff', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <nav className="slds-context-bar__secondary" role="navigation" style={{ width: '100%', minWidth: 'max-content' }}>
+            <ul className="slds-grid" style={{ display: 'flex', margin: 0, padding: 0, listStyle: 'none', flexWrap: 'nowrap' }}>
               <li className={`slds-context-bar__item ${isCurrent('/admin') && !isCurrent('/admin/events') && !isCurrent('/admin/users') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
                 <Link to="/admin" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
                   <span className="slds-truncate">Home</span>
@@ -114,10 +121,10 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
       </header>
 
       {/* Main Content Area */}
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem' }}>
         {/* Page Header */}
         <div className="slds-page-header slds-m-bottom_large" role="banner" style={{ borderRadius: '4px', border: '1px solid #dddbda', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div className="slds-page-header__row">
+          <div className="slds-page-header__row" style={{ flexWrap: 'wrap', gap: '12px' }}>
             <div className="slds-page-header__col-title">
               <div className="slds-media slds-no-space slds-grow">
                 <div className="slds-media__figure">

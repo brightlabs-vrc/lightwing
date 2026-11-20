@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { createFileRoute, Link, useParams } from '@tanstack/react-router'
 import {
   PixelContainer,
-  PixelSpinner,
   PixelEmptyState,
   PixelButton,
 } from '@pxlkit/ui-kit'
@@ -10,6 +9,7 @@ import { getPublicTeamProfile } from '../../lib/public-api'
 import type { teammanager } from '../../lib/client'
 import { buildSeoMeta } from '../../lib/seo'
 import { TeamProfileView } from '../../components/TeamProfileView'
+import { PixelSkeletonProfile } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/t/$team')({
   ssr: 'data-only',
@@ -45,6 +45,11 @@ export const Route = createFileRoute('/t/$team')({
       }),
     }
   },
+  pendingComponent: () => (
+    <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
+      <PixelSkeletonProfile />
+    </PixelContainer>
+  ),
   component: TeamProfilePage,
 })
 
@@ -100,10 +105,8 @@ export function TeamProfilePage() {
 
   if (loading) {
     return (
-      <PixelContainer maxWidth="full" padding="md">
-        <div className="flex justify-center items-center py-16">
-          <PixelSpinner size="lg" />
-        </div>
+      <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
+        <PixelSkeletonProfile />
       </PixelContainer>
     )
   }

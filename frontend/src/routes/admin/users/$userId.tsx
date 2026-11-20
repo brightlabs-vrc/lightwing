@@ -13,6 +13,8 @@ import {
 import { isValidUserSlug } from '../../../lib/slugs'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
+import { SldsSkeletonDetail } from '../../../components/LoadingSkeleton'
+import { MarkdownView } from '../../../components/MarkdownView'
 import type { auth, eventmanager, teammanager } from '../../../lib/client'
 import type { ClassTier, SiteRole } from '../../../types'
 
@@ -229,9 +231,7 @@ function AdminUserDetailPage() {
               )}
 
               {loading ? (
-                <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-                  <p>Loading user profile...</p>
-                </div>
+                <SldsSkeletonDetail />
               ) : profile ? (
                 <div>
                   {isEditing ? (
@@ -533,8 +533,8 @@ function AdminUserDetailPage() {
                       {/* Biography */}
                       <div className="slds-m-bottom_large">
                         <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Biography</p>
-                        <div className="slds-m-top_xx-small" style={{ whiteSpace: 'pre-wrap', background: '#f8fafc', padding: '12px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '60px', color: '#334155' }}>
-                          {profile.biography ? profile.biography : <span className="text-slate-400 italic">No biography registered.</span>}
+                        <div className="slds-m-top_xx-small" style={{ background: '#f8fafc', padding: '12px', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '60px', color: '#334155' }}>
+                          <MarkdownView content={profile.biography} fallbackText="No biography registered." />
                         </div>
                       </div>
 

@@ -4,27 +4,6 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { EditorView, keymap } from '@codemirror/view'
 import { Prec } from '@codemirror/state'
-import {
-  Bold,
-  Italic,
-  Strikethrough,
-  Code,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  CheckSquare,
-  Quote,
-  FileCode2,
-  Minus,
-  Table,
-  Link as LinkIcon,
-  Image as ImageIcon,
-  Columns2,
-  Pencil,
-  Eye,
-} from 'lucide-react'
 import { MarkdownView } from './MarkdownView'
 
 export type MarkdownEditorMode = 'split' | 'write' | 'preview'
@@ -41,42 +20,39 @@ export interface MarkdownEditorProps {
   className?: string
 }
 
-const retroEditorTheme = EditorView.theme(
-  {
-    '&': {
-      backgroundColor: 'var(--color-retro-bg, #0d1117)',
-      color: 'var(--color-retro-text, #f3f4f6)',
-      fontSize: '13px',
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    },
-    '.cm-content': {
-      padding: '12px 10px',
-      caretColor: 'var(--color-retro-primary, #a855f7)',
-    },
-    '.cm-gutters': {
-      backgroundColor: 'var(--color-retro-surface, #161b22)',
-      color: 'var(--color-retro-muted, #8b949e)',
-      borderRight: '1px solid var(--color-retro-border, #30363d)',
-    },
-    '.cm-activeLine': {
-      backgroundColor: 'rgba(168, 85, 247, 0.08)',
-    },
-    '.cm-activeLineGutter': {
-      backgroundColor: 'rgba(168, 85, 247, 0.14)',
-    },
-    '&.cm-focused .cm-cursor': {
-      borderLeftColor: 'var(--color-retro-primary, #a855f7)',
-    },
-    '&.cm-focused .cm-selectionBackground, ::selection': {
-      backgroundColor: 'rgba(168, 85, 247, 0.28)',
-    },
-    '.cm-placeholder': {
-      color: 'var(--color-retro-muted, #8b949e)',
-      fontStyle: 'italic',
-    },
+const retroEditorTheme = EditorView.theme({
+  '&': {
+    backgroundColor: 'var(--retro-bg, #F2F0EB)',
+    color: 'var(--retro-text, #1A1A2E)',
+    fontSize: '13px',
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   },
-  { dark: true },
-)
+  '.cm-content': {
+    padding: '12px 10px',
+    caretColor: 'var(--retro-primary, #4F46E5)',
+  },
+  '.cm-gutters': {
+    backgroundColor: 'var(--retro-surface, #E6E2DC)',
+    color: 'var(--retro-muted, #646478)',
+    borderRight: '1px solid var(--retro-border, #BEBAA2)',
+  },
+  '.cm-activeLine': {
+    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'rgba(79, 70, 229, 0.14)',
+  },
+  '&.cm-focused .cm-cursor': {
+    borderLeftColor: 'var(--retro-primary, #4F46E5)',
+  },
+  '&.cm-focused .cm-selectionBackground, ::selection': {
+    backgroundColor: 'rgba(79, 70, 229, 0.24)',
+  },
+  '.cm-placeholder': {
+    color: 'var(--retro-muted, #646478)',
+    fontStyle: 'italic',
+  },
+})
 
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   value,
@@ -280,7 +256,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => prefixLines('# ', 'Heading 1')}
             >
-              <Heading1 className="w-4 h-4" />
+              <i className="hn hn-heading-1-solid text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -289,7 +265,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => prefixLines('## ', 'Heading 2')}
             >
-              <Heading2 className="w-4 h-4" />
+              <i className="hn hn-heading-2-solid text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -298,7 +274,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => prefixLines('### ', 'Heading 3')}
             >
-              <Heading3 className="w-4 h-4" />
+              <i className="hn hn-heading-3-solid text-sm" aria-hidden="true" />
             </button>
 
             <span className="w-px h-4 bg-retro-border mx-1" />
@@ -310,7 +286,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => wrapSelection('**', '**', 'bold text')}
             >
-              <Bold className="w-4 h-4" />
+              <i className="hn hn-bold text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -319,7 +295,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => wrapSelection('*', '*', 'italic text')}
             >
-              <Italic className="w-4 h-4" />
+              <i className="hn hn-italics text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -328,7 +304,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => wrapSelection('~~', '~~', 'strikethrough')}
             >
-              <Strikethrough className="w-4 h-4" />
+              <i className="hn hn-strike-through text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -337,7 +313,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => wrapSelection('`', '`', 'code')}
             >
-              <Code className="w-4 h-4" />
+              <i className="hn hn-code text-sm" aria-hidden="true" />
             </button>
 
             <span className="w-px h-4 bg-retro-border mx-1" />
@@ -349,7 +325,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => prefixLines('- ', 'List item')}
             >
-              <List className="w-4 h-4" />
+              <i className="hn hn-bullet-list text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -358,7 +334,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => prefixLines('1. ', 'List item')}
             >
-              <ListOrdered className="w-4 h-4" />
+              <i className="hn hn-numbered-list text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -367,7 +343,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => prefixLines('- [ ] ', 'Task item')}
             >
-              <CheckSquare className="w-4 h-4" />
+              <i className="hn hn-check-list text-sm" aria-hidden="true" />
             </button>
 
             <span className="w-px h-4 bg-retro-border mx-1" />
@@ -379,7 +355,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => prefixLines('> ', 'Quote')}
             >
-              <Quote className="w-4 h-4" />
+              <i className="hn hn-quote-left text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -388,7 +364,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => insertBlock('```\ncode\n```')}
             >
-              <FileCode2 className="w-4 h-4" />
+              <i className="hn hn-code-block text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -399,7 +375,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 insertBlock('| Column 1 | Column 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |')
               }
             >
-              <Table className="w-4 h-4" />
+              <i className="hn hn-table text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -408,7 +384,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={toolbarBtnClass}
               onClick={() => insertBlock('---')}
             >
-              <Minus className="w-4 h-4" />
+              <i className="hn hn-minus text-sm" aria-hidden="true" />
             </button>
 
             <span className="w-px h-4 bg-retro-border mx-1" />
@@ -420,7 +396,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={`${toolbarBtnClass} ${insertPopover === 'link' ? 'bg-retro-bg text-retro-primary border-retro-primary' : ''}`}
               onClick={() => openInsertPopover('link')}
             >
-              <LinkIcon className="w-4 h-4" />
+              <i className="hn hn-link text-sm" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -429,7 +405,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               className={`${toolbarBtnClass} ${insertPopover === 'image' ? 'bg-retro-bg text-retro-primary border-retro-primary' : ''}`}
               onClick={() => openInsertPopover('image')}
             >
-              <ImageIcon className="w-4 h-4" />
+              <i className="hn hn-image text-sm" aria-hidden="true" />
             </button>
           </div>
 
@@ -444,7 +420,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                   : 'text-retro-muted hover:text-retro-text'
               }`}
             >
-              <Pencil className="w-3 h-3" />
+              <i className="hn hn-pencil text-[11px]" aria-hidden="true" />
               WRITE
             </button>
             <button
@@ -456,7 +432,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                   : 'text-retro-muted hover:text-retro-text'
               }`}
             >
-              <Columns2 className="w-3 h-3" />
+              <i className="hn hn-side-nav-collapse text-[11px]" aria-hidden="true" />
               SPLIT
             </button>
             <button
@@ -468,7 +444,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                   : 'text-retro-muted hover:text-retro-text'
               }`}
             >
-              <Eye className="w-3 h-3" />
+              <i className="hn hn-eye text-[11px]" aria-hidden="true" />
               PREVIEW
             </button>
           </div>
@@ -533,6 +509,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 ref={editorRef}
                 value={value}
                 onChange={onChange}
+                theme={retroEditorTheme}
                 extensions={extensions}
                 placeholder={placeholder}
                 minHeight={minHeight}

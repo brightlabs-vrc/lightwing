@@ -17,6 +17,7 @@ import { AlertBanner } from '../../../components/AlertBanner'
 import { UserSearchCombobox } from '../../../components/UserSearchCombobox'
 import { Pagination } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
+import { SldsSkeletonDetail } from '../../../components/LoadingSkeleton'
 import type { eventmanager, teammanager } from '../../../lib/client'
 import type { ClassTier } from '../../../types'
 
@@ -286,8 +287,8 @@ function AdminOrgDetailPage() {
         )}
 
         {loading ? (
-          <div className="slds-col slds-size_1-of-1 slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-            <p>Loading organization detail panel...</p>
+          <div className="slds-col slds-size_1-of-1">
+            <SldsSkeletonDetail />
           </div>
         ) : org ? (
           <>

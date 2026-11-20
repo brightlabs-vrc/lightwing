@@ -11,6 +11,7 @@ import {
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { Pagination } from '../../../components/Pagination'
+import { SldsSkeletonList } from '../../../components/LoadingSkeleton'
 import type { teammanager } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/organizations/')({
@@ -224,9 +225,7 @@ function AdminOrganizationsPage() {
               </div>
 
               {loading ? (
-                <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-                  <p>Loading organizations...</p>
-                </div>
+                <SldsSkeletonList count={4} />
               ) : orgs.length > 0 ? (
                 <>
                   <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>

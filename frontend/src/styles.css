@@ -1,8 +1,36 @@
 @import "tailwindcss";
+@import "@salesforce-ux/design-system/assets/styles/salesforce-lightning-design-system.min.css" layer(base);
 @import "@pxlkit/ui-kit/styles.css";
+@import "@hackernoon/pixel-icon-library/fonts/iconfont.css";
 
 /* Tell Tailwind to scan the pxlkit package for its utility classes */
 @source "../node_modules/@pxlkit/ui-kit";
+
+@layer base {
+  html,
+  body {
+    background-color: var(--retro-bg, #f2f0eb);
+    color: var(--retro-text, #1a1a2e);
+    font-family: var(--font-sans, sans-serif);
+    overflow-x: hidden;
+  }
+}
+
+.hn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 
 table {
   border-collapse: collapse;
@@ -19,7 +47,7 @@ th {
 }
 
 .site-header-inner {
-  min-height: 2rem;
+  min-height: 2.5rem;
 }
 
 .site-brand {
@@ -33,22 +61,6 @@ th {
 
 .site-account {
   flex-shrink: 0;
-}
-
-@media (max-width: 639px) {
-  .site-header-inner {
-    align-items: flex-start;
-    row-gap: 0.5rem;
-  }
-
-  .site-brand {
-    flex-basis: 100%;
-  }
-
-  .site-nav {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 
 .public-table {

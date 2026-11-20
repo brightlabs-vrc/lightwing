@@ -51,46 +51,45 @@ export function ManagementLayout({ children }: ManagementLayoutProps) {
 
   return (
     <div className="min-h-screen bg-retro-bg text-retro-text font-sans">
-      <header className="border-b-2 border-retro-border-strong bg-retro-surface py-0.5">
-        <PixelContainer maxWidth="full" padding="none" className="site-header-container px-4">
+      <header className="border-b-2 border-retro-border-strong bg-retro-surface py-1">
+        <PixelContainer maxWidth="full" padding="none" className="site-header-container px-3 sm:px-4">
           <PixelStack direction="row" gap={3} align="center" justify="between" wrap className="site-header-inner">
-            <PixelStack direction="row" gap={4} align="center">
-              <Link to="/" className="flex items-center gap-2">
+            <PixelStack direction="row" gap={3} align="center" wrap className="min-w-0">
+              <Link to="/" className="flex items-center gap-2 shrink-0">
                 <img src="/favicon.png" alt="Lightwing" className="w-6 h-6" />
-                <span className="font-pixel text-sm font-bold text-retro-text tracking-wide">
+                <span className="font-pixel text-xs sm:text-sm font-bold text-retro-text tracking-wide">
                   MANAGEMENT CONSOLE
                 </span>
               </Link>
 
-              {isManagePage && userManagedOrgs.length > 0 && (
-                <div className="flex items-center gap-2 pl-4 border-l-2 border-retro-border">
-                  <span className="font-pixel text-xs text-retro-muted font-bold">ENTITY:</span>
-                  <select
-                    value={currentTeamId || ''}
-                    onChange={(e) => {
-                      const targetId = e.target.value
-                      if (targetId && targetId !== currentTeamId) {
-                        void navigate({ to: '/teams/manage/$id', params: { id: targetId } })
-                      }
-                    }}
-                    disabled={loadingOrgs}
-                    className="px-3 py-1 bg-retro-bg border-2 border-retro-border rounded font-pixel text-xs text-retro-primary font-bold focus:outline-none focus:border-retro-primary cursor-pointer"
-                  >
-                    {loadingOrgs ? (
-                      <option value="">LOADING...</option>
-                    ) : (
-                      <>
-                        {currentTeamId && !userManagedOrgs.some((o) => o.id === currentTeamId) && (
-                          <option value={currentTeamId}>CURRENT ({currentTeamId})</option>
-                        )}
-                        {userManagedOrgs.map((org) => (
-                          <option key={org.id} value={org.id}>
-                            {org.name.toUpperCase()} (@{org.slug})
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
+              {isManagePage && (loadingOrgs || userManagedOrgs.length > 0) && (
+                <div className="flex items-center gap-2 sm:pl-4 sm:border-l-2 sm:border-retro-border min-w-0">
+                  <span className="font-pixel text-[10px] sm:text-xs text-retro-muted font-bold shrink-0">
+                    ENTITY:
+                  </span>
+                  {loadingOrgs ? (
+                    <div className="h-7 w-40 sm:w-52 bg-retro-bg border-2 border-retro-border rounded animate-pulse" />
+                  ) : (
+                    <select
+                      value={currentTeamId || ''}
+                      onChange={(e) => {
+                        const targetId = e.target.value
+                        if (targetId && targetId !== currentTeamId) {
+                          void navigate({ to: '/teams/manage/$id', params: { id: targetId } })
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-retro-bg border-2 border-retro-border rounded font-pixel text-[11px] sm:text-xs text-retro-primary font-bold focus:outline-none focus:border-retro-primary cursor-pointer max-w-[190px] sm:max-w-xs truncate"
+                    >
+                      {currentTeamId && !userManagedOrgs.some((o) => o.id === currentTeamId) && (
+                        <option value={currentTeamId}>CURRENT ({currentTeamId})</option>
+                      )}
+                      {userManagedOrgs.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name.toUpperCase()} (@{org.slug})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
             </PixelStack>
@@ -115,7 +114,7 @@ export function ManagementLayout({ children }: ManagementLayoutProps) {
         </PixelContainer>
       </header>
 
-      <main className="w-full px-6 py-8">
+      <main className="w-full px-3 sm:px-6 py-4 sm:py-8">
         {children}
       </main>
     </div>

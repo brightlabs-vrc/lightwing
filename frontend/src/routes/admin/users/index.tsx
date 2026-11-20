@@ -7,6 +7,7 @@ import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { Pagination } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
+import { SldsSkeletonList } from '../../../components/LoadingSkeleton'
 import type { auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/')({
@@ -97,9 +98,7 @@ function AdminUsersPage() {
               )}
 
               {loading ? (
-                <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center' }}>
-                  <p>Loading participant records...</p>
-                </div>
+                <SldsSkeletonList count={4} />
               ) : users.length > 0 ? (
                 <>
                   <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>

@@ -86,6 +86,11 @@ export const Route = createFileRoute('/events/$eventId')({
       }),
     }
   },
+  pendingComponent: () => (
+    <PixelContainer maxWidth="full" padding="md">
+      <PixelSkeletonDetail />
+    </PixelContainer>
+  ),
   component: EventDetailPage,
 })
 
@@ -445,8 +450,9 @@ function EventDetailPage() {
                       <div className="text-xs text-retro-muted font-sans">
                         {new Date(schedule.startsAt).toLocaleString()}
                         {schedule.location && (
-                          <span className="block mt-1 font-pixel text-[11px] text-retro-text bg-retro-surface px-2 py-0.5 border border-retro-border pxl-corner-sm inline-block">
-                            📍 {schedule.location}
+                          <span className="block mt-1 font-pixel text-[11px] text-retro-text bg-retro-surface px-2 py-0.5 border border-retro-border pxl-corner-sm inline-flex items-center gap-1">
+                            <i className="hn hn-location-pin-solid text-xs text-retro-primary" aria-hidden="true" />
+                            <span>{schedule.location}</span>
                           </span>
                         )}
                       </div>
@@ -784,7 +790,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                     <span>LOCATION: <strong>{race.location}</strong></span>
                   </div>
                 </PixelStack>
-                <PixelStack direction="row" gap={2} align="center">
+                <PixelStack direction="row" gap={2} align="center" wrap>
                   <PixelBadge tone="neutral">
                     CLASS:{' '}
                     {race.classRestriction && race.classRestriction !== 'PRE_OP' && race.classRestriction !== 'OP' ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}

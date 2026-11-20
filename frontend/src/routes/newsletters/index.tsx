@@ -153,6 +153,7 @@ function NewslettersFeedPage() {
                 setPageSize(next)
                 setPage(1)
               }}
+              variant="pixel"
             />
           </>
         )}

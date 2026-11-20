@@ -11,6 +11,7 @@ import { getPublicNewsletter } from '../../lib/public-api'
 import { usePageHead } from '../../hooks/usePageHead'
 import { buildSeoMeta } from '../../lib/seo'
 import { NewsletterArticleView } from '../../components/NewsletterArticleView'
+import { PixelSkeletonDetail } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/newsletters/$newsletterId')({
   ssr: 'data-only',
@@ -35,6 +36,11 @@ export const Route = createFileRoute('/newsletters/$newsletterId')({
       }),
     }
   },
+  pendingComponent: () => (
+    <PixelContainer maxWidth="lg" padding="md">
+      <PixelSkeletonDetail />
+    </PixelContainer>
+  ),
   component: NewsletterDetailPage,
 })
 
@@ -58,10 +64,8 @@ function NewsletterDetailPage() {
 
   if (isLoading) {
     return (
-      <PixelContainer maxWidth="md" padding="md">
-        <div className="flex justify-center items-center py-16">
-          <PixelSpinner size="lg" />
-        </div>
+      <PixelContainer maxWidth="lg" padding="md">
+        <PixelSkeletonDetail />
       </PixelContainer>
     )
   }

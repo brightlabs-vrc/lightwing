@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { createFileRoute, Link, useParams } from '@tanstack/react-router'
 import {
   PixelContainer,
-  PixelSpinner,
   PixelEmptyState,
   PixelButton,
 } from '@pxlkit/ui-kit'
@@ -10,6 +9,7 @@ import { getPublicUserProfile } from '../../lib/public-api'
 import type { auth } from '../../lib/client'
 import { buildSeoMeta } from '../../lib/seo'
 import { UserProfileView } from '../../components/UserProfileView'
+import { PixelSkeletonProfile } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/u/$user')({
   ssr: 'data-only',
@@ -42,6 +42,11 @@ export const Route = createFileRoute('/u/$user')({
       }),
     }
   },
+  pendingComponent: () => (
+    <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
+      <PixelSkeletonProfile />
+    </PixelContainer>
+  ),
   component: UserProfilePage,
 })
 
@@ -97,10 +102,8 @@ export function UserProfilePage() {
 
   if (loading) {
     return (
-      <PixelContainer maxWidth="full" padding="md">
-        <div className="flex justify-center items-center py-16">
-          <PixelSpinner size="lg" />
-        </div>
+      <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
+        <PixelSkeletonProfile />
       </PixelContainer>
     )
   }
