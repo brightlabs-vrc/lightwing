@@ -437,7 +437,7 @@ function ManageOrgPage() {
           scoringRulesMode: eventScoringType === 1 ? eventScoringRulesMode : null,
           customScoringTables: eventScoringType === 1 && eventScoringRulesMode === 'CUSTOM' ? eventCustomScoringTables : null,
           scheduledAt: eventScheduledAt ? new Date(eventScheduledAt).toISOString() : null,
-          participantLimit: !eventGranular ? limitNum : null,
+          participantLimit: !eventGranular || eventIsTeamEvent ? limitNum : null,
           maxConcurrentRaceParticipations: eventGranular ? maxConcurrentNum : null,
           isTeamEvent: eventIsTeamEvent,
           maxPrimaryRosterSize: eventIsTeamEvent ? maxPrimaryNum : null,
@@ -1563,7 +1563,7 @@ function ManageOrgPage() {
                   </label>
                 </div>
 
-                {!eventGranular ? (
+                {(!eventGranular || eventIsTeamEvent) && (
                   <PixelInput
                     label={eventIsTeamEvent ? 'TEAM LIMIT' : 'PARTICIPANT LIMIT'}
                     type="number"
@@ -1571,7 +1571,9 @@ function ManageOrgPage() {
                     value={eventParticipantLimit}
                     onChange={(e) => setEventParticipantLimit(e.target.value)}
                   />
-                ) : (
+                )}
+
+                {eventGranular && (
                   <PixelInput
                     label="MAX RACES PER PARTICIPANT"
                     type="number"
@@ -1789,6 +1791,8 @@ function OrgEventDetailView({
   const [raceEditClassRestriction, setRaceEditClassRestriction] = useState<string>('')
   const [raceEditGrade, setRaceEditGrade] = useState<string>('')
   const [raceEditParticipantLimit, setRaceEditParticipantLimit] = useState<string>('')
+  const [raceEditMaxMembersPerTeam, setRaceEditMaxMembersPerTeam] = useState<string>('')
+  const [raceMaxMembersPerTeam, setRaceMaxMembersPerTeam] = useState<string>('')
   const [raceEditError, setRaceEditError] = useState<string | null>(null)
   const [showRaceGradeConfirm, setShowRaceGradeConfirm] = useState(false)
 
@@ -1922,7 +1926,7 @@ function OrgEventDetailView({
     const maxPrimaryNum = editMaxPrimaryRosterSize.trim() ? Number(editMaxPrimaryRosterSize) : null
     const maxBackupNum = editMaxBackupRosterSize.trim() ? Number(editMaxBackupRosterSize) : null
 
-    if (!selectedEvent?.granularParticipation && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
+    if ((!selectedEvent?.granularParticipation || selectedEvent?.isTeamEvent) && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
       alert(selectedEvent?.isTeamEvent ? 'Team limit must be a positive whole number.' : 'Participant limit must be a positive whole number.')
       return
     }
@@ -2009,6 +2013,7 @@ function OrgEventDetailView({
     setRaceEditClassRestriction(race.classRestriction || '')
     setRaceEditGrade(race.grade || '')
     setRaceEditParticipantLimit(race.participantLimit !== null ? String(race.participantLimit) : '')
+    setRaceEditMaxMembersPerTeam(race.maxMembersPerTeam !== null ? String(race.maxMembersPerTeam) : '')
     setRaceEditError(null)
     setShowEditRaceModal(true)
   }
@@ -2020,6 +2025,11 @@ function OrgEventDetailView({
       setRaceEditError('Race participant limit must be a positive whole number.')
       return
     }
+    const maxPerTeamNum = raceEditMaxMembersPerTeam.trim() ? Number(raceEditMaxMembersPerTeam) : null
+    if (maxPerTeamNum !== null && (isNaN(maxPerTeamNum) || !Number.isSafeInteger(maxPerTeamNum) || maxPerTeamNum <= 0)) {
+      setRaceEditError('Max racers per team must be a positive whole number.')
+      return
+    }
 
     await handleUpdateRace(editingRace.id, {
       name: raceEditName.trim(),
@@ -2029,6 +2039,7 @@ function OrgEventDetailView({
       classRestriction: (raceEditClassRestriction as any) || null,
       grade: raceEditGrade || null,
       participantLimit: limitNum,
+      maxMembersPerTeam: selectedEvent?.isTeamEvent ? maxPerTeamNum : null,
     })
     setShowEditRaceModal(false)
     setEditingRace(null)
@@ -2083,6 +2094,11 @@ function OrgEventDetailView({
   async function onCreateRaceSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!authHeader || !raceName) return
+    const maxPerTeamNum = raceMaxMembersPerTeam.trim() ? Number(raceMaxMembersPerTeam) : null
+    if (selectedEvent?.isTeamEvent && maxPerTeamNum !== null && (isNaN(maxPerTeamNum) || !Number.isSafeInteger(maxPerTeamNum) || maxPerTeamNum <= 0)) {
+      toast({ tone: 'red', title: 'Max racers per team must be a positive whole number.' })
+      return
+    }
     try {
       await createRaceEvent(
         eventId,
@@ -2093,6 +2109,7 @@ function OrgEventDetailView({
           distanceMeters: raceDistance,
           classRestriction: null,
           grade: raceGrade || 'OP',
+          maxMembersPerTeam: selectedEvent?.isTeamEvent ? maxPerTeamNum : null,
         },
         authHeader,
       )
@@ -2101,6 +2118,7 @@ function OrgEventDetailView({
       setRaceName('')
       setRaceLocation('')
       setRaceGrade('')
+      setRaceMaxMembersPerTeam('')
       toast({ tone: 'green', title: `Successfully created race event "${raceName}".` })
     } catch (err) {
       toast({ tone: 'red', title: err instanceof Error ? err.message : 'Failed to create race' })
@@ -2564,7 +2582,7 @@ function OrgEventDetailView({
             <PixelStack gap={4}>
               <PixelSectionHeader
                 title={`REGISTERED TEAMS (${(selectedEvent.teams ?? []).length}${
-                  !selectedEvent.granularParticipation && selectedEvent.participantLimit
+                  selectedEvent.participantLimit
                     ? ` / ${selectedEvent.participantLimit}`
                     : ''
                 })`}
@@ -3024,7 +3042,7 @@ function OrgEventDetailView({
                   isRaceOngoing={selectedRace.startsAt !== null && selectedRace.endsAt === null}
                   isRaceNotStarted={selectedRace.startsAt === null}
                   loadingResults={loadingResults}
-                  memberCount={selectedEvent.granularParticipation ? (selectedRace.members?.length || 0) : selectedEvent.members.length}
+                  memberCount={derivedStates.length}
                   rows={derivedStates}
                   changeSummary={changeSummary}
                   savingBatch={savingBatch}
@@ -3141,7 +3159,7 @@ function OrgEventDetailView({
               onChange={(e) => setEditScheduledAt(e.target.value)}
             />
 
-            {!selectedEvent.granularParticipation ? (
+            {(!selectedEvent.granularParticipation || selectedEvent.isTeamEvent) && (
               <PixelInput
                 label={selectedEvent.isTeamEvent ? 'TEAM LIMIT' : 'PARTICIPANT LIMIT'}
                 type="number"
@@ -3149,7 +3167,9 @@ function OrgEventDetailView({
                 value={editParticipantLimit}
                 onChange={(e) => setEditParticipantLimit(e.target.value)}
               />
-            ) : (
+            )}
+
+            {selectedEvent.granularParticipation && (
               <PixelInput
                 label="MAX RACES PER PARTICIPANT"
                 type="number"
@@ -3343,6 +3363,16 @@ function OrgEventDetailView({
               />
             )}
 
+            {selectedEvent.isTeamEvent && (
+              <PixelInput
+                label="MAX RACERS PER TEAM (THIS RACE)"
+                type="number"
+                placeholder="e.g. 2 (leave blank for unlimited)"
+                value={raceEditMaxMembersPerTeam}
+                onChange={(e) => setRaceEditMaxMembersPerTeam(e.target.value)}
+              />
+            )}
+
             <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
               <PixelButton
                 variant="ghost"
@@ -3440,6 +3470,16 @@ function OrgEventDetailView({
                 </select>
               </div>
             </div>
+
+            {selectedEvent.isTeamEvent && (
+              <PixelInput
+                label="MAX RACERS PER TEAM (THIS RACE)"
+                type="number"
+                placeholder="e.g. 2 (leave blank for unlimited)"
+                value={raceMaxMembersPerTeam}
+                onChange={(e) => setRaceMaxMembersPerTeam(e.target.value)}
+              />
+            )}
 
             <div className="flex justify-end gap-2 pt-4 border-t border-retro-border">
               <PixelButton variant="ghost" tone="neutral" onClick={() => setShowCreateRaceModal(false)}>

@@ -72,6 +72,9 @@ func requireEventOrTeamAdminPermission(ctx context.Context, actor *auth.Actor, e
 	if actor == nil {
 		return &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
 	}
+	if event.Status == "CONCLUDED" {
+		return &errs.Error{Code: errs.FailedPrecondition, Message: "team rosters and team associations are frozen once an event has concluded"}
+	}
 	if _, err := auth.RequireEventPermission(ctx, actor, event.ID, auth.ActionUpdate); err == nil {
 		return nil
 	}
@@ -161,7 +164,7 @@ func UpsertEventTeamRosterCore(ctx context.Context, actor *auth.Actor, p *Upsert
 		}
 	}
 
-	// Enforce event-level team capacity (participantLimit caps registered teams on non-granular team events).
+	// Enforce event-level team capacity (participantLimit caps registered teams on both regular and granular team events).
 	alreadyRegistered, err := q().EventTeamExists(ctx, sqlc.EventTeamExistsParams{
 		EventId: p.EventID,
 		TeamId:  p.TeamID,
@@ -169,7 +172,7 @@ func UpsertEventTeamRosterCore(ctx context.Context, actor *auth.Actor, p *Upsert
 	if err != nil {
 		return nil, err
 	}
-	if !alreadyRegistered && !event.GranularParticipation && event.ParticipantLimit.Valid {
+	if !alreadyRegistered && event.ParticipantLimit.Valid {
 		teamCount, err := q().CountEventTeams(ctx, p.EventID)
 		if err != nil {
 			return nil, err
@@ -268,6 +271,13 @@ func UpsertEventTeamRosterCore(ctx context.Context, actor *auth.Actor, p *Upsert
 			TeamId:     teamIDNull,
 			RosterRole: sql.NullString{String: RosterRoleBackup, Valid: true},
 			CreatedAt:  now,
+		}); err != nil {
+			return nil, err
+		}
+		// Ensure a member moved to BACKUP is removed from any not-yet-started race lineups.
+		if err := q().DeleteUserFromUnstartedRaces(ctx, sqlc.DeleteUserFromUnstartedRacesParams{
+			EventId: p.EventID,
+			UserId:  uid,
 		}); err != nil {
 			return nil, err
 		}

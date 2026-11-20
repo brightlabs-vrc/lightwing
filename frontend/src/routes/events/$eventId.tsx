@@ -14,7 +14,12 @@ import {
   joinRaceEvent,
   leaveRaceEvent,
 } from '../../lib/public-api'
-import { upsertEventTeamRoster, removeEventTeam } from '../../lib/admin-api'
+import {
+  upsertEventTeamRoster,
+  removeEventTeam,
+  addRaceEventMember,
+  removeRaceEventMember,
+} from '../../lib/admin-api'
 import { formatLocalDateTime } from '../../lib/datetime'
 import { computeRaceEffectiveResults } from '../../lib/standings'
 import { MarkdownView } from '../../components/MarkdownView'
@@ -257,7 +262,6 @@ function EventDetailPage() {
   const registeredTeams = event.teams ?? []
   const teamLimitReached =
     event.isTeamEvent &&
-    !isGranular &&
     event.participantLimit !== null &&
     registeredTeams.length >= event.participantLimit
 
@@ -585,7 +589,7 @@ function EventDetailPage() {
           {event.isTeamEvent ? (
             <>
               <PixelSectionHeader
-                title={`REGISTERED TEAMS (${registeredTeams.length}${!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
+                title={`REGISTERED TEAMS (${registeredTeams.length}${event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
                 size="sm"
                 spacing="tight"
               />
@@ -1190,6 +1194,45 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
   const isEligiblePrimary = !event.isTeamEvent || currentMember?.rosterRole === 'PRIMARY'
   const isBackupOnly = Boolean(event.isTeamEvent && currentMember && currentMember.rosterRole !== 'PRIMARY')
 
+  const [lineupRaceId, setLineupRaceId] = useState<string | null>(null)
+  const [lineupTeamId, setLineupTeamId] = useState<string>('')
+
+  const adminTeamIds = new Set(
+    (session?.user.teams ?? [])
+      .filter((t) => {
+        const role = (t.role || '').toLowerCase()
+        return role === 'administrator' || role === 'admin' || role === 'owner'
+      })
+      .map((t) => t.organizationId),
+  )
+  const managedRegisteredTeams = (event.teams ?? []).filter((t) => adminTeamIds.has(t.teamId))
+
+  const addTeamRaceMemberMutation = useMutation({
+    mutationFn: ({ raceId, userId }: { raceId: string; userId: string }) =>
+      addRaceEventMember(event.id, raceId, userId, `Bearer ${session?.session.token ?? ''}`),
+    onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+    },
+    onError: (err: any) => {
+      toast({ tone: 'red', title: err?.message || 'Could not add racer to race lineup.' })
+    },
+  })
+
+  const removeTeamRaceMemberMutation = useMutation({
+    mutationFn: ({ raceId, userId }: { raceId: string; userId: string }) =>
+      removeRaceEventMember(event.id, raceId, userId, `Bearer ${session?.session.token ?? ''}`),
+    onSuccess: (_, { raceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', event.id] })
+      queryClient.invalidateQueries({ queryKey: ['public-race-results', event.id, raceId] })
+    },
+    onError: (err: any) => {
+      toast({ tone: 'red', title: err?.message || 'Could not remove racer from race lineup.' })
+    },
+  })
+
   const joinRaceMutation = useMutation({
     mutationFn: ({ raceId }: { raceId: string }) =>
       joinRaceEvent(event.id, raceId, `Bearer ${session?.session.token ?? ''}`),
@@ -1257,6 +1300,15 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
     )
   }
 
+  const lineupRace = lineupRaceId ? races.find((r) => r.id === lineupRaceId) ?? null : null
+  const activeLineupTeam =
+    managedRegisteredTeams.find((t) => t.teamId === lineupTeamId) ?? managedRegisteredTeams[0] ?? null
+  const canManageTeamLineups =
+    event.isTeamEvent &&
+    managedRegisteredTeams.length > 0 &&
+    !event.signupsLocked &&
+    (event.status === 'PENDING' || event.status === 'ONGOING')
+
   return (
     <PixelStack gap={6} className="mt-4">
       {races.map((race) => {
@@ -1281,11 +1333,32 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                     CLASS:{' '}
                     {race.classRestriction && race.classRestriction !== 'PRE_OP' && race.classRestriction !== 'OP' ? CLASS_TIER_LABELS[race.classRestriction] ?? race.classRestriction : 'OPEN'}
                   </PixelBadge>
-                    {race.participantLimit !== null && (
-                      <PixelBadge tone="neutral">
-                        CAPACITY: {(race.members ?? []).length} / {race.participantLimit}
-                      </PixelBadge>
-                    )}
+                  {race.participantLimit !== null && (
+                    <PixelBadge tone="neutral">
+                      CAPACITY: {(race.members ?? []).length} / {race.participantLimit}
+                    </PixelBadge>
+                  )}
+                  {event.isTeamEvent && race.maxMembersPerTeam !== null && (
+                    <PixelBadge tone="cyan">
+                      MAX {race.maxMembersPerTeam} / TEAM
+                    </PixelBadge>
+                  )}
+                  {canManageTeamLineups && !race.startsAt && (
+                    <PixelButton
+                      variant="outline"
+                      tone="purple"
+                      size="sm"
+                      className="pxl-btn-flat font-pixel text-[10px]"
+                      onClick={() => {
+                        setLineupRaceId(race.id)
+                        if (!lineupTeamId && managedRegisteredTeams.length > 0) {
+                          setLineupTeamId(managedRegisteredTeams[0].teamId)
+                        }
+                      }}
+                    >
+                      MANAGE TEAM LINEUP
+                    </PixelButton>
+                  )}
                   {event.granularParticipation && (
                     <>
                       {!session ? (
@@ -1304,7 +1377,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                           tone={isRaceMember ? 'red' : 'green'}
                           size="sm"
                           className="pxl-btn-flat font-pixel text-[10px]"
-                          disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending || (!isRaceMember && race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit)}
+                          disabled={event.status === 'CONCLUDED' || event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending || (!isRaceMember && race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit)}
                           onClick={() => {
                             if (isRaceMember) {
                               leaveRaceMutation.mutate({ raceId: race.id })
@@ -1327,7 +1400,7 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                         tone={isRaceMember ? 'red' : 'green'}
                         size="sm"
                         className="pxl-btn-flat font-pixel text-[10px]"
-                        disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
+                        disabled={event.status === 'CONCLUDED' || event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
                         onClick={() => {
                           if (isRaceMember) {
                             leaveRaceMutation.mutate({ raceId: race.id })
@@ -1359,6 +1432,105 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
         </PixelCard>
         )
       })}
+
+      {/* Team Admin Race Lineup Modal */}
+      {lineupRace && activeLineupTeam && (
+        <PixelModal
+          open={Boolean(lineupRace)}
+          onClose={() => setLineupRaceId(null)}
+          title={`TEAM LINEUP — #${lineupRace.sequence}. ${lineupRace.name}`}
+        >
+          <PixelStack gap={4}>
+            {managedRegisteredTeams.length > 1 && (
+              <div>
+                <label className="block font-pixel text-[10px] text-retro-muted mb-1">SELECT TEAM</label>
+                <select
+                  value={activeLineupTeam.teamId}
+                  onChange={(e) => setLineupTeamId(e.target.value)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                >
+                  {managedRegisteredTeams.map((t) => (
+                    <option key={t.teamId} value={t.teamId}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {(() => {
+              const raceMemberIds = new Set((lineupRace.members ?? []).map((m) => m.userId))
+              const primaryMembers = activeLineupTeam.primaryRoster ?? []
+              const assignedCount = primaryMembers.filter((m) => raceMemberIds.has(m.userId)).length
+              const teamCapReached =
+                lineupRace.maxMembersPerTeam !== null && assignedCount >= lineupRace.maxMembersPerTeam
+              const raceCapReached =
+                lineupRace.participantLimit !== null &&
+                (lineupRace.members ?? []).length >= lineupRace.participantLimit
+
+              return (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-pixel text-retro-muted">
+                    <span>TEAM: <strong className="text-retro-text">{activeLineupTeam.name}</strong></span>
+                    <span>
+                      IN RACE: <strong className="text-retro-text">{assignedCount}</strong>
+                      {lineupRace.maxMembersPerTeam !== null ? ` / ${lineupRace.maxMembersPerTeam}` : ''}
+                    </span>
+                  </div>
+
+                  {primaryMembers.length === 0 ? (
+                    <PixelAlert tone="cyan" message="No PRIMARY roster members registered for this team yet." />
+                  ) : (
+                    <div className="space-y-2">
+                      {primaryMembers.map((member) => {
+                        const inRace = raceMemberIds.has(member.userId)
+                        const busy = addTeamRaceMemberMutation.isPending || removeTeamRaceMemberMutation.isPending
+                        return (
+                          <div
+                            key={member.userId}
+                            className="flex items-center justify-between gap-3 p-2.5 bg-retro-bg border border-retro-border rounded"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-sans text-sm font-medium text-retro-text truncate">
+                                {member.name}
+                              </div>
+                              <div className="font-pixel text-[10px] text-retro-muted">
+                                {inRace ? 'IN RACE LINEUP' : 'AVAILABLE (PRIMARY)'}
+                              </div>
+                            </div>
+                            <PixelButton
+                              variant={inRace ? 'outline' : 'solid'}
+                              tone={inRace ? 'red' : 'green'}
+                              size="sm"
+                              className="pxl-btn-flat font-pixel text-[10px]"
+                              disabled={busy || (!inRace && (teamCapReached || raceCapReached))}
+                              onClick={() => {
+                                if (inRace) {
+                                  removeTeamRaceMemberMutation.mutate({ raceId: lineupRace.id, userId: member.userId })
+                                } else {
+                                  addTeamRaceMemberMutation.mutate({ raceId: lineupRace.id, userId: member.userId })
+                                }
+                              }}
+                            >
+                              {inRace ? 'REMOVE' : teamCapReached ? 'TEAM FULL' : raceCapReached ? 'RACE FULL' : 'ADD TO RACE'}
+                            </PixelButton>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+
+            <div className="flex justify-end pt-2 border-t border-retro-border">
+              <PixelButton variant="ghost" tone="neutral" onClick={() => setLineupRaceId(null)}>
+                DONE
+              </PixelButton>
+            </div>
+          </PixelStack>
+        </PixelModal>
+      )}
     </PixelStack>
   )
 }

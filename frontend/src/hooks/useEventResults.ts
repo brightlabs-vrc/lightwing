@@ -31,6 +31,49 @@ interface UseEventResultsProps {
   setGlobalSuccess: (success: string | null) => void;
 }
 
+/**
+ * Resolves the list of eligible participants for a race's results table:
+ * - Granular events: explicit race members (`selectedRace.members`).
+ * - Non-granular team events: explicit race lineup if populated, otherwise only `PRIMARY` roster members (BACKUP reserves are excluded).
+ * - Non-granular individual events: all event members.
+ * In all cases, anyone who already has a saved result for this race (e.g. a racer
+ * substituted to BACKUP after racing an earlier heat) is preserved so their result remains visible/editable.
+ */
+export function getEligibleRaceMembers(
+  selectedEvent: eventmanager.EventDetail,
+  selectedRace: eventmanager.RaceEventDetail | null,
+  results: eventmanager.RaceResultView[],
+): eventmanager.EventMemberView[] {
+  let base: eventmanager.EventMemberView[]
+  if (selectedEvent.granularParticipation && selectedRace) {
+    base = selectedRace.members ?? []
+  } else if (selectedEvent.isTeamEvent) {
+    if (selectedRace && (selectedRace.members ?? []).length > 0) {
+      base = selectedRace.members ?? []
+    } else {
+      base = selectedEvent.members.filter((m) => m.rosterRole === 'PRIMARY')
+    }
+  } else {
+    base = selectedEvent.members
+  }
+
+  if (results.length === 0) {
+    return base
+  }
+
+  const seen = new Set(base.map((m) => m.userId))
+  const extras: eventmanager.EventMemberView[] = []
+  for (const r of results) {
+    if (seen.has(r.userId)) continue
+    const fallbackMember = selectedEvent.members.find((m) => m.userId === r.userId)
+    if (fallbackMember) {
+      seen.add(r.userId)
+      extras.push(fallbackMember)
+    }
+  }
+  return extras.length > 0 ? [...base, ...extras] : base
+}
+
 export function useEventResults({
   eventId,
   authHeader,
@@ -103,7 +146,7 @@ export function useEventResults({
 
   const derivedStates: DerivedRow[] = useMemo(() => {
     if (!selectedEvent) return []
-    const membersToUse = (selectedEvent.granularParticipation && selectedRace) ? (selectedRace.members ?? []) : selectedEvent.members
+    const membersToUse = getEligibleRaceMembers(selectedEvent, selectedRace, results)
     return deriveRows(membersToUse, results, editedResults, pendingDeletions)
   }, [selectedEvent, selectedRace, results, editedResults, pendingDeletions])
 

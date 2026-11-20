@@ -158,8 +158,9 @@ type RaceEventView struct {
 	ClassRestriction *string               `json:"classRestriction"`
 	StartsAt         *string               `json:"startsAt"`
 	EndsAt           *string               `json:"endsAt"`
-	ParticipantLimit *int                  `json:"participantLimit"`
-	Members          []RaceEventMemberView `json:"members"`
+	ParticipantLimit  *int                  `json:"participantLimit"`
+	MaxMembersPerTeam *int                  `json:"maxMembersPerTeam"`
+	Members           []RaceEventMemberView `json:"members"`
 }
 
 // EventDetail is the full event payload.
@@ -329,9 +330,10 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		ScoringType      sql.NullInt64
 		Grade            sql.NullString
 		ClassRestriction sql.NullString
-		StartsAt         *time.Time
-		EndsAt           *time.Time
-		ParticipantLimit sql.NullInt64
+		StartsAt          *time.Time
+		EndsAt            *time.Time
+		ParticipantLimit  sql.NullInt64
+		MaxMembersPerTeam sql.NullInt64
 	}
 	var races []raceRow
 	rrows, err := q().ListEventRaces(ctx, id)
@@ -345,7 +347,8 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 			ScoringType: sql.NullInt64{Int64: int64(rr.ScoringType.Int16), Valid: rr.ScoringType.Valid},
 			Grade:       rr.Grade, ClassRestriction: nullStringFromAny(rr.ClassRestriction),
 			StartsAt: timePtrFromNull(rr.StartsAt), EndsAt: timePtrFromNull(rr.EndsAt),
-			ParticipantLimit: sql.NullInt64{Int64: int64(rr.ParticipantLimit.Int32), Valid: rr.ParticipantLimit.Valid},
+			ParticipantLimit:  sql.NullInt64{Int64: int64(rr.ParticipantLimit.Int32), Valid: rr.ParticipantLimit.Valid},
+			MaxMembersPerTeam: sql.NullInt64{Int64: int64(rr.MaxMembersPerTeam.Int32), Valid: rr.MaxMembersPerTeam.Valid},
 		})
 	}
 
@@ -500,8 +503,10 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 			DistanceMeters: r.DistanceMeters, TrackType: r.TrackType, Location: r.Location,
 			ScoringType: nullInt(r.ScoringType), Grade: nullString(r.Grade),
 			ClassRestriction: classTierPtr(r.ClassRestriction),
-			StartsAt:         nullTime(r.StartsAt), EndsAt: nullTime(r.EndsAt),
-			ParticipantLimit: nullInt(r.ParticipantLimit), Members: mems,
+			StartsAt:          nullTime(r.StartsAt), EndsAt: nullTime(r.EndsAt),
+			ParticipantLimit:  nullInt(r.ParticipantLimit),
+			MaxMembersPerTeam: nullInt(r.MaxMembersPerTeam),
+			Members:           mems,
 		})
 	}
 	if schedules == nil {
@@ -659,11 +664,11 @@ func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventReque
 	if p.MaxConcurrentRaceParticipations.Set {
 		maxConcurrent = p.MaxConcurrentRaceParticipations.Value
 	}
-	if isGranular {
+	if isGranular && !p.IsTeamEvent {
 		if participantLimit != nil {
-			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Granular events cannot have an event-level participant limit"}
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Granular individual events cannot have an event-level participant limit"}
 		}
-	} else {
+	} else if !isGranular {
 		if maxConcurrent != nil {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Regular events cannot have a maxConcurrentRaceParticipations limit"}
 		}

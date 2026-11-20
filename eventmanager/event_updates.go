@@ -89,18 +89,18 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 		}
 	}
 
-	if isGranular {
+	if isGranular && !existing.IsTeamEvent {
 		if participantLimit != nil {
-			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Granular events cannot have an event-level participant limit"}
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Granular individual events cannot have an event-level participant limit"}
 		}
-	} else {
+	} else if !isGranular {
 		if maxConcurrent != nil {
 			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Regular events cannot have a maxConcurrentRaceParticipations limit"}
 		}
 	}
 
 	// Capacity checks before reducing a limit.
-	if !isGranular && participantLimit != nil {
+	if participantLimit != nil && (!isGranular || existing.IsTeamEvent) {
 		if existing.IsTeamEvent {
 			teamCount64, err := q().CountEventTeams(ctx, p.ID)
 			if err != nil {

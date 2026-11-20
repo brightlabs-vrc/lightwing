@@ -254,7 +254,7 @@ export function EventMembersTab({
           <div className="primer-box-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
               Registered Teams ({teams.length}
-              {!isGranular && selectedEvent.participantLimit !== null ? ` / ${selectedEvent.participantLimit}` : ''})
+              {selectedEvent.participantLimit !== null ? ` / ${selectedEvent.participantLimit}` : ''})
             </h3>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)', cursor: 'pointer' }}>
               <input

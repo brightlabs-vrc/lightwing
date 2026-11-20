@@ -991,6 +991,9 @@ export async function getUserRaceRecords(
       eventName: 'Summer Sprint Invitational',
       eventTag: 'OFFICIAL',
       eventScheduledAt: now,
+      teamId: '',
+      teamName: '',
+      teamSlug: '',
     },
     {
       resultId: 'res_mock_004',
@@ -1011,6 +1014,9 @@ export async function getUserRaceRecords(
       eventName: 'Summer Sprint Invitational',
       eventTag: 'OFFICIAL',
       eventScheduledAt: now,
+      teamId: '',
+      teamName: '',
+      teamSlug: '',
     },
   ]
 

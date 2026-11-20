@@ -119,6 +119,7 @@ function AdminEventDetailPage() {
   const [raceEditClassRestriction, setRaceEditClassRestriction] = useState<ClassTier | null>(null)
   const [raceEditGrade, setRaceEditGrade] = useState<string | null>(null)
   const [raceEditParticipantLimit, setRaceEditParticipantLimit] = useState<string>('')
+  const [raceEditMaxMembersPerTeam, setRaceEditMaxMembersPerTeam] = useState<string>('')
   const [showRaceGradeConfirm, setShowRaceGradeConfirm] = useState(false)
   const [raceEditError, setRaceEditError] = useState<string | null>(null)
 
@@ -145,6 +146,7 @@ function AdminEventDetailPage() {
       setRaceEditClassRestriction(selectedRace.classRestriction as ClassTier | null)
       setRaceEditGrade(selectedRace.grade)
       setRaceEditParticipantLimit(selectedRace.participantLimit !== null ? String(selectedRace.participantLimit) : '')
+      setRaceEditMaxMembersPerTeam(selectedRace.maxMembersPerTeam !== null ? String(selectedRace.maxMembersPerTeam) : '')
       setRaceEditError(null)
     }
   }, [showEditRaceModal, selectedRace])
@@ -178,7 +180,7 @@ function AdminEventDetailPage() {
     const maxPrimaryNum = editMaxPrimaryRosterSize.trim() ? Number(editMaxPrimaryRosterSize) : null
     const maxBackupNum = editMaxBackupRosterSize.trim() ? Number(editMaxBackupRosterSize) : null
 
-    if (!editGranularParticipation && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
+    if ((!editGranularParticipation || selectedEvent?.isTeamEvent) && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
       window.alert(selectedEvent?.isTeamEvent ? 'Team limit must be a positive whole number.' : 'Participant limit must be a positive whole number.')
       return
     }
@@ -200,7 +202,7 @@ function AdminEventDetailPage() {
       description: editDescription || null,
       classRestriction: editClassRestriction || null,
       scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
-      participantLimit: editGranularParticipation ? null : limitNum,
+      participantLimit: !editGranularParticipation || selectedEvent?.isTeamEvent ? limitNum : null,
       maxConcurrentRaceParticipations: editGranularParticipation ? maxConcurrentNum : null,
       maxPrimaryRosterSize: selectedEvent?.isTeamEvent ? maxPrimaryNum : null,
       maxBackupRosterSize: selectedEvent?.isTeamEvent ? maxBackupNum : null,
@@ -260,6 +262,11 @@ function AdminEventDetailPage() {
       setRaceEditError('Race participant limit must be a positive whole number.')
       return
     }
+    const maxPerTeamNum = raceEditMaxMembersPerTeam.trim() ? Number(raceEditMaxMembersPerTeam) : null
+    if (maxPerTeamNum !== null && (isNaN(maxPerTeamNum) || !Number.isSafeInteger(maxPerTeamNum) || maxPerTeamNum <= 0)) {
+      setRaceEditError('Max racers per team must be a positive whole number.')
+      return
+    }
 
     await handleUpdateRace(selectedRace.id, {
       name: raceEditName.trim(),
@@ -269,6 +276,7 @@ function AdminEventDetailPage() {
       classRestriction: raceEditClassRestriction,
       grade: raceEditGrade,
       participantLimit: limitNum,
+      maxMembersPerTeam: selectedEvent?.isTeamEvent ? maxPerTeamNum : null,
     })
     setShowEditRaceModal(false)
   }
@@ -703,10 +711,27 @@ function AdminEventDetailPage() {
                   type="number"
                   min={1}
                   placeholder="Leave blank for unlimited"
-                  value={newRaceForm.participantLimit !== null ? String(newRaceForm.participantLimit) : ''}
+                  value={newRaceForm.participantLimit !== null && newRaceForm.participantLimit !== undefined ? String(newRaceForm.participantLimit) : ''}
                   onChange={(e) => {
                     const val = e.target.value
                     setNewRaceForm((c) => ({ ...c, participantLimit: val ? Number(val) : null }))
+                  }}
+                />
+              </FormControl>
+            )}
+
+            {selectedEvent && selectedEvent.isTeamEvent && (
+              <FormControl>
+                <FormControl.Label>Max Racers Per Team (This Race)</FormControl.Label>
+                <TextInput
+                  block
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 2 (leave blank for unlimited)"
+                  value={newRaceForm.maxMembersPerTeam !== null && newRaceForm.maxMembersPerTeam !== undefined ? String(newRaceForm.maxMembersPerTeam) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setNewRaceForm((c) => ({ ...c, maxMembersPerTeam: val ? Number(val) : null }))
                   }}
                 />
               </FormControl>
@@ -785,7 +810,7 @@ function AdminEventDetailPage() {
               </FormControl>
             </div>
 
-            {!editGranularParticipation ? (
+            {(!editGranularParticipation || selectedEvent?.isTeamEvent) && (
               <FormControl>
                 <FormControl.Label>{selectedEvent?.isTeamEvent ? 'Team Limit' : 'Participant Limit'}</FormControl.Label>
                 <TextInput
@@ -797,7 +822,9 @@ function AdminEventDetailPage() {
                   onChange={(e) => setEditParticipantLimit(e.target.value)}
                 />
               </FormControl>
-            ) : (
+            )}
+
+            {editGranularParticipation && (
               <FormControl>
                 <FormControl.Label>Max Races Per Participant</FormControl.Label>
                 <TextInput
@@ -946,6 +973,20 @@ function AdminEventDetailPage() {
                   placeholder="Leave blank for unlimited"
                   value={raceEditParticipantLimit}
                   onChange={(e) => setRaceEditParticipantLimit(e.target.value)}
+                />
+              </FormControl>
+            )}
+
+            {selectedEvent && selectedEvent.isTeamEvent && (
+              <FormControl>
+                <FormControl.Label>Max Racers Per Team (This Race)</FormControl.Label>
+                <TextInput
+                  block
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 2 (leave blank for unlimited)"
+                  value={raceEditMaxMembersPerTeam}
+                  onChange={(e) => setRaceEditMaxMembersPerTeam(e.target.value)}
                 />
               </FormControl>
             )}

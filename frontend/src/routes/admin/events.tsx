@@ -213,7 +213,7 @@ function AdminEventsListPage() {
           scoringRulesMode: formScoringType === 1 ? formScoringRulesMode : null,
           customScoringTables: formScoringType === 1 && formScoringRulesMode === 'CUSTOM' ? formCustomScoringTables : null,
           scheduledAt: formScheduledAt ? new Date(formScheduledAt).toISOString() : null,
-          participantLimit: formGranularParticipation ? null : limitNum,
+          participantLimit: !formGranularParticipation || formIsTeamEvent ? limitNum : null,
           maxConcurrentRaceParticipations: formGranularParticipation ? maxConcurrentNum : null,
           isTeamEvent: formIsTeamEvent,
           maxPrimaryRosterSize: formIsTeamEvent ? maxPrimaryNum : null,
@@ -534,9 +534,9 @@ function AdminEventsListPage() {
                 onChange={(e) => {
                   const checked = e.target.checked
                   setFormGranularParticipation(checked)
-                  if (checked) {
+                  if (checked && !formIsTeamEvent) {
                     setFormParticipantLimit('')
-                  } else {
+                  } else if (!checked) {
                     setFormMaxConcurrentRaceParticipations('')
                   }
                 }}
@@ -547,7 +547,7 @@ function AdminEventsListPage() {
               </FormControl.Caption>
             </FormControl>
 
-            {!formGranularParticipation ? (
+            {(!formGranularParticipation || formIsTeamEvent) && (
               <FormControl>
                 <FormControl.Label>{formIsTeamEvent ? 'Team Limit' : 'Participant Limit'}</FormControl.Label>
                 <TextInput
@@ -559,7 +559,9 @@ function AdminEventsListPage() {
                   onChange={(e) => setFormParticipantLimit(e.target.value)}
                 />
               </FormControl>
-            ) : (
+            )}
+
+            {formGranularParticipation && (
               <FormControl>
                 <FormControl.Label>Max Races Per Participant</FormControl.Label>
                 <TextInput

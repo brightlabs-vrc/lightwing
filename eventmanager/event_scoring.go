@@ -223,6 +223,9 @@ func SetEventStatusCore(ctx context.Context, actor *auth.Actor, p *SetEventStatu
 			}
 		}
 		if st == "CONCLUDED" {
+			if err := q().FreezeEventMemberTeamSnapshots(ctx, p.ID); err != nil {
+				return nil, err
+			}
 			if _, rerr := scorecalc.RecalculateAllRatings(ctx); rerr != nil {
 				scorecalc.InvalidateLeaderboardCache(ctx)
 			}

@@ -645,26 +645,27 @@ func (q *Queries) GetRaceEventMemberCount(ctx context.Context, raceeventid strin
 }
 
 const getRaceEventRow = `-- name: GetRaceEventRow :one
-SELECT id, "eventId", name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit", "createdAt", "updatedAt"
+SELECT id, "eventId", name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit", "maxMembersPerTeam", "createdAt", "updatedAt"
 FROM "race_event" WHERE id = $1
 `
 
 type GetRaceEventRowRow struct {
-	ID               string
-	EventId          string
-	Name             string
-	Sequence         int32
-	DistanceMeters   int32
-	TrackType        string
-	Location         string
-	ScoringType      sql.NullInt16
-	Grade            sql.NullString
-	ClassRestriction interface{}
-	StartsAt         sql.NullTime
-	EndsAt           sql.NullTime
-	ParticipantLimit sql.NullInt32
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                string
+	EventId           string
+	Name              string
+	Sequence          int32
+	DistanceMeters    int32
+	TrackType         string
+	Location          string
+	ScoringType       sql.NullInt16
+	Grade             sql.NullString
+	ClassRestriction  interface{}
+	StartsAt          sql.NullTime
+	EndsAt            sql.NullTime
+	ParticipantLimit  sql.NullInt32
+	MaxMembersPerTeam sql.NullInt32
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // Full race row (replaces raceEventColumns scans).
@@ -685,6 +686,7 @@ func (q *Queries) GetRaceEventRow(ctx context.Context, id string) (GetRaceEventR
 		&i.StartsAt,
 		&i.EndsAt,
 		&i.ParticipantLimit,
+		&i.MaxMembersPerTeam,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -971,26 +973,27 @@ func (q *Queries) InsertPointsStandingsRow(ctx context.Context, arg InsertPoints
 const insertRaceEvent = `-- name: InsertRaceEvent :exec
 INSERT INTO "race_event" (id, "eventId", name, sequence, "distanceMeters", "trackType",
     location, "scoringType", grade, "classRestriction", "startsAt", "endsAt",
-    "participantLimit", "createdAt", "updatedAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    "participantLimit", "maxMembersPerTeam", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 `
 
 type InsertRaceEventParams struct {
-	ID               string
-	EventId          string
-	Name             string
-	Sequence         int32
-	DistanceMeters   int32
-	TrackType        string
-	Location         string
-	ScoringType      sql.NullInt16
-	Grade            sql.NullString
-	ClassRestriction interface{}
-	StartsAt         sql.NullTime
-	EndsAt           sql.NullTime
-	ParticipantLimit sql.NullInt32
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                string
+	EventId           string
+	Name              string
+	Sequence          int32
+	DistanceMeters    int32
+	TrackType         string
+	Location          string
+	ScoringType       sql.NullInt16
+	Grade             sql.NullString
+	ClassRestriction  interface{}
+	StartsAt          sql.NullTime
+	EndsAt            sql.NullTime
+	ParticipantLimit  sql.NullInt32
+	MaxMembersPerTeam sql.NullInt32
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // Create race event row.
@@ -1009,6 +1012,7 @@ func (q *Queries) InsertRaceEvent(ctx context.Context, arg InsertRaceEventParams
 		arg.StartsAt,
 		arg.EndsAt,
 		arg.ParticipantLimit,
+		arg.MaxMembersPerTeam,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -1315,7 +1319,10 @@ func (q *Queries) ListEventMemberIDs(ctx context.Context, eventid string) ([]str
 
 const listEventMembersByEvent = `-- name: ListEventMembersByEvent :many
 SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
-       m."teamId", t.name AS "teamName", t.slug AS "teamSlug", m."rosterRole"
+       m."teamId",
+       CASE WHEN e.status = 'CONCLUDED' THEN COALESCE(m."teamNameSnapshot", t.name) ELSE COALESCE(t.name, m."teamNameSnapshot") END AS "teamName",
+       CASE WHEN e.status = 'CONCLUDED' THEN COALESCE(m."teamSlugSnapshot", t.slug) ELSE COALESCE(t.slug, m."teamSlugSnapshot") END AS "teamSlug",
+       m."rosterRole"
 FROM "event_member" m
 JOIN "event" e ON e.id = m."eventId"
 JOIN "user" u ON u.id = m."userId"
@@ -1359,23 +1366,24 @@ func (q *Queries) ListEventMembersByEvent(ctx context.Context, eventid string) (
 }
 
 const listEventRaces = `-- name: ListEventRaces :many
-SELECT id, name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit"
+SELECT id, name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit", "maxMembersPerTeam"
 FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC
 `
 
 type ListEventRacesRow struct {
-	ID               string
-	Name             string
-	Sequence         int32
-	DistanceMeters   int32
-	TrackType        string
-	Location         string
-	ScoringType      sql.NullInt16
-	Grade            sql.NullString
-	ClassRestriction interface{}
-	StartsAt         sql.NullTime
-	EndsAt           sql.NullTime
-	ParticipantLimit sql.NullInt32
+	ID                string
+	Name              string
+	Sequence          int32
+	DistanceMeters    int32
+	TrackType         string
+	Location          string
+	ScoringType       sql.NullInt16
+	Grade             sql.NullString
+	ClassRestriction  interface{}
+	StartsAt          sql.NullTime
+	EndsAt            sql.NullTime
+	ParticipantLimit  sql.NullInt32
+	MaxMembersPerTeam sql.NullInt32
 }
 
 // Races of an event for LoadEvent.
@@ -1401,6 +1409,7 @@ func (q *Queries) ListEventRaces(ctx context.Context, eventid string) ([]ListEve
 			&i.StartsAt,
 			&i.EndsAt,
 			&i.ParticipantLimit,
+			&i.MaxMembersPerTeam,
 		); err != nil {
 			return nil, err
 		}
@@ -1793,7 +1802,10 @@ func (q *Queries) ListPublicEvents(ctx context.Context, arg ListPublicEventsPara
 
 const listRaceEventMembers = `-- name: ListRaceEventMembers :many
 SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
-       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
+       em."teamId",
+       CASE WHEN e.status = 'CONCLUDED' THEN COALESCE(em."teamNameSnapshot", t.name) ELSE COALESCE(t.name, em."teamNameSnapshot") END AS "teamName",
+       CASE WHEN e.status = 'CONCLUDED' THEN COALESCE(em."teamSlugSnapshot", t.slug) ELSE COALESCE(t.slug, em."teamSlugSnapshot") END AS "teamSlug",
+       em."rosterRole"
 FROM "race_event_member" m
 JOIN "race_event" r ON r.id = m."raceEventId"
 JOIN "event" e ON e.id = r."eventId"
@@ -1839,26 +1851,27 @@ func (q *Queries) ListRaceEventMembers(ctx context.Context, raceeventid string) 
 }
 
 const listRaceEventRows = `-- name: ListRaceEventRows :many
-SELECT id, "eventId", name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit", "createdAt", "updatedAt"
+SELECT id, "eventId", name, sequence, "distanceMeters", "trackType", location, "scoringType", grade, "classRestriction", "startsAt", "endsAt", "participantLimit", "maxMembersPerTeam", "createdAt", "updatedAt"
 FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC
 `
 
 type ListRaceEventRowsRow struct {
-	ID               string
-	EventId          string
-	Name             string
-	Sequence         int32
-	DistanceMeters   int32
-	TrackType        string
-	Location         string
-	ScoringType      sql.NullInt16
-	Grade            sql.NullString
-	ClassRestriction interface{}
-	StartsAt         sql.NullTime
-	EndsAt           sql.NullTime
-	ParticipantLimit sql.NullInt32
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                string
+	EventId           string
+	Name              string
+	Sequence          int32
+	DistanceMeters    int32
+	TrackType         string
+	Location          string
+	ScoringType       sql.NullInt16
+	Grade             sql.NullString
+	ClassRestriction  interface{}
+	StartsAt          sql.NullTime
+	EndsAt            sql.NullTime
+	ParticipantLimit  sql.NullInt32
+	MaxMembersPerTeam sql.NullInt32
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // Full race rows of an event (used by ListRaceEventsCore).
@@ -1885,6 +1898,7 @@ func (q *Queries) ListRaceEventRows(ctx context.Context, eventid string) ([]List
 			&i.StartsAt,
 			&i.EndsAt,
 			&i.ParticipantLimit,
+			&i.MaxMembersPerTeam,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -2494,23 +2508,24 @@ func (q *Queries) UpdateEventTag(ctx context.Context, arg UpdateEventTagParams) 
 const updateRaceEvent = `-- name: UpdateRaceEvent :exec
 UPDATE "race_event" SET name=$1, sequence=$2, "distanceMeters"=$3, "trackType"=$4,
     location=$5, "scoringType"=$6, grade=$7, "classRestriction"=$8, "startsAt"=$9,
-    "endsAt"=$10, "participantLimit"=$11, "updatedAt"=$12 WHERE id=$13
+    "endsAt"=$10, "participantLimit"=$11, "maxMembersPerTeam"=$12, "updatedAt"=$13 WHERE id=$14
 `
 
 type UpdateRaceEventParams struct {
-	Name             string
-	Sequence         int32
-	DistanceMeters   int32
-	TrackType        string
-	Location         string
-	ScoringType      sql.NullInt16
-	Grade            sql.NullString
-	ClassRestriction interface{}
-	StartsAt         sql.NullTime
-	EndsAt           sql.NullTime
-	ParticipantLimit sql.NullInt32
-	UpdatedAt        time.Time
-	ID               string
+	Name              string
+	Sequence          int32
+	DistanceMeters    int32
+	TrackType         string
+	Location          string
+	ScoringType       sql.NullInt16
+	Grade             sql.NullString
+	ClassRestriction  interface{}
+	StartsAt          sql.NullTime
+	EndsAt            sql.NullTime
+	ParticipantLimit  sql.NullInt32
+	MaxMembersPerTeam sql.NullInt32
+	UpdatedAt         time.Time
+	ID                string
 }
 
 // Update race event (used by UpdateRaceEvent).
@@ -2527,6 +2542,7 @@ func (q *Queries) UpdateRaceEvent(ctx context.Context, arg UpdateRaceEventParams
 		arg.StartsAt,
 		arg.EndsAt,
 		arg.ParticipantLimit,
+		arg.MaxMembersPerTeam,
 		arg.UpdatedAt,
 		arg.ID,
 	)

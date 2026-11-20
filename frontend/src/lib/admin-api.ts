@@ -326,6 +326,7 @@ export function hydrateRaceEvent(eventId: string, race: eventmanager.RaceEventVi
     startsAt: race.startsAt,
     endsAt: race.endsAt,
     participantLimit: race.participantLimit ?? null,
+    maxMembersPerTeam: race.maxMembersPerTeam ?? null,
     createdAt: now,
     updatedAt: now,
     members: mockRaceMembersMap.get(race.id) ?? [],
@@ -806,6 +807,7 @@ export async function createRaceEvent(
     scoringType?: number | null
     grade?: string | null
     participantLimit?: number | null
+    maxMembersPerTeam?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
@@ -823,6 +825,7 @@ export async function createRaceEvent(
       scoringType: params.scoringType ?? null,
       grade: params.grade ?? null,
       participantLimit: params.participantLimit ?? null,
+      maxMembersPerTeam: params.maxMembersPerTeam ?? null,
     } as unknown as eventmanager.CreateRaceEventRequest)
   }
 
@@ -847,6 +850,7 @@ export async function createRaceEvent(
     startsAt: params.startsAt ?? null,
     endsAt: params.endsAt ?? null,
     participantLimit: params.participantLimit ?? null,
+    maxMembersPerTeam: params.maxMembersPerTeam ?? null,
     members: [],
   } as unknown as eventmanager.RaceEventView
 
@@ -917,6 +921,7 @@ export async function updateRaceEvent(
     scoringType?: number | null
     grade?: string | null
     participantLimit?: number | null
+    maxMembersPerTeam?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.RaceEventDetail> {
@@ -947,6 +952,7 @@ export async function updateRaceEvent(
             scoringType: params.scoringType === undefined ? race.scoringType : params.scoringType,
             grade: params.grade === undefined ? race.grade : params.grade,
             participantLimit: params.participantLimit === undefined ? race.participantLimit : params.participantLimit,
+            maxMembersPerTeam: params.maxMembersPerTeam === undefined ? race.maxMembersPerTeam : params.maxMembersPerTeam,
           } as unknown as eventmanager.RaceEventView
           return updatedRace!
         }

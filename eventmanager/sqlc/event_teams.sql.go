@@ -185,11 +185,18 @@ func (q *Queries) DeleteEventTeam(ctx context.Context, arg DeleteEventTeamParams
 }
 
 const upsertEventTeamMember = `-- name: UpsertEventTeamMember :exec
-INSERT INTO "event_member" (id, "eventId", "userId", "teamId", "rosterRole", "createdAt")
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO "event_member" (id, "eventId", "userId", "teamId", "rosterRole", "teamNameSnapshot", "teamSlugSnapshot", "createdAt")
+VALUES (
+  $1, $2, $3, $4, $5,
+  (SELECT name FROM "team" WHERE id = $4),
+  (SELECT slug FROM "team" WHERE id = $4),
+  $6
+)
 ON CONFLICT ("eventId", "userId") DO UPDATE SET
   "teamId" = EXCLUDED."teamId",
-  "rosterRole" = EXCLUDED."rosterRole"
+  "rosterRole" = EXCLUDED."rosterRole",
+  "teamNameSnapshot" = COALESCE(EXCLUDED."teamNameSnapshot", "event_member"."teamNameSnapshot"),
+  "teamSlugSnapshot" = COALESCE(EXCLUDED."teamSlugSnapshot", "event_member"."teamSlugSnapshot")
 `
 
 type UpsertEventTeamMemberParams struct {
@@ -419,3 +426,79 @@ func (q *Queries) ListTeamPointsOverview(ctx context.Context, eventid string) ([
 	}
 	return items, nil
 }
+
+const freezeEventMemberTeamSnapshots = `-- name: FreezeEventMemberTeamSnapshots :exec
+UPDATE "event_member" em
+SET
+  "teamNameSnapshot" = t.name,
+  "teamSlugSnapshot" = t.slug
+FROM "team" t
+WHERE em."eventId" = $1
+  AND em."teamId" = t.id
+`
+
+func (q *Queries) FreezeEventMemberTeamSnapshots(ctx context.Context, eventid string) error {
+	_, err := q.db.ExecContext(ctx, freezeEventMemberTeamSnapshots, eventid)
+	return err
+}
+
+const countRaceMembersForTeam = `-- name: CountRaceMembersForTeam :one
+SELECT COUNT(*)
+FROM "race_event_member" rem
+JOIN "race_event" re ON re.id = rem."raceEventId"
+JOIN "event_member" em ON em."eventId" = re."eventId" AND em."userId" = rem."userId"
+WHERE rem."raceEventId" = $1
+  AND em."teamId" = $2
+`
+
+type CountRaceMembersForTeamParams struct {
+	RaceEventId string
+	TeamId      sql.NullString
+}
+
+func (q *Queries) CountRaceMembersForTeam(ctx context.Context, arg CountRaceMembersForTeamParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRaceMembersForTeam, arg.RaceEventId, arg.TeamId)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteUserFromUnstartedRaces = `-- name: DeleteUserFromUnstartedRaces :exec
+DELETE FROM "race_event_member" rem
+USING "race_event" re
+WHERE rem."raceEventId" = re.id
+  AND re."eventId" = $1
+  AND re."startsAt" IS NULL
+  AND rem."userId" = $2
+`
+
+type DeleteUserFromUnstartedRacesParams struct {
+	EventId string
+	UserId  string
+}
+
+func (q *Queries) DeleteUserFromUnstartedRaces(ctx context.Context, arg DeleteUserFromUnstartedRacesParams) error {
+	_, err := q.db.ExecContext(ctx, deleteUserFromUnstartedRaces, arg.EventId, arg.UserId)
+	return err
+}
+
+const raceResultExistsForUser = `-- name: RaceResultExistsForUser :one
+SELECT EXISTS (
+    SELECT 1 FROM "race_event_result"
+    WHERE "raceEventId" = $1 AND "userId" = $2
+)
+`
+
+type RaceResultExistsForUserParams struct {
+	RaceEventId string
+	UserId      string
+}
+
+func (q *Queries) RaceResultExistsForUser(ctx context.Context, arg RaceResultExistsForUserParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, raceResultExistsForUser, arg.RaceEventId, arg.UserId)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+

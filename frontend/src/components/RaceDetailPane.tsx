@@ -350,6 +350,20 @@ export function RaceDetailPane({
                   </strong>
                 </span>
               )}
+              {selectedEvent.isTeamEvent && selectedRace.maxMembersPerTeam !== null && (
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    borderRadius: '999px',
+                    border: '1px solid var(--borderColor-default, #d0d7de)',
+                    backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+                    color: 'var(--fgColor-default, #1f2328)',
+                  }}
+                >
+                  Max / Team: <strong>{selectedRace.maxMembersPerTeam}</strong>
+                </span>
+              )}
             </div>
           </div>
 
@@ -686,7 +700,7 @@ export function RaceDetailPane({
         isRaceOngoing={isRaceOngoing(selectedRace)}
         isRaceNotStarted={isRaceNotStarted(selectedRace)}
         loadingResults={loadingResults}
-        memberCount={selectedEvent.granularParticipation ? (selectedRace.members?.length ?? 0) : selectedEvent.members.length}
+        memberCount={derivedStates.length}
         rows={derivedStates}
         changeSummary={changeSummary}
         savingBatch={savingBatch}

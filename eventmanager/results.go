@@ -90,7 +90,7 @@ func RequireRace(ctx context.Context, eventID, raceID string) (*raceEventRow, er
 }
 
 // RequireMembershipForResult asserts the user exists and is registered based
-// on the event's granularParticipation setting.
+// on the event's granularParticipation and isTeamEvent settings.
 func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID string) error {
 	exists, err := q().UserExists(ctx, userID)
 	if err != nil {
@@ -99,14 +99,11 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 	if !exists {
 		return &errs.Error{Code: errs.NotFound, Message: "user not found"}
 	}
-	granular, err := q().GetEventGranularity(ctx, eventID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return &errs.Error{Code: errs.NotFound, Message: "event not found"}
-	}
+	e, err := requireEventRow(ctx, eventID)
 	if err != nil {
 		return err
 	}
-	if granular {
+	if e.GranularParticipation {
 		registered, err := q().RaceMemberExists(ctx, sqlc.RaceMemberExistsParams{
 			RaceEventId: raceID,
 			UserId:      userID,
@@ -117,17 +114,54 @@ func RequireMembershipForResult(ctx context.Context, eventID, raceID, userID str
 		if !registered {
 			return &errs.Error{Code: errs.FailedPrecondition, Message: "user is not registered for this race"}
 		}
-	} else {
-		member, err := q().EventMemberExists(ctx, sqlc.EventMemberExistsParams{
+		return nil
+	}
+	if e.IsTeamEvent {
+		teamRole, err := q().GetEventMemberTeamRole(ctx, sqlc.GetEventMemberTeamRoleParams{
 			EventId: eventID,
 			UserId:  userID,
 		})
+		if errors.Is(err, sql.ErrNoRows) {
+			return &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
+		}
 		if err != nil {
 			return err
 		}
-		if !member {
-			return &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
+		if !teamRole.RosterRole.Valid || teamRole.RosterRole.String != RosterRolePrimary {
+			// Allow editing/re-saving an already-recorded result or explicit race lineup entry
+			// (e.g., if a racer was substituted to BACKUP after racing an earlier heat).
+			inRace, err := q().RaceMemberExists(ctx, sqlc.RaceMemberExistsParams{
+				RaceEventId: raceID,
+				UserId:      userID,
+			})
+			if err != nil {
+				return err
+			}
+			hasResult, err := q().RaceResultExistsForUser(ctx, sqlc.RaceResultExistsForUserParams{
+				RaceEventId: raceID,
+				UserId:      userID,
+			})
+			if err != nil {
+				return err
+			}
+			if !inRace && !hasResult {
+				return &errs.Error{
+					Code:    errs.FailedPrecondition,
+					Message: "only PRIMARY roster members can have race results recorded; substitute them into the primary roster first",
+				}
+			}
 		}
+		return nil
+	}
+	member, err := q().EventMemberExists(ctx, sqlc.EventMemberExistsParams{
+		EventId: eventID,
+		UserId:  userID,
+	})
+	if err != nil {
+		return err
+	}
+	if !member {
+		return &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
 	return nil
 }
@@ -479,6 +513,9 @@ type UserRaceRecordView struct {
 	EventName        string  `json:"eventName"`
 	EventTag         string  `json:"eventTag"`
 	EventScheduledAt *string `json:"eventScheduledAt"`
+	TeamID           *string `json:"teamId"`
+	TeamName         *string `json:"teamName"`
+	TeamSlug         *string `json:"teamSlug"`
 }
 
 // ListUserRaceRecordsParams carries request query params for user race records.
@@ -546,6 +583,9 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 			EventName:        r.EventName,
 			EventTag:         r.EventTag,
 			EventScheduledAt: nullTime(timePtrFromNull(r.EventScheduledAt)),
+			TeamID:           nullString(r.TeamId),
+			TeamName:         nullString(r.TeamName),
+			TeamSlug:         nullString(r.TeamSlug),
 		})
 	}
 

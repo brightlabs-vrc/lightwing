@@ -514,6 +514,7 @@ export namespace eventmanager {
         startsAt: string
         endsAt: string
         participantLimit: OptInt
+        maxMembersPerTeam: OptInt
     }
 
     /**
@@ -959,6 +960,7 @@ export namespace eventmanager {
         startsAt: string
         endsAt: string
         participantLimit: number
+        maxMembersPerTeam: number
         createdAt: string
         updatedAt: string
         members: RaceEventMemberView[]
@@ -1001,6 +1003,7 @@ export namespace eventmanager {
         startsAt: string
         endsAt: string
         participantLimit: number
+        maxMembersPerTeam: number
         members: RaceEventMemberView[]
     }
 
@@ -1285,6 +1288,7 @@ export namespace eventmanager {
         endsAt: string
         clearEndsAt: boolean
         participantLimit: OptInt
+        maxMembersPerTeam: OptInt
     }
 
     /**
@@ -1331,6 +1335,9 @@ export namespace eventmanager {
         eventName: string
         eventTag: string
         eventScheduledAt: string
+        teamId: string
+        teamName: string
+        teamSlug: string
     }
 
     export class ServiceClient {

@@ -16,6 +16,7 @@ export interface NewRaceForm {
   classRestriction: ClassTier | null
   grade?: string
   participantLimit?: number | null
+  maxMembersPerTeam?: number | null
 }
 
 interface UseEventRacesProps {
@@ -56,6 +57,8 @@ export function useEventRaces({
     location: '',
     classRestriction: null,
     grade: 'OP',
+    participantLimit: null,
+    maxMembersPerTeam: null,
   })
 
   // Create Race Event
@@ -75,6 +78,8 @@ export function useEventRaces({
           location: '',
           classRestriction: null,
           grade: 'OP',
+          participantLimit: null,
+          maxMembersPerTeam: null,
         })
         setGlobalSuccess(`Successfully created race event "${newRaceForm.name}".`)
       } catch (cause) {
@@ -136,6 +141,7 @@ export function useEventRaces({
         classRestriction?: ClassTier | null
         grade?: string | null
         participantLimit?: number | null
+        maxMembersPerTeam?: number | null
       }
     ) => {
       if (!authHeader) return

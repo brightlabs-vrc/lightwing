@@ -323,6 +323,21 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
                             <span className="text-xs text-retro-muted font-sans block">
                               Race #{r.raceSequence}: {r.raceName}
                             </span>
+                            {r.teamName && (
+                              <div className="mt-1">
+                                {r.teamSlug && r.teamId ? (
+                                  <Link
+                                    to="/$user"
+                                    params={{ user: r.teamSlug }}
+                                    className="inline-block hover:opacity-80"
+                                  >
+                                    <PixelBadge tone="cyan">{r.teamName}</PixelBadge>
+                                  </Link>
+                                ) : (
+                                  <PixelBadge tone="neutral">{r.teamName}</PixelBadge>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="p-3">
                             {r.raceGrade ? (

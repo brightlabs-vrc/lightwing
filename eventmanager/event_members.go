@@ -137,12 +137,12 @@ type RemoveEventMemberRequest struct {
 
 // RemoveEventMemberCore removes a participant from an event.
 func RemoveEventMemberCore(ctx context.Context, actor *auth.Actor, p *RemoveEventMemberRequest) (*EventDetail, error) {
-	exists, err := q().EventExists(ctx, p.EventID)
+	event, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
 		return nil, err
 	}
-	if !exists {
-		return nil, &errs.Error{Code: errs.NotFound, Message: "event not found"}
+	if event.IsTeamEvent && event.Status == "CONCLUDED" {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "team rosters and team associations are frozen once an event has concluded"}
 	}
 	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
 		return nil, err

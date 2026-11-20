@@ -51,10 +51,15 @@ SELECT
     e.id AS "eventId",
     e.name AS "eventName",
     e.tag AS "eventTag",
-    e."scheduledAt" AS "eventScheduledAt"
+    e."scheduledAt" AS "eventScheduledAt",
+    em."teamId" AS "teamId",
+    CASE WHEN e.status = 'CONCLUDED' THEN COALESCE(em."teamNameSnapshot", t.name) ELSE COALESCE(t.name, em."teamNameSnapshot") END AS "teamName",
+    CASE WHEN e.status = 'CONCLUDED' THEN COALESCE(em."teamSlugSnapshot", t.slug) ELSE COALESCE(t.slug, em."teamSlugSnapshot") END AS "teamSlug"
 FROM "race_result" r
 JOIN "race_event" re ON re.id = r."raceEventId"
 JOIN "event" e ON e.id = re."eventId"
+LEFT JOIN "event_member" em ON em."eventId" = e.id AND em."userId" = r."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE r."userId" = $1
   AND ($4::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $4::int)
 ORDER BY e."createdAt" DESC, re.sequence ASC
@@ -87,6 +92,9 @@ type ListUserRaceRecordsRow struct {
 	EventName        string
 	EventTag         string
 	EventScheduledAt sql.NullTime
+	TeamId           sql.NullString
+	TeamName         sql.NullString
+	TeamSlug         sql.NullString
 }
 
 // User race records query.
@@ -118,6 +126,9 @@ func (q *Queries) ListUserRaceRecords(ctx context.Context, arg ListUserRaceRecor
 			&i.EventName,
 			&i.EventTag,
 			&i.EventScheduledAt,
+			&i.TeamId,
+			&i.TeamName,
+			&i.TeamSlug,
 		); err != nil {
 			return nil, err
 		}

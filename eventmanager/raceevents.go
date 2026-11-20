@@ -40,27 +40,29 @@ type RaceEventDetail struct {
 	StartsAt          *string               `json:"startsAt"`
 	EndsAt            *string               `json:"endsAt"`
 	ParticipantLimit  *int                  `json:"participantLimit"`
+	MaxMembersPerTeam *int                  `json:"maxMembersPerTeam"`
 	CreatedAt         string                `json:"createdAt"`
 	UpdatedAt         string                `json:"updatedAt"`
 	Members           []RaceEventMemberView `json:"members"`
 }
 
 type raceEventRow struct {
-	ID               string
-	EventID          string
-	Name             string
-	Sequence         int
-	DistanceMeters   int
-	TrackType        string
-	Location         string
-	ScoringType      sql.NullInt64
-	Grade            sql.NullString
-	ClassRestriction sql.NullString
-	StartsAt         *time.Time
-	EndsAt           *time.Time
-	ParticipantLimit sql.NullInt64
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                string
+	EventID           string
+	Name              string
+	Sequence          int
+	DistanceMeters    int
+	TrackType         string
+	Location          string
+	ScoringType       sql.NullInt64
+	Grade             sql.NullString
+	ClassRestriction  sql.NullString
+	StartsAt          *time.Time
+	EndsAt            *time.Time
+	ParticipantLimit  sql.NullInt64
+	MaxMembersPerTeam sql.NullInt64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // loadRaceMembers returns the registered participants of a race with display
@@ -110,22 +112,23 @@ func toRaceEventDetail(r *raceEventRow, members []RaceEventMemberView) *RaceEven
 		members = []RaceEventMemberView{}
 	}
 	return &RaceEventDetail{
-		ID:               r.ID,
-		EventID:          r.EventID,
-		Name:             r.Name,
-		Sequence:         r.Sequence,
-		DistanceMeters:   r.DistanceMeters,
-		TrackType:        r.TrackType,
-		Location:         r.Location,
-		ScoringType:      nullInt(r.ScoringType),
-		Grade:            nullString(r.Grade),
-		ClassRestriction: classTierPtr(r.ClassRestriction),
-		StartsAt:         nullTime(r.StartsAt),
-		EndsAt:           nullTime(r.EndsAt),
-		ParticipantLimit: nullInt(r.ParticipantLimit),
-		CreatedAt:        isoTime(r.CreatedAt),
-		UpdatedAt:        isoTime(r.UpdatedAt),
-		Members:          members,
+		ID:                r.ID,
+		EventID:           r.EventID,
+		Name:              r.Name,
+		Sequence:          r.Sequence,
+		DistanceMeters:    r.DistanceMeters,
+		TrackType:         r.TrackType,
+		Location:          r.Location,
+		ScoringType:       nullInt(r.ScoringType),
+		Grade:             nullString(r.Grade),
+		ClassRestriction:  classTierPtr(r.ClassRestriction),
+		StartsAt:          nullTime(r.StartsAt),
+		EndsAt:            nullTime(r.EndsAt),
+		ParticipantLimit:  nullInt(r.ParticipantLimit),
+		MaxMembersPerTeam: nullInt(r.MaxMembersPerTeam),
+		CreatedAt:         isoTime(r.CreatedAt),
+		UpdatedAt:         isoTime(r.UpdatedAt),
+		Members:           members,
 	}
 }
 
@@ -138,7 +141,8 @@ func toRaceEventRow(r sqlc.GetRaceEventRowRow) *raceEventRow {
 		ScoringType: sql.NullInt64{Int64: int64(r.ScoringType.Int16), Valid: r.ScoringType.Valid},
 		Grade: r.Grade, ClassRestriction: nullStringFromAny(r.ClassRestriction),
 		StartsAt: timePtrFromNull(r.StartsAt), EndsAt: timePtrFromNull(r.EndsAt),
-		ParticipantLimit: sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
+		ParticipantLimit:  sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
+		MaxMembersPerTeam: sql.NullInt64{Int64: int64(r.MaxMembersPerTeam.Int32), Valid: r.MaxMembersPerTeam.Valid},
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
@@ -152,7 +156,8 @@ func toRaceEventListRow(r sqlc.ListRaceEventRowsRow) *raceEventRow {
 		ScoringType: sql.NullInt64{Int64: int64(r.ScoringType.Int16), Valid: r.ScoringType.Valid},
 		Grade: r.Grade, ClassRestriction: nullStringFromAny(r.ClassRestriction),
 		StartsAt: timePtrFromNull(r.StartsAt), EndsAt: timePtrFromNull(r.EndsAt),
-		ParticipantLimit: sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
+		ParticipantLimit:  sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
+		MaxMembersPerTeam: sql.NullInt64{Int64: int64(r.MaxMembersPerTeam.Int32), Valid: r.MaxMembersPerTeam.Valid},
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
@@ -207,18 +212,19 @@ func parseTimePtr(s *string) (*time.Time, error) {
 
 // CreateRaceEventRequest mirrors CreateRaceEventParams (POST /api/events/:eventId/races).
 type CreateRaceEventRequest struct {
-	EventID          string  `json:"eventId"`
-	Name             string  `json:"name"`
-	Sequence         *int    `json:"sequence,omitempty"`
-	DistanceMeters   int     `json:"distanceMeters"`
-	TrackType        string  `json:"trackType"`
-	Location         string  `json:"location"`
-	ScoringType      *int    `json:"scoringType,omitempty"`
-	Grade            *string `json:"grade,omitempty"`
-	ClassRestriction *string `json:"classRestriction,omitempty"`
-	StartsAt         *string `json:"startsAt,omitempty"`
-	EndsAt           *string `json:"endsAt,omitempty"`
-	ParticipantLimit OptInt  `json:"participantLimit,omitempty"`
+	EventID           string  `json:"eventId"`
+	Name              string  `json:"name"`
+	Sequence          *int    `json:"sequence,omitempty"`
+	DistanceMeters    int     `json:"distanceMeters"`
+	TrackType         string  `json:"trackType"`
+	Location          string  `json:"location"`
+	ScoringType       *int    `json:"scoringType,omitempty"`
+	Grade             *string `json:"grade,omitempty"`
+	ClassRestriction  *string `json:"classRestriction,omitempty"`
+	StartsAt          *string `json:"startsAt,omitempty"`
+	EndsAt            *string `json:"endsAt,omitempty"`
+	ParticipantLimit  OptInt  `json:"participantLimit,omitempty"`
+	MaxMembersPerTeam OptInt  `json:"maxMembersPerTeam,omitempty"`
 }
 
 // CreateRaceEventCore adds a race to an event, gated by event-create permission.
@@ -233,6 +239,16 @@ func CreateRaceEventCore(ctx context.Context, actor *auth.Actor, p *CreateRaceEv
 	limit := p.ParticipantLimit.Value
 	if p.ParticipantLimit.Set && limit != nil && !e.GranularParticipation {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Race participant limit can only be configured for granular events"}
+	}
+	var maxPerTeam sql.NullInt32
+	if p.MaxMembersPerTeam.Set && p.MaxMembersPerTeam.Value != nil {
+		if !e.IsTeamEvent {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxMembersPerTeam can only be configured for team-based events"}
+		}
+		if *p.MaxMembersPerTeam.Value < 1 {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxMembersPerTeam must be at least 1"}
+		}
+		maxPerTeam = sql.NullInt32{Int32: int32(*p.MaxMembersPerTeam.Value), Valid: true}
 	}
 	maxSeq, err := q().GetMaxRaceSequence(ctx, p.EventID)
 	if err != nil {
@@ -273,7 +289,7 @@ func CreateRaceEventCore(ctx context.Context, actor *auth.Actor, p *CreateRaceEv
 		DistanceMeters: int32(p.DistanceMeters), TrackType: p.TrackType, Location: p.Location,
 		ScoringType: scoringType, Grade: grade, ClassRestriction: classRestr,
 		StartsAt: nullTimeFromPtr(startsAt), EndsAt: nullTimeFromPtr(endsAt),
-		ParticipantLimit: participantLimit, CreatedAt: now, UpdatedAt: now,
+		ParticipantLimit: participantLimit, MaxMembersPerTeam: maxPerTeam, CreatedAt: now, UpdatedAt: now,
 	}); err != nil {
 		return nil, err
 	}
@@ -453,8 +469,9 @@ type UpdateRaceEventRequest struct {
 	StartsAt         *string `json:"startsAt,omitempty"`
 	ClearStartsAt    bool    `json:"clearStartsAt,omitempty"`
 	EndsAt           *string `json:"endsAt,omitempty"`
-	ClearEndsAt      bool    `json:"clearEndsAt,omitempty"`
-	ParticipantLimit OptInt  `json:"participantLimit,omitempty"`
+	ClearEndsAt       bool    `json:"clearEndsAt,omitempty"`
+	ParticipantLimit  OptInt  `json:"participantLimit,omitempty"`
+	MaxMembersPerTeam OptInt  `json:"maxMembersPerTeam,omitempty"`
 }
 
 // UpdateRaceEventCore updates editable race fields. A grade change triggers
@@ -493,6 +510,23 @@ func UpdateRaceEventCore(ctx context.Context, actor *auth.Actor, p *UpdateRaceEv
 			limit = *limitVal
 		} else {
 			limit = nil
+		}
+	}
+	var maxPerTeam sql.NullInt32
+	if existing.MaxMembersPerTeam.Valid {
+		maxPerTeam = sql.NullInt32{Int32: int32(existing.MaxMembersPerTeam.Int64), Valid: true}
+	}
+	if p.MaxMembersPerTeam.Set {
+		if p.MaxMembersPerTeam.Value != nil {
+			if !e.IsTeamEvent {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxMembersPerTeam can only be configured for team-based events"}
+			}
+			if *p.MaxMembersPerTeam.Value < 1 {
+				return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxMembersPerTeam must be at least 1"}
+			}
+			maxPerTeam = sql.NullInt32{Int32: int32(*p.MaxMembersPerTeam.Value), Valid: true}
+		} else {
+			maxPerTeam = sql.NullInt32{}
 		}
 	}
 	triggerRecomputation := false
@@ -581,7 +615,7 @@ func UpdateRaceEventCore(ctx context.Context, actor *auth.Actor, p *UpdateRaceEv
 		TrackType: trackType, Location: location, ScoringType: scoringType,
 		Grade: grade, ClassRestriction: classRestr,
 		StartsAt: nullTimeFromPtr(startsAt), EndsAt: nullTimeFromPtr(endsAt),
-		ParticipantLimit: participantLimit, UpdatedAt: now, ID: p.RaceID,
+		ParticipantLimit: participantLimit, MaxMembersPerTeam: maxPerTeam, UpdatedAt: now, ID: p.RaceID,
 	}); err != nil {
 		return nil, err
 	}
@@ -673,8 +707,8 @@ func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMembe
 		return nil, err
 	}
 	e := toEventRow(erow)
-	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
-		return nil, err
+	if e.Status == "CONCLUDED" {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "race lineups are frozen once an event has concluded"}
 	}
 	rrow, err := qq.GetRaceEventRow(ctx, p.RaceID)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && rrow.EventId != p.EventID) {
@@ -690,6 +724,7 @@ func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMembe
 	if err != nil {
 		return nil, err
 	}
+	var memberTeamID sql.NullString
 	if e.IsTeamEvent {
 		if !memberExists {
 			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "competitor must be registered on a team's PRIMARY roster for this team-based event"}
@@ -703,7 +738,36 @@ func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMembe
 		if !teamRole.TeamId.Valid || !teamRole.RosterRole.Valid || teamRole.RosterRole.String != RosterRolePrimary {
 			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "only PRIMARY roster members can be added to race lineups; sub in this BACKUP member to PRIMARY first"}
 		}
-	} else if !memberExists && !e.GranularParticipation {
+		memberTeamID = teamRole.TeamId
+	}
+
+	// Event Admins can always manage race lineups; on team events, Team Admins of the
+	// racer's registered team can also manage unstarted race lineups while signups are open.
+	if _, permErr := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); permErr != nil {
+		if !e.IsTeamEvent || !memberTeamID.Valid || actor == nil {
+			return nil, permErr
+		}
+		isTeamAdmin, err := qq.IsUserTeamAdmin(ctx, sqlc.IsUserTeamAdminParams{
+			TeamId: memberTeamID.String, UserId: actor.UserID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if !isTeamAdmin {
+			return nil, permErr
+		}
+		if e.SignupsLocked {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "signups are locked for this event"}
+		}
+		if e.Status != "PENDING" && e.Status != "ONGOING" {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "event is not open for team lineup changes"}
+		}
+		if r.StartsAt != nil {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "cannot modify race lineup after the race has started"}
+		}
+	}
+
+	if !e.IsTeamEvent && !memberExists && !e.GranularParticipation {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
 	if !isEligibleTier(userTier, raceRestriction(r, e)) {
@@ -724,6 +788,21 @@ func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMembe
 			if currentCount >= r.ParticipantLimit.Int64 {
 				return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "Race participant capacity has been reached",
 					Details: detailsMap{"code": CodeRaceParticipantLimitReached, "limit": int(r.ParticipantLimit.Int64), "currentCount": int(currentCount)}}
+			}
+		}
+		if e.IsTeamEvent && r.MaxMembersPerTeam.Valid && memberTeamID.Valid {
+			teamCount, err := qq.CountRaceMembersForTeam(ctx, sqlc.CountRaceMembersForTeamParams{
+				RaceEventId: p.RaceID,
+				TeamId:      memberTeamID,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if teamCount >= r.MaxMembersPerTeam.Int64 {
+				return nil, &errs.Error{
+					Code:    errs.FailedPrecondition,
+					Message: fmt.Sprintf("team has reached the maximum of %d racer(s) allowed in this race", r.MaxMembersPerTeam.Int64),
+				}
 			}
 		}
 		if e.MaxConcurrentRaceParticipations.Valid {
@@ -803,17 +882,47 @@ func removeRaceMemberUser(ctx context.Context, e *eventRow, eventID, raceID, use
 }
 
 // RemoveRaceEventMemberCore removes a participant from a race. On granular
-// events, losing the last race membership also removes event membership.
+// individual events, losing the last race membership also removes event membership.
 func RemoveRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMemberRequest) (*RaceEventDetail, error) {
 	e, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); err != nil {
+	if e.Status == "CONCLUDED" {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "race lineups are frozen once an event has concluded"}
+	}
+	r, err := requireRaceEvent(ctx, p.EventID, p.RaceID)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := requireRaceEvent(ctx, p.EventID, p.RaceID); err != nil {
-		return nil, err
+	if _, permErr := auth.RequireEventPermission(ctx, actor, p.EventID, auth.ActionUpdate); permErr != nil {
+		if !e.IsTeamEvent || actor == nil {
+			return nil, permErr
+		}
+		teamRole, err := q().GetEventMemberTeamRole(ctx, sqlc.GetEventMemberTeamRoleParams{
+			EventId: p.EventID, UserId: p.UserID,
+		})
+		if err != nil || !teamRole.TeamId.Valid {
+			return nil, permErr
+		}
+		isTeamAdmin, err := q().IsUserTeamAdmin(ctx, sqlc.IsUserTeamAdminParams{
+			TeamId: teamRole.TeamId.String, UserId: actor.UserID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if !isTeamAdmin {
+			return nil, permErr
+		}
+		if e.SignupsLocked {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "signups are locked for this event"}
+		}
+		if e.Status != "PENDING" && e.Status != "ONGOING" {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "event is not open for team lineup changes"}
+		}
+		if r.StartsAt != nil {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "cannot modify race lineup after the race has started"}
+		}
 	}
 	if err := removeRaceMemberUser(ctx, e, p.EventID, p.RaceID, p.UserID); err != nil {
 		return nil, err
@@ -899,6 +1008,9 @@ func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReques
 		return nil, err
 	}
 	e := toEventRow(erow)
+	if e.Status == "CONCLUDED" {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "race lineups are frozen once an event has concluded"}
+	}
 	if e.SignupsLocked {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "signups are locked for this event"}
 	}
@@ -916,6 +1028,7 @@ func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReques
 	if err != nil {
 		return nil, err
 	}
+	var memberTeamID sql.NullString
 	if e.IsTeamEvent {
 		if !memberExists {
 			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "you must be registered on a team's PRIMARY roster to join races in this team-based event"}
@@ -929,6 +1042,7 @@ func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReques
 		if !teamRole.TeamId.Valid || !teamRole.RosterRole.Valid || teamRole.RosterRole.String != RosterRolePrimary {
 			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "only PRIMARY roster members can join race lineups; ask an admin to sub you into the primary roster"}
 		}
+		memberTeamID = teamRole.TeamId
 	} else if !memberExists && !e.GranularParticipation {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
@@ -950,6 +1064,21 @@ func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReques
 			if currentCount >= r.ParticipantLimit.Int64 {
 				return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "Race participant capacity has been reached",
 					Details: detailsMap{"code": CodeRaceParticipantLimitReached, "limit": int(r.ParticipantLimit.Int64), "currentCount": int(currentCount)}}
+			}
+		}
+		if e.IsTeamEvent && r.MaxMembersPerTeam.Valid && memberTeamID.Valid {
+			teamCount, err := qq.CountRaceMembersForTeam(ctx, sqlc.CountRaceMembersForTeamParams{
+				RaceEventId: p.RaceID,
+				TeamId:      memberTeamID,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if teamCount >= r.MaxMembersPerTeam.Int64 {
+				return nil, &errs.Error{
+					Code:    errs.FailedPrecondition,
+					Message: fmt.Sprintf("team has reached the maximum of %d racer(s) allowed in this race", r.MaxMembersPerTeam.Int64),
+				}
 			}
 		}
 		if e.MaxConcurrentRaceParticipations.Valid {
@@ -1005,6 +1134,9 @@ func LeaveRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReque
 	e, err := requireEventRow(ctx, p.EventID)
 	if err != nil {
 		return nil, err
+	}
+	if e.Status == "CONCLUDED" {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "race lineups are frozen once an event has concluded"}
 	}
 	if e.SignupsLocked {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "signups are locked for this event"}
