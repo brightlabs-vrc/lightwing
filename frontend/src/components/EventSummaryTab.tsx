@@ -129,11 +129,11 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
         </div>
       )}
 
-      {/* Team Standings Leaderboard (Constructors' Sum) */}
+      {/* Team Standings */}
       {selectedEvent.isTeamEvent && selectedEvent.scoringType === 1 && (
         <div className="primer-box">
           <div className="primer-box-header">
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Team Standings (Constructors&apos; Points)</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Team Standings</h3>
           </div>
           {selectedEvent.teamPointsOverview && selectedEvent.teamPointsOverview.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
@@ -169,11 +169,11 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
         </div>
       )}
 
-      {/* Overall Individual Standings Leaderboard */}
+      {/* Individual Standings */}
       <div className="primer-box">
         <div className="primer-box-header">
           <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
-            {selectedEvent.isTeamEvent ? 'Individual Standings Leaderboard' : 'Current Event Overall Leaderboard'}
+            {selectedEvent.isTeamEvent ? 'Individual Standings' : 'Current Event Overall Leaderboard'}
           </h3>
         </div>
         {selectedEvent.scoringType === 1 ? (

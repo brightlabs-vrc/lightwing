@@ -786,12 +786,12 @@ function EventDetailPage() {
         </div>
       </div>
 
-      {/* Team Standings (Constructors) */}
+      {/* Team Standings */}
       {event.isTeamEvent && event.scoringType === 1 && (
         <div className="mt-8">
           <PixelStack direction="row" gap={3} align="center" wrap className="mb-4">
             <h2 className="font-pixel text-sm tracking-wider text-retro-gold">
-              TEAM STANDINGS (CONSTRUCTORS)
+              TEAM STANDINGS
             </h2>
             {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
               <PixelBadge tone="green">FINAL</PixelBadge>
@@ -816,7 +816,7 @@ function EventDetailPage() {
         <div className="mt-8">
           <PixelStack direction="row" gap={3} align="center" wrap className="mb-4">
             <h2 className="font-pixel text-sm tracking-wider text-retro-text">
-              {event.isTeamEvent ? 'INDIVIDUAL STANDINGS (POINTS)' : 'STANDINGS (POINTS)'}
+              {event.isTeamEvent ? 'INDIVIDUAL STANDINGS' : 'STANDINGS (POINTS)'}
             </h2>
             {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
               <PixelBadge tone="green">FINAL</PixelBadge>

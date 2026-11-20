@@ -2323,11 +2323,11 @@ function OrgEventDetailView({
             </PixelStack>
           </PixelCard>
 
-          {/* Team Standings (Constructors) */}
+          {/* Team Standings */}
           {selectedEvent.isTeamEvent && selectedEvent.scoringType === 1 && (
             <PixelCard className="bg-retro-surface">
               <PixelStack gap={4}>
-                <PixelSectionHeader title="TEAM STANDINGS (CONSTRUCTORS)" size="sm" />
+                <PixelSectionHeader title="TEAM STANDINGS" size="sm" />
                 {selectedEvent.teamPointsOverview && selectedEvent.teamPointsOverview.length > 0 ? (
                   <PixelTable
                     columns={[
