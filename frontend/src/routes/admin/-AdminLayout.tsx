@@ -1,23 +1,91 @@
-import React from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
+import {
+  Avatar,
+  BaseStyles,
+  Breadcrumbs,
+  Button,
+  CounterLabel,
+  IconButton,
+  Label,
+  NavList,
+  PageLayout,
+  ThemeProvider,
+} from '@primer/react'
+import {
+  ArrowLeftIcon,
+  CalendarIcon,
+  ChecklistIcon,
+  HomeIcon,
+  OrganizationIcon,
+  PeopleIcon,
+  ShieldIcon,
+  SignOutIcon,
+  ThreeBarsIcon,
+  XIcon,
+} from '@primer/octicons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { usePageHead } from '../../hooks/usePageHead'
+import { listAdminApplications } from '../../lib/admin-api'
+
+export interface AdminBreadcrumb {
+  label: string
+  to?: string
+  params?: Record<string, string>
+}
 
 interface AdminLayoutProps {
   children: React.ReactNode
   title: string
   subtitle?: string
   actions?: React.ReactNode
+  breadcrumbs?: AdminBreadcrumb[]
 }
 
-export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutProps) {
+export function AdminLayout({
+  children,
+  title,
+  subtitle,
+  actions,
+  breadcrumbs,
+}: AdminLayoutProps) {
   usePageHead({
-    title: title ? `Admin - ${title}` : 'Admin',
+    title: title ? `Admin — ${title}` : 'Admin Console',
     description: 'UmaKeiba Site & Event Administration.',
   })
 
   const { session, signOutUser } = useAuth()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number | null>(null)
+
+  const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
+
+  const authHeader = useMemo(() => {
+    const token = session?.session.token
+    return token ? `Bearer ${token}` : ''
+  }, [session?.session.token])
+
+  useEffect(() => {
+    if (!authHeader) return
+    let cancelled = false
+    listAdminApplications(authHeader)
+      .then((res) => {
+        if (cancelled) return
+        const count = (res.organizations?.length ?? 0) + (res.teams?.length ?? 0)
+        setPendingApprovalsCount(count)
+      })
+      .catch(() => {
+        // non-fatal sidebar counter fetch
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authHeader, pathname])
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [pathname])
 
   const isCurrent = (path: string) => {
     if (path === '/admin') {
@@ -26,151 +94,343 @@ export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutP
     return pathname.startsWith(path)
   }
 
-  return (
-    <div className="slds-scope bg-slate-100 min-h-screen font-sans" style={{ background: '#f3f2f1', minHeight: '100vh', paddingBottom: '3rem' }}>
-      {/* Salesforce Global Header */}
-      <header className="slds-global-header_container" style={{ position: 'static', marginBottom: '1.5rem' }}>
-        <div
-          className="slds-global-header slds-grid slds-grid_align-spread slds-grid_vertical-align-center"
-          style={{
-            minHeight: '3.125rem',
-            borderBottom: '1px solid #dddbda',
-            background: '#ffffff',
-            padding: '0.5rem 1rem',
-            flexWrap: 'wrap',
-            gap: '8px',
-          }}
+  const navContent = (
+    <NavList aria-label="Admin Console Navigation">
+      <NavList.Group title="General">
+        <NavList.Item
+          as={Link}
+          to="/admin"
+          aria-current={isCurrent('/admin') ? 'page' : undefined}
         >
-          <div className="slds-global-header__item slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center' }}>
-            <div className="slds-p-right_small" style={{ display: 'flex', alignItems: 'center' }}>
-              <span className="slds-icon_container slds-icon-utility-setup" style={{ background: '#0176d3', color: '#fff', borderRadius: '4px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', fontSize: '14px' }}>
-                ⚙️
-              </span>
-            </div>
-            <div className="slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src="/favicon.png" alt="Lightwing" className="w-5 h-5" />
-              <span className="slds-text-heading_small slds-truncate" style={{ fontWeight: 'bold', color: '#180505', fontSize: '1.1rem' }}>
-                Admin
-              </span>
-            </div>
-          </div>
+          <NavList.LeadingVisual>
+            <HomeIcon />
+          </NavList.LeadingVisual>
+          Overview
+        </NavList.Item>
 
-          <div className="slds-global-header__item slds-grid slds-grid_vertical-align-center">
-            {session ? (
-              <div className="slds-grid slds-grid_vertical-align-center" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <span className="slds-text-body_small slds-text-color_weak" style={{ fontSize: '12px' }}>
-                  Signed in as <strong>{session.user.vrchatUsername ?? session.user.name}</strong> ({session.user.siteRole})
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void signOutUser('/')}
-                  className="slds-button slds-button_neutral"
-                  style={{ padding: '2px 12px', fontSize: '12px', lineHeight: '1.5' }}
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <span className="slds-text-body_small slds-text-color_weak">Not signed in</span>
-            )}
-          </div>
-        </div>
+        <NavList.Item
+          as={Link}
+          to="/admin/events"
+          aria-current={isCurrent('/admin/events') ? 'page' : undefined}
+        >
+          <NavList.LeadingVisual>
+            <CalendarIcon />
+          </NavList.LeadingVisual>
+          Events &amp; Races
+        </NavList.Item>
 
-        {/* Context Navigation Bar */}
-        <div className="slds-context-bar" style={{ borderBottom: '1px solid #dddbda', background: '#ffffff', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <nav className="slds-context-bar__secondary" role="navigation" style={{ width: '100%', minWidth: 'max-content' }}>
-            <ul className="slds-grid" style={{ display: 'flex', margin: 0, padding: 0, listStyle: 'none', flexWrap: 'nowrap' }}>
-              <li className={`slds-context-bar__item ${isCurrent('/admin') && !isCurrent('/admin/events') && !isCurrent('/admin/users') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
-                <Link to="/admin" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
-                  <span className="slds-truncate">Home</span>
-                </Link>
-              </li>
-              <li className={`slds-context-bar__item ${isCurrent('/admin/events') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
-                <Link to="/admin/events" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
-                  <span className="slds-truncate">Events & Races</span>
-                </Link>
-              </li>
-              <li className={`slds-context-bar__item ${isCurrent('/admin/users') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
-                <Link to="/admin/users" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
-                  <span className="slds-truncate">Users</span>
-                </Link>
-              </li>
-              <li className={`slds-context-bar__item ${isCurrent('/admin/organizations') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
-                <Link to="/admin/organizations" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
-                  <span className="slds-truncate">Organizations</span>
-                </Link>
-              </li>
-              <li className={`slds-context-bar__item ${isCurrent('/admin/teams') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
-                <Link to="/admin/teams" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
-                  <span className="slds-truncate">Teams</span>
-                </Link>
-              </li>
-              <li className={`slds-context-bar__item ${isCurrent('/admin/approvals') ? 'slds-is-active' : ''}`} style={{ display: 'inline-flex' }}>
-                <Link to="/admin/approvals" className="slds-context-bar__label-action" style={{ textDecoration: 'none' }}>
-                  <span className="slds-truncate">Approvals</span>
-                </Link>
-              </li>
-              <li className="slds-context-bar__item" style={{ display: 'inline-flex', marginLeft: 'auto' }}>
-                <Link to="/" className="slds-context-bar__label-action" style={{ textDecoration: 'none', color: '#0176d3', fontWeight: 'bold' }}>
-                  <span className="slds-truncate">← Back to Portal</span>
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </header>
+        <NavList.Item
+          as={Link}
+          to="/admin/approvals"
+          aria-current={isCurrent('/admin/approvals') ? 'page' : undefined}
+        >
+          <NavList.LeadingVisual>
+            <ChecklistIcon />
+          </NavList.LeadingVisual>
+          Approvals Queue
+          {pendingApprovalsCount !== null && pendingApprovalsCount > 0 && (
+            <NavList.TrailingVisual>
+              <CounterLabel scheme="primary">{pendingApprovalsCount}</CounterLabel>
+            </NavList.TrailingVisual>
+          )}
+        </NavList.Item>
+      </NavList.Group>
 
-      {/* Main Content Area */}
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem' }}>
-        {/* Page Header */}
-        <div className="slds-page-header slds-m-bottom_large" role="banner" style={{ borderRadius: '4px', border: '1px solid #dddbda', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div className="slds-page-header__row" style={{ flexWrap: 'wrap', gap: '12px' }}>
-            <div className="slds-page-header__col-title">
-              <div className="slds-media slds-no-space slds-grow">
-                <div className="slds-media__figure">
-                  <span className="slds-icon_container slds-icon-standard-opportunity" style={{ background: '#0176d3', borderRadius: '4px', padding: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', color: '#fff', fontSize: '20px' }}>
-                    📈
-                  </span>
+      <NavList.Divider />
+
+      <NavList.Group title="Directory & Access">
+        <NavList.Item
+          as={Link}
+          to="/admin/users"
+          aria-current={isCurrent('/admin/users') ? 'page' : undefined}
+        >
+          <NavList.LeadingVisual>
+            <PeopleIcon />
+          </NavList.LeadingVisual>
+          Users
+        </NavList.Item>
+
+        {isSiteAdmin && (
+          <>
+            <NavList.Item
+              as={Link}
+              to="/admin/organizations"
+              aria-current={isCurrent('/admin/organizations') ? 'page' : undefined}
+            >
+              <NavList.LeadingVisual>
+                <OrganizationIcon />
+              </NavList.LeadingVisual>
+              Organizations
+            </NavList.Item>
+
+            <NavList.Item
+              as={Link}
+              to="/admin/teams"
+              aria-current={isCurrent('/admin/teams') ? 'page' : undefined}
+            >
+              <NavList.LeadingVisual>
+                <ShieldIcon />
+              </NavList.LeadingVisual>
+              Teams
+            </NavList.Item>
+          </>
+        )}
+      </NavList.Group>
+
+      <NavList.Divider />
+
+      <NavList.Item as={Link} to="/">
+        <NavList.LeadingVisual>
+          <ArrowLeftIcon />
+        </NavList.LeadingVisual>
+        Back to Portal
+      </NavList.Item>
+    </NavList>
+  )
+
+  return (
+    <ThemeProvider colorMode="day">
+      <BaseStyles>
+        <div className="primer-admin-scope" data-color-mode="light" data-light-theme="light">
+          {/* Compact GitHub-style Top Application Header */}
+          <header
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 30,
+              backgroundColor: 'var(--bgColor-default, #ffffff)',
+              borderBottom: '1px solid var(--borderColor-default, #d0d7de)',
+            }}
+          >
+            <div
+              style={{
+                maxWidth: '1440px',
+                margin: '0 auto',
+                padding: '10px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                <div className="md:hidden">
+                  <IconButton
+                    aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                    icon={mobileNavOpen ? XIcon : ThreeBarsIcon}
+                    variant="invisible"
+                    size="small"
+                    onClick={() => setMobileNavOpen((prev) => !prev)}
+                  />
                 </div>
-                <div className="slds-media__body" style={{ minWidth: 0 }}>
-                  <div className="slds-page-header__name">
-                    <div className="slds-page-header__name-title">
-                      <h1>
-                        <span className="slds-page-header__title slds-truncate" title={title} style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#080707' }}>
-                          {title}
-                        </span>
-                      </h1>
+
+                <Link
+                  to="/admin"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    textDecoration: 'none',
+                    color: 'var(--fgColor-default, #1f2328)',
+                  }}
+                >
+                  <img
+                    src="/favicon.png"
+                    alt="Lightwing"
+                    style={{ width: '24px', height: '24px', borderRadius: '4px' }}
+                  />
+                  <span style={{ fontWeight: 600, fontSize: '15px', letterSpacing: '-0.01em' }}>
+                    Lightwing
+                  </span>
+                  <span style={{ color: 'var(--fgColor-muted, #636c76)', fontWeight: 400 }}>/</span>
+                  <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--fgColor-default, #1f2328)' }}>
+                    Admin Console
+                  </span>
+                </Link>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <Link to="/" style={{ textDecoration: 'none' }} className="hidden sm:inline-flex">
+                  <Button variant="invisible" size="small" leadingVisual={ArrowLeftIcon}>
+                    Portal
+                  </Button>
+                </Link>
+
+                {session ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+                        border: '1px solid var(--borderColor-muted, #d8dee4)',
+                      }}
+                    >
+                      <Avatar
+                        src={session.user.image || '/fallback_avatar.jpg'}
+                        size={20}
+                        alt={session.user.vrchatUsername ?? session.user.name}
+                      />
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: 'var(--fgColor-default, #1f2328)',
+                          maxWidth: '140px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {session.user.vrchatUsername ?? session.user.name}
+                      </span>
+                      <Label
+                        variant={isSiteAdmin ? 'accent' : 'secondary'}
+                        size="small"
+                      >
+                        {session.user.siteRole}
+                      </Label>
                     </div>
+                    <Button
+                      type="button"
+                      size="small"
+                      leadingVisual={SignOutIcon}
+                      onClick={() => void signOutUser('/')}
+                    >
+                      Sign Out
+                    </Button>
                   </div>
-                  {subtitle ? (
-                    <p className="slds-page-header__name-meta slds-text-body_regular text-slate-600" style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#514f4d', whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                      {subtitle}
-                    </p>
-                  ) : (
-                    <p className="slds-page-header__name-meta slds-text-body_regular text-slate-600" style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#514f4d' }}>
-                      System Management & Operations Panel
-                    </p>
+                ) : (
+                  <span style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+                    Not signed in
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Mobile Collapsible Navigation */}
+            {mobileNavOpen && (
+              <div
+                className="md:hidden"
+                style={{
+                  borderTop: '1px solid var(--borderColor-default, #d0d7de)',
+                  backgroundColor: 'var(--bgColor-default, #ffffff)',
+                  padding: '8px 12px 16px 12px',
+                }}
+              >
+                {navContent}
+              </div>
+            )}
+          </header>
+
+          {/* Primer PageLayout: Sticky Left NavList Sidebar + Main Workspace */}
+          <div style={{ maxWidth: '1440px', margin: '0 auto' }}>
+            <PageLayout containerWidth="full" padding="normal" columnGap="normal">
+              <PageLayout.Pane
+                position="start"
+                sticky
+                width="small"
+                divider="line"
+                hidden={{ narrow: true }}
+              >
+                <div style={{ paddingTop: '4px' }}>{navContent}</div>
+              </PageLayout.Pane>
+
+              <PageLayout.Content width="full">
+                {/* Optional Breadcrumbs */}
+                {breadcrumbs && breadcrumbs.length > 0 && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <Breadcrumbs>
+                      {breadcrumbs.map((crumb, idx) => {
+                        const isLast = idx === breadcrumbs.length - 1
+                        if (isLast || !crumb.to) {
+                          return (
+                            <Breadcrumbs.Item key={crumb.label} selected={isLast}>
+                              {crumb.label}
+                            </Breadcrumbs.Item>
+                          )
+                        }
+                        return (
+                          <Breadcrumbs.Item
+                            key={crumb.label}
+                            as={Link}
+                            to={crumb.to as any}
+                            params={crumb.params as any}
+                          >
+                            {crumb.label}
+                          </Breadcrumbs.Item>
+                        )
+                      })}
+                    </Breadcrumbs>
+                  </div>
+                )}
+
+                {/* GitHub Settings-style Page Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                    paddingBottom: '16px',
+                    marginBottom: '20px',
+                    borderBottom: '1px solid var(--borderColor-default, #d0d7de)',
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: '1 1 300px' }}>
+                    <h1
+                      style={{
+                        margin: 0,
+                        fontSize: '22px',
+                        fontWeight: 600,
+                        lineHeight: 1.25,
+                        color: 'var(--fgColor-default, #1f2328)',
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      {title}
+                    </h1>
+                    {subtitle && (
+                      <p
+                        style={{
+                          margin: '6px 0 0 0',
+                          fontSize: '14px',
+                          color: 'var(--fgColor-muted, #636c76)',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {subtitle}
+                      </p>
+                    )}
+                  </div>
+
+                  {actions && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {actions}
+                    </div>
                   )}
                 </div>
-              </div>
-            </div>
-            {actions && (
-              <div className="slds-page-header__col-actions">
-                <div className="slds-page-header__controls">
-                  <div className="slds-page-header__control" style={{ display: 'flex', gap: '8px' }}>
-                    {actions}
-                  </div>
-                </div>
-              </div>
-            )}
+
+                {/* Page Content */}
+                <div style={{ paddingBottom: '48px' }}>{children}</div>
+              </PageLayout.Content>
+            </PageLayout>
           </div>
         </div>
-
-        {/* Content Children */}
-        <div className="slds-m-top_medium">
-          {children}
-        </div>
-      </main>
-    </div>
+      </BaseStyles>
+    </ThemeProvider>
   )
 }

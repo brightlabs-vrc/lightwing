@@ -928,6 +928,91 @@ func (s *Service) ConvertTeamToOrg(ctx context.Context, p *ConvertTeamToOrgReque
 	return convertTeamToOrg(ctx, actor, p.TeamID)
 }
 
+type DeleteEntityResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+func deleteAdminOrganization(ctx context.Context, actor *auth.Actor, id string) (*DeleteEntityResponse, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
+	}
+	if !auth.IsSiteAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "site admin required"}
+	}
+
+	var existingID, existingSlug string
+	if row, err := q().GetOrgByID(ctx, id); err == nil {
+		existingID = row.ID
+		existingSlug = row.Slug
+	} else if slugRow, errSlug := q().GetOrgBySlug(ctx, id); errSlug == nil {
+		existingID = slugRow.ID
+		existingSlug = slugRow.Slug
+	} else {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "organization not found"}
+	}
+
+	affected, err := q().DeleteOrg(ctx, existingID)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "organization not found"}
+	}
+
+	// Clean up any legacy team row sharing the same ID.
+	_ = q().DeleteTeam(ctx, existingID)
+
+	invalidateTeamCache(ctx, id)
+	invalidateTeamCache(ctx, existingID)
+	if existingSlug != "" {
+		invalidateTeamCache(ctx, existingSlug)
+	}
+	return &DeleteEntityResponse{Deleted: true}, nil
+}
+
+func deleteAdminTeam(ctx context.Context, actor *auth.Actor, id string) (*DeleteEntityResponse, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
+	}
+	if !auth.IsSiteAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "site admin required"}
+	}
+
+	var existingID, existingSlug string
+	if row, err := q().GetTeamByID(ctx, id); err == nil {
+		existingID = row.ID
+		existingSlug = row.Slug
+	} else if slugRow, errSlug := q().GetTeamBySlug(ctx, id); errSlug == nil {
+		existingID = slugRow.ID
+		existingSlug = slugRow.Slug
+	} else {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "team not found"}
+	}
+
+	if err := q().DeleteTeam(ctx, existingID); err != nil {
+		return nil, err
+	}
+
+	invalidateTeamCache(ctx, id)
+	invalidateTeamCache(ctx, existingID)
+	if existingSlug != "" {
+		invalidateTeamCache(ctx, existingSlug)
+	}
+	return &DeleteEntityResponse{Deleted: true}, nil
+}
+
+//encore:api auth method=DELETE path=/api/admin/organizations/:id
+func (s *Service) DeleteAdminOrganization(ctx context.Context, id string) (*DeleteEntityResponse, error) {
+	actor := encoreauth.Data().(*auth.Actor)
+	return deleteAdminOrganization(ctx, actor, id)
+}
+
+//encore:api auth method=DELETE path=/api/admin/teams/:id
+func (s *Service) DeleteAdminTeam(ctx context.Context, id string) (*DeleteEntityResponse, error) {
+	actor := encoreauth.Data().(*auth.Actor)
+	return deleteAdminTeam(ctx, actor, id)
+}
+
 // --- HTTP endpoints (thin wrappers over the cores above) ---
 
 //encore:api public method=GET path=/api/teams/:id

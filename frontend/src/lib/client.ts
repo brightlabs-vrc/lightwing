@@ -225,6 +225,7 @@ export namespace auth {
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
             this.Callback = this.Callback.bind(this)
+            this.DeleteUser = this.DeleteUser.bind(this)
             this.GetSession = this.GetSession.bind(this)
             this.GetUser = this.GetUser.bind(this)
             this.GetUserBySlug = this.GetUserBySlug.bind(this)
@@ -243,6 +244,14 @@ export namespace auth {
          */
         public async Callback(method: "GET", body?: RequestInit["body"], options?: CallParameters): Promise<globalThis.Response> {
             return this.baseClient.callAPI(method, `/api/auth/callback/discord`, body, options)
+        }
+
+        public async DeleteUser(id: string, params: { Authorization: string }): Promise<{ deleted: boolean }> {
+            const headers = makeRecord<string, string>({
+                authorization: params.Authorization,
+            })
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/admin/users/${encodeURIComponent(id)}`, undefined, {headers})
+            return await resp.json() as { deleted: boolean }
         }
 
         /**
@@ -2459,6 +2468,8 @@ export namespace teammanager {
             this.GetAdminOrganization = this.GetAdminOrganization.bind(this)
             this.CreateAdminOrganization = this.CreateAdminOrganization.bind(this)
             this.UpdateAdminOrganization = this.UpdateAdminOrganization.bind(this)
+            this.DeleteAdminOrganization = this.DeleteAdminOrganization.bind(this)
+            this.DeleteAdminTeam = this.DeleteAdminTeam.bind(this)
         }
 
         public async ListAdminOrganizations(params: ListAdminOrganizationsRequest): Promise<ListAdminOrganizationsResponse> {
@@ -2486,6 +2497,18 @@ export namespace teammanager {
             const headers = makeRecord<string, string>({ authorization: params.Authorization })
             const resp = await this.baseClient.callTypedAPI("PATCH", `/api/admin/organizations`, JSON.stringify(params), {headers})
             return await resp.json() as AdminOrganizationDetail
+        }
+
+        public async DeleteAdminOrganization(id: string, params: { Authorization: string }): Promise<{ deleted: boolean }> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/admin/organizations/${encodeURIComponent(id)}`, undefined, {headers})
+            return await resp.json() as { deleted: boolean }
+        }
+
+        public async DeleteAdminTeam(id: string, params: { Authorization: string }): Promise<{ deleted: boolean }> {
+            const headers = makeRecord<string, string>({ authorization: params.Authorization })
+            const resp = await this.baseClient.callTypedAPI("DELETE", `/api/admin/teams/${encodeURIComponent(id)}`, undefined, {headers})
+            return await resp.json() as { deleted: boolean }
         }
 
         public async ConvertTeamToOrg(params: ConvertTeamToOrgRequest): Promise<AdminOrganizationDetail> {
@@ -2560,8 +2583,10 @@ export namespace teammanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                logo: params.logo,
-                name: params.name,
+                description:           (params as any).description,
+                logo:                  params.logo,
+                name:                  params.name,
+                primaryOrganizationId: (params as any).primaryOrganizationId,
             }
 
             // Now make the actual call to the API
@@ -2637,11 +2662,13 @@ export namespace teammanager {
 
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                clearLogo: params.clearLogo,
-                id:        params.id,
-                logo:      params.logo,
-                name:      params.name,
-                slug:      params.slug,
+                clearDescription: params.clearDescription,
+                clearLogo:        params.clearLogo,
+                description:      params.description,
+                id:               params.id,
+                logo:             params.logo,
+                name:             params.name,
+                slug:             params.slug,
             }
 
             // Now make the actual call to the API

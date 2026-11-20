@@ -4,9 +4,9 @@ MUST write valid Go v1.22+ code, best practices.
 
 ## UI Framework & Design Conventions
 
-- **Salesforce Lightning Design System (`slds-`) Restrictions:**
-  - The Salesforce UI kit (`slds-` CSS classes and components) MUST remain restricted to **administrative routes only** (`/admin/*`).
-  - Do NOT use `slds-` styling or Salesforce UI kit components on public pages, user/team profile views, or entity management routes.
+- **GitHub Primer Design System (`@primer/react`, `@primer/primitives`, `@primer/octicons-react`) Restrictions:**
+  - The GitHub Primer UI kit (`@primer/react` components and `.primer-admin-scope` styles) MUST remain restricted to **administrative routes only** (`/admin/*`).
+  - Do NOT use `@primer/react` components on public pages, user/team profile views, or entity management routes.
 - **`pxlkit` UI Kit Usage:**
   - Public pages (`/`, `/events/*`, `/$user`, `/leaderboard`, `/profile`, `/auth`) and management UI routes (`/teams/new`, `/teams/manage/$id`) MUST use `@pxlkit/ui-kit` components and retro styling (`PixelContainer`, `PixelCard`, `PixelStack`, `PixelButton`, `PixelBadge`, `PixelTable`, `PixelModal`, etc.).
   - Markdown content across events, teams, and organizations MUST be rendered using `MarkdownView` (`react-markdown` + `remark-gfm`).

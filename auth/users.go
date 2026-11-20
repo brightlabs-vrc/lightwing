@@ -531,3 +531,49 @@ func (s *Service) ListUsers(ctx context.Context, p *ListUsersRequest) (*ListUser
 	actor := encoreauth.Data().(*Actor)
 	return listUsers(ctx, actor, ListUsersQuery{Search: p.Search, Limit: p.Limit, Offset: p.Offset})
 }
+
+// DeleteUserResponse confirms hard deletion of a user account.
+type DeleteUserResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+func deleteUser(ctx context.Context, actor *Actor, targetUserID string) (*DeleteUserResponse, error) {
+	if actor == nil {
+		return nil, &errs.Error{Code: errs.Unauthenticated, Message: "missing session token"}
+	}
+	if !isSiteAdmin(actor.SiteRole) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "site admin required"}
+	}
+	if actor.UserID == targetUserID {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "cannot delete your own active administrator account"}
+	}
+
+	existing, err := loadUserRow(ctx, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	affected, err := q().DeleteUserByID(ctx, existing.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete user: %w", err)
+	}
+	if affected == 0 {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+	}
+
+	slug := ""
+	if existing.Slug.Valid {
+		slug = existing.Slug.String
+	}
+	invalidateUserProfileCache(ctx, existing.ID, slug)
+	return &DeleteUserResponse{Deleted: true}, nil
+}
+
+// DeleteUser permanently deletes a user account and cascades related records.
+// Restricted to SITE_ADMIN and blocks self-deletion.
+//
+//encore:api auth method=DELETE path=/api/admin/users/:id
+func (s *Service) DeleteUser(ctx context.Context, id string) (*DeleteUserResponse, error) {
+	actor := encoreauth.Data().(*Actor)
+	return deleteUser(ctx, actor, id)
+}

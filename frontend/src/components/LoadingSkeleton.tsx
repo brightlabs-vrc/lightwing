@@ -1,32 +1,31 @@
 import React from 'react'
 
 /**
- * Salesforce Lightning Design System (SLDS) styled skeleton loader for Admin pages.
+ * Primer-styled skeleton list loader for Admin pages.
  */
-export function SldsSkeletonList({ count = 3 }: { count?: number }) {
+export function PrimerSkeletonList({ count = 3 }: { count?: number }) {
   return (
-    <div className="animate-pulse slds-p-around_medium" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
       {Array.from({ length: count }).map((_, idx) => (
         <div
           key={idx}
-          className="slds-box bg-white"
           style={{
-            background: '#ffffff',
-            borderRadius: '4px',
-            border: '1px solid #e0e0e0',
+            backgroundColor: 'var(--bgColor-default, #ffffff)',
+            borderRadius: '6px',
+            border: '1px solid var(--borderColor-default, #d0d7de)',
             padding: '16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px'
+            gap: '10px',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ height: '18px', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '40%' }}></div>
-            <div style={{ height: '20px', backgroundColor: '#e2e8f0', borderRadius: '12px', width: '60px' }}></div>
+            <div style={{ height: '16px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '6px', width: '40%' }} />
+            <div style={{ height: '20px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '999px', width: '68px' }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-            <div style={{ height: '14px', backgroundColor: '#f1f5f9', borderRadius: '4px', width: '25%' }}></div>
-            <div style={{ height: '14px', backgroundColor: '#f1f5f9', borderRadius: '4px', width: '20%' }}></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+            <div style={{ height: '12px', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', borderRadius: '6px', width: '28%' }} />
+            <div style={{ height: '12px', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', borderRadius: '6px', width: '20%' }} />
           </div>
         </div>
       ))}
@@ -35,39 +34,40 @@ export function SldsSkeletonList({ count = 3 }: { count?: number }) {
 }
 
 /**
- * Salesforce Lightning Design System (SLDS) styled skeleton details/tabs layout loader for Admin pages.
+ * Primer-styled skeleton detail loader for Admin pages.
  */
-export function SldsSkeletonDetail() {
+export function PrimerSkeletonDetail() {
   return (
-    <div className="animate-pulse slds-p-around_medium" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Header section placeholder */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e2e8f0', paddingBottom: '16px' }}>
+    <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '8px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--borderColor-default, #d0d7de)', paddingBottom: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '50%' }}>
-          <div style={{ height: '28px', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '80%' }}></div>
-          <div style={{ height: '14px', backgroundColor: '#f1f5f9', borderRadius: '4px', width: '40%' }}></div>
+          <div style={{ height: '24px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '6px', width: '75%' }} />
+          <div style={{ height: '14px', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', borderRadius: '6px', width: '45%' }} />
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ height: '32px', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '100px' }}></div>
-          <div style={{ height: '32px', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '120px' }}></div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ height: '32px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '6px', width: '100px' }} />
+          <div style={{ height: '32px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '6px', width: '110px' }} />
         </div>
       </div>
 
-      {/* Tabs list placeholder */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', gap: '16px', paddingBottom: '4px' }}>
-        <div style={{ height: '20px', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '120px' }}></div>
-        <div style={{ height: '20px', backgroundColor: '#f1f5f9', borderRadius: '4px', width: '140px' }}></div>
-        <div style={{ height: '20px', backgroundColor: '#f1f5f9', borderRadius: '4px', width: '110px' }}></div>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--borderColor-default, #d0d7de)', gap: '16px', paddingBottom: '8px' }}>
+        <div style={{ height: '18px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '6px', width: '110px' }} />
+        <div style={{ height: '18px', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', borderRadius: '6px', width: '130px' }} />
+        <div style={{ height: '18px', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', borderRadius: '6px', width: '100px' }} />
       </div>
 
-      {/* Main card body placeholder */}
-      <div style={{ height: '200px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
-        <div style={{ height: '16px', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '90%' }}></div>
-        <div style={{ height: '16px', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '85%' }}></div>
-        <div style={{ height: '16px', backgroundColor: '#f1f5f9', borderRadius: '4px', width: '60%' }}></div>
+      <div style={{ height: '200px', backgroundColor: 'var(--bgColor-default, #ffffff)', border: '1px solid var(--borderColor-default, #d0d7de)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px' }}>
+        <div style={{ height: '14px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '6px', width: '90%' }} />
+        <div style={{ height: '14px', backgroundColor: 'var(--bgColor-neutral-muted, #eaeef2)', borderRadius: '6px', width: '80%' }} />
+        <div style={{ height: '14px', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', borderRadius: '6px', width: '60%' }} />
       </div>
     </div>
   )
 }
+
+/** Backwards-compatible aliases */
+export const SldsSkeletonList = PrimerSkeletonList
+export const SldsSkeletonDetail = PrimerSkeletonDetail
 
 /**
  * Retro PixelKit styled card skeleton loader for public pages.

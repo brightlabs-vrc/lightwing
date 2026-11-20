@@ -1,11 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { Button, CounterLabel, Label, UnderlineNav } from '@primer/react'
+import { CheckIcon, OrganizationIcon, ShieldIcon, SyncIcon, XIcon } from '@primer/octicons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { requireAdminPanel } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
 import { listAdminApplications, reviewAdminApplication } from '../../lib/admin-api'
 import { AlertBanner } from '../../components/AlertBanner'
-import { SldsSkeletonList } from '../../components/LoadingSkeleton'
+import { PrimerSkeletonList } from '../../components/LoadingSkeleton'
 import type { teammanager } from '../../lib/client'
 
 export const Route = createFileRoute('/admin/approvals')({
@@ -15,6 +17,8 @@ export const Route = createFileRoute('/admin/approvals')({
   component: AdminApprovalsPage,
 })
 
+type QueueFilter = 'ALL' | 'ORGANIZATIONS' | 'TEAMS'
+
 function AdminApprovalsPage() {
   const { session } = useAuth()
   const [orgApps, setOrgApps] = useState<teammanager.OrgApplicationView[]>([])
@@ -23,6 +27,7 @@ function AdminApprovalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [filter, setFilter] = useState<QueueFilter>('ALL')
 
   const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
 
@@ -64,158 +69,217 @@ function AdminApprovalsPage() {
     }
   }
 
+  const totalPending = (isSiteAdmin ? orgApps.length : 0) + teamApps.length
+
   return (
     <AdminLayout
       title="Application Approvals Queue"
-      subtitle="Review pending organization and competitive team registration applications."
+      subtitle="Review and act on pending organization and competitive team registration requests."
+      breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Approvals' }]}
       actions={
-        <button
-          type="button"
-          onClick={() => void fetchApplications()}
-          className="slds-button slds-button_neutral"
-        >
+        <Button type="button" leadingVisual={SyncIcon} onClick={() => void fetchApplications()} disabled={loading}>
           Refresh Queue
-        </button>
+        </Button>
       }
     >
-      {error && (
-        <div className="slds-m-bottom_medium">
-          <AlertBanner variant="error">{error}</AlertBanner>
-        </div>
-      )}
-      {success && (
-        <div className="slds-m-bottom_medium">
-          <AlertBanner variant="success">{success}</AlertBanner>
-        </div>
-      )}
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
+      {success && <AlertBanner variant="success">{success}</AlertBanner>}
+
+      <div style={{ marginBottom: '20px' }}>
+        <UnderlineNav aria-label="Approvals Queue Filter">
+          <UnderlineNav.Item
+            aria-current={filter === 'ALL' ? 'page' : undefined}
+            counter={totalPending}
+            onSelect={(e) => {
+              e.preventDefault()
+              setFilter('ALL')
+            }}
+          >
+            All Pending
+          </UnderlineNav.Item>
+          {isSiteAdmin && (
+            <UnderlineNav.Item
+              aria-current={filter === 'ORGANIZATIONS' ? 'page' : undefined}
+              icon={OrganizationIcon}
+              counter={orgApps.length}
+              onSelect={(e) => {
+                e.preventDefault()
+                setFilter('ORGANIZATIONS')
+              }}
+            >
+              Organizations
+            </UnderlineNav.Item>
+          )}
+          <UnderlineNav.Item
+            aria-current={filter === 'TEAMS' ? 'page' : undefined}
+            icon={ShieldIcon}
+            counter={teamApps.length}
+            onSelect={(e) => {
+              e.preventDefault()
+              setFilter('TEAMS')
+            }}
+          >
+            Competitive Teams
+          </UnderlineNav.Item>
+        </UnderlineNav>
+      </div>
 
       {loading ? (
-        <SldsSkeletonList count={3} />
+        <PrimerSkeletonList count={3} />
       ) : (
-        <div className="slds-grid slds-wrap slds-gutters" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Organization Applications Section (SITE_ADMIN only) */}
-          {isSiteAdmin && (
-            <div className="slds-col slds-size_1-of-1">
-              <article className="slds-card" style={{ border: '1px solid #dddbda', borderRadius: '6px', background: '#fff', padding: '1.25rem' }}>
-                <div className="slds-card__header slds-m-bottom_medium">
-                  <h2 className="slds-text-heading_small font-bold" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                    🏢 Pending Organization Applications ({orgApps.length})
-                  </h2>
-                </div>
-
-                {orgApps.length === 0 ? (
-                  <p className="text-slate-500 text-sm">No pending organization applications in queue.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {orgApps.map((app) => (
-                      <div key={app.id} className="slds-box bg-slate-50" style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '1rem', background: '#f8fafc' }}>
-                        <div className="slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div>
-                            <h3 className="text-lg font-bold text-slate-900" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{app.name}</h3>
-                            <p className="text-xs text-slate-500" style={{ fontSize: '12px', color: '#64748b' }}>Slug: @{app.slug} | Type: {app.orgType}</p>
-                            <div className="slds-m-top_x-small" style={{ fontSize: '13px', display: 'flex', gap: '16px', marginTop: '6px' }}>
-                              <span><strong>Discord Invite:</strong> {app.discordInvite}</span>
-                              <span><strong>VRChat Group ID:</strong> {app.vrchatGroupId}</span>
-                            </div>
-                            {app.members && app.members.length > 0 && (
-                              <p className="text-xs text-slate-600 slds-m-top_x-small" style={{ fontSize: '12px', marginTop: '4px' }}>
-                                <strong>Staff Roster ({app.members.length}):</strong> {app.members.map((m) => m.name).join(', ')}
-                              </p>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              type="button"
-                              disabled={reviewingId === app.id}
-                              onClick={() => void handleReview(app.id, 'ORGANIZATION', 'APPROVE')}
-                              className="slds-button slds-button_brand"
-                              style={{ padding: '4px 12px', fontSize: '12px' }}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              disabled={reviewingId === app.id}
-                              onClick={() => void handleReview(app.id, 'ORGANIZATION', 'REJECT')}
-                              className="slds-button slds-button_destructive"
-                              style={{ padding: '4px 12px', fontSize: '12px' }}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-            </div>
-          )}
-
-          {/* Team Applications Section (SITE_ADMIN and EVENT_ADMIN) */}
-          <div className="slds-col slds-size_1-of-1">
-            <article className="slds-card" style={{ border: '1px solid #dddbda', borderRadius: '6px', background: '#fff', padding: '1.25rem' }}>
-              <div className="slds-card__header slds-m-bottom_medium">
-                <h2 className="slds-text-heading_small font-bold" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                  🏁 Pending Competitive Team Applications ({teamApps.length})
-                </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Organization Applications (SITE_ADMIN only) */}
+          {isSiteAdmin && (filter === 'ALL' || filter === 'ORGANIZATIONS') && (
+            <section className="primer-box">
+              <div className="primer-box-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <OrganizationIcon size={16} />
+                <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Pending Organization Applications</h2>
+                <CounterLabel>{orgApps.length}</CounterLabel>
               </div>
 
-              {teamApps.length === 0 ? (
-                <p className="text-slate-500 text-sm">No pending team applications in queue.</p>
+              {orgApps.length === 0 ? (
+                <p style={{ margin: 0, padding: '20px 16px', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+                  No pending organization applications in queue.
+                </p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {teamApps.map((app) => (
-                    <div key={app.id} className="slds-box bg-slate-50" style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '1rem', background: '#f8fafc' }}>
-                      <div className="slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <h3 className="text-lg font-bold text-slate-900" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{app.name}</h3>
-                          <p className="text-xs text-slate-500" style={{ fontSize: '12px', color: '#64748b' }}>Slug: @{app.slug}</p>
-                          <div className="slds-m-top_x-small" style={{ fontSize: '13px', marginTop: '6px' }}>
-                            <p>
-                              <strong>Primary Organization:</strong> {app.primaryOrganization.name} (@{app.primaryOrganization.slug})
-                            </p>
-                            {app.secondaryOrganizations && app.secondaryOrganizations.length > 0 && (
-                              <p style={{ marginTop: '2px' }}>
-                                <strong>Secondary Organizations:</strong> {app.secondaryOrganizations.map((s) => s.name).join(', ')}
-                              </p>
-                            )}
-                            {app.members && app.members.length > 0 && (
-                              <p style={{ marginTop: '2px' }}>
-                                <strong>Preliminary Roster ({app.members.length}):</strong> {app.members.map((m) => m.name).join(', ')}
-                              </p>
-                            )}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {orgApps.map((app, idx) => (
+                    <div
+                      key={app.id}
+                      style={{
+                        padding: '16px',
+                        borderTop: idx === 0 ? 'none' : '1px solid var(--borderColor-muted, #d8dee4)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '16px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{app.name}</h3>
+                          <Label variant="accent" size="small">{app.orgType}</Label>
+                          <span style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>@{app.slug}</span>
+                        </div>
+                        <div style={{ marginTop: '8px', fontSize: '13px', display: 'flex', gap: '16px', flexWrap: 'wrap', color: 'var(--fgColor-default, #1f2328)' }}>
+                          <span><strong>Discord Invite:</strong> {app.discordInvite}</span>
+                          <span><strong>VRChat Group ID:</strong> <code>{app.vrchatGroupId}</code></span>
+                        </div>
+                        {app.members && app.members.length > 0 && (
+                          <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+                            <strong>Staff Roster ({app.members.length}):</strong> {app.members.map((m) => m.name).join(', ')}
                           </div>
-                        </div>
+                        )}
+                      </div>
 
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            type="button"
-                            disabled={reviewingId === app.id}
-                            onClick={() => void handleReview(app.id, 'TEAM', 'APPROVE')}
-                            className="slds-button slds-button_brand"
-                            style={{ padding: '4px 12px', fontSize: '12px' }}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            disabled={reviewingId === app.id}
-                            onClick={() => void handleReview(app.id, 'TEAM', 'REJECT')}
-                            className="slds-button slds-button_destructive"
-                            style={{ padding: '4px 12px', fontSize: '12px' }}
-                          >
-                            Reject
-                          </button>
-                        </div>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="small"
+                          leadingVisual={CheckIcon}
+                          disabled={reviewingId === app.id}
+                          onClick={() => void handleReview(app.id, 'ORGANIZATION', 'APPROVE')}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="small"
+                          leadingVisual={XIcon}
+                          disabled={reviewingId === app.id}
+                          onClick={() => void handleReview(app.id, 'ORGANIZATION', 'REJECT')}
+                        >
+                          Reject
+                        </Button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </article>
-          </div>
+            </section>
+          )}
+
+          {/* Team Applications (SITE_ADMIN and EVENT_ADMIN) */}
+          {(filter === 'ALL' || filter === 'TEAMS') && (
+            <section className="primer-box">
+              <div className="primer-box-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldIcon size={16} />
+                <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Pending Competitive Team Applications</h2>
+                <CounterLabel>{teamApps.length}</CounterLabel>
+              </div>
+
+              {teamApps.length === 0 ? (
+                <p style={{ margin: 0, padding: '20px 16px', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+                  No pending team applications in queue.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {teamApps.map((app, idx) => (
+                    <div
+                      key={app.id}
+                      style={{
+                        padding: '16px',
+                        borderTop: idx === 0 ? 'none' : '1px solid var(--borderColor-muted, #d8dee4)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '16px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{app.name}</h3>
+                          <span style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>@{app.slug}</span>
+                        </div>
+                        <div style={{ marginTop: '8px', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div>
+                            <strong>Primary Organization:</strong> {app.primaryOrganization.name} (@{app.primaryOrganization.slug})
+                          </div>
+                          {app.secondaryOrganizations && app.secondaryOrganizations.length > 0 && (
+                            <div>
+                              <strong>Secondary Organizations:</strong> {app.secondaryOrganizations.map((s) => s.name).join(', ')}
+                            </div>
+                          )}
+                          {app.members && app.members.length > 0 && (
+                            <div style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+                              <strong>Preliminary Roster ({app.members.length}):</strong> {app.members.map((m) => m.name).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="small"
+                          leadingVisual={CheckIcon}
+                          disabled={reviewingId === app.id}
+                          onClick={() => void handleReview(app.id, 'TEAM', 'APPROVE')}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="small"
+                          leadingVisual={XIcon}
+                          disabled={reviewingId === app.id}
+                          onClick={() => void handleReview(app.id, 'TEAM', 'REJECT')}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
     </AdminLayout>

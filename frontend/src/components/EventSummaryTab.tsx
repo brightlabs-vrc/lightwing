@@ -1,120 +1,144 @@
 import type { eventmanager } from '../lib/client'
 import { GradePointsPreview } from './GradePointsPreview'
-import styles from './EventSummaryTab.module.css'
 import { DEFAULT_SCORING_TABLES } from '../lib/scoringDefaults'
 import { UserLink } from './UserLink'
 import { MarkdownView } from './MarkdownView'
+import { formatLocalDateTime } from '../lib/datetime'
 
 interface EventSummaryTabProps {
   selectedEvent: eventmanager.EventDetail
 }
 
-import { formatLocalDateTime } from '../lib/datetime'
-
 export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
   return (
-    <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
-      <div className={styles.summaryGrid}>
+    <div style={{ paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Key Metadata Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
+        }}
+      >
         {selectedEvent.scheduledAt && (
-          <div>
-            <p className={styles.titleCaps}>Scheduled Time</p>
-            <p className={styles.bodyRegular}>
-              <time dateTime={selectedEvent.scheduledAt}>
-                <strong>{formatLocalDateTime(selectedEvent.scheduledAt)}</strong>
-              </time>
-            </p>
+          <div className="primer-box" style={{ padding: '12px 14px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--fgColor-muted, #636c76)', marginBottom: '4px' }}>
+              Scheduled Time
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)' }}>
+              <time dateTime={selectedEvent.scheduledAt}>{formatLocalDateTime(selectedEvent.scheduledAt)}</time>
+            </div>
           </div>
         )}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <p className={styles.titleCaps}>Description</p>
-          <div className="mt-1 bg-white p-3 rounded border border-slate-200">
-            <MarkdownView content={selectedEvent.description} fallbackText="No description registered." />
+
+        <div className="primer-box" style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--fgColor-muted, #636c76)', marginBottom: '4px' }}>
+            Scoring Configuration
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--fgColor-default, #1f2328)' }}>
+            Mode: <strong>{selectedEvent.scoringTypeLabel}</strong> ({selectedEvent.scoringType === 1 ? 'Points aggregation' : 'Ladder Rating (ELO)'})
+            {selectedEvent.scoringType === 1 && (
+              <div style={{ marginTop: '2px', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+                Rules Source: <strong>{selectedEvent.scoringRulesMode || 'STANDARD'}</strong>
+              </div>
+            )}
           </div>
         </div>
-        <div>
-          <p className={styles.titleCaps}>Scoring Configuration</p>
-          <p className={styles.bodyRegular}>
-            Scoring Mode: <strong>{selectedEvent.scoringTypeLabel}</strong> ({selectedEvent.scoringType === 1 ? 'Points aggregation' : 'Ladder Rating (ELO)'}) <br />
-            {selectedEvent.scoringType === 1 && (
-              <>
-                Rules Source: <strong>{selectedEvent.scoringRulesMode || 'STANDARD'}</strong>
-              </>
-            )}
-          </p>
+
+        <div className="primer-box" style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--fgColor-muted, #636c76)', marginBottom: '4px' }}>
+            Owner Parameters
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--fgColor-default, #1f2328)' }}>
+            Type: <strong>{selectedEvent.ownerType}</strong>
+            <div style={{ marginTop: '2px', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)', wordBreak: 'break-all' }}>
+              ID: <code>{selectedEvent.organizationId ?? selectedEvent.ownerUserId}</code>
+            </div>
+          </div>
         </div>
-        <div>
-          <p className={styles.titleCaps}>Owner Parameters</p>
-          <p className={styles.bodyRegular}>
-            Ownership Type: {selectedEvent.ownerType} <br />
-            ID: {selectedEvent.organizationId ?? selectedEvent.ownerUserId}
-          </p>
+
+        <div className="primer-box" style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--fgColor-muted, #636c76)', marginBottom: '4px' }}>
+            Class Restriction
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--fgColor-default, #1f2328)' }}>
+            Tier: <strong>{selectedEvent.classRestriction ?? 'Any tier eligibility'}</strong>
+          </div>
         </div>
-        <div>
-          <p className={styles.titleCaps}>Class restriction</p>
-          <p className={styles.bodyRegular}>
-            Tier Restriction: <strong>{selectedEvent.classRestriction ?? 'PRE_OP (Any tier eligibility)'}</strong>
-          </p>
+
+        <div className="primer-box" style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--fgColor-muted, #636c76)', marginBottom: '4px' }}>
+            Participation Model
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--fgColor-default, #1f2328)' }}>
+            <strong>{selectedEvent.granularParticipation ? 'Granular (Per-Race registration)' : 'Event-wide registration'}</strong>
+          </div>
         </div>
-        <div>
-          <p className={styles.titleCaps}>Participation Model</p>
-          <p className={styles.bodyRegular}>
-            Granular Per-Race Participation: <strong>{selectedEvent.granularParticipation ? 'Enabled (Per-Race registration required)' : 'Disabled (Event-wide registration)'}</strong>
-          </p>
-        </div>
-        <div>
-          <p className={styles.titleCaps}>Signups Status</p>
-          <p className={styles.bodyRegular}>
-            Signups Lock: <strong>{selectedEvent.signupsLocked ? 'Locked (Self-service signups disabled)' : 'Open (Self-service signups enabled)'}</strong>
-          </p>
+
+        <div className="primer-box" style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--fgColor-muted, #636c76)', marginBottom: '4px' }}>
+            Signups Status
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--fgColor-default, #1f2328)' }}>
+            <strong>{selectedEvent.signupsLocked ? 'Locked (Self-service disabled)' : 'Open (Self-service enabled)'}</strong>
+          </div>
         </div>
       </div>
 
+      {/* Description */}
+      <div className="primer-box">
+        <div className="primer-box-header">
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600 }}>Description</h3>
+        </div>
+        <div style={{ padding: '14px 16px' }}>
+          <MarkdownView content={selectedEvent.description} fallbackText="No description registered." />
+        </div>
+      </div>
+
+      {/* Points Scoring Tables */}
       {selectedEvent.scoringType === 1 && (
-        <div className={styles.tablesSection}>
-          <h3 className={styles.tablesHeader}>
+        <div>
+          <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)' }}>
             Event Points Scoring Configuration Tables
           </h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {['OP', 'GIII', 'GII', 'GI'].map((grade) => {
-              const table = (selectedEvent.scoringRulesMode === 'CUSTOM' && selectedEvent.customScoringTables)
-                ? ((selectedEvent.customScoringTables as Record<string, Record<number, number>>)[grade] || DEFAULT_SCORING_TABLES[grade])
-                : DEFAULT_SCORING_TABLES[grade];
-              return <GradePointsPreview key={grade} grade={grade} table={table} />;
+              const table =
+                selectedEvent.scoringRulesMode === 'CUSTOM' && selectedEvent.customScoringTables
+                  ? (selectedEvent.customScoringTables as Record<string, Record<number, number>>)[grade] || DEFAULT_SCORING_TABLES[grade]
+                  : DEFAULT_SCORING_TABLES[grade]
+              return <GradePointsPreview key={grade} grade={grade} table={table} />
             })}
           </div>
         </div>
       )}
 
-      {/* Standings overview aggregates block */}
-      <div className={styles.leaderboardSection}>
-        <h3 className={styles.leaderboardHeader}>
-          Current Event Overall Leaderboard
-        </h3>
+      {/* Overall Standings Leaderboard */}
+      <div className="primer-box">
+        <div className="primer-box-header">
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Current Event Overall Leaderboard</h3>
+        </div>
         {selectedEvent.scoringType === 1 ? (
           selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
-              <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.leaderboardTable}`} style={{ width: '100%', tableLayout: 'fixed' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="primer-table" style={{ tableLayout: 'fixed', minWidth: '520px' }}>
                 <thead>
-                  <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '70px' }}><div className="slds-truncate" title="Rank">Rank</div></th>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '40%', minWidth: '160px' }}><div className="slds-truncate" title="Name">Name</div></th>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '35%', minWidth: '140px' }}><div className="slds-truncate" title="User ID">User ID</div></th>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Total Points">Total Points</div></th>
+                  <tr>
+                    <th scope="col" style={{ width: '70px' }}>Rank</th>
+                    <th scope="col" style={{ width: '40%' }}>Name</th>
+                    <th scope="col" style={{ width: '35%' }}>User ID</th>
+                    <th scope="col" style={{ width: '130px' }}>Total Points</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedEvent.pointsOverview.map((item, idx) => (
-                    <tr key={item.userId} className="slds-hint-parent">
-                      <td><strong>{idx + 1}</strong></td>
+                    <tr key={item.userId}>
+                      <td><strong>#{idx + 1}</strong></td>
                       <td>
-                        <div className="slds-truncate" title={item.name}>
-                          <UserLink userId={item.userId} name={item.name} />
-                        </div>
+                        <UserLink userId={item.userId} name={item.name} />
                       </td>
                       <td>
-                        <div className="slds-truncate" title={item.userId}>
-                          <code className="text-xs">{item.userId}</code>
-                        </div>
+                        <code style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>{item.userId}</code>
                       </td>
                       <td><strong>{item.points} pts</strong></td>
                     </tr>
@@ -123,39 +147,39 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
               </table>
             </div>
           ) : (
-            <p className="slds-text-body_small text-slate-500">No participants score standings loaded.</p>
+            <p style={{ margin: 0, padding: '16px', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+              No participant score standings loaded yet.
+            </p>
           )
-        ) : (
-          selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
-              <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.leaderboardTable}`} style={{ width: '100%', tableLayout: 'fixed' }}>
-                <thead>
-                  <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '70px' }}><div className="slds-truncate" title="Rank">Rank</div></th>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '45%', minWidth: '160px' }}><div className="slds-truncate" title="Name">Name</div></th>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Rating (ELO)">Rating (ELO)</div></th>
-                    <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Wins / Losses">Wins / Losses</div></th>
+        ) : selectedEvent.ladderOverview && selectedEvent.ladderOverview.length > 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="primer-table" style={{ tableLayout: 'fixed', minWidth: '520px' }}>
+              <thead>
+                <tr>
+                  <th scope="col" style={{ width: '70px' }}>Rank</th>
+                  <th scope="col" style={{ width: '45%' }}>Name</th>
+                  <th scope="col" style={{ width: '130px' }}>Rating (ELO)</th>
+                  <th scope="col" style={{ width: '130px' }}>Wins / Losses</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedEvent.ladderOverview.map((item) => (
+                  <tr key={item.userId}>
+                    <td><strong>#{item.rank}</strong></td>
+                    <td>
+                      <UserLink userId={item.userId} name={item.name} />
+                    </td>
+                    <td><strong>{item.elo}</strong></td>
+                    <td>{item.wins}W – {item.losses}L</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {selectedEvent.ladderOverview.map((item) => (
-                    <tr key={item.userId} className="slds-hint-parent">
-                      <td><strong>{item.rank}</strong></td>
-                      <td>
-                        <div className="slds-truncate" title={item.name}>
-                          <UserLink userId={item.userId} name={item.name} />
-                        </div>
-                      </td>
-                      <td><strong>{item.elo}</strong></td>
-                      <td>{item.wins}W - {item.losses}L</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="slds-text-body_small text-slate-500">No ladder match results computed yet.</p>
-          )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p style={{ margin: 0, padding: '16px', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+            No ladder match results computed yet.
+          </p>
         )}
       </div>
     </div>

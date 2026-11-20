@@ -1,3 +1,5 @@
+import { Button } from '@primer/react'
+import { PlusIcon } from '@primer/octicons-react'
 import type { eventmanager } from '../lib/client'
 import { RaceListPanel } from './RaceListPanel'
 import { RaceDetailPane } from './RaceDetailPane'
@@ -74,23 +76,40 @@ export function EventRacesTab({
   handleUndoRow,
 }: EventRacesTabProps) {
   return (
-    <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
+    <div style={{ paddingTop: '20px' }}>
       {races.length === 0 ? (
-        <div className="slds-align_absolute-center slds-p-around_large text-slate-500" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
-          <p className="slds-text-heading_small font-bold text-slate-700" style={{ fontWeight: 'bold' }}>No races yet</p>
-          <p className="slds-text-body_regular text-slate-500 slds-m-top_xx-small">
-            Configure your first race track using the wizard.
+        <div
+          className="primer-box"
+          style={{
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '280px',
+            padding: '32px',
+            gap: '8px',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)' }}>
+            No races configured yet
           </p>
-          <button
-            type="button"
-            onClick={() => setShowCreateRaceModal(true)}
-            className="slds-button slds-button_brand slds-m-top_medium"
-          >
-            Create Race Track
-          </button>
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--fgColor-muted, #636c76)', maxWidth: '360px' }}>
+            Configure your first race track to start managing lineups and recording standings.
+          </p>
+          <div style={{ marginTop: '8px' }}>
+            <Button
+              type="button"
+              variant="primary"
+              leadingVisual={PlusIcon}
+              onClick={() => setShowCreateRaceModal(true)}
+            >
+              Create Race Track
+            </Button>
+          </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <RaceListPanel
             races={races}
             selectedRaceId={selectedRaceId}
@@ -102,7 +121,7 @@ export function EventRacesTab({
             hasStartedOrConcludedRaces={hasStartedOrConcludedRaces}
             setShowCreateRaceModal={setShowCreateRaceModal}
           />
-          <div style={{ flex: '2 1 500px', minWidth: '0' }}>
+          <div style={{ flex: '2 1 500px', minWidth: 0 }}>
             <RaceDetailPane
               selectedEvent={selectedEvent}
               selectedRace={selectedRace}

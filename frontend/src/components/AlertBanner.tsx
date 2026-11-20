@@ -1,6 +1,8 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { Flash } from '@primer/react'
+import { AlertIcon, CheckCircleIcon, InfoIcon } from '@primer/octicons-react'
 
-type AlertVariant = 'error' | 'success' | 'warning'
+type AlertVariant = 'error' | 'success' | 'warning' | 'info'
 
 interface AlertBannerProps {
   variant: AlertVariant
@@ -8,37 +10,44 @@ interface AlertBannerProps {
   action?: ReactNode
 }
 
-const VARIANT_STYLES: Record<AlertVariant, CSSProperties> = {
-  error: { background: '#d32f2f', color: '#fff' },
-  success: { background: '#2e7d32', color: '#fff' },
-  warning: { background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' },
-}
-
-const VARIANT_ICON: Record<AlertVariant, string> = {
-  error: '⚠️',
-  success: '✓',
-  warning: '📝',
+const PRIMER_VARIANT: Record<AlertVariant, 'danger' | 'success' | 'warning' | 'default'> = {
+  error: 'danger',
+  success: 'success',
+  warning: 'warning',
+  info: 'default',
 }
 
 export function AlertBanner({ variant, children, action }: AlertBannerProps) {
+  const Icon =
+    variant === 'error'
+      ? AlertIcon
+      : variant === 'success'
+      ? CheckCircleIcon
+      : variant === 'warning'
+      ? AlertIcon
+      : InfoIcon
+
   return (
-    <div
-      className="slds-notify slds-notify_alert slds-theme_alert-texture slds-m-bottom_medium"
-      role="alert"
+    <Flash
+      variant={PRIMER_VARIANT[variant]}
       style={{
-        borderRadius: '4px',
-        padding: '10px 16px',
+        marginBottom: '16px',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        ...VARIANT_STYLES[variant],
+        justifyContent: 'space-between',
+        gap: '12px',
+        flexWrap: 'wrap',
       }}
     >
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <span className="slds-icon_container slds-p-right_small">{VARIANT_ICON[variant]}</span>
-        <h2>{children}</h2>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: '1 1 auto', minWidth: 0 }}>
+        <span style={{ flexShrink: 0, marginTop: '2px', display: 'inline-flex' }}>
+          <Icon size={16} />
+        </span>
+        <div style={{ fontSize: '13px', lineHeight: 1.5, minWidth: 0, flex: '1 1 auto' }}>
+          {children}
+        </div>
       </div>
-      {action}
-    </div>
+      {action && <div style={{ flexShrink: 0 }}>{action}</div>}
+    </Flash>
   )
 }

@@ -337,3 +337,52 @@ func Test_setUserSiteRole(t *testing.T) {
 		}
 	})
 }
+
+func Test_deleteUser(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("site admin can delete another user", func(t *testing.T) {
+		targetID := createUsersTestUser(t, ctx, "Delete Target", string(SiteRoleUser), "", "")
+		adminID := createUsersTestUser(t, ctx, "Delete Admin", string(SiteRoleSiteAdmin), "", "")
+		admin := mustResolveActor(t, ctx, createUsersTestSession(t, ctx, adminID))
+
+		res, err := deleteUser(ctx, admin, targetID)
+		if err != nil {
+			t.Fatalf("deleteUser failed: %v", err)
+		}
+		if !res.Deleted {
+			t.Fatalf("expected deleted = true")
+		}
+		if _, err := getUserProfile(ctx, targetID); errs.Code(err) != errs.NotFound {
+			t.Errorf("expected not_found after delete, got %v", err)
+		}
+	})
+
+	t.Run("blocks self deletion", func(t *testing.T) {
+		adminID := createUsersTestUser(t, ctx, "Self Delete Admin", string(SiteRoleSiteAdmin), "", "")
+		admin := mustResolveActor(t, ctx, createUsersTestSession(t, ctx, adminID))
+
+		_, err := deleteUser(ctx, admin, adminID)
+		if err == nil {
+			t.Fatal("expected error when deleting own account")
+		}
+		if errs.Code(err) != errs.FailedPrecondition {
+			t.Errorf("code = %v, want failed_precondition", errs.Code(err))
+		}
+	})
+
+	t.Run("denies non-site-admin deletion", func(t *testing.T) {
+		targetID := createUsersTestUser(t, ctx, "Protected Target", string(SiteRoleUser), "", "")
+		regularID := createUsersTestUser(t, ctx, "Regular Deleter", string(SiteRoleEventAdmin), "", "")
+		regular := mustResolveActor(t, ctx, createUsersTestSession(t, ctx, regularID))
+
+		_, err := deleteUser(ctx, regular, targetID)
+		if err == nil {
+			t.Fatal("expected permission_denied error")
+		}
+		if errs.Code(err) != errs.PermissionDenied {
+			t.Errorf("code = %v, want permission_denied", errs.Code(err))
+		}
+	})
+}
+

@@ -1,6 +1,6 @@
+import { Button, Flash, Label } from '@primer/react'
+import { PersonAddIcon, TrashIcon } from '@primer/octicons-react'
 import type { eventmanager } from '../lib/client'
-import styles from './EventMembersTab.module.css'
-
 import { UserSearchCombobox } from './UserSearchCombobox'
 import { UserLink } from './UserLink'
 
@@ -22,129 +22,130 @@ export function EventMembersTab({
   const isGranular = selectedEvent.granularParticipation
 
   return (
-    <div className="slds-tabs_default__content slds-show slds-p-vertical_medium" style={{ paddingTop: '1.5rem' }}>
-      {/* Add Member Quick Form / Banner */}
+    <div style={{ paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {isGranular ? (
-        <div className="slds-box slds-m-bottom_medium" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', color: '#0369a1', padding: '12px 16px', borderRadius: '4px' }}>
-          <strong style={{ display: 'block', marginBottom: '4px' }}>Granular Per-Race Participation Enabled</strong>
-          <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.5' }}>
-            In granular events, competitors enroll directly into individual races on the <strong>Races &amp; Tracks</strong> tab. Removing a participant below will un-enroll them from all registered races and remove them from the event.
-          </p>
-        </div>
+        <Flash variant="default">
+          <div style={{ fontSize: '13px', lineHeight: 1.5 }}>
+            <strong>Granular Per-Race Participation Enabled</strong>
+            <p style={{ margin: '4px 0 0 0' }}>
+              In granular events, competitors enroll directly into individual races on the{' '}
+              <strong>Races &amp; Tracks</strong> tab. Removing a participant below will un-enroll them from all registered races and remove them from the event.
+            </p>
+          </div>
+        </Flash>
       ) : (
-        <div className={styles.formBox}>
-          <form onSubmit={handleAddMember} className={styles.formGrid}>
-            <div className={`slds-form-element ${styles.formElement}`}>
-              <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="new-member-input">
+        <div className="primer-box" style={{ padding: '14px 16px' }}>
+          <form
+            onSubmit={handleAddMember}
+            style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', flexWrap: 'wrap' }}
+          >
+            <div style={{ flex: '1 1 280px', minWidth: '200px' }}>
+              <label
+                htmlFor="new-member-input"
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  marginBottom: '6px',
+                  color: 'var(--fgColor-default, #1f2328)',
+                }}
+              >
                 Register Competitor
               </label>
-              <div className="slds-form-element__control">
-                <UserSearchCombobox
-                  value={newMemberUserId}
-                  onChange={(val) => setNewMemberUserId(val)}
-                />
-              </div>
+              <UserSearchCombobox
+                value={newMemberUserId}
+                onChange={(val) => setNewMemberUserId(val)}
+              />
             </div>
-            <button
-              type="submit"
-              className="slds-button slds-button_brand"
-              style={{ padding: '6px 16px', height: '36px' }}
-            >
+            <Button type="submit" variant="primary" leadingVisual={PersonAddIcon} disabled={!newMemberUserId}>
               Register Member
-            </button>
+            </Button>
           </form>
-          <p className={styles.helperText}>
-            💡 For mock testing, you can input "mock-user-1", "mock-user-2", "mock-user-3" or other valid IDs.
+        </div>
+      )}
+
+      <div className="primer-box">
+        <div className="primer-box-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
+            Registered Participants ({selectedEvent.members.length})
+          </h3>
+        </div>
+
+        {selectedEvent.members.length === 0 ? (
+          <p style={{ margin: 0, padding: '24px 16px', textAlign: 'center', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+            No participants are currently registered for this competition.
           </p>
-        </div>
-      )}
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="primer-table" style={{ minWidth: '640px' }}>
+              <thead>
+                <tr>
+                  <th scope="col" style={{ width: '24%' }}>Competitor Name</th>
+                  <th scope="col" style={{ width: '22%' }}>User ID</th>
+                  <th scope="col" style={{ width: '110px' }}>Skill Tier</th>
+                  {isGranular && <th scope="col">Registered Races</th>}
+                  <th scope="col" style={{ width: '100px', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedEvent.members.map((member) => {
+                  const registeredRaces = isGranular
+                    ? (selectedEvent.raceEvents ?? []).filter((r) =>
+                        (r.members ?? []).some((rm) => rm.userId === member.userId),
+                      )
+                    : []
 
-      {/* List Members */}
-      <h3 className={styles.headerTitle}>Registered Participants</h3>
-      {selectedEvent.members.length === 0 ? (
-        <p className="slds-text-body_small text-slate-500">No participants are currently registered for this competition.</p>
-      ) : (
-        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
-          <table className={`slds-table slds-table_cell-buffer slds-table_bordered ${styles.membersTable}`} style={{ width: '100%', tableLayout: 'fixed' }}>
-            <thead>
-              <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                <th scope="col" style={{ fontWeight: 'bold', width: '22%', minWidth: '160px' }}>
-                  <div className="slds-truncate" title="Competitor Name">Competitor Name</div>
-                </th>
-                <th scope="col" style={{ fontWeight: 'bold', width: '20%', minWidth: '140px' }}>
-                  <div className="slds-truncate" title="User ID">User ID</div>
-                </th>
-                <th scope="col" style={{ fontWeight: 'bold', width: '110px' }}>
-                  <div className="slds-truncate" title="Skill Tier">Skill Tier</div>
-                </th>
-                {isGranular && (
-                  <th scope="col" style={{ fontWeight: 'bold', minWidth: '240px' }}>
-                    <div className="slds-truncate" title="Registered Races">Registered Races</div>
-                  </th>
-                )}
-                <th scope="col" style={{ fontWeight: 'bold', width: '90px', textAlign: 'right' }}>
-                  <div className="slds-truncate" title="Actions">Actions</div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {selectedEvent.members.map((member) => {
-                const registeredRaces = isGranular
-                  ? (selectedEvent.raceEvents ?? []).filter((r) =>
-                      (r.members ?? []).some((rm) => rm.userId === member.userId)
-                    )
-                  : []
-
-                return (
-                  <tr key={member.userId} className="slds-hint-parent">
-                    <td>
-                      <div className="slds-truncate" title={member.name}>
+                  return (
+                    <tr key={member.userId}>
+                      <td style={{ fontWeight: 600 }}>
                         <UserLink userId={member.userId} name={member.name} />
-                      </div>
-                    </td>
-                    <td>
-                      <div className="slds-truncate" title={member.userId}>
-                        <code className="text-xs">{member.userId}</code>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px' }}>
-                        {!member.classTier || member.classTier === 'PRE_OP' || member.classTier === 'OP' ? 'None' : member.classTier}
-                      </span>
-                    </td>
-                    {isGranular && (
-                      <td>
-                        {registeredRaces.length === 0 ? (
-                          <span className="slds-badge slds-theme_light" style={{ padding: '1px 6px', fontSize: '10px', color: '#64748b' }}>
-                            None
-                          </span>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '80px', overflowY: 'auto' }}>
-                            {registeredRaces.map((r) => (
-                              <span key={r.id} className="slds-badge slds-theme_light" title={`#${r.sequence} ${r.name}`} style={{ padding: '1px 6px', fontSize: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '220px' }}>
-                                #{r.sequence} {r.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </td>
-                    )}
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => void handleRemoveMember(member.userId)}
-                        className={styles.btnDestructive}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      <td>
+                        <code style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+                          {member.userId}
+                        </code>
+                      </td>
+                      <td>
+                        <Label variant="secondary" size="small">
+                          {!member.classTier || member.classTier === 'PRE_OP' || member.classTier === 'OP'
+                            ? 'None'
+                            : member.classTier}
+                        </Label>
+                      </td>
+                      {isGranular && (
+                        <td>
+                          {registeredRaces.length === 0 ? (
+                            <span style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>None</span>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '72px', overflowY: 'auto' }}>
+                              {registeredRaces.map((r) => (
+                                <Label key={r.id} variant="accent" size="small">
+                                  #{r.sequence} {r.name}
+                                </Label>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      )}
+                      <td style={{ textAlign: 'right' }}>
+                        <Button
+                          type="button"
+                          size="small"
+                          variant="danger"
+                          leadingVisual={TrashIcon}
+                          onClick={() => void handleRemoveMember(member.userId)}
+                        >
+                          Remove
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

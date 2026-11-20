@@ -110,19 +110,28 @@ export const TeamSearchCombobox: React.FC<TeamSearchComboboxProps> = ({
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-      <div className="slds-form-element__control slds-input-has-icon slds-input-has-icon_right">
+      <div style={{ position: 'relative', width: '100%' }}>
         <input
           type="text"
           value={searchTerm}
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="slds-input"
-          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
+          style={{
+            padding: '5px 28px 5px 12px',
+            border: '1px solid var(--borderColor-default, #d0d7de)',
+            borderRadius: '6px',
+            width: '100%',
+            fontSize: '13px',
+            lineHeight: '20px',
+            backgroundColor: 'var(--bgColor-default, #ffffff)',
+            color: 'var(--fgColor-default, #1f2328)',
+          }}
         />
         {searchTerm && (
           <button
             type="button"
+            aria-label="Clear selection"
             onClick={() => {
               setSearchTerm('')
               onChange('', null)
@@ -136,8 +145,9 @@ export const TeamSearchCombobox: React.FC<TeamSearchComboboxProps> = ({
               border: 'none',
               background: 'transparent',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: 'var(--fgColor-muted, #636c76)',
               fontSize: '12px',
+              padding: '2px',
             }}
           >
             ✕
@@ -145,31 +155,31 @@ export const TeamSearchCombobox: React.FC<TeamSearchComboboxProps> = ({
         )}
       </div>
 
-      {isOpen && (searchTerm && !value || results.length > 0 || loading) && (
+      {isOpen && ((searchTerm && !value) || results.length > 0 || loading) && (
         <div
           style={{
             position: 'absolute',
             top: '100%',
             left: 0,
             right: 0,
-            background: '#fff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '4px',
+            backgroundColor: 'var(--bgColor-default, #ffffff)',
+            border: '1px solid var(--borderColor-default, #d0d7de)',
+            borderRadius: '6px',
             marginTop: '4px',
             zIndex: 9999,
-            maxHeight: '200px',
+            maxHeight: '220px',
             overflowY: 'auto',
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+            boxShadow: '0 8px 24px rgba(140, 149, 159, 0.2)',
           }}
         >
           {loading && (
-            <div style={{ padding: '8px 12px', color: '#64748b', fontSize: '13px' }}>
+            <div style={{ padding: '8px 12px', color: 'var(--fgColor-muted, #636c76)', fontSize: '12px' }}>
               Searching teams...
             </div>
           )}
 
           {!loading && results.length === 0 && (
-            <div style={{ padding: '8px 12px', color: '#64748b', fontSize: '13px' }}>
+            <div style={{ padding: '8px 12px', color: 'var(--fgColor-muted, #636c76)', fontSize: '12px' }}>
               No matches found
             </div>
           )}
@@ -182,19 +192,19 @@ export const TeamSearchCombobox: React.FC<TeamSearchComboboxProps> = ({
                 style={{
                   padding: '8px 12px',
                   cursor: 'pointer',
-                  borderBottom: '1px solid #f1f5f9',
+                  borderBottom: '1px solid var(--borderColor-muted, #d8dee4)',
                   fontSize: '13px',
                 }}
                 onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.background = '#f8fafc'
+                  ;(e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--bgColor-muted, #f6f8fa)'
                 }}
                 onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                  ;(e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent'
                 }}
               >
-                <div style={{ fontWeight: '600', color: '#1e293b' }}>{team.name}</div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>
-                  Slug: {team.slug}
+                <div style={{ fontWeight: 600, color: 'var(--fgColor-default, #1f2328)' }}>{team.name}</div>
+                <div style={{ fontSize: '11px', color: 'var(--fgColor-muted, #636c76)' }}>
+                  @{team.slug}
                 </div>
               </div>
             ))}

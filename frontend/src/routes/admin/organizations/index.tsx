@@ -1,17 +1,21 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { Button, CounterLabel, Dialog, FormControl, IconButton, Label, Select, TextInput } from '@primer/react'
+import { ArrowSwitchIcon, PlusIcon, SearchIcon, TrashIcon } from '@primer/octicons-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireSiteAdmin } from '../../../lib/auth-guard'
 import {
-  listAdminOrganizations,
-  createAdminOrganization,
-  listAdminTeams,
   convertAdminTeamToOrg,
+  createAdminOrganization,
+  deleteAdminOrganization,
+  listAdminOrganizations,
+  listAdminTeams,
 } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { Pagination } from '../../../components/Pagination'
-import { SldsSkeletonList } from '../../../components/LoadingSkeleton'
+import { PrimerSkeletonList } from '../../../components/LoadingSkeleton'
+import { DangerZoneDeleteDialog } from '../../../components/DangerZoneDeleteDialog'
 import type { teammanager } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/organizations/')({
@@ -33,11 +37,10 @@ function AdminOrganizationsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<teammanager.AdminOrganizationItem | null>(null)
 
-  // Create Org form state
   const [orgName, setOrgName] = useState('')
   const [orgLogo, setOrgLogo] = useState('')
   const [discordInvite, setDiscordInvite] = useState('')
@@ -45,7 +48,6 @@ function AdminOrganizationsPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  // Convert Team form state
   const [teamsList, setTeamsList] = useState<teammanager.TeamListItem[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [converting, setConverting] = useState(false)
@@ -90,7 +92,6 @@ function AdminOrganizationsPage() {
       setCreateError('Organization name is required.')
       return
     }
-
     if (!authHeader) {
       setCreateError('Authentication token missing.')
       return
@@ -106,7 +107,7 @@ function AdminOrganizationsPage() {
           discordInvite: discordInvite.trim() || null,
           vrchatGroupId: vrchatGroupId.trim() || null,
         },
-        authHeader
+        authHeader,
       )
       setIsCreateModalOpen(false)
       setOrgName('')
@@ -128,7 +129,6 @@ function AdminOrganizationsPage() {
       setConvertError('Please select a team to convert.')
       return
     }
-
     if (!authHeader) {
       setConvertError('Authentication token missing.')
       return
@@ -149,364 +149,264 @@ function AdminOrganizationsPage() {
     }
   }
 
-  const actions = (
-    <div style={{ display: 'flex', gap: '8px' }}>
-      <button
-        type="button"
-        onClick={() => {
-          setConvertError(null)
-          void loadTeamsForConvert()
-          setIsConvertModalOpen(true)
-        }}
-        className="slds-button slds-button_neutral"
-      >
-        Convert Team to Org
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setCreateError(null)
-          setIsCreateModalOpen(true)
-        }}
-        className="slds-button slds-button_brand"
-      >
-        New Organization
-      </button>
-    </div>
-  )
+  async function handleConfirmDeleteOrg() {
+    if (!deleteTarget || !authHeader) return
+    await deleteAdminOrganization(deleteTarget.id, authHeader)
+    setSuccess(`Permanently deleted organization "${deleteTarget.name}".`)
+    setDeleteTarget(null)
+    await fetchOrganizations()
+  }
 
   return (
     <AdminLayout
-      title="Organizations Directory"
-      subtitle="Oversee system organizations, manage administrative roles, and convert registered teams."
-      actions={actions}
-    >
-      <div className="slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <article className="slds-card" style={{ border: '1px solid #dddbda' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Registered System Organizations
-                    </span>
-                  </h2>
-                </div>
-              </header>
-            </div>
-
-            <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-              {error && (
-                <div className="slds-m-bottom_medium">
-                  <AlertBanner variant="error">{error}</AlertBanner>
-                </div>
-              )}
-              {success && (
-                <div className="slds-m-bottom_medium">
-                  <AlertBanner variant="success">{success}</AlertBanner>
-                </div>
-              )}
-
-              <div className="slds-form-element slds-m-bottom_medium" style={{ maxWidth: '300px' }}>
-                <div className="slds-form-element__control">
-                  <input
-                    type="text"
-                    placeholder="Search organizations by name/slug..."
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value)
-                      setPage(1)
-                    }}
-                    className="slds-input"
-                    style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              {loading ? (
-                <SldsSkeletonList count={4} />
-              ) : orgs.length > 0 ? (
-                <>
-                  <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Organizations Directory Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '700px' }}>
-                      <thead>
-                        <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '30%', minWidth: '180px' }}>
-                            <div className="slds-truncate font-bold" title="Organization Name" style={{ fontWeight: 'bold' }}>Organization Name</div>
-                          </th>
-                          <th scope="col" style={{ width: '25%', minWidth: '150px' }}>
-                            <div className="slds-truncate font-bold" title="Unique Slug" style={{ fontWeight: 'bold' }}>Unique Slug</div>
-                          </th>
-                          <th scope="col" style={{ width: '110px' }}>
-                            <div className="slds-truncate font-bold" title="Members Count" style={{ fontWeight: 'bold' }}>Members</div>
-                          </th>
-                          <th scope="col" style={{ minWidth: '180px' }}>
-                            <div className="slds-truncate font-bold" title="Admin Slots" style={{ fontWeight: 'bold' }}>Admin Slots Remaining</div>
-                          </th>
-                          <th scope="col" style={{ width: '100px' }}>
-                            <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orgs.map((org) => (
-                          <tr key={org.id} className="slds-hint-parent hover:bg-slate-50">
-                            <th scope="row">
-                              <div className="slds-truncate font-bold" title={org.name}>
-                                <Link
-                                  to="/admin/organizations/$orgId"
-                                  params={{ orgId: org.id }}
-                                  className="text-blue-600 hover:underline font-bold"
-                                >
-                                  {org.name}
-                                </Link>
-                              </div>
-                            </th>
-                            <td>
-                              <div className="slds-truncate" title={org.slug}>{org.slug}</div>
-                            </td>
-                            <td>
-                              <div className="slds-truncate" title={String(org.memberCount)}>
-                                {org.memberCount}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`slds-badge ${org.administratorSlotsRemaining > 0 ? 'slds-theme_success' : 'slds-theme_error'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                                {org.administratorSlotsRemaining} / 3 slots remaining
-                              </span>
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                onClick={() => navigate({ to: '/admin/organizations/$orgId', params: { orgId: org.id } })}
-                                className="slds-button slds-button_neutral"
-                                style={{ fontSize: '12px', padding: '2px 10px' }}
-                              >
-                                Manage
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <Pagination
-                    page={page}
-                    pageSize={pageSize}
-                    total={totalOrgs}
-                    onPageChange={setPage}
-                    onPageSizeChange={setPageSize}
-                  />
-                </>
-              ) : (
-                <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                  <p>No organizations have been registered yet.</p>
-                </div>
-              )}
-            </div>
-          </article>
+      title="Organizations"
+      subtitle="Oversee registered organizations, manage staff roles, convert teams, or remove organizations."
+      breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Organizations' }]}
+      actions={
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Button
+            type="button"
+            leadingVisual={ArrowSwitchIcon}
+            onClick={() => {
+              setConvertError(null)
+              void loadTeamsForConvert()
+              setIsConvertModalOpen(true)
+            }}
+          >
+            Convert Team to Org
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            leadingVisual={PlusIcon}
+            onClick={() => {
+              setCreateError(null)
+              setIsCreateModalOpen(true)
+            }}
+          >
+            New Organization
+          </Button>
         </div>
-      </div>
+      }
+    >
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
+      {success && <AlertBanner variant="success">{success}</AlertBanner>}
 
-      {/* CREATE ORG MODAL */}
-      {isCreateModalOpen && (
-        <>
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                >
-                  X
-                </button>
-                <h2 className="slds-modal__title font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Register New Organization
-                </h2>
-              </header>
+      <section className="primer-box">
+        <div
+          className="primer-box-header"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Registered Organizations</h2>
+            <CounterLabel>{totalOrgs}</CounterLabel>
+          </div>
 
-              <form onSubmit={(e) => void handleCreateOrg(e)}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {createError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{createError}</AlertBanner>
-                    </div>
-                  )}
+          <div style={{ minWidth: '240px' }}>
+            <TextInput
+              size="small"
+              block
+              leadingVisual={SearchIcon}
+              placeholder="Search organizations by name or slug..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+            />
+          </div>
+        </div>
 
-                  <div className="slds-form slds-form_stacked">
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="org-name-input">
-                        Organization Name
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="org-name-input"
-                          type="text"
-                          required
-                          value={orgName}
-                          onChange={(e) => setOrgName(e.target.value)}
-                          placeholder="e.g. International Umamusume Racing Association"
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="org-logo-input">
-                        Logo URL (Optional)
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="org-logo-input"
-                          type="url"
-                          value={orgLogo}
-                          onChange={(e) => setOrgLogo(e.target.value)}
-                          placeholder="https://example.com/logo.png"
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="org-discord-input">
-                        Discord Invite Link (Optional)
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="org-discord-input"
-                          type="text"
-                          value={discordInvite}
-                          onChange={(e) => setDiscordInvite(e.target.value)}
-                          placeholder="https://discord.gg/example"
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="org-vrc-input">
-                        VRChat Group ID (Optional)
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="org-vrc-input"
-                          type="text"
-                          value={vrchatGroupId}
-                          onChange={(e) => setVrchatGroupId(e.target.value)}
-                          placeholder="grp_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsCreateModalOpen(false)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creating}
-                    className="slds-button slds-button_brand"
-                  >
-                    {creating ? 'Creating...' : 'Create Organization'}
-                  </button>
-                </footer>
-              </form>
+        {loading ? (
+          <PrimerSkeletonList count={4} />
+        ) : orgs.length > 0 ? (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="primer-table" aria-label="Organizations Directory Table" style={{ minWidth: '680px' }}>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: '30%' }}>Organization</th>
+                    <th scope="col" style={{ width: '20%' }}>Slug</th>
+                    <th scope="col" style={{ width: '100px' }}>Members</th>
+                    <th scope="col" style={{ width: '190px' }}>Admin Slots</th>
+                    <th scope="col" style={{ width: '140px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orgs.map((org) => (
+                    <tr key={org.id}>
+                      <td>
+                        <Link
+                          to="/admin/organizations/$orgId"
+                          params={{ orgId: org.id }}
+                          style={{ fontWeight: 600, color: 'var(--fgColor-accent, #0969da)', textDecoration: 'none' }}
+                        >
+                          {org.name}
+                        </Link>
+                      </td>
+                      <td style={{ color: 'var(--fgColor-muted, #636c76)' }}>@{org.slug}</td>
+                      <td>{org.memberCount}</td>
+                      <td>
+                        <Label variant={org.administratorSlotsRemaining > 0 ? 'success' : 'danger'} size="small">
+                          {org.administratorSlotsRemaining} / 3 remaining
+                        </Label>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <Button
+                            type="button"
+                            size="small"
+                            onClick={() => navigate({ to: '/admin/organizations/$orgId', params: { orgId: org.id } })}
+                          >
+                            Manage
+                          </Button>
+                          <IconButton
+                            type="button"
+                            size="small"
+                            variant="danger"
+                            aria-label={`Delete ${org.name}`}
+                            icon={TrashIcon}
+                            onClick={() => setDeleteTarget(org)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
-        </>
+
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={totalOrgs}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </>
+        ) : (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--fgColor-muted, #636c76)', fontSize: '13px' }}>
+            No organizations have been registered yet.
+          </div>
+        )}
+      </section>
+
+      {isCreateModalOpen && (
+        <Dialog title="Register New Organization" onClose={() => setIsCreateModalOpen(false)} width="medium">
+          <form onSubmit={(e) => void handleCreateOrg(e)} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {createError && <AlertBanner variant="error">{createError}</AlertBanner>}
+
+            <FormControl required>
+              <FormControl.Label>Organization Name</FormControl.Label>
+              <TextInput
+                block
+                required
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                placeholder="e.g. International Umamusume Racing Association"
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormControl.Label>Logo URL (Optional)</FormControl.Label>
+              <TextInput
+                block
+                type="url"
+                value={orgLogo}
+                onChange={(e) => setOrgLogo(e.target.value)}
+                placeholder="https://example.com/logo.png"
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormControl.Label>Discord Invite Link (Optional)</FormControl.Label>
+              <TextInput
+                block
+                value={discordInvite}
+                onChange={(e) => setDiscordInvite(e.target.value)}
+                placeholder="https://discord.gg/example"
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormControl.Label>VRChat Group ID (Optional)</FormControl.Label>
+              <TextInput
+                block
+                value={vrchatGroupId}
+                onChange={(e) => setVrchatGroupId(e.target.value)}
+                placeholder="grp_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+            </FormControl>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--borderColor-muted, #d8dee4)' }}>
+              <Button type="button" onClick={() => setIsCreateModalOpen(false)} disabled={creating}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={creating}>
+                {creating ? 'Creating...' : 'Create Organization'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
 
-      {/* CONVERT TEAM MODAL */}
       {isConvertModalOpen && (
-        <>
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  type="button"
-                  onClick={() => setIsConvertModalOpen(false)}
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                >
-                  X
-                </button>
-                <h2 className="slds-modal__title font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Convert Team to Organization
-                </h2>
-              </header>
+        <Dialog title="Convert Team to Organization" onClose={() => setIsConvertModalOpen(false)} width="medium">
+          <form onSubmit={(e) => void handleConvertTeam(e)} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {convertError && <AlertBanner variant="error">{convertError}</AlertBanner>}
 
-              <form onSubmit={(e) => void handleConvertTeam(e)}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {convertError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{convertError}</AlertBanner>
-                    </div>
-                  )}
+            <FormControl required>
+              <FormControl.Label>Select Team to Convert</FormControl.Label>
+              <Select
+                block
+                required
+                value={selectedTeamId}
+                onChange={(e) => setSelectedTeamId(e.target.value)}
+              >
+                <Select.Option value="">-- Choose Team --</Select.Option>
+                {teamsList.map((t) => (
+                  <Select.Option key={t.id} value={t.id}>
+                    {t.name} (@{t.slug})
+                  </Select.Option>
+                ))}
+              </Select>
+              <FormControl.Caption>
+                Converting a team promotes it into a full organization, migrating its roster into staff members and removing the team record.
+              </FormControl.Caption>
+            </FormControl>
 
-                  <div className="slds-form-element">
-                    <label className="slds-form-element__label font-bold text-slate-700" htmlFor="select-team-convert">
-                      Select Team to Convert
-                    </label>
-                    <div className="slds-form-element__control">
-                      <select
-                        id="select-team-convert"
-                        required
-                        value={selectedTeamId}
-                        onChange={(e) => setSelectedTeamId(e.target.value)}
-                        className="slds-select"
-                        style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                      >
-                        <option value="">-- Choose Team --</option>
-                        {teamsList.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} (@{t.slug})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', marginTop: '6px' }}>
-                      Converting a team turns it into a full organization, migrating all roster members into staff administrators/members and deleting the team record.
-                    </p>
-                  </div>
-                </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsConvertModalOpen(false)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={converting}
-                    className="slds-button slds-button_brand"
-                  >
-                    {converting ? 'Converting...' : 'Convert to Organization'}
-                  </button>
-                </footer>
-              </form>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--borderColor-muted, #d8dee4)' }}>
+              <Button type="button" onClick={() => setIsConvertModalOpen(false)} disabled={converting}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={converting}>
+                {converting ? 'Converting...' : 'Convert to Organization'}
+              </Button>
             </div>
-          </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
-        </>
+          </form>
+        </Dialog>
+      )}
+
+      {deleteTarget && (
+        <DangerZoneDeleteDialog
+          isOpen={true}
+          onClose={() => setDeleteTarget(null)}
+          entityType="organization"
+          entityName={deleteTarget.name}
+          confirmText={deleteTarget.slug}
+          consequences={[
+            'All organization staff memberships and administrator assignments.',
+            'All organization-owned competition events, races, and newsletters.',
+            'All organization-scoped participant class grades and team links.',
+          ]}
+          onConfirmDelete={handleConfirmDeleteOrg}
+        />
       )}
     </AdminLayout>
   )

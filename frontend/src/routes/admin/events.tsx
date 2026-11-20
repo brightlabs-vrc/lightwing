@@ -1,9 +1,21 @@
 import { Link, Outlet, createFileRoute, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  FormControl,
+  Label,
+  Select,
+  Textarea,
+  TextInput,
+  UnderlineNav,
+} from '@primer/react'
+import { PlusIcon, SyncIcon } from '@primer/octicons-react'
 import { useAuth } from '../../hooks/useAuth'
 import { requireAdminPanel } from '../../lib/auth-guard'
 import { AdminLayout } from './-AdminLayout'
-import { listAdminEvents, createAdminEvent } from '../../lib/admin-api'
+import { createAdminEvent, listAdminEvents } from '../../lib/admin-api'
 import type { ClassTier, EventOwnerType, EventStatus, EventTag } from '../../types'
 import { AlertBanner } from '../../components/AlertBanner'
 import { UserSearchCombobox } from '../../components/UserSearchCombobox'
@@ -13,7 +25,7 @@ import { EventScoringTablesEditor } from '../../components/EventScoringTablesEdi
 import type { eventmanager } from '../../lib/client'
 import { MOCK_MODE } from '../../lib/mock-mode'
 import { DEFAULT_SCORING_TABLES } from '../../lib/scoringDefaults'
-import { SldsSkeletonList } from '../../components/LoadingSkeleton'
+import { PrimerSkeletonList } from '../../components/LoadingSkeleton'
 
 export const Route = createFileRoute('/admin/events')({
   beforeLoad: async ({ location }) => {
@@ -22,19 +34,36 @@ export const Route = createFileRoute('/admin/events')({
   component: AdminEventsListPage,
 })
 
+type StatusTab = 'ACTIVE' | 'ONGOING' | 'PENDING' | 'DRAFT' | 'CONCLUDED' | 'PENDING_DELETION'
+
+function statusLabelVariant(status: string): 'success' | 'accent' | 'danger' | 'attention' | 'secondary' {
+  switch (status) {
+    case 'ONGOING':
+      return 'success'
+    case 'PENDING':
+      return 'accent'
+    case 'PENDING_DELETION':
+      return 'danger'
+    case 'DRAFT':
+      return 'attention'
+    default:
+      return 'secondary'
+  }
+}
+
 function AdminEventsListPage() {
   const { session } = useAuth()
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  })
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
   const isListRoute = pathname === '/admin/events'
+
   const [events, setEvents] = useState<eventmanager.EventListItem[]>([])
   const [totalEvents, setTotalEvents] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [loadingEvents, setLoadingEvents] = useState(true)
   const [globalError, setGlobalError] = useState<string | null>(null)
-  const [viewPendingDeletion, setViewPendingDeletion] = useState(false)
+  const [statusTab, setStatusTab] = useState<StatusTab>('ACTIVE')
+  const [tagFilter, setTagFilter] = useState<string>('')
 
   // Create Event Form state
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -63,8 +92,10 @@ function AdminEventsListPage() {
     setGlobalError(null)
     try {
       const offset = (page - 1) * pageSize
-      const statusParam = viewPendingDeletion ? ('PENDING_DELETION' as EventStatus) : undefined
-      const response = await listAdminEvents(undefined, undefined, pageSize, offset, statusParam, undefined, viewPendingDeletion)
+      const statusParam = statusTab === 'ACTIVE' ? undefined : (statusTab as EventStatus)
+      const includeDeleted = statusTab === 'PENDING_DELETION'
+      const tagParam = tagFilter ? (tagFilter as EventTag) : undefined
+      const response = await listAdminEvents(undefined, undefined, pageSize, offset, statusParam, tagParam, includeDeleted)
       setEvents(response.events)
       setTotalEvents(response.total)
     } catch (cause) {
@@ -76,9 +107,8 @@ function AdminEventsListPage() {
 
   useEffect(() => {
     void loadEvents()
-  }, [page, pageSize, viewPendingDeletion])
+  }, [page, pageSize, statusTab, tagFilter])
 
-  // Set default values when modal opens or active session changes
   useEffect(() => {
     if (showCreateModal) {
       setFormName('')
@@ -105,7 +135,6 @@ function AdminEventsListPage() {
       return
     }
 
-    // Strict validation for custom scoring table cells if CUSTOM points rules are selected
     if (formScoringType === 1 && formScoringRulesMode === 'CUSTOM') {
       const grades = ['OP', 'GIII', 'GII', 'GI']
       for (const grade of grades) {
@@ -151,21 +180,20 @@ function AdminEventsListPage() {
 
     setSubmitting(true)
     setFormError(null)
-
     try {
       await createAdminEvent(
         {
           name: formName.trim(),
           description: formDescription.trim() || null,
           ownerType: formOwnerType,
-          organizationId: formOwnerType === 'ORGANIZATION' ? (formOrganizationId.trim() || null) : null,
-          ownerUserId: formOwnerType === 'USER' ? (formOwnerUserId.trim() || null) : null,
+          organizationId: formOwnerType === 'ORGANIZATION' ? formOrganizationId.trim() || null : null,
+          ownerUserId: formOwnerType === 'USER' ? formOwnerUserId.trim() || null : null,
           tag: formTag,
           scoringType: Number(formScoringType),
           classRestriction: formClassRestriction ? (formClassRestriction as ClassTier) : null,
           granularParticipation: formGranularParticipation,
           scoringRulesMode: formScoringType === 1 ? formScoringRulesMode : null,
-          customScoringTables: (formScoringType === 1 && formScoringRulesMode === 'CUSTOM') ? formCustomScoringTables : null,
+          customScoringTables: formScoringType === 1 && formScoringRulesMode === 'CUSTOM' ? formCustomScoringTables : null,
           scheduledAt: formScheduledAt ? new Date(formScheduledAt).toISOString() : null,
           participantLimit: formGranularParticipation ? null : limitNum,
           maxConcurrentRaceParticipations: formGranularParticipation ? maxConcurrentNum : null,
@@ -185,481 +213,324 @@ function AdminEventsListPage() {
     return <Outlet />
   }
 
+  const tabs: Array<{ key: StatusTab; label: string }> = [
+    { key: 'ACTIVE', label: 'All Active' },
+    { key: 'ONGOING', label: 'Ongoing' },
+    { key: 'PENDING', label: 'Pending' },
+    { key: 'DRAFT', label: 'Draft' },
+    { key: 'CONCLUDED', label: 'Concluded' },
+    { key: 'PENDING_DELETION', label: 'Pending Deletion' },
+  ]
+
   return (
     <AdminLayout
-      title="Event & Race Operations"
-      subtitle="Select a competition event to manage its lifecycle, competitors, race tracks, and results."
+      title="Events & Races"
+      subtitle="Select a competition event to manage its lifecycle, competitors, race tracks, and standings."
+      breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Events' }]}
       actions={
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={() => {
-              void loadEvents()
-            }}
-            className="slds-button slds-button_neutral"
-            style={{ padding: '4px 12px', fontSize: '12px' }}
-          >
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Button type="button" leadingVisual={SyncIcon} onClick={() => void loadEvents()} disabled={loadingEvents}>
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="primary"
+            leadingVisual={PlusIcon}
             onClick={() => {
               setShowCreateModal(true)
               setFormError(null)
             }}
-            className="slds-button slds-button_brand"
-            style={{ padding: '4px 12px', fontSize: '12px' }}
           >
-            ➕ Create Event
-          </button>
+            Create Event
+          </Button>
         </div>
       }
     >
-      {globalError && (
-        <AlertBanner variant="error">{globalError}</AlertBanner>
-      )}
+      {globalError && <AlertBanner variant="error">{globalError}</AlertBanner>}
 
-      <div className="slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-1">
-          <article className="slds-card" style={{ border: '1px solid #dddbda' }}>
-            <div className="slds-card__header slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__figure" style={{ marginRight: '0.5rem' }}>
-                  <span className="slds-icon_container" style={{ fontSize: '18px' }}>🏁</span>
-                </div>
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Competition Events
-                    </span>
-                  </h2>
-                </div>
-              </header>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => { setViewPendingDeletion(false); setPage(1); }}
-                  className={`slds-button ${!viewPendingDeletion ? 'slds-button_brand' : 'slds-button_neutral'}`}
-                  style={{ fontSize: '11px', padding: '2px 10px' }}
-                >
-                  Active Events
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setViewPendingDeletion(true); setPage(1); }}
-                  className={`slds-button ${viewPendingDeletion ? 'slds-button_destructive' : 'slds-button_neutral'}`}
-                  style={{ fontSize: '11px', padding: '2px 10px' }}
-                >
-                  Pending Deletion Queue
-                </button>
-              </div>
-            </div>
+      {/* Status UnderlineNav + Tag Filter */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap',
+          marginBottom: '16px',
+        }}
+      >
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+          <UnderlineNav aria-label="Event Status Filter">
+            {tabs.map((tab) => (
+              <UnderlineNav.Item
+                key={tab.key}
+                aria-current={statusTab === tab.key ? 'page' : undefined}
+                onSelect={(e) => {
+                  e.preventDefault()
+                  setStatusTab(tab.key)
+                  setPage(1)
+                }}
+              >
+                {tab.label}
+              </UnderlineNav.Item>
+            ))}
+          </UnderlineNav>
+        </div>
 
-            <div className="slds-card__body" style={{ padding: '0 1rem 1rem 1rem' }}>
-              {loadingEvents ? (
-                <SldsSkeletonList count={3} />
-              ) : events.length === 0 ? (
-                <p className="slds-text-body_small slds-p-around_medium" style={{ color: '#514f4d' }}>No events found.</p>
-              ) : (
-                <>
-                  <ul className="slds-has-dividers_bottom-space" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                    {events.map((evt) => (
-                      <li key={evt.id} className="slds-item slds-p-vertical_small">
+        <Select
+          aria-label="Filter by hosting tag"
+          size="small"
+          value={tagFilter}
+          onChange={(e) => {
+            setTagFilter(e.target.value)
+            setPage(1)
+          }}
+        >
+          <Select.Option value="">All Tags</Select.Option>
+          <Select.Option value="OFFICIAL">OFFICIAL</Select.Option>
+          <Select.Option value="COMMUNITY">COMMUNITY</Select.Option>
+        </Select>
+      </div>
+
+      <section className="primer-box">
+        {loadingEvents ? (
+          <PrimerSkeletonList count={4} />
+        ) : events.length === 0 ? (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--fgColor-muted, #636c76)', fontSize: '13px' }}>
+            No events found for the selected filter.
+          </div>
+        ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="primer-table" aria-label="Competition Events Table" style={{ minWidth: '680px' }}>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: '36%' }}>Event Name</th>
+                    <th scope="col" style={{ width: '130px' }}>Status</th>
+                    <th scope="col" style={{ width: '110px' }}>Tag</th>
+                    <th scope="col" style={{ width: '140px' }}>Scoring</th>
+                    <th scope="col" style={{ width: '90px' }}>Tier</th>
+                    <th scope="col" style={{ width: '110px' }}>Races / Entries</th>
+                    <th scope="col" style={{ width: '90px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((evt) => (
+                    <tr key={evt.id}>
+                      <td>
                         <Link
                           to="/admin/events/$eventId"
                           params={{ eventId: evt.id }}
-                          className="slds-text-link_reset"
-                          style={{
-                            display: 'block',
-                            textDecoration: 'none',
-                            borderRadius: '4px',
-                            padding: '12px',
-                            transition: 'background 0.2s',
-                            borderLeft: '4px solid transparent',
-                          }}
+                          style={{ fontWeight: 600, color: 'var(--fgColor-accent, #0969da)', textDecoration: 'none' }}
                         >
-                          <div className="slds-grid slds-grid_align-spread" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span className="slds-text-body_regular font-bold text-slate-900" style={{ fontWeight: 'bold', fontSize: '1rem' }}>{evt.name}</span>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <span
-                                className="slds-badge"
-                                style={{
-                                  fontSize: '10px',
-                                  padding: '2px 8px',
-                                  borderRadius: '3px',
-                                  color: evt.tag === 'OFFICIAL' ? '#fff' : '#1e293b',
-                                  backgroundColor: evt.tag === 'OFFICIAL' ? '#7c3aed' : '#e2e8f0',
-                                }}
-                              >
-                                {evt.tag || 'OFFICIAL'}
-                              </span>
-                              <span
-                                className="slds-badge"
-                                style={{
-                                  fontSize: '10px',
-                                  padding: '2px 8px',
-                                  borderRadius: '3px',
-                                  color: evt.status === 'ONGOING' ? '#fff' : evt.status === 'CONCLUDED' ? '#fff' : evt.status === 'PENDING_DELETION' ? '#fff' : '#1e293b',
-                                  backgroundColor: evt.status === 'ONGOING' ? '#16a34a' : evt.status === 'CONCLUDED' ? '#1e293b' : evt.status === 'PENDING_DELETION' ? '#dc2626' : evt.status === 'PENDING' ? '#0284c7' : '#e2e8f0',
-                                }}
-                              >
-                                {evt.status}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="slds-text-body_small text-slate-500 slds-m-top_xx-small" style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Type: {evt.scoringTypeLabel}</span>
-                            <span>Tier: {evt.classRestriction && evt.classRestriction !== 'PRE_OP' && evt.classRestriction !== 'OP' ? evt.classRestriction : 'Any'}</span>
-                          </div>
+                          {evt.name}
                         </Link>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Pagination
-                    page={page}
-                    pageSize={pageSize}
-                    total={totalEvents}
-                    onPageChange={setPage}
-                    onPageSizeChange={setPageSize}
-                  />
-                </>
-              )}
+                      </td>
+                      <td>
+                        <Label variant={statusLabelVariant(evt.status)} size="small">
+                          {evt.status}
+                        </Label>
+                      </td>
+                      <td>
+                        <Label variant={evt.tag === 'OFFICIAL' ? 'sponsors' : 'secondary'} size="small">
+                          {evt.tag || 'OFFICIAL'}
+                        </Label>
+                      </td>
+                      <td style={{ color: 'var(--fgColor-muted, #636c76)' }}>{evt.scoringTypeLabel}</td>
+                      <td>
+                        {evt.classRestriction && evt.classRestriction !== 'PRE_OP' && evt.classRestriction !== 'OP'
+                          ? evt.classRestriction
+                          : 'Any'}
+                      </td>
+                      <td style={{ color: 'var(--fgColor-muted, #636c76)' }}>
+                        {evt.raceCount} / {evt.memberCount}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <Link to="/admin/events/$eventId" params={{ eventId: evt.id }} style={{ textDecoration: 'none' }}>
+                          <Button size="small">Manage</Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </article>
-        </div>
-      </div>
 
-      {/* EVENT CREATION DIALOG MODAL */}
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={totalEvents}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </>
+        )}
+      </section>
+
+      {/* Create Event Primer Dialog */}
       {showCreateModal && (
-        <div className="slds-scope">
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                  onClick={() => setShowCreateModal(false)}
-                  style={{
-                    position: 'absolute',
-                    top: '1rem',
-                    right: '1.5rem',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: '1.25rem',
-                    cursor: 'pointer',
-                    color: '#747474',
-                  }}
-                >
-                  ✕
-                </button>
-                <h2 className="slds-modal__title slds-hyphenate font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Create New Competition Event
-                </h2>
-              </header>
+        <Dialog title="Create New Competition Event" onClose={() => setShowCreateModal(false)} width="large">
+          <form onSubmit={(e) => void handleCreateEventSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {formError && <AlertBanner variant="error">{formError}</AlertBanner>}
 
-              <form onSubmit={handleCreateEventSubmit}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {formError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{formError}</AlertBanner>
-                    </div>
-                  )}
+            <FormControl required>
+              <FormControl.Label>Event Name</FormControl.Label>
+              <TextInput
+                block
+                required
+                placeholder="e.g. Winter Derby Championship"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
+            </FormControl>
 
-                  <div className="slds-form slds-form_stacked">
-                    {/* Event Name */}
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="event-name">
-                        Event Name <span className="text-red-500">*</span>
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="event-name"
-                          type="text"
-                          required
-                          placeholder="e.g. Winter Derby Championship"
-                          value={formName}
-                          onChange={(e) => setFormName(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                        />
-                      </div>
-                    </div>
+            <FormControl>
+              <FormControl.Label>Description</FormControl.Label>
+              <Textarea
+                block
+                rows={3}
+                placeholder="Brief description of the event details, dates, or format..."
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+              />
+            </FormControl>
 
-                    {/* Description */}
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="event-desc">
-                        Description
-                      </label>
-                      <div className="slds-form-element__control">
-                        <textarea
-                          id="event-desc"
-                          placeholder="Brief description of the event details, dates, or format..."
-                          value={formDescription}
-                          onChange={(e) => setFormDescription(e.target.value)}
-                          className="slds-textarea"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%', minHeight: '80px' }}
-                        />
-                      </div>
-                    </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <FormControl>
+                <FormControl.Label>Event Hosting Tag</FormControl.Label>
+                <Select block value={formTag} onChange={(e) => setFormTag(e.target.value as EventTag)}>
+                  <Select.Option value="OFFICIAL">Official</Select.Option>
+                  <Select.Option value="COMMUNITY">Community</Select.Option>
+                </Select>
+              </FormControl>
 
-                    {/* Event Hosting Tag */}
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="event-tag">
-                        Event Hosting Tag
-                      </label>
-                      <div className="slds-form-element__control">
-                        <select
-                          id="event-tag"
-                          value={formTag}
-                          onChange={(e) => setFormTag(e.target.value as EventTag)}
-                          className="slds-select"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                        >
-                          <option value="OFFICIAL">Official (Officially Hosted)</option>
-                          <option value="COMMUNITY">Community (Community Hosted)</option>
-                        </select>
-                      </div>
-                    </div>
+              <FormControl>
+                <FormControl.Label>Scoring Mode</FormControl.Label>
+                <Select block value={String(formScoringType)} onChange={(e) => setFormScoringType(Number(e.target.value))}>
+                  <Select.Option value="1">Points Aggregation</Select.Option>
+                  <Select.Option value="2">Ladder Rating (ELO)</Select.Option>
+                </Select>
+              </FormControl>
 
-                    {/* Scoring Mode & Tier restriction */}
-                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
-                        <div className="slds-form-element">
-                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="scoring-type">
-                            Scoring Mode
-                          </label>
-                          <div className="slds-form-element__control">
-                            <select
-                              id="scoring-type"
-                              value={formScoringType}
-                              onChange={(e) => setFormScoringType(Number(e.target.value))}
-                              className="slds-select"
-                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                            >
-                              <option value={1}>Points Aggregation</option>
-                              <option value={2}>Ladder Rating (ELO)</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-2" style={{ flex: 1 }}>
-                        <div className="slds-form-element">
-                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="class-tier">
-                            Class Tier Eligibility
-                          </label>
-                          <div className="slds-form-element__control">
-                            <select
-                              id="class-tier"
-                              value={formClassRestriction || ''}
-                              onChange={(e) => setFormClassRestriction(e.target.value || '')}
-                              className="slds-select"
-                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                            >
-                              <option value="">Any Tier Eligibility (None)</option>
-                              <option value="G3">G3</option>
-                              <option value="G2">G2</option>
-                              <option value="G1">G1</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {formScoringType === 1 && (
-                      <div className="slds-form-element slds-m-bottom_medium" style={{ borderTop: '1px solid #dddbda', paddingTop: '1rem' }}>
-                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="create-scoring-rules-mode">
-                          Points Scoring Rules Source
-                        </label>
-                        <div className="slds-form-element__control">
-                          <select
-                            id="create-scoring-rules-mode"
-                            value={formScoringRulesMode}
-                            onChange={(e) => setFormScoringRulesMode(e.target.value as 'STANDARD' | 'CUSTOM')}
-                            className="slds-select"
-                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                          >
-                            <option value="STANDARD">Standard Default Tables</option>
-                            <option value="CUSTOM">Custom Event Tables (Configure below)</option>
-                          </select>
-                        </div>
-
-                        {formScoringRulesMode === 'CUSTOM' && (
-                          <div className="slds-m-top_medium">
-                            <EventScoringTablesEditor
-                              value={formCustomScoringTables}
-                              onChange={setFormCustomScoringTables}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Optional Event Date/Time */}
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="event-scheduled-at">
-                        Scheduled Date / Time ({Intl.DateTimeFormat().resolvedOptions().timeZone})
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="event-scheduled-at"
-                          type="datetime-local"
-                          value={formScheduledAt}
-                          onChange={(e) => setFormScheduledAt(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Granular Participation Toggle */}
-                    <div className="slds-form-element slds-m-bottom_medium" style={{ display: 'flex', alignItems: 'center' }}>
-                      <div className="slds-form-element__control">
-                        <div className="slds-checkbox">
-                          <input
-                            type="checkbox"
-                            name="options"
-                            id="granular-participation"
-                            checked={formGranularParticipation}
-                            onChange={(e) => {
-                              const checked = e.target.checked
-                              setFormGranularParticipation(checked)
-                              if (checked) {
-                                setFormParticipantLimit('')
-                              } else {
-                                setFormMaxConcurrentRaceParticipations('')
-                              }
-                            }}
-                            style={{ marginRight: '8px' }}
-                          />
-                          <label className="slds-checkbox__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="granular-participation">
-                            <span className="slds-checkbox_faux"></span>
-                            <span className="slds-form-element__label">Enable Granular Per-Race Participation</span>
-                          </label>
-                        </div>
-                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
-                          If enabled, participants must be registered separately for each individual race. Otherwise, registrations are event-wide.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Capacity and Limits fields */}
-                    {!formGranularParticipation ? (
-                      <div className="slds-form-element slds-m-bottom_medium">
-                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="participant-limit">
-                          Participant limit
-                        </label>
-                        <div className="slds-form-element__control">
-                          <input
-                            id="participant-limit"
-                            type="number"
-                            min="1"
-                            placeholder="e.g. 20"
-                            value={formParticipantLimit}
-                            onChange={(e) => setFormParticipantLimit(e.target.value)}
-                            className="slds-input"
-                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                          />
-                        </div>
-                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
-                          Maximum participants for the whole event. Leave blank for unlimited.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="slds-form-element slds-m-bottom_medium">
-                        <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="max-concurrent-participations">
-                          Max races per participant
-                        </label>
-                        <div className="slds-form-element__control">
-                          <input
-                            id="max-concurrent-participations"
-                            type="number"
-                            min="1"
-                            placeholder="e.g. 3"
-                            value={formMaxConcurrentRaceParticipations}
-                            onChange={(e) => setFormMaxConcurrentRaceParticipations(e.target.value)}
-                            className="slds-input"
-                            style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                          />
-                        </div>
-                        <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: '4px 0 0 0' }}>
-                          Maximum races one participant may join in this event. Leave blank for unlimited.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Owner Parameters */}
-                    <div className="slds-grid slds-gutters slds-wrap" style={{ display: 'flex', gap: '16px', marginBottom: '1rem' }}>
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3" style={{ flex: 1 }}>
-                        <div className="slds-form-element">
-                          <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-type">
-                            Ownership Type
-                          </label>
-                          <div className="slds-form-element__control">
-                            <select
-                              id="owner-type"
-                              value={formOwnerType}
-                              onChange={(e) => setFormOwnerType(e.target.value as EventOwnerType)}
-                              className="slds-select"
-                              style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%' }}
-                            >
-                              <option value="USER">Single User</option>
-                              <option value="ORGANIZATION">Organization</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="slds-col slds-size_1-of-1 slds-medium-size_2-of-3" style={{ flex: 2 }}>
-                        {formOwnerType === 'USER' ? (
-                          <div className="slds-form-element">
-                            <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-user-id">
-                              Owner User
-                            </label>
-                            <UserSearchCombobox
-                              value={formOwnerUserId}
-                              onChange={(val) => setFormOwnerUserId(val)}
-                            />
-                          </div>
-                        ) : (
-                          <div className="slds-form-element">
-                            <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="owner-org-id">
-                              Owner Organization
-                            </label>
-                            <OrganizationSearchCombobox
-                              value={formOrganizationId}
-                              onChange={(val) => setFormOrganizationId(val)}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="slds-button slds-button_neutral"
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="slds-button slds-button_brand"
-                    disabled={submitting}
-                  >
-                    {submitting ? 'Creating...' : 'Create Event'}
-                  </button>
-                </footer>
-              </form>
+              <FormControl>
+                <FormControl.Label>Class Tier Eligibility</FormControl.Label>
+                <Select block value={formClassRestriction} onChange={(e) => setFormClassRestriction(e.target.value)}>
+                  <Select.Option value="">Any Tier (None)</Select.Option>
+                  <Select.Option value="G3">G3</Select.Option>
+                  <Select.Option value="G2">G2</Select.Option>
+                  <Select.Option value="G1">G1</Select.Option>
+                </Select>
+              </FormControl>
             </div>
-          </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }} />
-        </div>
+
+            {formScoringType === 1 && (
+              <div style={{ borderTop: '1px solid var(--borderColor-muted, #d8dee4)', paddingTop: '12px' }}>
+                <FormControl>
+                  <FormControl.Label>Points Scoring Rules Source</FormControl.Label>
+                  <Select
+                    block
+                    value={formScoringRulesMode}
+                    onChange={(e) => setFormScoringRulesMode(e.target.value as 'STANDARD' | 'CUSTOM')}
+                  >
+                    <Select.Option value="STANDARD">Standard Default Tables</Select.Option>
+                    <Select.Option value="CUSTOM">Custom Event Tables</Select.Option>
+                  </Select>
+                </FormControl>
+
+                {formScoringRulesMode === 'CUSTOM' && (
+                  <EventScoringTablesEditor value={formCustomScoringTables} onChange={setFormCustomScoringTables} />
+                )}
+              </div>
+            )}
+
+            <FormControl>
+              <FormControl.Label>
+                Scheduled Date / Time ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+              </FormControl.Label>
+              <TextInput
+                block
+                type="datetime-local"
+                value={formScheduledAt}
+                onChange={(e) => setFormScheduledAt(e.target.value)}
+              />
+            </FormControl>
+
+            <FormControl>
+              <Checkbox
+                checked={formGranularParticipation}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setFormGranularParticipation(checked)
+                  if (checked) {
+                    setFormParticipantLimit('')
+                  } else {
+                    setFormMaxConcurrentRaceParticipations('')
+                  }
+                }}
+              />
+              <FormControl.Label>Enable Granular Per-Race Participation</FormControl.Label>
+              <FormControl.Caption>
+                When enabled, competitors register separately for individual races instead of event-wide.
+              </FormControl.Caption>
+            </FormControl>
+
+            {!formGranularParticipation ? (
+              <FormControl>
+                <FormControl.Label>Participant Limit</FormControl.Label>
+                <TextInput
+                  block
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 20 (leave blank for unlimited)"
+                  value={formParticipantLimit}
+                  onChange={(e) => setFormParticipantLimit(e.target.value)}
+                />
+              </FormControl>
+            ) : (
+              <FormControl>
+                <FormControl.Label>Max Races Per Participant</FormControl.Label>
+                <TextInput
+                  block
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 3 (leave blank for unlimited)"
+                  value={formMaxConcurrentRaceParticipations}
+                  onChange={(e) => setFormMaxConcurrentRaceParticipations(e.target.value)}
+                />
+              </FormControl>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', alignItems: 'end' }}>
+              <FormControl>
+                <FormControl.Label>Ownership Type</FormControl.Label>
+                <Select block value={formOwnerType} onChange={(e) => setFormOwnerType(e.target.value as EventOwnerType)}>
+                  <Select.Option value="USER">Single User</Select.Option>
+                  <Select.Option value="ORGANIZATION">Organization</Select.Option>
+                </Select>
+              </FormControl>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+                  {formOwnerType === 'USER' ? 'Owner User' : 'Owner Organization'}
+                </label>
+                {formOwnerType === 'USER' ? (
+                  <UserSearchCombobox value={formOwnerUserId} onChange={(val) => setFormOwnerUserId(val)} />
+                ) : (
+                  <OrganizationSearchCombobox value={formOrganizationId} onChange={(val) => setFormOrganizationId(val)} />
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '10px', borderTop: '1px solid var(--borderColor-muted, #d8dee4)' }}>
+              <Button type="button" onClick={() => setShowCreateModal(false)} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={submitting}>
+                {submitting ? 'Creating...' : 'Create Event'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
     </AdminLayout>
   )

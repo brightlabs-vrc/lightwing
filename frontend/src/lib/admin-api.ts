@@ -2507,3 +2507,47 @@ export async function deleteNewsletter(id: string): Promise<void> {
   mockOrgNewsletters = mockOrgNewsletters.filter((n) => n.id !== id)
 }
 
+export async function deleteAdminUser(
+  userId: string,
+  authorization: string,
+): Promise<{ deleted: boolean }> {
+  if (!MOCK_MODE) {
+    return appClient.auth.DeleteUser(userId, { Authorization: authorization })
+  }
+  if (!mockUserProfiles.has(userId)) {
+    throw new Error('Mock user not found')
+  }
+  mockUserProfiles.delete(userId)
+  return { deleted: true }
+}
+
+export async function deleteAdminOrganization(
+  orgId: string,
+  authorization: string,
+): Promise<{ deleted: boolean }> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.DeleteAdminOrganization(orgId, { Authorization: authorization })
+  }
+  const idx = mockTeamsList.findIndex((t) => t.id === orgId || t.slug === orgId)
+  if (idx !== -1) {
+    mockTeamsList.splice(idx, 1)
+  }
+  return { deleted: true }
+}
+
+export async function deleteAdminTeam(
+  teamId: string,
+  authorization: string,
+): Promise<{ deleted: boolean }> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.DeleteAdminTeam(teamId, { Authorization: authorization })
+  }
+  const idx = mockTeamsList.findIndex((t) => t.id === teamId || t.slug === teamId)
+  if (idx === -1) {
+    throw new Error('Mock team not found')
+  }
+  mockTeamsList.splice(idx, 1)
+  return { deleted: true }
+}
+
+

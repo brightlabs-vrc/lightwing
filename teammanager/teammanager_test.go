@@ -938,3 +938,56 @@ func TestAggregateRowsToTeamStats(t *testing.T) {
 	}
 }
 
+func TestDeleteAdminOrganizationAndTeam(t *testing.T) {
+	ctx := context.Background()
+	adminID := nextTeamID("del-site-admin")
+	regularID := nextTeamID("del-regular")
+	insertTestUser(t, ctx, adminID, "Site Admin", "SITE_ADMIN")
+	insertTestUser(t, ctx, regularID, "Regular User", "USER")
+
+	orgID := nextTeamID("del-org")
+	createOrgWithMembers(t, ctx, orgID, "Delete Me Org", orgID, []memberSpec{
+		{userID: nextTeamID("del-org-m"), role: "administrator", name: "Org Admin"},
+	})
+
+	// Non-site-admin cannot delete org
+	if _, err := deleteAdminOrganization(ctx, testActor(regularID, "EVENT_ADMIN"), orgID); errs.Code(err) != errs.PermissionDenied {
+		t.Fatalf("expected permission_denied for non-site-admin, got %v", err)
+	}
+
+	// Site admin can delete org
+	res, err := deleteAdminOrganization(ctx, testActor(adminID, "SITE_ADMIN"), orgID)
+	if err != nil {
+		t.Fatalf("deleteAdminOrganization failed: %v", err)
+	}
+	if !res.Deleted {
+		t.Fatalf("expected deleted = true")
+	}
+	if _, err := getAdminOrganization(ctx, orgID); errs.Code(err) != errs.NotFound {
+		t.Errorf("expected not_found after org delete, got %v", err)
+	}
+
+	teamID := nextTeamID("del-team")
+	createTeamWithRoster(t, ctx, teamID, "Delete Me Team", teamID, []memberSpec{
+		{userID: nextTeamID("del-team-m"), role: "member", name: "Team Member"},
+	})
+
+	// Non-site-admin cannot delete team
+	if _, err := deleteAdminTeam(ctx, testActor(regularID, "USER"), teamID); errs.Code(err) != errs.PermissionDenied {
+		t.Fatalf("expected permission_denied for non-site-admin team delete, got %v", err)
+	}
+
+	// Site admin can delete team
+	teamRes, err := deleteAdminTeam(ctx, testActor(adminID, "SITE_ADMIN"), teamID)
+	if err != nil {
+		t.Fatalf("deleteAdminTeam failed: %v", err)
+	}
+	if !teamRes.Deleted {
+		t.Fatalf("expected deleted = true for team")
+	}
+	if _, err := getTeam(ctx, teamID); errs.Code(err) != errs.NotFound {
+		t.Errorf("expected not_found after team delete, got %v", err)
+	}
+}
+
+

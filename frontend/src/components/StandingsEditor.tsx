@@ -171,35 +171,51 @@ export function StandingsEditor({
 
   return (
     <article
-      className={`slds-card ${noTopMargin ? '' : 'slds-m-top_large'}`}
-      style={{ border: '2px solid #0176d3', borderRadius: '4px', background: '#f8fafc', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}
+      className="primer-box"
+      style={{
+        marginTop: noTopMargin ? 0 : '20px',
+        overflow: 'hidden',
+      }}
     >
       <div
-        className="slds-card__header slds-grid slds-grid_align-spread"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f1f5f9', padding: '12px 16px', borderBottom: '1px solid #dddbda' }}
+        className="primer-box-header"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+        }}
       >
-        <header className="slds-media slds-media_center slds-has-flexi-truncate">
-          <div className="slds-media__body">
-            <h2 className="slds-card__header-title">
-              <span className="slds-card__header-link slds-truncate font-bold text-slate-800" style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
-                Standings Grid: {raceName}
-              </span>
-            </h2>
-            <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px' }}>
-              Assign finishes for registered event participants. Click on a participant or Penalty button to issue conduct penalties. Status: {isRaceNotStarted ? 'Not Started' : isRaceOngoing ? 'Ongoing (Live - Provisional Saving Allowed)' : 'Concluded'}
-            </p>
-          </div>
-        </header>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)' }}>
+            Standings Grid: {raceName}
+          </h2>
+          <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+            Assign finishes for registered participants. Click a participant or Penalty button to issue conduct penalties. Status:{' '}
+            <strong>
+              {isRaceNotStarted ? 'Not Started' : isRaceOngoing ? 'Ongoing (Provisional Saving Allowed)' : 'Concluded'}
+            </strong>
+          </p>
+        </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {!isRaceNotStarted && !isRaceOngoing && (
             <button
               type="button"
               onClick={onInferTimes}
               disabled={savingBatch || loadingResults}
-              className="slds-button slds-button_neutral"
-              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
               title="Fill in missing finish times from the leader's time plus each horse's margin/length"
+              style={{
+                padding: '5px 12px',
+                fontSize: '12px',
+                fontWeight: 500,
+                borderRadius: '6px',
+                border: '1px solid var(--borderColor-default, #d0d7de)',
+                backgroundColor: 'var(--bgColor-default, #ffffff)',
+                color: 'var(--fgColor-default, #1f2328)',
+                cursor: savingBatch || loadingResults ? 'not-allowed' : 'pointer',
+              }}
             >
               Infer Times
             </button>
@@ -208,8 +224,16 @@ export function StandingsEditor({
             type="button"
             onClick={onCancel}
             disabled={savingBatch || loadingResults}
-            className="slds-button slds-button_neutral"
-            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+            style={{
+              padding: '5px 12px',
+              fontSize: '12px',
+              fontWeight: 500,
+              borderRadius: '6px',
+              border: '1px solid var(--borderColor-default, #d0d7de)',
+              backgroundColor: 'var(--bgColor-default, #ffffff)',
+              color: 'var(--fgColor-default, #1f2328)',
+              cursor: savingBatch || loadingResults ? 'not-allowed' : 'pointer',
+            }}
           >
             Cancel
           </button>
@@ -217,62 +241,91 @@ export function StandingsEditor({
             type="button"
             onClick={onSave}
             disabled={savingBatch || loadingResults || changeSummary.totalCount === 0}
-            className={`slds-button ${changeSummary.totalCount > 0 ? 'slds-button_brand' : 'slds-button_neutral'}`}
-            style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
             title={isRaceNotStarted ? 'Save draw numbers' : isRaceOngoing ? 'Save provisional standings' : 'Save final standings'}
+            style={{
+              padding: '5px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: '1px solid rgba(31, 35, 40, 0.15)',
+              backgroundColor:
+                changeSummary.totalCount > 0 && !savingBatch && !loadingResults
+                  ? 'var(--bgColor-success-emphasis, #1f883d)'
+                  : 'var(--bgColor-muted, #f6f8fa)',
+              color:
+                changeSummary.totalCount > 0 && !savingBatch && !loadingResults
+                  ? '#ffffff'
+                  : 'var(--fgColor-disabled, #8c959f)',
+              cursor: savingBatch || loadingResults || changeSummary.totalCount === 0 ? 'not-allowed' : 'pointer',
+            }}
           >
-            {savingBatch ? 'Saving...' : isRaceNotStarted ? `Save Draw Numbers (${changeSummary.totalCount})` : `Save (${changeSummary.totalCount})`}
+            {savingBatch
+              ? 'Saving...'
+              : isRaceNotStarted
+              ? `Save Draw Numbers (${changeSummary.totalCount})`
+              : `Save (${changeSummary.totalCount})`}
           </button>
         </div>
       </div>
 
-      <div className="slds-card__body" style={{ padding: '16px' }}>
+      <div style={{ padding: '16px' }}>
         {isRaceNotStarted && (
-          <div className="slds-m-bottom_medium">
-            <AlertBanner variant="warning">
-              <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
-                Race has not started yet. You can set or edit the <strong>Draw (Gate Number)</strong> for each competitor below. Other finish-related fields will be enabled once the race starts.
-              </span>
-            </AlertBanner>
-          </div>
+          <AlertBanner variant="warning">
+            <span style={{ fontSize: '12px' }}>
+              Race has not started yet. You can set or edit the <strong>Draw (Gate Number)</strong> for each competitor below. Other finish-related fields will unlock once the race starts.
+            </span>
+          </AlertBanner>
         )}
 
         {isRaceOngoing && (
-          <div className="slds-m-bottom_medium">
-            <AlertBanner variant="warning">
-              <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#7c2d12' }}>
-                Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong>. You can still edit or finalize them once the race concludes.
-              </span>
-            </AlertBanner>
-          </div>
+          <AlertBanner variant="warning">
+            <span style={{ fontSize: '12px' }}>
+              Race is currently Ongoing (Live). You can save results now as <strong>Provisional Standings</strong> and finalize them once the race concludes.
+            </span>
+          </AlertBanner>
         )}
 
         {changeSummary.totalCount > 0 && !isRaceOngoing && (
           <AlertBanner
             variant="warning"
             action={
-              <button type="button" onClick={onResetAll} className="slds-button slds-button_neutral" style={{ padding: '2px 8px', fontSize: '10px' }}>
+              <button
+                type="button"
+                onClick={onResetAll}
+                style={{
+                  padding: '3px 10px',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  borderRadius: '6px',
+                  border: '1px solid var(--borderColor-default, #d0d7de)',
+                  backgroundColor: 'var(--bgColor-default, #ffffff)',
+                  color: 'var(--fgColor-default, #1f2328)',
+                  cursor: 'pointer',
+                }}
+              >
                 Reset All
               </button>
             }
           >
-            <span style={{ fontWeight: 'bold', fontSize: '12px' }}>
+            <span style={{ fontSize: '12px' }}>
               Unsaved changes: {changeSummary.newCount > 0 && `${changeSummary.newCount} new, `}
               {changeSummary.modifiedCount > 0 && `${changeSummary.modifiedCount} modified, `}
-              {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click "Save" above to submit.
+              {changeSummary.deletedCount > 0 && `${changeSummary.deletedCount} pending deletion`}. Click &quot;Save&quot; above to submit.
             </span>
           </AlertBanner>
         )}
 
         {loadingResults ? (
-          <p className="slds-text-body_medium text-slate-500">Loading race results data...</p>
+          <p style={{ fontSize: '13px', color: 'var(--fgColor-muted, #636c76)', margin: '12px 0' }}>
+            Loading race results data...
+          </p>
         ) : memberCount === 0 ? (
-          <div className="slds-align_absolute-center slds-p-around_large text-slate-500">
-            No registered event participants found. Add participants under "Event Members" tab first.
+          <div style={{ padding: '32px', textAlign: 'center', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+            No registered event participants found. Add participants under the &quot;Event Members&quot; tab first.
           </div>
         ) : (
           <StandingsTable
-            variant="slds"
+            variant="primer"
             rows={rows}
             onResultChange={onResultChange}
             onTogglePendingDeletion={onTogglePendingDeletion}
@@ -290,7 +343,7 @@ export function StandingsEditor({
 }
 
 interface StandingsTableProps {
-  variant?: 'pixel' | 'slds'
+  variant?: 'pixel' | 'primer' | 'slds'
   rows: DerivedRow[]
   onResultChange: (userId: string, field: keyof EditedResult, value: string) => void
   onTogglePendingDeletion: (userId: string) => void
@@ -555,11 +608,21 @@ function StandingsTable({
     )
   }
 
+  const inputStyle: React.CSSProperties = {
+    padding: '4px 8px',
+    border: '1px solid var(--borderColor-default, #d0d7de)',
+    borderRadius: '6px',
+    width: '100%',
+    fontSize: '12px',
+    backgroundColor: 'var(--bgColor-default, #ffffff)',
+    color: 'var(--fgColor-default, #1f2328)',
+  }
+
   return (
     <div>
       {penaltyTarget && (
         <PenaltyDialogue
-          variant="slds"
+          variant="primer"
           participantName={penaltyTarget.name}
           currentStatus={penaltyTarget.currentStatus}
           onApply={(newStatus) => {
@@ -570,22 +633,22 @@ function StandingsTable({
         />
       )}
 
-      <div style={{ overflowX: 'auto', width: '100%', border: '1px solid #dddbda', borderRadius: '4px' }}>
-        <table className="slds-table slds-table_cell-buffer slds-table_bordered" style={{ minWidth: '1100px', width: '100%', tableLayout: 'fixed' }}>
+      <div style={{ overflowX: 'auto', width: '100%', border: '1px solid var(--borderColor-default, #d0d7de)', borderRadius: '6px' }}>
+        <table className="primer-table" style={{ minWidth: '1100px', width: '100%', tableLayout: 'fixed' }}>
           <thead>
-            <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-              <th scope="col" style={{ fontWeight: 'bold', width: '160px' }}><div className="slds-truncate" title="Competitor Name">Competitor Name</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="User ID">User ID</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate" title="Draw">Draw</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate" title="Position">Position</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '80px' }}><div className="slds-truncate" title="Points">Points</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate" title="Finish Time">Finish Time</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '85px' }}><div className="slds-truncate" title="Behind">Behind</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '100px' }}><div className="slds-truncate" title="Passing Order">Passing Order</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '85px' }}><div className="slds-truncate" title="Final 3F">Final 3F</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Outcome / Penalty">Outcome / Penalty</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '140px' }}><div className="slds-truncate" title="Status">Status</div></th>
-              <th scope="col" style={{ fontWeight: 'bold', width: '130px' }}><div className="slds-truncate" title="Staged Actions">Staged Actions</div></th>
+            <tr>
+              <th scope="col" style={{ width: '160px' }}>Competitor</th>
+              <th scope="col" style={{ width: '130px' }}>User ID</th>
+              <th scope="col" style={{ width: '75px' }}>Draw</th>
+              <th scope="col" style={{ width: '80px' }}>Position</th>
+              <th scope="col" style={{ width: '80px' }}>Points</th>
+              <th scope="col" style={{ width: '100px' }}>Finish Time</th>
+              <th scope="col" style={{ width: '85px' }}>Behind</th>
+              <th scope="col" style={{ width: '100px' }}>Passing Order</th>
+              <th scope="col" style={{ width: '85px' }}>Final 3F</th>
+              <th scope="col" style={{ width: '130px' }}>Outcome / Penalty</th>
+              <th scope="col" style={{ width: '140px' }}>Status</th>
+              <th scope="col" style={{ width: '130px' }}>Staged Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -594,23 +657,26 @@ function StandingsTable({
               const isModified = rowState === 'modified'
               const isNew = rowState === 'new'
 
-                const details = userDetailsMap.get(member.userId)!
+              const details = userDetailsMap.get(member.userId)!
 
               return (
                 <tr
                   key={member.userId}
-                  className="slds-hint-parent"
                   style={{
-                    background: isDeleted ? '#fee2e2' : isModified ? '#eff6ff' : isNew ? '#f0fdf4' : 'transparent',
-                    transition: 'background 0.2s',
+                    backgroundColor: isDeleted
+                      ? 'var(--bgColor-danger-muted, #ffebe9)'
+                      : isModified
+                      ? 'var(--bgColor-accent-muted, #ddf4ff)'
+                      : isNew
+                      ? 'var(--bgColor-success-muted, #dafbe1)'
+                      : undefined,
                     textDecoration: isDeleted ? 'line-through' : 'none',
-                    opacity: isDeleted ? 0.6 : 1,
+                    opacity: isDeleted ? 0.65 : 1,
                   }}
                 >
                   <td>
                     <div
-                      className="slds-truncate"
-                      style={{ cursor: 'pointer' }}
+                      style={{ cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}
                       onClick={() => !isDeleted && setPenaltyTarget({ userId: member.userId, name: member.name, currentStatus: edit.resultStatus })}
                       title={`Click ${member.name} to issue penalty`}
                     >
@@ -618,134 +684,102 @@ function StandingsTable({
                     </div>
                   </td>
                   <td>
-                    <div className="slds-truncate" title={member.userId}>
-                      <code className="text-xs">{member.userId}</code>
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={member.userId}>
+                      <code style={{ fontSize: '11px', color: 'var(--fgColor-muted, #636c76)' }}>{member.userId}</code>
                     </div>
                   </td>
                   <td>
-                    <div className="slds-form-element">
-                      <div className="slds-form-element__control">
-                        <input
-                          type="number"
-                          placeholder="Draw"
-                          value={edit.gateNumber}
-                          onChange={(e) => onResultChange(member.userId, 'gateNumber', e.target.value)}
-                          className="slds-input standings-input-no-spinner"
-                          style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
+                    <input
+                      type="number"
+                      placeholder="Draw"
+                      value={edit.gateNumber}
+                      onChange={(e) => onResultChange(member.userId, 'gateNumber', e.target.value)}
+                      className="standings-input-no-spinner"
+                      style={inputStyle}
+                    />
                   </td>
                   <td>
-                    <div className="slds-form-element">
-                      <div className="slds-form-element__control">
-                        <input
-                          type="number"
-                          placeholder="None"
-                          disabled={isDeleted || isRaceNotStarted}
-                          value={edit.position}
-                          onChange={(e) => onResultChange(member.userId, 'position', e.target.value)}
-                          className="slds-input standings-input-no-spinner"
-                          style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
+                    <input
+                      type="number"
+                      placeholder="None"
+                      disabled={isDeleted || isRaceNotStarted}
+                      value={edit.position}
+                      onChange={(e) => onResultChange(member.userId, 'position', e.target.value)}
+                      className="standings-input-no-spinner"
+                      style={inputStyle}
+                    />
                     {details.penaltyType === 'POS' && details.effectivePosition !== null && (
-                      <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: 'bold', textAlign: 'center', marginTop: '2px' }} title={`Position demoted from ${details.physicalPosition} to ${details.effectivePosition}`}>
+                      <div style={{ fontSize: '10px', color: 'var(--fgColor-danger, #d1242f)', fontWeight: 600, textAlign: 'center', marginTop: '2px' }} title={`Position demoted from ${details.physicalPosition} to ${details.effectivePosition}`}>
                         Demoted: Pos {details.effectivePosition}
                       </div>
                     )}
                   </td>
                   <td>
                     {scoringType === 1 ? (
-                      <div style={{ fontWeight: 'bold', color: '#0176d3', fontSize: '13px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--fgColor-accent, #0969da)', fontSize: '13px', textAlign: 'center' }}>
                         {details.awardedPoints} pts
                         {details.hasPenalty && details.basePoints > 0 && details.basePoints !== details.awardedPoints && (
-                          <span style={{ fontSize: '10px', color: '#64748b', display: 'block', fontWeight: 'normal' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--fgColor-muted, #636c76)', display: 'block', fontWeight: 400 }}>
                             ({details.basePoints} orig)
                           </span>
                         )}
                         {!details.hasPenalty && (
-                          <span style={{ fontSize: '9px', color: '#64748b', display: 'block', fontWeight: 'normal' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--fgColor-muted, #636c76)', display: 'block', fontWeight: 400 }}>
                             (Auto)
                           </span>
                         )}
                       </div>
                     ) : (
-                      <div className="slds-form-element">
-                        <div className="slds-form-element__control">
-                          <input
-                            type="number"
-                            placeholder="0"
-                            disabled={isDeleted || isRaceNotStarted}
-                            value={edit.points}
-                            onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
-                            className="slds-input standings-input-no-spinner"
-                            style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                          />
-                        </div>
-                      </div>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        disabled={isDeleted || isRaceNotStarted}
+                        value={edit.points}
+                        onChange={(e) => onResultChange(member.userId, 'points', e.target.value)}
+                        className="standings-input-no-spinner"
+                        style={inputStyle}
+                      />
                     )}
                   </td>
                   <td>
-                    <div className="slds-form-element">
-                      <div className="slds-form-element__control">
-                        <input
-                          type="text"
-                          placeholder="1:32.1"
-                          disabled={isDeleted || isRaceNotStarted}
-                          value={edit.finishTime}
-                          onChange={(e) => onResultChange(member.userId, 'finishTime', e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="1:32.1"
+                      disabled={isDeleted || isRaceNotStarted}
+                      value={edit.finishTime}
+                      onChange={(e) => onResultChange(member.userId, 'finishTime', e.target.value)}
+                      style={inputStyle}
+                    />
                   </td>
                   <td>
-                    <div className="slds-form-element">
-                      <div className="slds-form-element__control">
-                        <input
-                          type="text"
-                          placeholder="nose"
-                          disabled={isDeleted || isRaceNotStarted}
-                          value={edit.margin}
-                          onChange={(e) => onResultChange(member.userId, 'margin', e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="nose"
+                      disabled={isDeleted || isRaceNotStarted}
+                      value={edit.margin}
+                      onChange={(e) => onResultChange(member.userId, 'margin', e.target.value)}
+                      style={inputStyle}
+                    />
                   </td>
                   <td>
-                    <div className="slds-form-element">
-                      <div className="slds-form-element__control">
-                        <input
-                          type="text"
-                          placeholder="3-2-1"
-                          disabled={isDeleted || isRaceNotStarted}
-                          value={edit.passingOrder}
-                          onChange={(e) => onResultChange(member.userId, 'passingOrder', e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="3-2-1"
+                      disabled={isDeleted || isRaceNotStarted}
+                      value={edit.passingOrder}
+                      onChange={(e) => onResultChange(member.userId, 'passingOrder', e.target.value)}
+                      style={inputStyle}
+                    />
                   </td>
                   <td>
-                    <div className="slds-form-element">
-                      <div className="slds-form-element__control">
-                        <input
-                          type="text"
-                          placeholder="34.5"
-                          disabled={isDeleted || isRaceNotStarted}
-                          value={edit.final3F}
-                          onChange={(e) => onResultChange(member.userId, 'final3F', e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '4px 8px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="34.5"
+                      disabled={isDeleted || isRaceNotStarted}
+                      value={edit.final3F}
+                      onChange={(e) => onResultChange(member.userId, 'final3F', e.target.value)}
+                      style={inputStyle}
+                    />
                   </td>
                   <td>
                     <button
@@ -755,12 +789,12 @@ function StandingsTable({
                       style={{
                         padding: '4px 8px',
                         fontSize: '11px',
-                        fontWeight: 'bold',
-                        borderRadius: '4px',
+                        fontWeight: 600,
+                        borderRadius: '6px',
                         border: '1px solid',
-                        borderColor: edit.resultStatus ? '#f87171' : '#cbd5e1',
-                        backgroundColor: edit.resultStatus ? '#fef2f2' : '#ffffff',
-                        color: edit.resultStatus ? '#dc2626' : '#475569',
+                        borderColor: edit.resultStatus ? 'var(--borderColor-danger-emphasis, #cf222e)' : 'var(--borderColor-default, #d0d7de)',
+                        backgroundColor: edit.resultStatus ? 'var(--bgColor-danger-muted, #ffebe9)' : 'var(--bgColor-default, #ffffff)',
+                        color: edit.resultStatus ? 'var(--fgColor-danger, #d1242f)' : 'var(--fgColor-default, #1f2328)',
                         cursor: isDeleted ? 'not-allowed' : 'pointer',
                         whiteSpace: 'nowrap',
                         width: '100%',
@@ -773,35 +807,34 @@ function StandingsTable({
                   </td>
                   <td>
                     {isDeleted ? (
-                      <span className="slds-badge slds-theme_error" style={{ padding: '2px 8px', background: '#dc2626', color: '#fff', borderRadius: '4px' }}>
+                      <span style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#cf222e', color: '#fff', borderRadius: '999px', display: 'inline-block' }}>
                         Pending Deletion
                       </span>
                     ) : isModified ? (
-                      <span className="slds-badge slds-theme_warning" style={{ padding: '2px 8px', background: '#2563eb', color: '#fff', borderRadius: '4px' }}>
-                        Modified (Unsaved)
+                      <span style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#0969da', color: '#fff', borderRadius: '999px', display: 'inline-block' }}>
+                        Modified
                       </span>
                     ) : isNew ? (
-                      <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', background: '#16a34a', color: '#fff', borderRadius: '4px' }}>
-                        New (Unsaved)
+                      <span style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#1f883d', color: '#fff', borderRadius: '999px', display: 'inline-block' }}>
+                        New
                       </span>
                     ) : savedResult ? (
-                      <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', background: savedResult.resultStatus === 'DEFERRED' ? '#64748b' : savedResult.resultStatus ? '#dc2626' : '#2e7d32', color: '#fff', borderRadius: '4px' }}>
-                        {savedResult.resultStatus ? savedResult.resultStatus : isRaceNotStarted ? `Draw Assigned (${savedResult.gateNumber ?? 'n/a'})` : `Saved (Pos: ${savedResult.position ?? 'n/a'}, Pts: ${savedResult.points})`}
+                      <span style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, backgroundColor: savedResult.resultStatus === 'DEFERRED' ? '#636c76' : savedResult.resultStatus ? '#cf222e' : '#1f883d', color: '#fff', borderRadius: '999px', display: 'inline-block' }}>
+                        {savedResult.resultStatus ? savedResult.resultStatus : isRaceNotStarted ? `Draw ${savedResult.gateNumber ?? 'n/a'}` : `Pos ${savedResult.position ?? 'n/a'} (${savedResult.points} pts)`}
                       </span>
                     ) : (
-                      <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', background: '#e0e0e0', color: '#555', borderRadius: '4px' }}>
-                        {isRaceNotStarted ? 'No draw assigned' : 'No result recorded'}
+                      <span style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 500, backgroundColor: 'var(--bgColor-muted, #f6f8fa)', color: 'var(--fgColor-muted, #636c76)', border: '1px solid var(--borderColor-default, #d0d7de)', borderRadius: '999px', display: 'inline-block' }}>
+                        {isRaceNotStarted ? 'No draw' : 'Unrecorded'}
                       </span>
                     )}
                   </td>
                   <td>
-                    <div className="slds-grid" style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       {isDeleted ? (
                         <button
                           type="button"
                           onClick={() => onTogglePendingDeletion(member.userId)}
-                          className="slds-button slds-button_neutral"
-                          style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
+                          style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 500, borderRadius: '6px', border: '1px solid var(--borderColor-default, #d0d7de)', backgroundColor: 'var(--bgColor-default, #ffffff)', color: 'var(--fgColor-default, #1f2328)', cursor: 'pointer', flexGrow: 1 }}
                         >
                           Restore
                         </button>
@@ -810,8 +843,7 @@ function StandingsTable({
                           <button
                             type="button"
                             onClick={() => onUndoRow(member.userId)}
-                            className="slds-button slds-button_neutral"
-                            style={{ padding: '2px 8px', fontSize: '11px', flexGrow: 1 }}
+                            style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 500, borderRadius: '6px', border: '1px solid var(--borderColor-default, #d0d7de)', backgroundColor: 'var(--bgColor-default, #ffffff)', color: 'var(--fgColor-default, #1f2328)', cursor: 'pointer', flexGrow: 1 }}
                           >
                             Reset
                           </button>
@@ -819,8 +851,7 @@ function StandingsTable({
                             <button
                               type="button"
                               onClick={() => onTogglePendingDeletion(member.userId)}
-                              className="slds-button slds-button_destructive"
-                              style={{ padding: '2px 8px', fontSize: '11px', background: '#dc2626', color: '#fff' }}
+                              style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 500, borderRadius: '6px', border: '1px solid rgba(31, 35, 40, 0.15)', backgroundColor: '#cf222e', color: '#fff', cursor: 'pointer' }}
                             >
                               Remove
                             </button>
@@ -830,13 +861,12 @@ function StandingsTable({
                         <button
                           type="button"
                           onClick={() => onTogglePendingDeletion(member.userId)}
-                          className="slds-button slds-button_destructive"
-                          style={{ padding: '2px 8px', fontSize: '11px', background: '#dc2626', color: '#fff', flexGrow: 1 }}
+                          style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 500, borderRadius: '6px', border: '1px solid rgba(31, 35, 40, 0.15)', backgroundColor: '#cf222e', color: '#fff', cursor: 'pointer', flexGrow: 1 }}
                         >
                           Remove
                         </button>
                       ) : (
-                        <span style={{ fontSize: '11px', color: '#888', fontStyle: 'italic', padding: '2px 8px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--fgColor-muted, #636c76)', padding: '2px 4px' }}>
                           No changes
                         </span>
                       )}
@@ -849,12 +879,22 @@ function StandingsTable({
         </table>
       </div>
 
-      <div className="slds-m-top_medium slds-box" style={{ background: '#f8fafc', border: '1px solid #dddbda', borderRadius: '4px', padding: '12px' }}>
-        <h4 className="font-bold text-slate-800" style={{ fontWeight: 'bold' }}>Explanation of Standings update actions</h4>
-        <ul style={{ paddingLeft: '1.25rem', marginTop: '4px' }}>
-          <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Conduct Penalties</strong> - Click on a participant or the "Issue Penalty" button to launch the penalty dialogue for DSQ, DNF, DNS, Position Reduction PEN (POS-x), or Points Reduction PEN (PTS-x).</li>
-          <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Staging Changes</strong> - Edits to the standings are compiled locally. Highlighting shows which rows have modified values or are pending deletion.</li>
-          <li className="text-slate-600" style={{ fontSize: '12px' }}><strong>Smart Save Standings</strong> - The system analyzes your edits and executes the safest, most performant update automatically when you click "Save".</li>
+      <div
+        style={{
+          marginTop: '14px',
+          backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+          border: '1px solid var(--borderColor-default, #d0d7de)',
+          borderRadius: '6px',
+          padding: '12px 14px',
+        }}
+      >
+        <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)' }}>
+          Standings Update Guide
+        </h4>
+        <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <li><strong>Conduct Penalties</strong> — Click a participant or &quot;Issue Penalty&quot; to assign DSQ, DNF, DNS, Position Reduction (POS-x), or Points Reduction (PTS-x).</li>
+          <li><strong>Staging Changes</strong> — Edits are tracked locally with row highlights until you click &quot;Save&quot;.</li>
+          <li><strong>Smart Save Standings</strong> — Only modified or deleted entries are sent in batch on save.</li>
         </ul>
       </div>
     </div>
@@ -862,7 +902,7 @@ function StandingsTable({
 }
 
 interface PenaltyDialogueProps {
-  variant?: 'pixel' | 'slds'
+  variant?: 'pixel' | 'primer' | 'slds'
   participantName: string
   currentStatus: string
   onApply: (status: string) => void
@@ -870,7 +910,7 @@ interface PenaltyDialogueProps {
 }
 
 function PenaltyDialogue({
-  variant = 'slds',
+  variant = 'primer',
   participantName,
   currentStatus,
   onApply,
@@ -970,7 +1010,7 @@ function PenaltyDialogue({
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(2px)' }}
+        style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(27, 31, 36, 0.5)' }}
       />
 
       <div
@@ -980,31 +1020,36 @@ function PenaltyDialogue({
           position: 'relative',
           width: '90%',
           maxWidth: '480px',
-          backgroundColor: '#ffffff',
-          borderRadius: '8px',
-          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1)',
+          backgroundColor: 'var(--bgColor-default, #ffffff)',
+          border: '1px solid var(--borderColor-default, #d0d7de)',
+          borderRadius: '12px',
+          boxShadow: '0 8px 24px rgba(140, 149, 159, 0.25)',
           overflow: 'hidden',
           zIndex: 10001,
         }}
       >
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--borderColor-default, #d0d7de)', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: '#0f172a' }}>Issue Penalty / Conduct Violation</h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>Participant: <strong>{participantName}</strong></p>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)' }}>
+              Issue Penalty / Conduct Violation
+            </h3>
+            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+              Participant: <strong>{participantName}</strong>
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            style={{ border: 'none', background: 'transparent', fontSize: '20px', cursor: 'pointer', color: '#64748b', padding: '0 4px' }}
+            style={{ border: 'none', background: 'transparent', fontSize: '18px', cursor: 'pointer', color: 'var(--fgColor-muted, #636c76)', padding: '0 4px' }}
           >
             &times;
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)', marginBottom: '8px' }}>
                 Penalty Type
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -1023,14 +1068,14 @@ function PenaltyDialogue({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      padding: '8px 12px',
+                      padding: '8px 10px',
                       borderRadius: '6px',
-                      border: selectedType === type ? '2px solid #0176d3' : '1px solid #cbd5e1',
-                      backgroundColor: selectedType === type ? '#f0f9ff' : '#ffffff',
+                      border: selectedType === type ? '1px solid var(--borderColor-accent-emphasis, #0969da)' : '1px solid var(--borderColor-default, #d0d7de)',
+                      backgroundColor: selectedType === type ? 'var(--bgColor-accent-muted, #ddf4ff)' : 'var(--bgColor-default, #ffffff)',
                       cursor: 'pointer',
                       fontSize: '12px',
-                      fontWeight: selectedType === type ? 'bold' : 'normal',
-                      color: selectedType === type ? '#0369a1' : '#334155',
+                      fontWeight: selectedType === type ? 600 : 400,
+                      color: selectedType === type ? 'var(--fgColor-accent, #0969da)' : 'var(--fgColor-default, #1f2328)',
                     }}
                   >
                     <input
@@ -1039,7 +1084,6 @@ function PenaltyDialogue({
                       value={type}
                       checked={selectedType === type}
                       onChange={() => setSelectedType(type as PenaltyType)}
-                      style={{ accentColor: '#0176d3' }}
                     />
                     {label}
                   </label>
@@ -1048,8 +1092,8 @@ function PenaltyDialogue({
             </div>
 
             {(selectedType === 'POS' || selectedType === 'PTS') && (
-              <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
+              <div style={{ backgroundColor: 'var(--bgColor-muted, #f6f8fa)', padding: '12px', borderRadius: '6px', border: '1px solid var(--borderColor-default, #d0d7de)' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--fgColor-default, #1f2328)', marginBottom: '6px' }}>
                   {selectedType === 'POS' ? 'Position Penalty Amount (positions to demote)' : 'Points Penalty Amount (points to deduct)'}
                 </label>
                 <input
@@ -1058,21 +1102,21 @@ function PenaltyDialogue({
                   max={50}
                   value={amount}
                   onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  style={{ width: '100%', padding: '6px 12px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                  style={{ width: '100%', padding: '5px 10px', fontSize: '13px', borderRadius: '6px', border: '1px solid var(--borderColor-default, #d0d7de)' }}
                 />
               </div>
             )}
 
-            <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: '#475569', fontWeight: '500' }}>Result Status Badge:</span>
+            <div style={{ backgroundColor: 'var(--bgColor-muted, #f6f8fa)', padding: '10px 14px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)', fontWeight: 500 }}>Result Status Badge:</span>
               <span
                 style={{
                   fontSize: '12px',
-                  fontWeight: 'bold',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  backgroundColor: previewTag ? '#fee2e2' : '#e2e8f0',
-                  color: previewTag ? '#dc2626' : '#475569',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  backgroundColor: previewTag ? 'var(--bgColor-danger-muted, #ffebe9)' : 'var(--bgColor-neutral-muted, #eaeef2)',
+                  color: previewTag ? 'var(--fgColor-danger, #d1242f)' : 'var(--fgColor-muted, #636c76)',
                 }}
               >
                 {previewTag || 'Normal (No Penalty)'}
@@ -1080,19 +1124,17 @@ function PenaltyDialogue({
             </div>
           </div>
 
-          <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <div style={{ padding: '12px 18px', borderTop: '1px solid var(--borderColor-default, #d0d7de)', backgroundColor: 'var(--bgColor-muted, #f6f8fa)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
             <button
               type="button"
               onClick={onClose}
-              className="slds-button slds-button_neutral"
-              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+              style={{ padding: '5px 14px', fontSize: '13px', fontWeight: 500, borderRadius: '6px', border: '1px solid var(--borderColor-default, #d0d7de)', backgroundColor: 'var(--bgColor-default, #ffffff)', color: 'var(--fgColor-default, #1f2328)', cursor: 'pointer' }}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="slds-button slds-button_brand"
-              style={{ padding: '6px 16px', fontSize: '13px', fontWeight: 'bold' }}
+              style={{ padding: '5px 14px', fontSize: '13px', fontWeight: 600, borderRadius: '6px', border: '1px solid rgba(31, 35, 40, 0.15)', backgroundColor: 'var(--bgColor-success-emphasis, #1f883d)', color: '#ffffff', cursor: 'pointer' }}
             >
               Apply
             </button>

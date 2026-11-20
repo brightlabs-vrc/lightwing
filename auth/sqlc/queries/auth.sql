@@ -174,3 +174,8 @@ FROM "user"
 WHERE ($1::text = '' OR name ILIKE $1 ESCAPE '\' OR "vrchatUsername" ILIKE $1 ESCAPE '\' OR email ILIKE $1 ESCAPE '\' OR slug ILIKE $1 ESCAPE '\')
 ORDER BY "createdAt" ASC
 LIMIT NULLIF($2::int, 0) OFFSET $3::int;
+
+-- Delete user by ID (hard delete; cascades via foreign keys).
+-- name: DeleteUserByID :execrows
+DELETE FROM "user" WHERE id = $1;
+

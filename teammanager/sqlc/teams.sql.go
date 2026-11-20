@@ -1778,3 +1778,17 @@ func (q *Queries) CountTeamAdmins(ctx context.Context, arg CountTeamAdminsParams
 	return count, err
 }
 
+const deleteOrg = `-- name: DeleteOrg :execrows
+DELETE FROM "organization"
+WHERE id = $1
+`
+
+func (q *Queries) DeleteOrg(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteOrg, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+

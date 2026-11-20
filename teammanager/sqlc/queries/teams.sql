@@ -136,6 +136,10 @@ WHERE "teamId" = $1;
 DELETE FROM "team"
 WHERE id = $1;
 
+-- name: DeleteOrg :execrows
+DELETE FROM "organization"
+WHERE id = $1;
+
 -- name: UpdateOrgDetails :exec
 UPDATE "organization"
 SET "slug" = sqlc.arg('slug'),

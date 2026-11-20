@@ -1,13 +1,16 @@
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { Avatar, Button, CounterLabel, IconButton, Label, Select, TextInput } from '@primer/react'
+import { SearchIcon, TrashIcon } from '@primer/octicons-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireAdminPanel } from '../../../lib/auth-guard'
-import { listAdminUsers } from '../../../lib/admin-api'
+import { deleteAdminUser, listAdminUsers } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
 import { AlertBanner } from '../../../components/AlertBanner'
 import { Pagination } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
-import { SldsSkeletonList } from '../../../components/LoadingSkeleton'
+import { PrimerSkeletonList } from '../../../components/LoadingSkeleton'
+import { DangerZoneDeleteDialog } from '../../../components/DangerZoneDeleteDialog'
 import type { auth } from '../../../lib/client'
 
 export const Route = createFileRoute('/admin/users/')({
@@ -20,13 +23,17 @@ export const Route = createFileRoute('/admin/users/')({
 function AdminUsersPage() {
   const navigate = useNavigate()
   const { session } = useAuth()
+  const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<string>('ALL')
   const [users, setUsers] = useState<auth.UserProfile[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<auth.UserProfile | null>(null)
 
   const authHeader = useMemo(() => {
     const token = session?.session.token
@@ -53,144 +60,205 @@ function AdminUsersPage() {
     void fetchUsers()
   }, [authHeader, search, page, pageSize])
 
+  const visibleUsers = useMemo(() => {
+    if (roleFilter === 'ALL') return users
+    return users.filter((u) => u.siteRole === roleFilter)
+  }, [users, roleFilter])
+
+  async function handleConfirmDeleteUser() {
+    if (!deleteTarget || !authHeader) return
+    await deleteAdminUser(deleteTarget.id, authHeader)
+    setSuccess(`Permanently deleted user account "${deleteTarget.vrchatUsername || deleteTarget.name}".`)
+    setDeleteTarget(null)
+    await fetchUsers()
+  }
+
   return (
     <AdminLayout
-      title="User Account Directory"
-      subtitle="Verify system participant profiles, review site role authorization levels, and manage global system privileges."
+      title="Users"
+      subtitle="Lookup participant accounts, review site role privileges, inspect team affiliations, and manage user lifecycle."
+      breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Users' }]}
     >
-      <div className="slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <article className="slds-card" style={{ border: '1px solid #dddbda' }}>
-            <div className="slds-card__header slds-grid">
-              <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                <div className="slds-media__body">
-                  <h2 className="slds-card__header-title">
-                    <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                      Registered System Participants
-                    </span>
-                  </h2>
-                </div>
-              </header>
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
+      {success && <AlertBanner variant="success">{success}</AlertBanner>}
+
+      <section className="primer-box">
+        {/* Filter Toolbar */}
+        <div
+          className="primer-box-header"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Registered Users</h2>
+            <CounterLabel>{totalUsers}</CounterLabel>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ minWidth: '240px' }}>
+              <TextInput
+                id="user-search-input"
+                leadingVisual={SearchIcon}
+                value={search}
+                onChange={(evt) => {
+                  setSearch(evt.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search name, VRChat, or @slug..."
+                size="small"
+                block
+              />
             </div>
 
-            <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-              {/* Search Control */}
-              <div className="slds-form-element slds-m-bottom_large" style={{ maxWidth: '400px' }}>
-                <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold' }} htmlFor="user-search-input">
-                  Search by Name
-                </label>
-                <div className="slds-form-element__control">
-                  <input
-                    id="user-search-input"
-                    value={search}
-                    onChange={(evt) => setSearch(evt.target.value)}
-                    placeholder="Search participants..."
-                    className="slds-input"
-                    style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
+            <Select
+              aria-label="Filter by site role"
+              size="small"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+            >
+              <Select.Option value="ALL">All Roles</Select.Option>
+              <Select.Option value="SITE_ADMIN">SITE_ADMIN</Select.Option>
+              <Select.Option value="EVENT_ADMIN">EVENT_ADMIN</Select.Option>
+              <Select.Option value="USER">USER</Select.Option>
+            </Select>
+          </div>
+        </div>
 
-              {error && (
-                <div className="slds-m-bottom_medium">
-                  <AlertBanner variant="error">{error}</AlertBanner>
-                </div>
-              )}
-
-              {loading ? (
-                <SldsSkeletonList count={4} />
-              ) : users.length > 0 ? (
-                <>
-                  <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                    <table className="slds-table slds-table_cell-buffer slds-table_bordered slds-table_col-bordered" aria-label="Participants Directory Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '800px' }}>
-                      <thead>
-                        <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                          <th scope="col" style={{ width: '24%', minWidth: '160px' }}>
-                            <div className="slds-truncate font-bold" title="VRChat Username" style={{ fontWeight: 'bold' }}>VRChat Username</div>
-                          </th>
-                          <th scope="col" style={{ width: '22%', minWidth: '150px' }}>
-                            <div className="slds-truncate font-bold" title="Discord Name" style={{ fontWeight: 'bold' }}>Discord Name</div>
-                          </th>
-                          <th scope="col" style={{ width: '120px' }}>
-                            <div className="slds-truncate font-bold" title="Site Role" style={{ fontWeight: 'bold' }}>Site Role</div>
-                          </th>
-                          <th scope="col" style={{ minWidth: '220px' }}>
-                            <div className="slds-truncate font-bold" title="Team Affiliations" style={{ fontWeight: 'bold' }}>Team Affiliations</div>
-                          </th>
-                          <th scope="col" style={{ width: '100px' }}>
-                            <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((user) => (
-                          <tr key={user.id} className="slds-hint-parent hover:bg-slate-50">
-                            <th scope="row">
-                              <div className="slds-truncate font-bold" title={user.vrchatUsername || 'No VRChat Name'}>
-                                <UserLink userId={user.id} name={user.vrchatUsername || '—'} />
-                                {user.id === session?.user.id && (
-                                  <span className="slds-badge slds-m-left_small" style={{ fontSize: '10px', padding: '1px 4px' }}>
-                                    You
-                                  </span>
+        {loading ? (
+          <PrimerSkeletonList count={4} />
+        ) : visibleUsers.length > 0 ? (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="primer-table" aria-label="Users Directory Table" style={{ minWidth: '760px' }}>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: '28%' }}>User / VRChat</th>
+                    <th scope="col" style={{ width: '20%' }}>Discord Name</th>
+                    <th scope="col" style={{ width: '130px' }}>Site Role</th>
+                    <th scope="col">Affiliations</th>
+                    <th scope="col" style={{ width: '140px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleUsers.map((user) => {
+                    const isSelf = user.id === session?.user.id
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                            <Avatar
+                              src={user.image || '/fallback_avatar.jpg'}
+                              size={28}
+                              alt={user.vrchatUsername || user.name}
+                            />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontWeight: 600 }}>
+                                  <UserLink userId={user.id} name={user.vrchatUsername || user.name} />
+                                </span>
+                                {isSelf && (
+                                  <Label variant="accent" size="small">You</Label>
                                 )}
                               </div>
-                            </th>
-                            <td>
-                              <div className="slds-truncate" title={user.name}>
-                                {user.name}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`slds-badge ${user.siteRole === 'SITE_ADMIN' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                                {user.siteRole}
-                              </span>
-                            </td>
-                            <td>
-                              {user.teams.length > 0 ? (
-                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '60px', overflowY: 'auto' }}>
-                                  {user.teams.map((t) => (
-                                    <span key={t.organizationId} className="slds-badge slds-theme_light" title={`${t.name} (${t.role})`} style={{ fontSize: '11px', padding: '1px 6px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '180px' }}>
-                                      {t.name} ({t.role})
-                                    </span>
-                                  ))}
+                              {user.slug && (
+                                <div style={{ fontSize: '11px', color: 'var(--fgColor-muted, #636c76)' }}>
+                                  @{user.slug}
                                 </div>
-                              ) : (
-                                <span className="text-slate-400">None</span>
                               )}
-                            </td>
-                            <td>
-                              <button
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--fgColor-muted, #636c76)' }}>{user.name}</td>
+                        <td>
+                          <Label
+                            variant={
+                              user.siteRole === 'SITE_ADMIN'
+                                ? 'accent'
+                                : user.siteRole === 'EVENT_ADMIN'
+                                ? 'attention'
+                                : 'secondary'
+                            }
+                            size="small"
+                          >
+                            {user.siteRole}
+                          </Label>
+                        </td>
+                        <td>
+                          {user.teams.length > 0 ? (
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxHeight: '56px', overflowY: 'auto' }}>
+                              {user.teams.map((t) => (
+                                <Label key={t.organizationId} variant="secondary" size="small">
+                                  {t.name} ({t.role})
+                                </Label>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--fgColor-muted, #636c76)', fontSize: '12px' }}>None</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Button
+                              type="button"
+                              size="small"
+                              onClick={() => navigate({ to: '/admin/users/$userId', params: { userId: user.id } })}
+                            >
+                              Manage
+                            </Button>
+                            {isSiteAdmin && !isSelf && (
+                              <IconButton
                                 type="button"
-                                onClick={() => navigate({ to: '/admin/users/$userId', params: { userId: user.id } })}
-                                className="slds-button slds-button_neutral"
-                                style={{ fontSize: '12px', padding: '2px 10px' }}
-                              >
-                                Manage
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <Pagination
-                    page={page}
-                    pageSize={pageSize}
-                    total={totalUsers}
-                    onPageChange={setPage}
-                    onPageSizeChange={setPageSize}
-                  />
-                </>
-              ) : (
-                <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                  <p>No participant accounts match the current query filter.</p>
-                </div>
-              )}
+                                size="small"
+                                variant="danger"
+                                aria-label={`Delete ${user.vrchatUsername || user.name}`}
+                                icon={TrashIcon}
+                                onClick={() => setDeleteTarget(user)}
+                              />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-          </article>
-        </div>
-      </div>
+
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={totalUsers}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </>
+        ) : (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--fgColor-muted, #636c76)', fontSize: '13px' }}>
+            No user accounts match the current filter.
+          </div>
+        )}
+      </section>
+
+      {deleteTarget && (
+        <DangerZoneDeleteDialog
+          isOpen={true}
+          onClose={() => setDeleteTarget(null)}
+          entityType="user"
+          entityName={deleteTarget.vrchatUsername || deleteTarget.name}
+          confirmText={deleteTarget.slug || deleteTarget.name}
+          consequences={[
+            'All active sessions and linked OAuth accounts for this user.',
+            'All organization and competitive team memberships.',
+            'All event registrations, race results, Glicko-2 ratings, and organization class grades.',
+          ]}
+          onConfirmDelete={handleConfirmDeleteUser}
+        />
+      )}
     </AdminLayout>
   )
 }

@@ -112,7 +112,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-      <div className="slds-form-element__control slds-input-has-icon slds-input-has-icon_right">
+      <div style={{ position: 'relative', width: '100%' }}>
         <input
           type="text"
           value={searchTerm}
@@ -120,8 +120,16 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
           onKeyDown={handleKeyDown}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="slds-input"
-          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px', width: '100%', background: '#fff', fontSize: '12px' }}
+          style={{
+            padding: '5px 28px 5px 12px',
+            border: '1px solid var(--borderColor-default, #d0d7de)',
+            borderRadius: '6px',
+            width: '100%',
+            backgroundColor: 'var(--bgColor-default, #ffffff)',
+            color: 'var(--fgColor-default, #1f2328)',
+            fontSize: '12px',
+            lineHeight: '20px',
+          }}
         />
         {searchTerm && (
           <button
@@ -139,7 +147,7 @@ export const RaceMemberCombobox: React.FC<RaceMemberComboboxProps> = ({
               border: 'none',
               background: 'transparent',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: 'var(--fgColor-muted, #636c76)',
               fontSize: '12px',
             }}
           >
@@ -256,21 +264,39 @@ export function RaceDetailPane({
   handleUndoRow,
 }: RaceDetailPaneProps) {
   if (selectedRaceId === null || !selectedRace) {
-    /* Elegant placeholder state box */
     return (
-      <div className="slds-box slds-align_absolute-center bg-white" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid #dddbda', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center', textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <div style={{ padding: '2rem' }}>
-          <p className="slds-text-heading_medium font-bold text-slate-700" style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
+      <div
+        className="primer-box"
+        style={{
+          minHeight: '360px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          textAlign: 'center',
+          padding: '32px',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: '16px', color: 'var(--fgColor-default, #1f2328)' }}>
             No race selected
           </p>
-          <p className="slds-text-body_regular text-slate-500 slds-m-top_small" style={{ fontSize: '14px', maxWidth: '360px', margin: '8px auto 0 auto', lineHeight: '1.5' }}>
-            Select a race track from the left panel to begin managing competitors, recording standings, and starting or concluding races.
+          <p style={{ margin: 0, fontSize: '13px', maxWidth: '360px', color: 'var(--fgColor-muted, #636c76)', lineHeight: 1.5 }}>
+            Select a race track from the left panel to manage competitors, record standings, and start or conclude races.
           </p>
           <button
             type="button"
             onClick={() => setShowCreateRaceModal(true)}
-            className="slds-button slds-button_brand slds-m-top_large"
-            style={{ padding: '6px 16px' }}
+            style={{
+              marginTop: '8px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              border: '1px solid rgba(31, 35, 40, 0.15)',
+              backgroundColor: 'var(--bgColor-success-emphasis, #1f883d)',
+              color: '#ffffff',
+              fontWeight: 500,
+              fontSize: '13px',
+              cursor: 'pointer',
+            }}
           >
             Create Race Track
           </button>
@@ -280,81 +306,137 @@ export function RaceDetailPane({
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Race Details Header Card */}
-      <div className="slds-box slds-m-bottom_medium bg-white" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '16px' }}>
-        <div className="slds-grid slds-grid_align-spread slds-grid_vertical-align-center" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="primer-box" style={{ padding: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h3 className="slds-text-heading_small font-bold text-slate-900" style={{ fontWeight: 'bold', margin: 0 }}>
+            <h3 style={{ fontWeight: 600, fontSize: '16px', margin: 0, color: 'var(--fgColor-default, #1f2328)' }}>
               #{selectedRace.sequence}. {selectedRace.name}
             </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
-              <p className="text-slate-500 text-xs" style={{ margin: 0 }}>
-                Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> | Location: <strong>{selectedRace.location}</strong>
-              </p>
-              <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '11px', textTransform: 'none' }}>
-                Class Restriction: <strong>{formatClassTier(selectedRace.classRestriction)}</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '6px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+                Type: <strong>{selectedRace.trackType} ({selectedRace.distanceMeters}m)</strong> · Location:{' '}
+                <strong>{selectedRace.location}</strong>
+              </span>
+              <span
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  borderRadius: '999px',
+                  border: '1px solid var(--borderColor-default, #d0d7de)',
+                  backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+                  color: 'var(--fgColor-default, #1f2328)',
+                }}
+              >
+                Class: <strong>{formatClassTier(selectedRace.classRestriction)}</strong>
               </span>
               {selectedEvent.granularParticipation && (
-                <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '11px', textTransform: 'none' }}>
-                  Capacity: <strong>{selectedRace.participantLimit !== null ? `${(selectedRace.members ?? []).length} / ${selectedRace.participantLimit}` : `${(selectedRace.members ?? []).length}`}</strong>
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    borderRadius: '999px',
+                    border: '1px solid var(--borderColor-default, #d0d7de)',
+                    backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+                    color: 'var(--fgColor-default, #1f2328)',
+                  }}
+                >
+                  Capacity:{' '}
+                  <strong>
+                    {selectedRace.participantLimit !== null
+                      ? `${(selectedRace.members ?? []).length} / ${selectedRace.participantLimit}`
+                      : `${(selectedRace.members ?? []).length}`}
+                  </strong>
                 </span>
               )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0, fontSize: '12px' }} htmlFor="race-class-restriction-select">
-                Class Restriction:
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label
+                htmlFor="race-class-restriction-select"
+                style={{ fontWeight: 600, fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}
+              >
+                Class:
               </label>
-              <div className="slds-form-element__control">
-                <select
-                  id="race-class-restriction-select"
-                  value={(!selectedRace.classRestriction || selectedRace.classRestriction === 'PRE_OP' || selectedRace.classRestriction === 'OP') ? '' : selectedRace.classRestriction}
-                  onChange={(e) => void handleUpdateRace(selectedRace.id, { classRestriction: e.target.value ? e.target.value as ClassTier : null })}
-                  className="slds-select"
-                  style={{ minWidth: '130px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
-                >
-                  <option value="">Any Tier (None)</option>
-                  {CLASS_TIER_OPTIONS.map((tier) => (
-                    <option key={tier} value={tier}>
-                      {tier}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                id="race-class-restriction-select"
+                value={
+                  !selectedRace.classRestriction ||
+                  selectedRace.classRestriction === 'PRE_OP' ||
+                  selectedRace.classRestriction === 'OP'
+                    ? ''
+                    : selectedRace.classRestriction
+                }
+                onChange={(e) =>
+                  void handleUpdateRace(selectedRace.id, {
+                    classRestriction: e.target.value ? (e.target.value as ClassTier) : null,
+                  })
+                }
+                style={{
+                  padding: '4px 8px',
+                  border: '1px solid var(--borderColor-default, #d0d7de)',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  backgroundColor: 'var(--bgColor-default, #ffffff)',
+                  color: 'var(--fgColor-default, #1f2328)',
+                }}
+              >
+                <option value="">Any Tier (None)</option>
+                {CLASS_TIER_OPTIONS.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {tier}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {selectedEvent.scoringType === 1 && (
-              <div className="slds-form-element" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label className="slds-form-element__label font-bold text-slate-700" style={{ fontWeight: 'bold', margin: 0, fontSize: '12px' }} htmlFor="race-grade-select">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <label
+                  htmlFor="race-grade-select"
+                  style={{ fontWeight: 600, fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}
+                >
                   Grade:
                 </label>
-                <div className="slds-form-element__control">
-                  <select
-                    id="race-grade-select"
-                    value={selectedRace.grade || ''}
-                    onChange={(e) => void handleUpdateRace(selectedRace.id, { grade: e.target.value || null })}
-                    className="slds-select"
-                    style={{ minWidth: '100px', padding: '4px 24px 4px 12px', border: '1px solid #dddbda', borderRadius: '4px', fontSize: '12px', height: '30px' }}
-                  >
-                    <option value="">-- None --</option>
-                    <option value="OP">OP</option>
-                    <option value="GIII">GIII</option>
-                    <option value="GII">GII</option>
-                    <option value="GI">GI</option>
-                  </select>
-                </div>
+                <select
+                  id="race-grade-select"
+                  value={selectedRace.grade || ''}
+                  onChange={(e) => void handleUpdateRace(selectedRace.id, { grade: e.target.value || null })}
+                  style={{
+                    padding: '4px 8px',
+                    border: '1px solid var(--borderColor-default, #d0d7de)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--bgColor-default, #ffffff)',
+                    color: 'var(--fgColor-default, #1f2328)',
+                  }}
+                >
+                  <option value="">-- None --</option>
+                  <option value="OP">OP</option>
+                  <option value="GIII">GIII</option>
+                  <option value="GII">GII</option>
+                  <option value="GI">GI</option>
+                </select>
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => setShowEditRaceModal(true)}
-                className="slds-button slds-button_neutral"
-                style={{ padding: '4px 12px', fontSize: '12px' }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  borderRadius: '6px',
+                  border: '1px solid var(--borderColor-default, #d0d7de)',
+                  backgroundColor: 'var(--bgColor-default, #ffffff)',
+                  color: 'var(--fgColor-default, #1f2328)',
+                  cursor: 'pointer',
+                }}
               >
                 Edit Race
               </button>
@@ -362,8 +444,16 @@ export function RaceDetailPane({
                 <button
                   type="button"
                   onClick={() => void handleStartRace(selectedRace.id)}
-                  className="slds-button slds-button_success"
-                  style={{ padding: '4px 12px', fontSize: '12px', background: '#2e7d32', color: '#fff' }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    border: '1px solid rgba(31, 35, 40, 0.15)',
+                    backgroundColor: 'var(--bgColor-success-emphasis, #1f883d)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                  }}
                 >
                   Start Race
                 </button>
@@ -372,8 +462,16 @@ export function RaceDetailPane({
                 <button
                   type="button"
                   onClick={() => void handleEndRace(selectedRace.id)}
-                  className="slds-button slds-button_destructive"
-                  style={{ padding: '4px 12px', fontSize: '12px', background: '#d32f2f', color: '#fff' }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    border: '1px solid rgba(31, 35, 40, 0.15)',
+                    backgroundColor: 'var(--bgColor-danger-emphasis, #cf222e)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                  }}
                 >
                   End Race
                 </button>
@@ -381,112 +479,152 @@ export function RaceDetailPane({
               <button
                 type="button"
                 onClick={() => void handleDeleteRace(selectedRace.id)}
-                className="slds-button slds-button_neutral"
-                style={{ padding: '4px 12px', fontSize: '12px', color: '#d32f2f' }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  borderRadius: '6px',
+                  border: '1px solid var(--borderColor-default, #d0d7de)',
+                  backgroundColor: 'var(--bgColor-default, #ffffff)',
+                  color: 'var(--fgColor-danger, #d1242f)',
+                  cursor: 'pointer',
+                }}
               >
-                Delete Race
+                Delete
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedRaceId(null)
+                onClick={() => setSelectedRaceId(null)}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  borderRadius: '6px',
+                  border: '1px solid var(--borderColor-default, #d0d7de)',
+                  backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+                  color: 'var(--fgColor-muted, #636c76)',
+                  cursor: 'pointer',
                 }}
-                className="slds-button slds-button_neutral"
-                style={{ padding: '4px 12px', fontSize: '12px' }}
               >
-                Clear Selection
+                Close
               </button>
             </div>
           </div>
         </div>
 
-        <div className="text-slate-500 slds-m-top_small" style={{ fontSize: '11px', borderTop: '1px solid #f3f2f1', paddingTop: '8px' }}>
-          {selectedRace.startsAt ? `Started: ${new Date(selectedRace.startsAt).toLocaleString()}` : 'Race is currently not started'} <br />
-          {selectedRace.endsAt ? `Ended: ${new Date(selectedRace.endsAt).toLocaleString()}` : ''}
+        <div
+          style={{
+            fontSize: '12px',
+            color: 'var(--fgColor-muted, #636c76)',
+            borderTop: '1px solid var(--borderColor-muted, #d8dee4)',
+            paddingTop: '8px',
+            marginTop: '10px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
+          <div>
+            {selectedRace.startsAt ? `Started: ${new Date(selectedRace.startsAt).toLocaleString()}` : 'Not started'}
+            {selectedRace.endsAt ? ` · Ended: ${new Date(selectedRace.endsAt).toLocaleString()}` : ''}
+          </div>
           {selectedRace.grade && (
-            <span style={{ float: 'right' }}>
-              Scoring Table: <strong>{selectedRace.grade}</strong> | Source: <strong>{selectedEvent.scoringRulesMode === 'CUSTOM' ? 'Event Custom Rules' : 'Event Standard Rules'}</strong>
-            </span>
+            <div>
+              Scoring Table: <strong>{selectedRace.grade}</strong> · Source:{' '}
+              <strong>{selectedEvent.scoringRulesMode === 'CUSTOM' ? 'Custom Rules' : 'Standard Rules'}</strong>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Warning Banner if points-based event but race has no grade */}
       {selectedEvent.scoringType === 1 && !selectedRace.grade && (
-        <div className="slds-m-bottom_medium">
-          <AlertBanner variant="error">
-            <div style={{ textAlign: 'left' }}>
-              <strong>Missing Race Grade Configuration</strong>
-              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#7f1d1d' }}>
-                This event is points-based, but this race has no grade configured. Points for its results will resolve to <strong>0</strong> until a grade is configured.
-              </p>
-            </div>
-          </AlertBanner>
-        </div>
+        <AlertBanner variant="error">
+          <div>
+            <strong>Missing Race Grade Configuration</strong>
+            <p style={{ margin: '2px 0 0 0', fontSize: '12px' }}>
+              This event is points-based, but this race has no grade configured. Points for its results will resolve to{' '}
+              <strong>0</strong> until a grade is configured.
+            </p>
+          </div>
+        </AlertBanner>
       )}
 
       {/* Granular Participant lineup box */}
       {selectedEvent.granularParticipation && (
-        <div className="slds-box slds-m-bottom_medium" style={{ background: '#ffffff', border: '1px solid #dddbda', borderRadius: '4px', padding: '1rem' }}>
-          <h3 className="slds-text-heading_small font-bold text-slate-900 slds-m-bottom_small" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Competitor Lineup</span>
-            <span className="slds-badge slds-theme_light" style={{ padding: '2px 8px', fontSize: '10px' }}>
+        <div className="primer-box" style={{ padding: '14px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Competitor Lineup</h3>
+            <span
+              style={{
+                padding: '2px 8px',
+                fontSize: '11px',
+                fontWeight: 500,
+                borderRadius: '999px',
+                backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+                border: '1px solid var(--borderColor-default, #d0d7de)',
+              }}
+            >
               {(selectedRace.members ?? []).length} Registered
             </span>
-          </h3>
-
-          <div className="slds-box slds-m-bottom_small" style={{ background: '#f3f2f1', border: '1px solid #dddbda', padding: '8px 12px' }}>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void handleAddRaceMember(selectedRace.id, newRaceMemberUserId);
-              }}
-              className="slds-grid slds-wrap"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <div style={{ flexGrow: 1, minWidth: '180px' }}>
-                {selectedEvent.granularParticipation ? (
-                  <UserSearchCombobox
-                    value={newRaceMemberUserId}
-                    onChange={(val) => setNewRaceMemberUserId(val)}
-                  />
-                ) : (
-                  <RaceMemberCombobox
-                    value={newRaceMemberUserId}
-                    onChange={(val) => setNewRaceMemberUserId(val)}
-                    members={selectedEvent.members.filter(
-                      (em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId)
-                    )}
-                  />
-                )}
-              </div>
-              <button
-                type="submit"
-                className="slds-button slds-button_brand"
-                style={{ padding: '4px 12px', height: '30px', fontSize: '12px' }}
-                disabled={!newRaceMemberUserId}
-              >
-                Add
-              </button>
-            </form>
           </div>
 
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void handleAddRaceMember(selectedRace.id, newRaceMemberUserId)
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}
+          >
+            <div style={{ flexGrow: 1, minWidth: '180px' }}>
+              {selectedEvent.granularParticipation ? (
+                <UserSearchCombobox value={newRaceMemberUserId} onChange={(val) => setNewRaceMemberUserId(val)} />
+              ) : (
+                <RaceMemberCombobox
+                  value={newRaceMemberUserId}
+                  onChange={(val) => setNewRaceMemberUserId(val)}
+                  members={selectedEvent.members.filter(
+                    (em) => !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId),
+                  )}
+                />
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={!newRaceMemberUserId}
+              style={{
+                padding: '5px 12px',
+                fontSize: '12px',
+                fontWeight: 500,
+                borderRadius: '6px',
+                border: '1px solid rgba(31, 35, 40, 0.15)',
+                backgroundColor: newRaceMemberUserId ? 'var(--bgColor-success-emphasis, #1f883d)' : 'var(--bgColor-muted, #f6f8fa)',
+                color: newRaceMemberUserId ? '#ffffff' : 'var(--fgColor-disabled, #8c959f)',
+                cursor: newRaceMemberUserId ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Add
+            </button>
+          </form>
+
           {(selectedRace.members?.length ?? 0) === 0 ? (
-            <p className="slds-text-body_small text-slate-500" style={{ fontSize: '11px', margin: 0 }}>No competitors registered specifically for this race yet.</p>
+            <p style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)', margin: 0 }}>
+              No competitors registered specifically for this race yet.
+            </p>
           ) : (
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {(selectedRace.members ?? []).map((m) => (
                 <span
                   key={m.userId}
-                  className="slds-badge slds-theme_light"
                   style={{
-                    padding: '2px 8px',
-                    fontSize: '11px',
+                    padding: '3px 8px',
+                    fontSize: '12px',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    border: '1px solid #dddbda',
-                    background: '#f8fafc',
+                    borderRadius: '999px',
+                    border: '1px solid var(--borderColor-default, #d0d7de)',
+                    backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
                   }}
                 >
                   <UserLink userId={m.userId} name={m.name} />
@@ -496,10 +634,11 @@ export function RaceDetailPane({
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: '#d32f2f',
+                      color: 'var(--fgColor-danger, #d1242f)',
                       cursor: 'pointer',
-                      fontWeight: 'bold',
+                      fontWeight: 700,
                       padding: 0,
+                      lineHeight: 1,
                     }}
                     title="Remove competitor"
                   >

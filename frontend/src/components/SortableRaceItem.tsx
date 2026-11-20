@@ -1,5 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { IconButton, Label } from '@primer/react'
+import { ArrowDownIcon, ArrowUpIcon, GrabberIcon } from '@primer/octicons-react'
 import type { eventmanager } from '../lib/client'
 import { getRaceStatusLabel } from '../lib/raceStatus'
 
@@ -22,56 +24,51 @@ export function SortableRaceItem({
   isSelected,
   onSelect,
 }: SortableRaceItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: race.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: race.id })
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    border: '1px solid #dddbda',
-    borderRadius: '4px',
-    background: isSelected ? '#0176d3' : '#ffffff',
+    border: isSelected
+      ? '1px solid var(--borderColor-accent-emphasis, #0969da)'
+      : '1px solid var(--borderColor-default, #d0d7de)',
+    borderRadius: '6px',
+    backgroundColor: isSelected ? 'var(--bgColor-accent-muted, #ddf4ff)' : 'var(--bgColor-default, #ffffff)',
     padding: '8px',
     marginBottom: '8px',
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    boxShadow: isDragging ? '0 5px 15px rgba(0,0,0,0.15)' : 'none',
+    gap: '10px',
+    boxShadow: isDragging ? '0 8px 24px rgba(140, 149, 159, 0.25)' : 'none',
     zIndex: isDragging ? 1000 : 'auto',
   }
 
   const statusText = getRaceStatusLabel(race)
+  const labelVariant = statusText === 'Live' ? 'success' : statusText === 'Done' ? 'secondary' : 'accent'
 
   return (
     <div ref={setNodeRef} style={style}>
-      {/* Left side: Drag handle. Only the drag handle should initiate drag behavior */}
       <div
         {...attributes}
         {...listeners}
         style={{
           cursor: 'grab',
-          padding: '4px 8px',
-          background: '#f1f5f9',
-          border: '1px solid #cbd5e1',
+          padding: '4px 6px',
+          backgroundColor: 'var(--bgColor-muted, #f6f8fa)',
+          border: '1px solid var(--borderColor-default, #d0d7de)',
           borderRadius: '4px',
           userSelect: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          color: 'var(--fgColor-muted, #636c76)',
         }}
         title="Drag to reorder"
       >
-        <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#64748b' }}>☰</span>
+        <GrabberIcon size={14} />
       </div>
 
-      {/* Center: main body. Clicking anywhere else selects the race */}
       <div
         onClick={onSelect}
         style={{
@@ -81,65 +78,47 @@ export function SortableRaceItem({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px', color: isSelected ? '#ffffff' : '#1e293b' }}>
-            #{race.sequence}. {race.name}
-          </span>
           <span
-            className="slds-badge"
             style={{
-              padding: '1px 6px',
-              fontSize: '10px',
-              backgroundColor: statusText === 'Live' ? '#2e7d32' : statusText === 'Done' ? '#475569' : '#0284c7',
-              color: '#ffffff',
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontSize: '13px',
+              color: isSelected ? 'var(--fgColor-accent, #0969da)' : 'var(--fgColor-default, #1f2328)',
             }}
           >
-            {statusText}
+            #{race.sequence}. {race.name}
           </span>
+          <Label variant={labelVariant} size="small">
+            {statusText}
+          </Label>
         </div>
       </div>
 
-      {/* Right side: fallback controls */}
       <div style={{ display: 'flex', gap: '4px' }}>
-        <button
+        <IconButton
           type="button"
+          size="small"
+          aria-label="Move up"
+          icon={ArrowUpIcon}
           disabled={isFirst}
           onClick={(e) => {
             e.stopPropagation()
-            if (onMoveUp) onMoveUp()
+            onMoveUp?.()
           }}
-          className="slds-button slds-button_neutral"
-          style={{
-            padding: '2px 6px',
-            fontSize: '11px',
-            height: '24px',
-            lineHeight: '20px',
-            borderRadius: '3px',
-            color: isSelected ? '#1e293b' : undefined,
-          }}
-          title="Move up"
-        >
-          &uarr;
-        </button>
-        <button
+        />
+        <IconButton
           type="button"
+          size="small"
+          aria-label="Move down"
+          icon={ArrowDownIcon}
           disabled={isLast}
           onClick={(e) => {
             e.stopPropagation()
-            if (onMoveDown) onMoveDown()
+            onMoveDown?.()
           }}
-          className="slds-button slds-button_neutral"
-          style={{
-            padding: '2px 6px',
-            fontSize: '11px',
-            height: '24px',
-            lineHeight: '20px',
-            borderRadius: '3px',
-            color: isSelected ? '#1e293b' : undefined,
-          }}
-          title="Move down"
-        >
-          &darr;
-        </button>
+        />
       </div>
     </div>
   )

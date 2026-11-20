@@ -66,6 +66,19 @@ func (q *Queries) DeleteVerificationByIdentifier(ctx context.Context, identifier
 	return err
 }
 
+const deleteUserByID = `-- name: DeleteUserByID :execrows
+DELETE FROM "user" WHERE id = $1
+`
+
+// Delete user by ID (hard delete; cascades via foreign keys).
+func (q *Queries) DeleteUserByID(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUserByID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const eventAdminExists = `-- name: EventAdminExists :one
 SELECT EXISTS(SELECT 1 FROM "event_admin" WHERE "eventId" = $1 AND "userId" = $2)
 `

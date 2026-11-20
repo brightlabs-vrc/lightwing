@@ -1,15 +1,18 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { Button, CounterLabel, Dialog, FormControl, Label, Select, TextInput } from '@primer/react'
+import { ArrowLeftIcon, PencilIcon, PersonAddIcon, PlusIcon, SearchIcon, TrashIcon } from '@primer/octicons-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { requireAdminPanel } from '../../../lib/auth-guard'
 import {
-  getAdminOrganization,
-  updateAdminOrganization,
   addAdminTeamMember,
-  updateAdminTeamMemberRole,
-  removeAdminTeamMember,
+  deleteAdminOrganization,
+  getAdminOrganization,
   listAdminTeamMembers,
   listOrgClassGrades,
+  removeAdminTeamMember,
+  updateAdminOrganization,
+  updateAdminTeamMemberRole,
   updateAdminUserClass,
 } from '../../../lib/admin-api'
 import { AdminLayout } from '../-AdminLayout'
@@ -17,7 +20,8 @@ import { AlertBanner } from '../../../components/AlertBanner'
 import { UserSearchCombobox } from '../../../components/UserSearchCombobox'
 import { Pagination } from '../../../components/Pagination'
 import { UserLink } from '../../../components/UserLink'
-import { SldsSkeletonDetail } from '../../../components/LoadingSkeleton'
+import { PrimerSkeletonDetail } from '../../../components/LoadingSkeleton'
+import { DangerZoneDeleteDialog } from '../../../components/DangerZoneDeleteDialog'
 import type { eventmanager, teammanager } from '../../../lib/client'
 import type { ClassTier } from '../../../types'
 
@@ -30,20 +34,21 @@ export const Route = createFileRoute('/admin/organizations/$orgId')({
 
 function AdminOrgDetailPage() {
   const { orgId } = Route.useParams()
+  const navigate = useNavigate()
   const { session } = useAuth()
+  const isSiteAdmin = session?.user.siteRole === 'SITE_ADMIN'
+
   const [org, setOrg] = useState<teammanager.AdminOrganizationDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // Staff roster state
   const [members, setMembers] = useState<Array<{ userId: string; name: string; slug: string | null; role: string }>>([])
   const [totalMembers, setTotalMembers] = useState(0)
   const [memberPage, setMemberPage] = useState(1)
   const [memberPageSize, setMemberPageSize] = useState(10)
   const [memberSearch, setMemberSearch] = useState('')
 
-  // Org Class Grades state
   const [classGrades, setClassGrades] = useState<eventmanager.OrgClassEntry[]>([])
   const [totalClassGrades, setTotalClassGrades] = useState(0)
   const [gradePage, setGradePage] = useState(1)
@@ -53,11 +58,9 @@ function AdminOrgDetailPage() {
   const [newGradeTier, setNewGradeTier] = useState<ClassTier>('G3')
   const [savingGrade, setSavingGrade] = useState(false)
 
-  // Modals state
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false)
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
 
-  // Edit Org Metadata form state
   const [orgName, setOrgName] = useState('')
   const [orgSlug, setOrgSlug] = useState('')
   const [orgLogo, setOrgLogo] = useState('')
@@ -66,7 +69,6 @@ function AdminOrgDetailPage() {
   const [updatingOrg, setUpdatingOrg] = useState(false)
   const [orgError, setOrgError] = useState<string | null>(null)
 
-  // Add Staff Member form state
   const [selectedUserId, setSelectedUserId] = useState('')
   const [selectedRole, setSelectedRole] = useState('administrator')
   const [addingMember, setAddingMember] = useState(false)
@@ -83,7 +85,6 @@ function AdminOrgDetailPage() {
     try {
       const loadedOrg = await getAdminOrganization(orgId)
       setOrg(loadedOrg)
-
       setOrgName(loadedOrg.name || '')
       setOrgSlug(loadedOrg.slug || '')
       setOrgLogo(loadedOrg.logo || '')
@@ -149,7 +150,6 @@ function AdminOrgDetailPage() {
   async function handleUpdateOrg(evt: React.FormEvent) {
     evt.preventDefault()
     if (!authHeader) return
-
     setUpdatingOrg(true)
     setOrgError(null)
     try {
@@ -165,9 +165,6 @@ function AdminOrgDetailPage() {
         authHeader,
       )
       setOrg(updated)
-      setOrgName(updated.name || '')
-      setOrgSlug(updated.slug || '')
-      setOrgLogo(updated.logo || '')
       setIsOrgModalOpen(false)
       setSuccess('Organization details updated successfully.')
     } catch (cause) {
@@ -184,19 +181,12 @@ function AdminOrgDetailPage() {
       return
     }
     if (!authHeader) return
-
     setAddingMember(true)
     setMemberError(null)
     try {
-      await addAdminTeamMember(
-        orgId,
-        {
-          userId: selectedUserId,
-          role: selectedRole,
-        },
-        authHeader,
-      )
+      await addAdminTeamMember(orgId, { userId: selectedUserId, role: selectedRole }, authHeader)
       setIsMemberModalOpen(false)
+      setSelectedUserId('')
       setSuccess('Staff member added successfully.')
       void fetchRoster()
       void loadOrgData()
@@ -210,7 +200,6 @@ function AdminOrgDetailPage() {
   async function handleRemoveMember(memberUserId: string) {
     if (!authHeader) return
     if (!confirm('Are you sure you want to remove this staff member from the organization?')) return
-
     setError(null)
     setSuccess(null)
     try {
@@ -225,12 +214,11 @@ function AdminOrgDetailPage() {
 
   async function handleChangeRole(memberUserId: string, newRole: string) {
     if (!authHeader) return
-
     setError(null)
     setSuccess(null)
     try {
       await updateAdminTeamMemberRole(orgId, memberUserId, newRole, authHeader)
-      setSuccess(`Staff role updated to ${newRole} successfully.`)
+      setSuccess(`Staff role updated to ${newRole}.`)
       void fetchRoster()
       void loadOrgData()
     } catch (cause) {
@@ -238,580 +226,436 @@ function AdminOrgDetailPage() {
     }
   }
 
+  async function handleDeleteOrg() {
+    if (!org || !authHeader) return
+    await deleteAdminOrganization(org.id, authHeader)
+    void navigate({ to: '/admin/organizations' })
+  }
+
   const roleOptions = [
     { value: 'administrator', label: 'Administrator' },
     { value: 'member', label: 'Member / Staff' },
   ]
 
-  const actions = (
-    <div style={{ display: 'flex', gap: '8px' }}>
-      <button
-        type="button"
-        onClick={() => {
-          setOrgError(null)
-          setIsOrgModalOpen(true)
-        }}
-        className="slds-button slds-button_neutral"
-      >
-        Edit Organization Details
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setMemberError(null)
-          setIsMemberModalOpen(true)
-        }}
-        className="slds-button slds-button_brand"
-      >
-        Add Staff Member
-      </button>
-    </div>
-  )
-
   return (
     <AdminLayout
       title={org ? org.name : 'Organization Detail'}
-      subtitle={org ? `Manage demographics and staff roles for organization: @${org.slug}` : 'Demographics and staff details'}
-      actions={org ? actions : undefined}
+      subtitle={org ? `Manage demographics, staff roles, and class grades for @${org.slug}` : 'Organization details'}
+      breadcrumbs={[
+        { label: 'Admin', to: '/admin' },
+        { label: 'Organizations', to: '/admin/organizations' },
+        { label: org ? org.name : orgId },
+      ]}
+      actions={
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Link to="/admin/organizations" style={{ textDecoration: 'none' }}>
+            <Button leadingVisual={ArrowLeftIcon}>Back</Button>
+          </Link>
+          {org && (
+            <>
+              <Button
+                type="button"
+                leadingVisual={PencilIcon}
+                onClick={() => {
+                  setOrgError(null)
+                  setIsOrgModalOpen(true)
+                }}
+              >
+                Edit Details
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                leadingVisual={PersonAddIcon}
+                onClick={() => {
+                  setMemberError(null)
+                  setIsMemberModalOpen(true)
+                }}
+              >
+                Add Staff
+              </Button>
+            </>
+          )}
+        </div>
+      }
     >
-      <div className="slds-grid slds-wrap slds-gutters">
-        {error && (
-          <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-            <AlertBanner variant="error">{error}</AlertBanner>
-          </div>
-        )}
-        {success && (
-          <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-            <AlertBanner variant="success">{success}</AlertBanner>
-          </div>
-        )}
+      {error && <AlertBanner variant="error">{error}</AlertBanner>}
+      {success && <AlertBanner variant="success">{success}</AlertBanner>}
 
-        {loading ? (
-          <div className="slds-col slds-size_1-of-1">
-            <SldsSkeletonDetail />
-          </div>
-        ) : org ? (
-          <>
-            {/* Left Column: Organization Summary */}
-            <div className="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-m-bottom_medium">
-              <article className="slds-card" style={{ border: '1px solid #dddbda', height: '100%' }}>
-                <div className="slds-card__header slds-grid">
-                  <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                    <div className="slds-media__body">
-                      <h2 className="slds-card__header-title">
-                        <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                          Organization Profile
-                        </span>
-                      </h2>
-                    </div>
-                  </header>
-                </div>
-
-                <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.25rem' }}>
-                  <div className="slds-box slds-m-bottom_medium" style={{ background: org.administratorSlotsRemaining > 0 ? '#ecfdf5' : '#fef2f2', border: org.administratorSlotsRemaining > 0 ? '1px solid #a7f3d0' : '1px solid #fecaca', borderRadius: '4px' }}>
-                    <p className="font-bold text-sm" style={{ fontWeight: 'bold', color: org.administratorSlotsRemaining > 0 ? '#065f46' : '#991b1b' }}>
-                      Administrator Slots Remaining
-                    </p>
-                    <p className="text-xl font-extrabold slds-m-top_xx-small" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: org.administratorSlotsRemaining > 0 ? '#047857' : '#dc2626' }}>
-                      {org.administratorSlotsRemaining} / 3 slots
-                    </p>
-                    <p className="text-xs slds-m-top_xx-small text-slate-500">
-                      An organization may have at most three administrators belonging to it.
-                    </p>
-                  </div>
-
-                  <div className="slds-m-bottom_medium">
-                    <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Slug Identifier</p>
-                    <p className="font-semibold text-slate-900">@{org.slug}</p>
-                  </div>
-
-                  <div className="slds-m-bottom_medium">
-                    <p className="slds-text-title text-slate-500" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Organization Status</p>
-                    <span className="slds-badge slds-theme_success" style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                      {org.status || 'APPROVED'}
-                    </span>
-                  </div>
-                </div>
-              </article>
+      {loading ? (
+        <PrimerSkeletonDetail />
+      ) : org ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Organization Profile Summary */}
+          <section className="primer-box">
+            <div className="primer-box-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Organization Profile</h2>
+              <Label variant="success">{org.status || 'APPROVED'}</Label>
             </div>
-
-            {/* Right Column: Staff Roster Table */}
-            <div className="slds-col slds-size_1-of-1 slds-medium-size_2-of-3 slds-m-bottom_medium">
-              <article className="slds-card" style={{ border: '1px solid #dddbda', height: '100%' }}>
-                <div className="slds-card__header slds-grid">
-                  <header className="slds-media slds-media_center slds-has-flexi-truncate">
-                    <div className="slds-media__body">
-                      <h2 className="slds-card__header-title">
-                        <span className="slds-card__header-link slds-truncate font-semibold" style={{ fontWeight: 'bold' }}>
-                          Staff Roster ({totalMembers} Members)
-                        </span>
-                      </h2>
-                    </div>
-                  </header>
+            <div
+              style={{
+                padding: '16px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--fgColor-muted, #636c76)' }}>
+                  Slug Identifier
                 </div>
-
-                <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.5rem' }}>
-                  <div className="slds-form-element slds-m-bottom_medium" style={{ maxWidth: '300px' }}>
-                    <div className="slds-form-element__control">
-                      <input
-                        type="text"
-                        placeholder="Search staff by name/slug..."
-                        value={memberSearch}
-                        onChange={(e) => {
-                          setMemberSearch(e.target.value)
-                          setMemberPage(1)
-                        }}
-                        className="slds-input"
-                        style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                      />
-                    </div>
-                  </div>
-
-                  {members.length > 0 ? (
-                    <>
-                      <div style={{ overflowX: 'auto', border: '1px solid #dddbda', borderRadius: '4px' }}>
-                        <table className="slds-table slds-table_cell-buffer slds-table_bordered" aria-label="Staff Roster Table" style={{ width: '100%', tableLayout: 'fixed', minWidth: '600px' }}>
-                          <thead>
-                            <tr className="slds-line-height_reset" style={{ background: '#f3f2f1' }}>
-                              <th scope="col" style={{ width: '35%', minWidth: '160px' }}>
-                                <div className="slds-truncate font-bold" title="Staff Name" style={{ fontWeight: 'bold' }}>Staff Name</div>
-                              </th>
-                              <th scope="col" style={{ width: '140px' }}>
-                                <div className="slds-truncate font-bold" title="Role" style={{ fontWeight: 'bold' }}>Role</div>
-                              </th>
-                              <th scope="col" style={{ width: '160px' }}>
-                                <div className="slds-truncate font-bold" title="Change Role" style={{ fontWeight: 'bold' }}>Change Role</div>
-                              </th>
-                              <th scope="col" style={{ width: '100px' }}>
-                                <div className="slds-truncate font-bold" title="Actions" style={{ fontWeight: 'bold' }}>Actions</div>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {members.map((member) => (
-                              <tr key={member.userId} className="slds-hint-parent hover:bg-slate-50">
-                                <th scope="row">
-                                  <div className="slds-truncate font-bold" title={`${member.name}${member.slug ? ` (@${member.slug})` : ''}`}>
-                                    <UserLink userId={member.userId} name={member.name} />
-                                    {member.slug && (
-                                      <span className="slds-truncate" style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
-                                        @{member.slug}
-                                      </span>
-                                    )}
-                                  </div>
-                                </th>
-                                <td>
-                                  <span className={`slds-badge ${member.role === 'administrator' ? 'slds-theme_success' : 'slds-theme_light'}`} style={{ padding: '2px 8px', borderRadius: '4px' }}>
-                                    {member.role}
-                                  </span>
-                                </td>
-                                <td>
-                                  <select
-                                    value={member.role}
-                                    onChange={(e) => handleChangeRole(member.userId, e.target.value)}
-                                    className="slds-select"
-                                    style={{ padding: '2px 8px', height: '28px', fontSize: '12px', width: '100%' }}
-                                  >
-                                    {roleOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveMember(member.userId)}
-                                    className="slds-button slds-button_destructive"
-                                    style={{ fontSize: '12px', padding: '2px 10px', background: '#d32f2f', color: '#fff' }}
-                                  >
-                                    Remove
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <Pagination
-                        page={memberPage}
-                        pageSize={memberPageSize}
-                        total={totalMembers}
-                        onPageChange={setMemberPage}
-                        onPageSizeChange={setMemberPageSize}
-                      />
-                    </>
-                  ) : (
-                    <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                      <p>This organization does not have any staff members. Click "Add Staff Member" to populate the roster.</p>
-                    </div>
-                  )}
+                <div style={{ fontSize: '14px', fontWeight: 600 }}>@{org.slug}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--fgColor-muted, #636c76)' }}>
+                  Administrator Slots
                 </div>
-
-                <footer className="slds-card__footer" style={{ borderTop: '1px solid #f3f2f1', padding: '1rem' }}>
-                  <Link to="/admin/organizations" className="slds-button slds-button_neutral" style={{ textDecoration: 'none' }}>
-                    Back to Organizations Directory
-                  </Link>
-                </footer>
-              </article>
-
-              {/* Org Class Grades Card */}
-              <article className="slds-card slds-m-top_large" style={{ borderRadius: '4px', border: '1px solid #dddbda', background: '#ffffff' }}>
-                <div className="slds-card__header slds-grid" style={{ padding: '1rem', borderBottom: '1px solid #f3f2f1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                  <h2 className="slds-card__header-title" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                    <span>Participant Class Grades ({totalClassGrades})</span>
-                  </h2>
-                  <div style={{ width: '250px' }}>
-                    <input
-                      type="text"
-                      placeholder="Search participant or @username..."
-                      value={gradeSearch}
-                      onChange={(e) => {
-                        setGradeSearch(e.target.value)
-                        setGradePage(1)
-                      }}
-                      className="slds-input"
-                      style={{ padding: '4px 10px', fontSize: '13px' }}
-                    />
-                  </div>
+                <div style={{ marginTop: '2px' }}>
+                  <Label variant={org.administratorSlotsRemaining > 0 ? 'success' : 'danger'}>
+                    {org.administratorSlotsRemaining} / 3 slots remaining
+                  </Label>
                 </div>
-
-                <div className="slds-card__body slds-card__body_inner" style={{ padding: '1.25rem' }}>
-                  <div className="slds-m-bottom_medium" style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                    <div style={{ flex: '1 1 260px' }}>
-                      <label className="slds-form-element__label" style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                        Assign Class Grade to Participant
-                      </label>
-                      <UserSearchCombobox
-                        value={newGradeUserId}
-                        onChange={setNewGradeUserId}
-                        placeholder="Search participant by name, @username or email..."
-                      />
-                    </div>
-                    <div>
-                      <select
-                        value={newGradeTier}
-                        onChange={(e) => setNewGradeTier(e.target.value as ClassTier)}
-                        className="slds-select"
-                        style={{ padding: '6px 10px' }}
-                      >
-                        <option value="G3">G3</option>
-                        <option value="G2">G2</option>
-                        <option value="G1">G1</option>
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!newGradeUserId || savingGrade}
-                      onClick={() => {
-                        if (!newGradeUserId) return
-                        void handleAssignClassGrade(newGradeUserId, newGradeTier)
-                        setNewGradeUserId('')
-                      }}
-                      className="slds-button slds-button_brand"
-                      style={{ padding: '5px 14px' }}
-                    >
-                      Assign Grade
-                    </button>
-                  </div>
-
-                  {classGrades.length > 0 ? (
-                    <>
-                      <div style={{ overflowX: 'auto' }}>
-                        <table className="slds-table slds-table_cell-buffer slds-table_bordered">
-                          <thead>
-                            <tr className="slds-line-height_reset">
-                              <th scope="col">Participant</th>
-                              <th scope="col">Class Grade</th>
-                              <th scope="col" style={{ width: '100px' }}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {classGrades.map((cg) => (
-                              <tr key={cg.userId}>
-                                <td>
-                                  <UserLink userId={cg.userId} name={cg.name} slug={cg.slug} />
-                                  {cg.slug && (
-                                    <div className="text-slate-500" style={{ fontSize: '11px' }}>
-                                      @{cg.slug}
-                                    </div>
-                                  )}
-                                </td>
-                                <td>
-                                  <select
-                                    value={cg.classTier || ''}
-                                    disabled={savingGrade}
-                                    onChange={(e) => {
-                                      const v = e.target.value as ClassTier | ''
-                                      void handleAssignClassGrade(cg.userId, v === '' ? null : v)
-                                    }}
-                                    className="slds-select"
-                                    style={{ padding: '4px 8px', maxWidth: '140px' }}
-                                  >
-                                    <option value="">OPEN (Clear)</option>
-                                    <option value="G3">G3</option>
-                                    <option value="G2">G2</option>
-                                    <option value="G1">G1</option>
-                                  </select>
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    disabled={savingGrade}
-                                    onClick={() => void handleAssignClassGrade(cg.userId, null)}
-                                    className="slds-button slds-button_destructive"
-                                    style={{ fontSize: '12px', padding: '2px 10px' }}
-                                  >
-                                    Clear
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <Pagination
-                        page={gradePage}
-                        pageSize={gradePageSize}
-                        total={totalClassGrades}
-                        onPageChange={setGradePage}
-                        onPageSizeChange={setGradePageSize}
-                      />
-                    </>
-                  ) : (
-                    <div className="slds-align_absolute-center text-slate-500 slds-p-around_large" style={{ textAlign: 'center', border: '1px dashed #dddbda', borderRadius: '4px' }}>
-                      <p>No organization-scoped class grades assigned yet.</p>
-                    </div>
-                  )}
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--fgColor-muted, #636c76)' }}>
+                  Discord Invite
                 </div>
-              </article>
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      {/* Edit Org Modal */}
-      {isOrgModalOpen && (
-        <>
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  type="button"
-                  onClick={() => setIsOrgModalOpen(false)}
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                >
-                  X
-                </button>
-                <h2 className="slds-modal__title font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Configure Organization Details
-                </h2>
-              </header>
-
-              <form onSubmit={(e) => void handleUpdateOrg(e)}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {orgError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{orgError}</AlertBanner>
-                    </div>
-                  )}
-
-                  <div className="slds-form slds-form_stacked">
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="org-name-input">
-                        Organization Name
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="org-name-input"
-                          type="text"
-                          value={orgName}
-                          onChange={(e) => setOrgName(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="org-slug-input">
-                        Organization Slug
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="org-slug-input"
-                          type="text"
-                          value={orgSlug}
-                          onChange={(e) => setOrgSlug(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="org-logo-input">
-                        Logo URL
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="org-logo-input"
-                          type="text"
-                          value={orgLogo}
-                          onChange={(e) => setOrgLogo(e.target.value)}
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="discord-invite-input">
-                        Discord Invite Link
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="discord-invite-input"
-                          type="text"
-                          value={discordInvite}
-                          onChange={(e) => setDiscordInvite(e.target.value)}
-                          placeholder="https://discord.gg/..."
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element">
-                      <label className="slds-form-element__label font-bold text-slate-700" htmlFor="vrchat-group-input">
-                        VRChat Group ID
-                      </label>
-                      <div className="slds-form-element__control">
-                        <input
-                          id="vrchat-group-input"
-                          type="text"
-                          value={vrchatGroupId}
-                          onChange={(e) => setVrchatGroupId(e.target.value)}
-                          placeholder="grp_..."
-                          className="slds-input"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                <div style={{ fontSize: '13px', wordBreak: 'break-all' }}>{org.discordInvite || 'Not configured'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, color: 'var(--fgColor-muted, #636c76)' }}>
+                  VRChat Group ID
                 </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsOrgModalOpen(false)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updatingOrg}
-                    className="slds-button slds-button_brand"
-                  >
-                    {updatingOrg ? 'Updating...' : 'Save Details'}
-                  </button>
-                </footer>
-              </form>
+                <code style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>{org.vrchatGroupId || 'Not configured'}</code>
+              </div>
             </div>
           </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
-        </>
+
+          {/* Staff Roster */}
+          <section className="primer-box">
+            <div
+              className="primer-box-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Staff Roster</h2>
+                <CounterLabel>{totalMembers}</CounterLabel>
+              </div>
+              <div style={{ minWidth: '220px' }}>
+                <TextInput
+                  size="small"
+                  block
+                  leadingVisual={SearchIcon}
+                  placeholder="Search staff..."
+                  value={memberSearch}
+                  onChange={(e) => {
+                    setMemberSearch(e.target.value)
+                    setMemberPage(1)
+                  }}
+                />
+              </div>
+            </div>
+
+            {members.length > 0 ? (
+              <>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="primer-table" aria-label="Staff Roster Table" style={{ minWidth: '580px' }}>
+                    <thead>
+                      <tr>
+                        <th>Staff Name</th>
+                        <th style={{ width: '130px' }}>Role</th>
+                        <th style={{ width: '170px' }}>Change Role</th>
+                        <th style={{ width: '100px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((member) => (
+                        <tr key={member.userId}>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>
+                              <UserLink userId={member.userId} name={member.name} />
+                            </div>
+                            {member.slug && (
+                              <div style={{ fontSize: '11px', color: 'var(--fgColor-muted, #636c76)' }}>
+                                @{member.slug}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <Label variant={member.role === 'administrator' ? 'accent' : 'secondary'} size="small">
+                              {member.role}
+                            </Label>
+                          </td>
+                          <td>
+                            <Select
+                              size="small"
+                              block
+                              value={member.role}
+                              onChange={(e) => void handleChangeRole(member.userId, e.target.value)}
+                            >
+                              {roleOptions.map((opt) => (
+                                <Select.Option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <Button
+                              type="button"
+                              size="small"
+                              variant="danger"
+                              leadingVisual={TrashIcon}
+                              onClick={() => void handleRemoveMember(member.userId)}
+                            >
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination
+                  page={memberPage}
+                  pageSize={memberPageSize}
+                  total={totalMembers}
+                  onPageChange={setMemberPage}
+                  onPageSizeChange={setMemberPageSize}
+                />
+              </>
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+                No staff members found. Click &quot;Add Staff&quot; to populate the roster.
+              </div>
+            )}
+          </section>
+
+          {/* Participant Class Grades */}
+          <section className="primer-box">
+            <div
+              className="primer-box-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Participant Class Grades</h2>
+                <CounterLabel>{totalClassGrades}</CounterLabel>
+              </div>
+              <div style={{ minWidth: '220px' }}>
+                <TextInput
+                  size="small"
+                  block
+                  leadingVisual={SearchIcon}
+                  placeholder="Search participant..."
+                  value={gradeSearch}
+                  onChange={(e) => {
+                    setGradeSearch(e.target.value)
+                    setGradePage(1)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 260px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                    Assign Class Grade to Participant
+                  </label>
+                  <UserSearchCombobox
+                    value={newGradeUserId}
+                    onChange={setNewGradeUserId}
+                    placeholder="Search participant by name, @username or email..."
+                  />
+                </div>
+                <Select
+                  size="small"
+                  value={newGradeTier}
+                  onChange={(e) => setNewGradeTier(e.target.value as ClassTier)}
+                >
+                  <Select.Option value="G3">G3</Select.Option>
+                  <Select.Option value="G2">G2</Select.Option>
+                  <Select.Option value="G1">G1</Select.Option>
+                </Select>
+                <Button
+                  type="button"
+                  size="small"
+                  variant="primary"
+                  leadingVisual={PlusIcon}
+                  disabled={!newGradeUserId || savingGrade}
+                  onClick={() => {
+                    if (!newGradeUserId) return
+                    void handleAssignClassGrade(newGradeUserId, newGradeTier)
+                    setNewGradeUserId('')
+                  }}
+                >
+                  Assign Grade
+                </Button>
+              </div>
+
+              {classGrades.length > 0 ? (
+                <>
+                  <div style={{ overflowX: 'auto', border: '1px solid var(--borderColor-default, #d0d7de)', borderRadius: '6px' }}>
+                    <table className="primer-table">
+                      <thead>
+                        <tr>
+                          <th>Participant</th>
+                          <th style={{ width: '160px' }}>Class Grade</th>
+                          <th style={{ width: '100px', textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {classGrades.map((cg) => (
+                          <tr key={cg.userId}>
+                            <td>
+                              <UserLink userId={cg.userId} name={cg.name} slug={cg.slug} />
+                              {cg.slug && (
+                                <div style={{ fontSize: '11px', color: 'var(--fgColor-muted, #636c76)' }}>
+                                  @{cg.slug}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <Select
+                                size="small"
+                                value={cg.classTier || ''}
+                                disabled={savingGrade}
+                                onChange={(e) => {
+                                  const v = e.target.value as ClassTier | ''
+                                  void handleAssignClassGrade(cg.userId, v === '' ? null : v)
+                                }}
+                              >
+                                <Select.Option value="">OPEN (Clear)</Select.Option>
+                                <Select.Option value="G3">G3</Select.Option>
+                                <Select.Option value="G2">G2</Select.Option>
+                                <Select.Option value="G1">G1</Select.Option>
+                              </Select>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <Button
+                                type="button"
+                                size="small"
+                                variant="danger"
+                                disabled={savingGrade}
+                                onClick={() => void handleAssignClassGrade(cg.userId, null)}
+                              >
+                                Clear
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Pagination
+                    page={gradePage}
+                    pageSize={gradePageSize}
+                    total={totalClassGrades}
+                    onPageChange={setGradePage}
+                    onPageSizeChange={setGradePageSize}
+                  />
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+                  No organization-scoped class grades assigned yet.
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* Danger Zone (SITE_ADMIN only) */}
+          {isSiteAdmin && (
+            <DangerZoneDeleteDialog
+              entityType="organization"
+              entityName={org.name}
+              confirmText={org.slug}
+              cardDescription="Permanently delete this organization, its staff roster, organization-owned events, newsletters, and class grades."
+              consequences={[
+                'All staff memberships and administrator roles for this organization.',
+                'All competition events, races, and newsletters owned by this organization.',
+                'All organization-scoped participant class grades and team affiliations.',
+              ]}
+              onConfirmDelete={handleDeleteOrg}
+            />
+          )}
+        </div>
+      ) : null}
+
+      {isOrgModalOpen && (
+        <Dialog title="Edit Organization Details" onClose={() => setIsOrgModalOpen(false)} width="medium">
+          <form onSubmit={(e) => void handleUpdateOrg(e)} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {orgError && <AlertBanner variant="error">{orgError}</AlertBanner>}
+
+            <FormControl required>
+              <FormControl.Label>Organization Name</FormControl.Label>
+              <TextInput block required value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+            </FormControl>
+
+            <FormControl required>
+              <FormControl.Label>Organization Slug</FormControl.Label>
+              <TextInput block required value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} />
+            </FormControl>
+
+            <FormControl>
+              <FormControl.Label>Logo URL</FormControl.Label>
+              <TextInput block value={orgLogo} onChange={(e) => setOrgLogo(e.target.value)} />
+            </FormControl>
+
+            <FormControl>
+              <FormControl.Label>Discord Invite Link</FormControl.Label>
+              <TextInput block value={discordInvite} onChange={(e) => setDiscordInvite(e.target.value)} placeholder="https://discord.gg/..." />
+            </FormControl>
+
+            <FormControl>
+              <FormControl.Label>VRChat Group ID</FormControl.Label>
+              <TextInput block value={vrchatGroupId} onChange={(e) => setVrchatGroupId(e.target.value)} placeholder="grp_..." />
+            </FormControl>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--borderColor-muted, #d8dee4)' }}>
+              <Button type="button" onClick={() => setIsOrgModalOpen(false)} disabled={updatingOrg}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={updatingOrg}>
+                {updatingOrg ? 'Saving...' : 'Save Details'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
 
-      {/* Add Staff Member Modal */}
       {isMemberModalOpen && (
-        <>
-          <section role="dialog" tabIndex={-1} aria-modal="true" className="slds-modal slds-fade-in-open" style={{ zIndex: 9001 }}>
-            <div className="slds-modal__container" style={{ maxWidth: '40rem', width: '90%' }}>
-              <header className="slds-modal__header">
-                <button
-                  type="button"
-                  onClick={() => setIsMemberModalOpen(false)}
-                  className="slds-button slds-button_icon slds-modal__close"
-                  title="Close"
-                >
-                  X
-                </button>
-                <h2 className="slds-modal__title font-bold text-slate-900" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  Add Staff Member
-                </h2>
-              </header>
+        <Dialog title="Add Staff Member" onClose={() => setIsMemberModalOpen(false)} width="medium">
+          <form onSubmit={(e) => void handleAddMember(e)} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {memberError && <AlertBanner variant="error">{memberError}</AlertBanner>}
 
-              <form onSubmit={(e) => void handleAddMember(e)}>
-                <div className="slds-modal__content slds-p-around_medium" style={{ background: '#fff' }}>
-                  {memberError && (
-                    <div className="slds-m-bottom_medium">
-                      <AlertBanner variant="error">{memberError}</AlertBanner>
-                    </div>
-                  )}
-
-                  <div className="slds-form slds-form_stacked">
-                    <div className="slds-form-element slds-m-bottom_medium">
-                      <label className="slds-form-element__label font-bold text-slate-700">
-                        Select System User
-                      </label>
-                      <div className="slds-form-element__control">
-                        <UserSearchCombobox
-                          value={selectedUserId}
-                          onChange={(val) => setSelectedUserId(val)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="slds-form-element">
-                      <label className="slds-form-element__label font-bold text-slate-700">
-                        Initial Staff Role
-                      </label>
-                      <div className="slds-form-element__control">
-                        <select
-                          value={selectedRole}
-                          onChange={(e) => setSelectedRole(e.target.value)}
-                          className="slds-select"
-                          style={{ padding: '6px 12px', border: '1px solid #dddbda', borderRadius: '4px' }}
-                        >
-                          {roleOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <footer className="slds-modal__footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsMemberModalOpen(false)}
-                    className="slds-button slds-button_neutral"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={addingMember}
-                    className="slds-button slds-button_brand"
-                  >
-                    {addingMember ? 'Adding...' : 'Add Staff Member'}
-                  </button>
-                </footer>
-              </form>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+                Select System User
+              </label>
+              <UserSearchCombobox value={selectedUserId} onChange={(val) => setSelectedUserId(val)} />
             </div>
-          </section>
-          <div className="slds-backdrop slds-backdrop_open" style={{ zIndex: 9000 }}></div>
-        </>
+
+            <FormControl>
+              <FormControl.Label>Initial Staff Role</FormControl.Label>
+              <Select block value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}>
+                {roleOptions.map((opt) => (
+                  <Select.Option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </Select.Option>
+                ))}
+              </Select>
+            </FormControl>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--borderColor-muted, #d8dee4)' }}>
+              <Button type="button" onClick={() => setIsMemberModalOpen(false)} disabled={addingMember}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={addingMember}>
+                {addingMember ? 'Adding...' : 'Add Staff Member'}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
       )}
     </AdminLayout>
   )
