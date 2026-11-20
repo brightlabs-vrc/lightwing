@@ -618,16 +618,11 @@ function ManageOrgPage() {
           <PixelStack gap={6}>
             <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <PixelSectionHeader
-                    title={isOrg ? 'EDIT ORGANIZATION PROFILE' : 'EDIT TEAM PROFILE'}
-                    titleTone="purple"
-                    size="sm"
-                  />
-                  <p className="font-sans text-xs text-retro-muted mt-1">
-                    Update your {isOrg ? 'organization' : 'team'} name, custom URL slug, logo, and Markdown description.
-                  </p>
-                </div>
+                <PixelSectionHeader
+                  title={isOrg ? 'EDIT ORGANIZATION PROFILE' : 'EDIT TEAM PROFILE'}
+                  titleTone="purple"
+                  size="sm"
+                />
                 <div className="flex flex-wrap items-center gap-2">
                   <PixelButton
                     variant="outline"
@@ -726,11 +721,11 @@ function ManageOrgPage() {
                 </PixelStack>
               </PixelCard>
 
-              {/* Full-Width Split Markdown Description Editor */}
+              {/* Description Editor */}
               <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
                 <PixelStack gap={4}>
                   <PixelSectionHeader
-                    title="ABOUT / DESCRIPTION & LIVE PREVIEW"
+                    title="DESCRIPTION"
                     titleTone="purple"
                     size="sm"
                   />
@@ -739,7 +734,7 @@ function ManageOrgPage() {
                     onChange={setTeamDescription}
                     minHeight="340px"
                     defaultMode="split"
-                    placeholder="Write about your organization or team in Markdown..."
+                    placeholder="Describe your organization or team..."
                     previewFallbackText="No description details set yet."
                   />
 

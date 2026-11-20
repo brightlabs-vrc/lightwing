@@ -114,12 +114,7 @@ function ProfilePage() {
         {/* Header Bar */}
         <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <PixelSectionHeader title="PROFILE SETTINGS" titleTone="purple" size="lg" />
-              <p className="font-sans text-xs sm:text-sm text-retro-muted mt-1">
-                Customize your public @username, VRChat display name, and Markdown biography.
-              </p>
-            </div>
+            <PixelSectionHeader title="PROFILE SETTINGS" titleTone="purple" size="lg" />
             {publicSlug && (
               <PixelButton asChild variant="outline" tone="cyan" size="sm" className="w-full sm:w-auto justify-center shrink-0">
                 <Link to="/$user" params={{ user: publicSlug }}>
@@ -214,11 +209,11 @@ function ProfilePage() {
           </PixelCard>
         </div>
 
-        {/* Full-Width Biography & Live Preview */}
+        {/* Biography */}
         <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
           <PixelStack gap={4}>
             <PixelSectionHeader
-              title="BIOGRAPHY & LIVE MARKDOWN PREVIEW"
+              title="BIOGRAPHY"
               titleTone="purple"
               size="sm"
             />
@@ -227,7 +222,7 @@ function ProfilePage() {
               onChange={setBiography}
               minHeight="280px"
               defaultMode="split"
-              placeholder="Tell us about yourself using Markdown (links, headings, lists, formatting)..."
+              placeholder="Tell us about yourself..."
               previewFallbackText="No biography details provided yet."
             />
 
