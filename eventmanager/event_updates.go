@@ -91,7 +91,7 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 
 	if isGranular && !existing.IsTeamEvent {
 		if participantLimit != nil {
-			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Granular individual events cannot have an event-level participant limit"}
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Granular events cannot have an event-level participant limit unless it is a team event"}
 		}
 	} else if !isGranular {
 		if maxConcurrent != nil {

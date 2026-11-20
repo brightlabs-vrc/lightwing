@@ -484,7 +484,7 @@ func (q *Queries) DeleteUserFromUnstartedRaces(ctx context.Context, arg DeleteUs
 
 const raceResultExistsForUser = `-- name: RaceResultExistsForUser :one
 SELECT EXISTS (
-    SELECT 1 FROM "race_event_result"
+    SELECT 1 FROM "race_result"
     WHERE "raceEventId" = $1 AND "userId" = $2
 )
 `

@@ -401,7 +401,7 @@ func TestConcludedTeamEventFreezesRosterAndSnapshotsHistory(t *testing.T) {
 	}
 	// Record a finished result so ListUserRaceRecords returns it.
 	if _, err := db.Exec(f.ctx,
-		`INSERT INTO "race_event_result" (id, "raceEventId", "userId", "placement", "finishTimeMs", "createdAt", "updatedAt") VALUES ($1, $2, $3, 1, 120000, $4, $4)`,
+		`INSERT INTO "race_result" (id, "raceEventId", "userId", position, points, "createdAt", "updatedAt") VALUES ($1, $2, $3, 1, 10, $4, $4)`,
 		"res-"+newID()[:8], race.ID, racerID, now); err != nil {
 		t.Fatalf("insert result: %v", err)
 	}
