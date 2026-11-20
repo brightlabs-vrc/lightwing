@@ -13,6 +13,10 @@ function makeMockRow(
       userId,
       name: "User_" + userId,
       classTier: null as unknown as string,
+      teamId: "",
+      teamName: "",
+      teamSlug: "",
+      rosterRole: "",
     },
     savedResult: undefined,
     edit: {

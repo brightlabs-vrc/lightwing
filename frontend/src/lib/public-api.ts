@@ -5,6 +5,9 @@ import type { auth, eventmanager, scorecalc, teammanager } from './client'
 export type LeaderboardEntry = scorecalc.LeaderboardEntry
 export type LeaderboardResponse = scorecalc.LeaderboardResponse
 export type GetLeaderboardParams = scorecalc.GetLeaderboardParams
+export type TeamLeaderboardEntry = scorecalc.TeamLeaderboardEntry
+export type TeamLeaderboardResponse = scorecalc.TeamLeaderboardResponse
+export type GetTeamLeaderboardParams = scorecalc.GetTeamLeaderboardParams
 
 const now = new Date().toISOString()
 
@@ -683,16 +686,17 @@ export async function leaveRaceEvent(
 }
 
 export async function getLeaderboard(
-  params: GetLeaderboardParams = {},
+  params: Partial<GetLeaderboardParams> = {},
 ): Promise<LeaderboardResponse> {
   if (!MOCK_MODE) {
     return appClient.scorecalc.GetLeaderboard({
-      SortBy: params.SortBy,
-      Search: params.Search,
-      ClassTier: params.ClassTier,
-      Year: params.Year,
-      Limit: params.Limit,
-      Offset: params.Offset,
+      SortBy: params.SortBy ?? '',
+      Search: params.Search ?? '',
+      ClassTier: params.ClassTier ?? '',
+      Year: params.Year ?? 0,
+      AllTime: params.AllTime ?? false,
+      Limit: params.Limit ?? 10,
+      Offset: params.Offset ?? 0,
     })
   }
 
@@ -852,14 +856,64 @@ export async function getPublicTeamProfile(teamOrSlug: string): Promise<teammana
   }
 }
 
+export async function getTeamLeaderboard(
+  params: Partial<GetTeamLeaderboardParams> = {},
+): Promise<TeamLeaderboardResponse> {
+  if (!MOCK_MODE) {
+    return appClient.scorecalc.GetTeamLeaderboard({
+      SortBy: params.SortBy ?? '',
+      Search: params.Search ?? '',
+      Year: params.Year ?? 0,
+      AllTime: params.AllTime ?? false,
+      Limit: params.Limit ?? 10,
+      Offset: params.Offset ?? 0,
+    })
+  }
+  const currentYear = new Date().getUTCFullYear()
+  return {
+    entries: [],
+    total: 0,
+    year: params.AllTime ? 0 : (params.Year && params.Year > 0 ? params.Year : currentYear),
+    availableYears: [currentYear],
+    rankingSource: 'TEAM_EVENTS',
+    calculatedAt: new Date().toISOString(),
+  }
+}
+
+export async function getTeamStats(
+  id: string,
+  options: { year?: number; allTime?: boolean } = {},
+): Promise<teammanager.TeamStats> {
+  if (!MOCK_MODE) {
+    return appClient.teammanager.GetTeamStats({
+      ID: id,
+      Year: options.year ?? 0,
+      AllTime: options.allTime ?? false,
+    })
+  }
+  const currentYear = new Date().getUTCFullYear()
+  return {
+    rankingAverage: null,
+    pointsAverage: null,
+    seasonRank: null,
+    averagePointsPerEvent: null,
+    teamEventsParticipated: 0,
+    teamTotalPoints: 0,
+    year: options.allTime ? 0 : (options.year ?? currentYear),
+    availableYears: [currentYear],
+  }
+}
+
 export async function getUserRaceRecords(
   userId: string,
   limit?: number,
   offset?: number,
+  year?: number,
 ): Promise<eventmanager.ListUserRaceRecordsResponse> {
   if (!MOCK_MODE) {
-    return appClient.eventmanager.GetUserRaceRecords({
-      userId,
+    return appClient.eventmanager.GetUserRaceRecords(userId, {
+      UserID: userId,
+      Year: year ?? 0,
       Limit: limit ?? 10,
       Offset: offset ?? 0,
     })

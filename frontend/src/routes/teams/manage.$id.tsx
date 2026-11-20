@@ -5,6 +5,7 @@ import { usePageHead } from '../../hooks/usePageHead'
 import { requireAuth } from '../../lib/auth-guard'
 import {
   getAdminTeam,
+  listAdminTeams,
   updateAdminTeam,
   addAdminTeamMember,
   updateAdminTeamMemberRole,
@@ -175,6 +176,9 @@ function ManageOrgPage() {
   const [eventScheduledAt, setEventScheduledAt] = useState('')
   const [eventParticipantLimit, setEventParticipantLimit] = useState('')
   const [eventMaxConcurrent, setEventMaxConcurrent] = useState('')
+  const [eventIsTeamEvent, setEventIsTeamEvent] = useState(false)
+  const [eventMaxPrimaryRosterSize, setEventMaxPrimaryRosterSize] = useState('')
+  const [eventMaxBackupRosterSize, setEventMaxBackupRosterSize] = useState('')
   const [eventScoringRulesMode, setEventScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [eventCustomScoringTables, setEventCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [creatingEvent, setCreatingEvent] = useState(false)
@@ -405,6 +409,19 @@ function ManageOrgPage() {
     try {
       const limitNum = eventParticipantLimit.trim() ? Number(eventParticipantLimit) : null
       const maxConcurrentNum = eventMaxConcurrent.trim() ? Number(eventMaxConcurrent) : null
+      const maxPrimaryNum = eventMaxPrimaryRosterSize.trim() ? Number(eventMaxPrimaryRosterSize) : null
+      const maxBackupNum = eventMaxBackupRosterSize.trim() ? Number(eventMaxBackupRosterSize) : null
+
+      if (eventIsTeamEvent && maxPrimaryNum !== null && (isNaN(maxPrimaryNum) || !Number.isSafeInteger(maxPrimaryNum) || maxPrimaryNum <= 0)) {
+        setEventError('Max primary roster size must be a positive whole number.')
+        setCreatingEvent(false)
+        return
+      }
+      if (eventIsTeamEvent && maxBackupNum !== null && (isNaN(maxBackupNum) || !Number.isSafeInteger(maxBackupNum) || maxBackupNum < 0)) {
+        setEventError('Max backup roster size must be 0 or a positive whole number.')
+        setCreatingEvent(false)
+        return
+      }
 
       await createAdminEvent(
         {
@@ -422,6 +439,9 @@ function ManageOrgPage() {
           scheduledAt: eventScheduledAt ? new Date(eventScheduledAt).toISOString() : null,
           participantLimit: !eventGranular ? limitNum : null,
           maxConcurrentRaceParticipations: eventGranular ? maxConcurrentNum : null,
+          isTeamEvent: eventIsTeamEvent,
+          maxPrimaryRosterSize: eventIsTeamEvent ? maxPrimaryNum : null,
+          maxBackupRosterSize: eventIsTeamEvent ? maxBackupNum : null,
         },
         authHeader
       )
@@ -433,6 +453,9 @@ function ManageOrgPage() {
       setEventScheduledAt('')
       setEventParticipantLimit('')
       setEventMaxConcurrent('')
+      setEventIsTeamEvent(false)
+      setEventMaxPrimaryRosterSize('')
+      setEventMaxBackupRosterSize('')
       setEventScoringRulesMode('STANDARD')
       setEventCustomScoringTables(DEFAULT_SCORING_TABLES)
       setSuccess('Organization event created successfully.')
@@ -1492,6 +1515,44 @@ function ManageOrgPage() {
                 <div className="flex items-center gap-2 pt-2">
                   <input
                     type="checkbox"
+                    id="is-team-event"
+                    checked={eventIsTeamEvent}
+                    onChange={(e) => {
+                      setEventIsTeamEvent(e.target.checked)
+                      if (!e.target.checked) {
+                        setEventMaxPrimaryRosterSize('')
+                        setEventMaxBackupRosterSize('')
+                      }
+                    }}
+                    className="w-4 h-4 accent-retro-primary"
+                  />
+                  <label htmlFor="is-team-event" className="font-pixel text-xs text-retro-text cursor-pointer">
+                    Team-Based Event (Primary &amp; Backup Rosters + Team Standings)
+                  </label>
+                </div>
+
+                {eventIsTeamEvent && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <PixelInput
+                      label="MAX PRIMARY ROSTER (PER TEAM)"
+                      type="number"
+                      placeholder="e.g. 3 (blank = unlimited)"
+                      value={eventMaxPrimaryRosterSize}
+                      onChange={(e) => setEventMaxPrimaryRosterSize(e.target.value)}
+                    />
+                    <PixelInput
+                      label="MAX BACKUP ROSTER (PER TEAM)"
+                      type="number"
+                      placeholder="e.g. 2 (blank = unlimited)"
+                      value={eventMaxBackupRosterSize}
+                      onChange={(e) => setEventMaxBackupRosterSize(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
                     id="granular"
                     checked={eventGranular}
                     onChange={(e) => setEventGranular(e.target.checked)}
@@ -1504,9 +1565,9 @@ function ManageOrgPage() {
 
                 {!eventGranular ? (
                   <PixelInput
-                    label="PARTICIPANT LIMIT"
+                    label={eventIsTeamEvent ? 'TEAM LIMIT' : 'PARTICIPANT LIMIT'}
                     type="number"
-                    placeholder="e.g. 20"
+                    placeholder={eventIsTeamEvent ? 'e.g. 12 teams' : 'e.g. 20'}
                     value={eventParticipantLimit}
                     onChange={(e) => setEventParticipantLimit(e.target.value)}
                   />
@@ -1658,6 +1719,9 @@ function OrgEventDetailView({
     handleRestoreEvent,
     handleAddMember,
     handleRemoveMember,
+    handleUpsertEventTeamRoster,
+    handleSubstituteTeamMember,
+    handleRemoveEventTeam,
     handleAddRaceMember,
     handleRemoveRaceMember,
     handleCreateRace,
@@ -1685,6 +1749,8 @@ function OrgEventDetailView({
   const [editScheduledAt, setEditScheduledAt] = useState('')
   const [editParticipantLimit, setEditParticipantLimit] = useState('')
   const [editMaxConcurrent, setEditMaxConcurrent] = useState('')
+  const [editMaxPrimaryRosterSize, setEditMaxPrimaryRosterSize] = useState('')
+  const [editMaxBackupRosterSize, setEditMaxBackupRosterSize] = useState('')
   const [editSignupsLocked, setEditSignupsLocked] = useState(false)
   const [editScoringRulesMode, setEditScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
@@ -1692,6 +1758,18 @@ function OrgEventDetailView({
 
   // Member Add State
   const [addMemberUserId, setAddMemberUserId] = useState('')
+
+  // Team Event Roster Management State
+  const [availableTeams, setAvailableTeams] = useState<teammanager.TeamListItem[]>([])
+  const [selectedTeamId, setSelectedTeamId] = useState('')
+  const [selectedTeamDetail, setSelectedTeamDetail] = useState<teammanager.Team | null>(null)
+  const [loadingTeamDetail, setLoadingTeamDetail] = useState(false)
+  const [primaryUserIds, setPrimaryUserIds] = useState<string[]>([])
+  const [backupUserIds, setBackupUserIds] = useState<string[]>([])
+  const [savingTeamRoster, setSavingTeamRoster] = useState(false)
+  const [teamRosterError, setTeamRosterError] = useState<string | null>(null)
+  const [subSwapTargets, setSubSwapTargets] = useState<Record<string, string>>({})
+  const [subReplaceUpcoming, setSubReplaceUpcoming] = useState<Record<string, boolean>>({})
 
   // Create Race Modal State
   const [showCreateRaceModal, setShowCreateRaceModal] = useState(false)
@@ -1733,6 +1811,8 @@ function OrgEventDetailView({
       setEditScheduledAt(selectedEvent.scheduledAt ? toLocalISOString(selectedEvent.scheduledAt) : '')
       setEditParticipantLimit(selectedEvent.participantLimit !== null ? String(selectedEvent.participantLimit) : '')
       setEditMaxConcurrent(selectedEvent.maxConcurrentRaceParticipations !== null ? String(selectedEvent.maxConcurrentRaceParticipations) : '')
+      setEditMaxPrimaryRosterSize(selectedEvent.maxPrimaryRosterSize !== null ? String(selectedEvent.maxPrimaryRosterSize) : '')
+      setEditMaxBackupRosterSize(selectedEvent.maxBackupRosterSize !== null ? String(selectedEvent.maxBackupRosterSize) : '')
       setEditSignupsLocked(selectedEvent.signupsLocked)
       setEditScoringRulesMode((selectedEvent.scoringRulesMode as 'STANDARD' | 'CUSTOM') || 'STANDARD')
       if (selectedEvent.customScoringTables) {
@@ -1742,6 +1822,56 @@ function OrgEventDetailView({
       }
     }
   }, [selectedEvent, showEditModal])
+
+  useEffect(() => {
+    if (!selectedEvent?.isTeamEvent || activeTab !== 'members') return
+    let cancelled = false
+    void listAdminTeams('', 200, 0)
+      .then((res) => {
+        if (!cancelled) {
+          setAvailableTeams((res.teams ?? []).filter((t) => t.status === 'APPROVED'))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [selectedEvent?.isTeamEvent, activeTab])
+
+  useEffect(() => {
+    if (!selectedEvent?.isTeamEvent || !selectedTeamId) {
+      setSelectedTeamDetail(null)
+      return
+    }
+    let cancelled = false
+    setLoadingTeamDetail(true)
+    setTeamRosterError(null)
+    void getAdminTeam(selectedTeamId)
+      .then((t) => {
+        if (cancelled) return
+        setSelectedTeamDetail(t)
+        const existing = (selectedEvent.teams ?? []).find((et) => et.teamId === selectedTeamId)
+        if (existing) {
+          setPrimaryUserIds((existing.primaryRoster ?? []).map((m) => m.userId))
+          setBackupUserIds((existing.backupRoster ?? []).map((m) => m.userId))
+        } else {
+          setPrimaryUserIds([])
+          setBackupUserIds([])
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSelectedTeamDetail(null)
+          setTeamRosterError(err instanceof Error ? err.message : 'Unable to load team members.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTeamDetail(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedEvent?.isTeamEvent, selectedEvent?.teams, selectedTeamId])
 
   useEffect(() => {
     if (activeTab === 'datasets' && eventId) {
@@ -1789,14 +1919,26 @@ function OrgEventDetailView({
   const performSaveEventDetails = async () => {
     const limitNum = editParticipantLimit.trim() ? Number(editParticipantLimit) : null
     const maxConcurrentNum = editMaxConcurrent.trim() ? Number(editMaxConcurrent) : null
+    const maxPrimaryNum = editMaxPrimaryRosterSize.trim() ? Number(editMaxPrimaryRosterSize) : null
+    const maxBackupNum = editMaxBackupRosterSize.trim() ? Number(editMaxBackupRosterSize) : null
 
     if (!selectedEvent?.granularParticipation && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
-      alert('Participant limit must be a positive whole number.')
+      alert(selectedEvent?.isTeamEvent ? 'Team limit must be a positive whole number.' : 'Participant limit must be a positive whole number.')
       return
     }
 
     if (selectedEvent?.granularParticipation && maxConcurrentNum !== null && (isNaN(maxConcurrentNum) || !Number.isSafeInteger(maxConcurrentNum) || maxConcurrentNum <= 0)) {
       alert('Max races per participant must be a positive whole number.')
+      return
+    }
+
+    if (selectedEvent?.isTeamEvent && maxPrimaryNum !== null && (isNaN(maxPrimaryNum) || !Number.isSafeInteger(maxPrimaryNum) || maxPrimaryNum <= 0)) {
+      alert('Max primary roster size must be a positive whole number.')
+      return
+    }
+
+    if (selectedEvent?.isTeamEvent && maxBackupNum !== null && (isNaN(maxBackupNum) || !Number.isSafeInteger(maxBackupNum) || maxBackupNum < 0)) {
+      alert('Max backup roster size must be 0 or a positive whole number.')
       return
     }
 
@@ -1808,6 +1950,8 @@ function OrgEventDetailView({
       scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
       participantLimit: limitNum,
       maxConcurrentRaceParticipations: maxConcurrentNum,
+      maxPrimaryRosterSize: selectedEvent?.isTeamEvent ? maxPrimaryNum : null,
+      maxBackupRosterSize: selectedEvent?.isTeamEvent ? maxBackupNum : null,
       scoringRulesMode: editScoringRulesMode,
       customScoringTables: editScoringRulesMode === 'CUSTOM' ? editCustomScoringTables : null,
     })
@@ -2093,7 +2237,12 @@ function OrgEventDetailView({
           <div className="flex items-center gap-2 border-b-2 border-retro-border pt-2 overflow-x-auto no-scrollbar whitespace-nowrap">
             {[
               { id: 'details', label: 'OVERVIEW & DETAILS' },
-              { id: 'members', label: `MEMBERS (${selectedEvent.members.length})` },
+              {
+                id: 'members',
+                label: selectedEvent.isTeamEvent
+                  ? `TEAMS & ROSTERS (${(selectedEvent.teams ?? []).length})`
+                  : `MEMBERS (${selectedEvent.members.length})`,
+              },
               { id: 'races', label: `RACES (${races.length})` },
               { id: 'datasets', label: 'DATASETS' },
             ].map((tab) => (
@@ -2129,7 +2278,7 @@ function OrgEventDetailView({
                 </PixelButton>
               </PixelStack>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-sans text-xs text-retro-text">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-sans text-xs text-retro-text">
                 <div className="p-3 bg-retro-bg rounded border border-retro-border">
                   <div className="font-pixel text-[10px] text-retro-muted uppercase">SCHEDULED AT</div>
                   <div className="font-bold mt-1">
@@ -2150,6 +2299,18 @@ function OrgEventDetailView({
                     {selectedEvent.granularParticipation ? 'Granular (Per-Race)' : 'Regular (Event-wide)'}
                   </div>
                 </div>
+
+                <div className="p-3 bg-retro-bg rounded border border-retro-border">
+                  <div className="font-pixel text-[10px] text-retro-muted uppercase">COMPETITION FORMAT</div>
+                  <div className="font-bold mt-1">
+                    {selectedEvent.isTeamEvent ? 'Team-Based Event' : 'Individual Event'}
+                  </div>
+                  {selectedEvent.isTeamEvent && (
+                    <div className="text-[11px] text-retro-muted mt-0.5">
+                      Primary: {selectedEvent.maxPrimaryRosterSize ?? '∞'} · Backup: {selectedEvent.maxBackupRosterSize ?? '∞'}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="p-4 bg-retro-bg rounded border border-retro-border">
@@ -2162,10 +2323,48 @@ function OrgEventDetailView({
             </PixelStack>
           </PixelCard>
 
+          {/* Team Standings (Constructors) */}
+          {selectedEvent.isTeamEvent && selectedEvent.scoringType === 1 && (
+            <PixelCard className="bg-retro-surface">
+              <PixelStack gap={4}>
+                <PixelSectionHeader title="TEAM STANDINGS (CONSTRUCTORS)" size="sm" />
+                {selectedEvent.teamPointsOverview && selectedEvent.teamPointsOverview.length > 0 ? (
+                  <PixelTable
+                    columns={[
+                      { key: 'rank', header: '#', width: '10%', render: (_, idx) => idx + 1 },
+                      {
+                        key: 'team',
+                        header: 'TEAM',
+                        width: '50%',
+                        render: (t) => (
+                          <Link
+                            to="/$user"
+                            params={{ user: t.slug || t.teamId }}
+                            className="font-bold text-retro-text hover:text-retro-primary"
+                          >
+                            {t.name}
+                          </Link>
+                        ),
+                      },
+                      { key: 'members', header: 'SCORING RACERS', width: '20%', render: (t) => t.memberCount },
+                      { key: 'points', header: 'TEAM POINTS', width: '20%', render: (t) => `${t.points} pts` },
+                    ]}
+                    data={selectedEvent.teamPointsOverview}
+                  />
+                ) : (
+                  <span className="font-pixel text-xs text-retro-muted">NO TEAM STANDINGS RECORDED YET</span>
+                )}
+              </PixelStack>
+            </PixelCard>
+          )}
+
           {/* Standings Overview */}
           <PixelCard className="bg-retro-surface">
             <PixelStack gap={4}>
-              <PixelSectionHeader title="OVERALL EVENT LEADERBOARD" size="sm" />
+              <PixelSectionHeader
+                title={selectedEvent.isTeamEvent ? 'INDIVIDUAL STANDINGS' : 'OVERALL EVENT LEADERBOARD'}
+                size="sm"
+              />
               {selectedEvent.scoringType === 1 ? (
                 selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
                   <PixelTable
@@ -2175,7 +2374,14 @@ function OrgEventDetailView({
                         key: 'name',
                         header: 'COMPETITOR',
                         width: '60%',
-                        render: (p) => <UserLink userId={p.userId} name={p.name} />,
+                        render: (p) => (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <UserLink userId={p.userId} name={p.name} />
+                            {selectedEvent.isTeamEvent && p.teamName && (
+                              <PixelBadge tone="purple">{p.teamName}</PixelBadge>
+                            )}
+                          </div>
+                        ),
                       },
                       { key: 'points', header: 'POINTS', width: '30%', render: (p) => `${p.points} pts` },
                     ]}
@@ -2193,7 +2399,14 @@ function OrgEventDetailView({
                         key: 'name',
                         header: 'COMPETITOR',
                         width: '50%',
-                        render: (l) => <UserLink userId={l.userId} name={l.name} />,
+                        render: (l) => (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <UserLink userId={l.userId} name={l.name} />
+                            {selectedEvent.isTeamEvent && l.teamName && (
+                              <PixelBadge tone="purple">{l.teamName}</PixelBadge>
+                            )}
+                          </div>
+                        ),
                       },
                       { key: 'elo', header: 'ELO', width: '20%', render: (l) => l.elo },
                       { key: 'wl', header: 'W-L', width: '20%', render: (l) => `${l.wins}W - ${l.losses}L` },
@@ -2209,8 +2422,278 @@ function OrgEventDetailView({
         </PixelStack>
       )}
 
-      {/* SUB-TAB 2: EVENT MEMBERS */}
-      {activeTab === 'members' && (
+      {/* SUB-TAB 2: EVENT MEMBERS OR TEAMS & ROSTERS */}
+      {activeTab === 'members' && selectedEvent.isTeamEvent && (
+        <PixelStack gap={6}>
+          <PixelCard className="bg-retro-surface">
+            <PixelStack gap={4}>
+              <PixelSectionHeader
+                title={`REGISTER OR EDIT TEAM ROSTER (PRIMARY MAX: ${selectedEvent.maxPrimaryRosterSize ?? '∞'} · BACKUP MAX: ${selectedEvent.maxBackupRosterSize ?? '∞'})`}
+                size="sm"
+              />
+              {teamRosterError && <PixelAlert tone="red" message={teamRosterError} />}
+
+              <div>
+                <label className="block font-pixel text-xs text-retro-muted mb-1">SELECT APPROVED TEAM</label>
+                <select
+                  value={selectedTeamId}
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border rounded font-sans text-sm text-retro-text"
+                >
+                  <option value="">-- Choose a Team --</option>
+                  {availableTeams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} (@{t.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {loadingTeamDetail ? (
+                <PixelSpinner size="sm" label="Loading team members..." />
+              ) : selectedTeamDetail ? (
+                <PixelStack gap={3}>
+                  <div className="flex gap-2 flex-wrap">
+                    <PixelBadge tone="green">
+                      PRIMARY: {primaryUserIds.length} / {selectedEvent.maxPrimaryRosterSize ?? '∞'}
+                    </PixelBadge>
+                    <PixelBadge tone="neutral">
+                      BACKUP: {backupUserIds.length} / {selectedEvent.maxBackupRosterSize ?? '∞'}
+                    </PixelBadge>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto space-y-2 border-2 border-retro-border p-2 bg-retro-bg">
+                    {(selectedTeamDetail.members ?? []).map((m) => {
+                      const isPrimary = primaryUserIds.includes(m.userId)
+                      const isBackup = backupUserIds.includes(m.userId)
+                      return (
+                        <div
+                          key={m.userId}
+                          className="flex items-center justify-between gap-2 p-2 border border-retro-border bg-retro-surface"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-retro-text truncate">{m.name}</div>
+                            <div className="text-xs text-retro-muted truncate">{m.role}</div>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <PixelButton
+                              type="button"
+                              size="sm"
+                              variant={isPrimary ? 'solid' : 'ghost'}
+                              tone={isPrimary ? 'green' : 'neutral'}
+                              onClick={() => {
+                                setTeamRosterError(null)
+                                if (isPrimary) {
+                                  setPrimaryUserIds((prev) => prev.filter((id) => id !== m.userId))
+                                } else {
+                                  if (
+                                    selectedEvent.maxPrimaryRosterSize !== null &&
+                                    selectedEvent.maxPrimaryRosterSize > 0 &&
+                                    primaryUserIds.length >= selectedEvent.maxPrimaryRosterSize
+                                  ) {
+                                    setTeamRosterError(`Primary roster limit is ${selectedEvent.maxPrimaryRosterSize} per team.`)
+                                    return
+                                  }
+                                  setBackupUserIds((prev) => prev.filter((id) => id !== m.userId))
+                                  setPrimaryUserIds((prev) => [...prev, m.userId])
+                                }
+                              }}
+                            >
+                              PRIMARY
+                            </PixelButton>
+                            <PixelButton
+                              type="button"
+                              size="sm"
+                              variant={isBackup ? 'solid' : 'ghost'}
+                              tone={isBackup ? 'cyan' : 'neutral'}
+                              onClick={() => {
+                                setTeamRosterError(null)
+                                if (isBackup) {
+                                  setBackupUserIds((prev) => prev.filter((id) => id !== m.userId))
+                                } else {
+                                  if (
+                                    selectedEvent.maxBackupRosterSize !== null &&
+                                    backupUserIds.length >= selectedEvent.maxBackupRosterSize
+                                  ) {
+                                    setTeamRosterError(`Backup roster limit is ${selectedEvent.maxBackupRosterSize} per team.`)
+                                    return
+                                  }
+                                  setPrimaryUserIds((prev) => prev.filter((id) => id !== m.userId))
+                                  setBackupUserIds((prev) => [...prev, m.userId])
+                                }
+                              }}
+                            >
+                              BACKUP
+                            </PixelButton>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex justify-end">
+                    <PixelButton
+                      type="button"
+                      variant="solid"
+                      tone="purple"
+                      size="sm"
+                      loading={savingTeamRoster}
+                      disabled={primaryUserIds.length === 0}
+                      onClick={async () => {
+                        setSavingTeamRoster(true)
+                        setTeamRosterError(null)
+                        try {
+                          await handleUpsertEventTeamRoster(selectedTeamId, primaryUserIds, backupUserIds)
+                          toast({ tone: 'green', title: 'Team roster saved.' })
+                        } catch (err) {
+                          setTeamRosterError(err instanceof Error ? err.message : 'Failed to save team roster')
+                        } finally {
+                          setSavingTeamRoster(false)
+                        }
+                      }}
+                    >
+                      SAVE TEAM ROSTER
+                    </PixelButton>
+                  </div>
+                </PixelStack>
+              ) : null}
+            </PixelStack>
+          </PixelCard>
+
+          <PixelCard className="bg-retro-surface">
+            <PixelStack gap={4}>
+              <PixelSectionHeader
+                title={`REGISTERED TEAMS (${(selectedEvent.teams ?? []).length}${
+                  !selectedEvent.granularParticipation && selectedEvent.participantLimit
+                    ? ` / ${selectedEvent.participantLimit}`
+                    : ''
+                })`}
+                size="sm"
+              />
+              {(selectedEvent.teams ?? []).length === 0 ? (
+                <span className="font-pixel text-xs text-retro-muted">NO TEAMS REGISTERED YET</span>
+              ) : (
+                <PixelStack gap={4}>
+                  {(selectedEvent.teams ?? []).map((t) => (
+                    <div key={t.teamId} className="p-4 bg-retro-bg border-2 border-retro-border rounded space-y-3">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="font-pixel text-sm font-bold text-retro-text">{t.name}</span>
+                          <PixelBadge tone="green">PRIMARY: {(t.primaryRoster ?? []).length}</PixelBadge>
+                          <PixelBadge tone="neutral">BACKUP: {(t.backupRoster ?? []).length}</PixelBadge>
+                        </div>
+                        <div className="flex gap-2">
+                          <PixelButton
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            tone="cyan"
+                            onClick={() => setSelectedTeamId(t.teamId)}
+                          >
+                            EDIT ROSTER
+                          </PixelButton>
+                          <PixelButton
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            tone="red"
+                            onClick={() => {
+                              if (confirm(`Remove team "${t.name}" and its roster from this event?`)) {
+                                void handleRemoveEventTeam(t.teamId)
+                              }
+                            }}
+                          >
+                            REMOVE TEAM
+                          </PixelButton>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="font-pixel text-[10px] text-retro-muted mb-1">PRIMARY ROSTER</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(t.primaryRoster ?? []).map((m) => (
+                            <PixelBadge key={m.userId} tone="green">
+                              {m.name}
+                            </PixelBadge>
+                          ))}
+                        </div>
+                      </div>
+
+                      {(t.backupRoster ?? []).length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-retro-border">
+                          <div className="font-pixel text-[10px] text-retro-muted">
+                            BACKUP ROSTER (1-CLICK SUBSTITUTION)
+                          </div>
+                          {(t.backupRoster ?? []).map((bm) => {
+                            const key = `${t.teamId}:${bm.userId}`
+                            const swapOutId = subSwapTargets[key] ?? ''
+                            const replaceUpcoming = subReplaceUpcoming[key] ?? true
+                            return (
+                              <div
+                                key={bm.userId}
+                                className="flex flex-wrap items-center justify-between gap-2 p-2 bg-retro-surface border border-retro-border rounded"
+                              >
+                                <span className="text-xs font-medium text-retro-text">{bm.name}</span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <select
+                                    value={swapOutId}
+                                    onChange={(e) =>
+                                      setSubSwapTargets((prev) => ({ ...prev, [key]: e.target.value }))
+                                    }
+                                    className="px-2 py-1 bg-retro-bg border border-retro-border rounded text-xs text-retro-text"
+                                  >
+                                    <option value="">Promote (No Swap)</option>
+                                    {(t.primaryRoster ?? []).map((pm) => (
+                                      <option key={pm.userId} value={pm.userId}>
+                                        Swap with {pm.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {swapOutId && (
+                                    <label className="flex items-center gap-1 text-[11px] text-retro-muted cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={replaceUpcoming}
+                                        onChange={(e) =>
+                                          setSubReplaceUpcoming((prev) => ({ ...prev, [key]: e.target.checked }))
+                                        }
+                                      />
+                                      Update upcoming races
+                                    </label>
+                                  )}
+                                  <PixelButton
+                                    type="button"
+                                    size="sm"
+                                    variant="solid"
+                                    tone="green"
+                                    onClick={() =>
+                                      void handleSubstituteTeamMember(
+                                        t.teamId,
+                                        bm.userId,
+                                        swapOutId || null,
+                                        replaceUpcoming,
+                                      )
+                                    }
+                                  >
+                                    {swapOutId ? 'SWAP IN' : 'PROMOTE'}
+                                  </PixelButton>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </PixelStack>
+              )}
+            </PixelStack>
+          </PixelCard>
+        </PixelStack>
+      )}
+
+      {/* SUB-TAB 2: EVENT MEMBERS (INDIVIDUAL) */}
+      {activeTab === 'members' && !selectedEvent.isTeamEvent && (
         <PixelCard className="bg-retro-surface">
           <PixelStack gap={4}>
             <PixelSectionHeader title={`EVENT MEMBERS (${selectedEvent.members.length})`} size="sm" />
@@ -2461,7 +2944,17 @@ function OrgEventDetailView({
                   />
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 bg-retro-bg rounded border border-retro-border">
                     <div className="flex-1 min-w-0">
-                      {selectedEvent.granularParticipation ? (
+                      {selectedEvent.isTeamEvent ? (
+                        <RaceMemberCombobox
+                          value={addRaceMemberUserId}
+                          onChange={setAddRaceMemberUserId}
+                          members={selectedEvent.members.filter(
+                            (em) =>
+                              em.rosterRole === 'PRIMARY' &&
+                              !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId)
+                          )}
+                        />
+                      ) : selectedEvent.granularParticipation ? (
                         <UserSearchCombobox value={addRaceMemberUserId} onChange={setAddRaceMemberUserId} />
                       ) : (
                         <RaceMemberCombobox
@@ -2488,6 +2981,12 @@ function OrgEventDetailView({
                     </PixelButton>
                   </div>
 
+                  {selectedEvent.isTeamEvent && (
+                    <div className="text-xs text-retro-muted font-sans">
+                      Only <strong>PRIMARY</strong> roster members are eligible for race lineups. To sub in a backup, use <strong>Teams &amp; Rosters</strong>.
+                    </div>
+                  )}
+
                   {(selectedRace.members ?? []).length > 0 ? (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {(selectedRace.members ?? []).map((m) => (
@@ -2496,6 +2995,9 @@ function OrgEventDetailView({
                           className="flex items-center gap-2 px-3 py-1.5 bg-retro-bg border border-retro-border rounded font-pixel text-xs text-retro-text"
                         >
                           <UserLink userId={m.userId} name={m.name} />
+                          {selectedEvent.isTeamEvent && m.teamName && (
+                            <PixelBadge tone="purple">{m.teamName}</PixelBadge>
+                          )}
                           <PixelButton
                             variant="ghost"
                             tone="red"
@@ -2641,9 +3143,9 @@ function OrgEventDetailView({
 
             {!selectedEvent.granularParticipation ? (
               <PixelInput
-                label="PARTICIPANT LIMIT"
+                label={selectedEvent.isTeamEvent ? 'TEAM LIMIT' : 'PARTICIPANT LIMIT'}
                 type="number"
-                placeholder="e.g. 20"
+                placeholder={selectedEvent.isTeamEvent ? 'e.g. 12 teams' : 'e.g. 20'}
                 value={editParticipantLimit}
                 onChange={(e) => setEditParticipantLimit(e.target.value)}
               />
@@ -2655,6 +3157,25 @@ function OrgEventDetailView({
                 value={editMaxConcurrent}
                 onChange={(e) => setEditMaxConcurrent(e.target.value)}
               />
+            )}
+
+            {selectedEvent.isTeamEvent && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <PixelInput
+                  label="MAX PRIMARY ROSTER (PER TEAM)"
+                  type="number"
+                  placeholder="Blank for unlimited"
+                  value={editMaxPrimaryRosterSize}
+                  onChange={(e) => setEditMaxPrimaryRosterSize(e.target.value)}
+                />
+                <PixelInput
+                  label="MAX BACKUP ROSTER (PER TEAM)"
+                  type="number"
+                  placeholder="Blank for unlimited"
+                  value={editMaxBackupRosterSize}
+                  onChange={(e) => setEditMaxBackupRosterSize(e.target.value)}
+                />
+              </div>
             )}
 
             <div className="flex items-center gap-2 pt-2">

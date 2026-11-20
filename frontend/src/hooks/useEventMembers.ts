@@ -4,6 +4,9 @@ import {
   removeEventMember,
   addRaceEventMember,
   removeRaceEventMember,
+  upsertEventTeamRoster,
+  substituteEventTeamMember,
+  removeEventTeam,
 } from '../lib/admin-api'
 import type { eventmanager } from '../lib/client'
 
@@ -110,6 +113,81 @@ export function useEventMembers({
     [authHeader, eventId, setRaces, setGlobalError, setGlobalSuccess, reloadCurrentEvent],
   )
 
+  // Upsert Event Team Roster (Primary + Backup)
+  const handleUpsertEventTeamRoster = useCallback(
+    async (teamId: string, primaryUserIds: string[], backupUserIds: string[]) => {
+      if (!teamId || !authHeader) return false
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updated = await upsertEventTeamRoster(eventId, teamId, primaryUserIds, backupUserIds, authHeader)
+        setSelectedEvent(updated)
+        setRaces(updated.raceEvents as unknown as eventmanager.RaceEventDetail[])
+        setGlobalSuccess('Successfully saved team roster.')
+        return true
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to save team roster')
+        return false
+      }
+    },
+    [authHeader, eventId, setSelectedEvent, setRaces, setGlobalError, setGlobalSuccess],
+  )
+
+  // 1-Click Substitute / Promote Backup to Primary
+  const handleSubstituteTeamMember = useCallback(
+    async (
+      teamId: string,
+      incomingUserId: string,
+      outgoingUserId?: string | null,
+      replaceInUpcomingRaces = true,
+    ) => {
+      if (!teamId || !incomingUserId || !authHeader) return false
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updated = await substituteEventTeamMember(
+          eventId,
+          teamId,
+          incomingUserId,
+          outgoingUserId,
+          replaceInUpcomingRaces,
+          authHeader,
+        )
+        setSelectedEvent(updated)
+        setRaces(updated.raceEvents as unknown as eventmanager.RaceEventDetail[])
+        setGlobalSuccess(
+          outgoingUserId
+            ? 'Successfully swapped backup member into the primary roster.'
+            : 'Successfully promoted backup member to the primary roster.',
+        )
+        return true
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to substitute team member')
+        return false
+      }
+    },
+    [authHeader, eventId, setSelectedEvent, setRaces, setGlobalError, setGlobalSuccess],
+  )
+
+  // Remove Team from Event
+  const handleRemoveEventTeam = useCallback(
+    async (teamId: string) => {
+      if (!authHeader) return
+      if (!confirm('Are you sure you want to remove this team and all its roster members from the event?')) return
+      setGlobalError(null)
+      setGlobalSuccess(null)
+      try {
+        const updated = await removeEventTeam(eventId, teamId, authHeader)
+        setSelectedEvent(updated)
+        setRaces(updated.raceEvents as unknown as eventmanager.RaceEventDetail[])
+        setGlobalSuccess('Successfully removed team from the event.')
+      } catch (cause) {
+        setGlobalError(cause instanceof Error ? cause.message : 'Unable to remove team from event')
+      }
+    },
+    [authHeader, eventId, setSelectedEvent, setRaces, setGlobalError, setGlobalSuccess],
+  )
+
   return {
     newMemberUserId,
     setNewMemberUserId,
@@ -119,5 +197,8 @@ export function useEventMembers({
     handleRemoveMember,
     handleAddRaceMember,
     handleRemoveRaceMember,
+    handleUpsertEventTeamRoster,
+    handleSubstituteTeamMember,
+    handleRemoveEventTeam,
   }
 }

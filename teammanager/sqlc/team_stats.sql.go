@@ -165,3 +165,106 @@ func (q *Queries) GetAllApprovedTeamsMembersLeaderboardStats(ctx context.Context
 	}
 	return items, nil
 }
+
+const getAllApprovedTeamsCompetitionStats = `-- name: GetAllApprovedTeamsCompetitionStats :many
+WITH team_event_scores AS (
+    SELECT
+        et."eventId",
+        et."teamId",
+        COALESCE(SUM(COALESCE(epe.points, 0)), 0)::bigint AS event_points
+    FROM "event_team" et
+    JOIN "event" e ON e.id = et."eventId"
+    JOIN "team" t ON t.id = et."teamId"
+    LEFT JOIN "event_member" em ON em."eventId" = et."eventId" AND em."teamId" = et."teamId"
+    LEFT JOIN "event_points_entry" epe ON epe."eventId" = et."eventId" AND epe."userId" = em."userId"
+    WHERE e."deletedAt" IS NULL
+      AND e."isTeamEvent" = TRUE
+      AND t.status = 'APPROVED'
+      AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
+    GROUP BY et."eventId", et."teamId"
+),
+ranked_team_events AS (
+    SELECT
+        "eventId",
+        "teamId",
+        event_points,
+        RANK() OVER (PARTITION BY "eventId" ORDER BY event_points DESC)::double precision AS event_rank
+    FROM team_event_scores
+)
+SELECT
+    "teamId" AS team_id,
+    COUNT(DISTINCT "eventId")::bigint AS team_events_participated,
+    COALESCE(SUM(event_points), 0)::bigint AS team_total_points,
+    COALESCE(AVG(event_points), 0)::double precision AS team_avg_points,
+    COALESCE(AVG(event_rank), 0)::double precision AS team_event_rank_avg
+FROM ranked_team_events
+GROUP BY "teamId"
+`
+
+type GetAllApprovedTeamsCompetitionStatsRow struct {
+	TeamID                 string
+	TeamEventsParticipated int64
+	TeamTotalPoints        int64
+	TeamAvgPoints          float64
+	TeamEventRankAvg       float64
+}
+
+func (q *Queries) GetAllApprovedTeamsCompetitionStats(ctx context.Context, year int32) ([]GetAllApprovedTeamsCompetitionStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllApprovedTeamsCompetitionStats, year)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllApprovedTeamsCompetitionStatsRow
+	for rows.Next() {
+		var i GetAllApprovedTeamsCompetitionStatsRow
+		if err := rows.Scan(
+			&i.TeamID,
+			&i.TeamEventsParticipated,
+			&i.TeamTotalPoints,
+			&i.TeamAvgPoints,
+			&i.TeamEventRankAvg,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTeamStatYears = `-- name: ListTeamStatYears :many
+SELECT DISTINCT EXTRACT(YEAR FROM COALESCE("scheduledAt", "createdAt"))::int AS year
+FROM "event"
+WHERE "deletedAt" IS NULL
+ORDER BY year DESC
+`
+
+func (q *Queries) ListTeamStatYears(ctx context.Context) ([]int32, error) {
+	rows, err := q.db.QueryContext(ctx, listTeamStatYears)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int32
+	for rows.Next() {
+		var year int32
+		if err := rows.Scan(&year); err != nil {
+			return nil, err
+		}
+		items = append(items, year)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+

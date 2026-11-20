@@ -151,6 +151,8 @@ export function useEventDetail(eventId: string) {
       scheduledAt?: string | null
       participantLimit?: number | null
       maxConcurrentRaceParticipations?: number | null
+      maxPrimaryRosterSize?: number | null
+      maxBackupRosterSize?: number | null
     }) => {
       if (!authHeader) return
       setGlobalError(null)
@@ -314,6 +316,9 @@ export function useEventDetail(eventId: string) {
     handleRemoveMember: membersHook.handleRemoveMember,
     handleAddRaceMember: membersHook.handleAddRaceMember,
     handleRemoveRaceMember: membersHook.handleRemoveRaceMember,
+    handleUpsertEventTeamRoster: membersHook.handleUpsertEventTeamRoster,
+    handleSubstituteTeamMember: membersHook.handleSubstituteTeamMember,
+    handleRemoveEventTeam: membersHook.handleRemoveEventTeam,
     handleCreateRace: racesHook.handleCreateRace,
     handleStartRace: racesHook.handleStartRace,
     handleEndRace: racesHook.handleEndRace,

@@ -1,11 +1,14 @@
 -- Race members for a race.
 -- name: ListRaceEventMembers :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
 FROM "race_event_member" m
 JOIN "race_event" r ON r.id = m."raceEventId"
 JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = m."userId"
 LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
+LEFT JOIN "event_member" em ON em."eventId" = r."eventId" AND em."userId" = m."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE m."raceEventId" = $1;
 
 -- Max sequence for a race event (used by CreateRaceEvent).
@@ -142,7 +145,7 @@ SELECT EXISTS(SELECT 1 FROM "event" WHERE id = $1);
 
 -- Full event row (replaces eventColumns scans).
 -- name: GetEventRow :one
-SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."isTeamEvent", e."maxPrimaryRosterSize", e."maxBackupRosterSize", e."createdAt", e."updatedAt",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -179,8 +182,9 @@ SELECT EXISTS(SELECT 1 FROM "organization" WHERE id = $1);
 INSERT INTO "event" (id, name, description, "bannerUrl", "ownerType", "organizationId", "ownerUserId",
   status, tag, "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction",
   "granularParticipation", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations",
+  "isTeamEvent", "maxPrimaryRosterSize", "maxBackupRosterSize",
   "createdAt", "updatedAt")
-VALUES ($1,$2,$3,$4,$5,$6,$7,'DRAFT',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17);
+VALUES ($1,$2,$3,$4,$5,$6,$7,'DRAFT',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$20);
 
 -- Purge long-deleted events.
 -- name: PurgeExpiredDeletedEvents :exec
@@ -200,9 +204,11 @@ WHERE ($1::text = '' OR e."organizationId" = $1)
 SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
+e."isTeamEvent", e."maxPrimaryRosterSize", e."maxBackupRosterSize",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+(SELECT COUNT(*) FROM "event_team" et WHERE et."eventId" = e.id) AS "teamCount",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -226,9 +232,11 @@ SELECT COUNT(*) FROM "event" e WHERE e.status IN ('PENDING','ONGOING','CONCLUDED
 SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
+e."isTeamEvent", e."maxPrimaryRosterSize", e."maxBackupRosterSize",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+(SELECT COUNT(*) FROM "event_team" et WHERE et."eventId" = e.id) AS "teamCount",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -273,21 +281,26 @@ FROM "race_event" WHERE "eventId" = $1 ORDER BY sequence ASC;
 
 -- Race members of an event with display names (used by LoadEvent).
 -- name: ListRaceMembersByEvent :many
-SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
 FROM "race_event_member" m
 JOIN "race_event" r ON r.id = m."raceEventId"
 JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = m."userId"
 LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
+LEFT JOIN "event_member" em ON em."eventId" = r."eventId" AND em."userId" = m."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE r."eventId" = $1;
 
 -- Event members with display names (used by LoadEvent).
 -- name: ListEventMembersByEvent :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
+       m."teamId", t.name AS "teamName", t.slug AS "teamSlug", m."rosterRole"
 FROM "event_member" m
 JOIN "event" e ON e.id = m."eventId"
 JOIN "user" u ON u.id = m."userId"
 LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
+LEFT JOIN "team" t ON t.id = m."teamId"
 WHERE m."eventId" = $1;
 
 -- Schedules of an event (used by LoadEvent).
@@ -297,13 +310,21 @@ WHERE "eventId" = $1 ORDER BY "startsAt" ASC;
 
 -- Scoring overviews (used by LoadEvent).
 -- name: ListPointsOverview :many
-SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.points
-FROM "event_points_entry" e JOIN "user" u ON u.id = e."userId"
+SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.points,
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
+FROM "event_points_entry" e
+JOIN "user" u ON u.id = e."userId"
+LEFT JOIN "event_member" em ON em."eventId" = e."eventId" AND em."userId" = e."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE e."eventId" = $1 ORDER BY e.points DESC;
 
 -- name: ListLadderOverview :many
-SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.elo, e.wins, e.losses
-FROM "event_ladder_entry" e JOIN "user" u ON u.id = e."userId"
+SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.elo, e.wins, e.losses,
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
+FROM "event_ladder_entry" e
+JOIN "user" u ON u.id = e."userId"
+LEFT JOIN "event_member" em ON em."eventId" = e."eventId" AND em."userId" = e."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE e."eventId" = $1 ORDER BY e.elo DESC;
 
 -- Granularity flag (used by RequireMembershipForResult, ApplyAutoDeferrals).
@@ -431,7 +452,9 @@ UPDATE "event" SET
   "classRestriction" = CASE WHEN sqlc.arg('class_set')::boolean THEN sqlc.narg('class_val') ELSE "classRestriction" END,
   "scheduledAt" = CASE WHEN sqlc.arg('sched_set')::boolean THEN sqlc.narg('sched_val') ELSE "scheduledAt" END,
   "participantLimit" = CASE WHEN sqlc.arg('pl_clear')::boolean THEN NULL ELSE COALESCE(sqlc.narg('pl_val'), "participantLimit") END,
-  "maxConcurrentRaceParticipations" = CASE WHEN sqlc.arg('mc_clear')::boolean THEN NULL ELSE COALESCE(sqlc.narg('mc_val'), "maxConcurrentRaceParticipations") END
+  "maxConcurrentRaceParticipations" = CASE WHEN sqlc.arg('mc_clear')::boolean THEN NULL ELSE COALESCE(sqlc.narg('mc_val'), "maxConcurrentRaceParticipations") END,
+  "maxPrimaryRosterSize" = CASE WHEN sqlc.arg('mpr_clear')::boolean THEN NULL ELSE COALESCE(sqlc.narg('mpr_val'), "maxPrimaryRosterSize") END,
+  "maxBackupRosterSize" = CASE WHEN sqlc.arg('mbr_clear')::boolean THEN NULL ELSE COALESCE(sqlc.narg('mbr_val'), "maxBackupRosterSize") END
 WHERE id = sqlc.arg('id');
 
 -- Race ids for an event.
@@ -554,3 +577,120 @@ FROM "dataset" WHERE id = $1 AND "eventId" = $2;
 -- name: UpdateDatasetStatus :one
 UPDATE "dataset" SET status = $1, "importedAt" = $2 WHERE id = $3
 RETURNING id, "eventId", source, rows, status, "importedAt", "createdAt", "updatedAt";
+
+-- ============================================================================
+-- Team-based events & primary/backup rosters
+-- ============================================================================
+
+-- Lookup team metadata & approval status for event registration.
+-- name: GetTeamForEvent :one
+SELECT id, name, slug, logo, status FROM "team" WHERE id = $1;
+
+-- Check if a user belongs to a team.
+-- name: IsUserInTeam :one
+SELECT EXISTS(SELECT 1 FROM "teamMember" WHERE "teamId" = $1 AND "userId" = $2);
+
+-- Check if a user is a team administrator.
+-- name: IsUserTeamAdmin :one
+SELECT EXISTS(
+  SELECT 1 FROM "teamMember"
+  WHERE "teamId" = $1
+    AND "userId" = $2
+    AND LOWER(COALESCE(role, '')) IN ('administrator', 'organizationadministrator')
+);
+
+-- List all teams registered in an event.
+-- name: ListEventTeamsByEvent :many
+SELECT et.id, et."eventId", et."teamId", et."registeredByUserId", et."createdAt", et."updatedAt",
+       t.name, t.slug, t.logo
+FROM "event_team" et
+JOIN "team" t ON t.id = et."teamId"
+WHERE et."eventId" = $1
+ORDER BY et."createdAt" ASC;
+
+-- Check if a team is already registered in an event.
+-- name: EventTeamExists :one
+SELECT EXISTS(SELECT 1 FROM "event_team" WHERE "eventId" = $1 AND "teamId" = $2);
+
+-- Count registered teams in an event.
+-- name: CountEventTeams :one
+SELECT COUNT(*) FROM "event_team" WHERE "eventId" = $1;
+
+-- Insert or touch an event_team registration.
+-- name: UpsertEventTeam :exec
+INSERT INTO "event_team" (id, "eventId", "teamId", "registeredByUserId", "createdAt", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $5)
+ON CONFLICT ("eventId", "teamId") DO UPDATE SET "updatedAt" = EXCLUDED."updatedAt";
+
+-- Delete an event_team registration.
+-- name: DeleteEventTeam :exec
+DELETE FROM "event_team" WHERE "eventId" = $1 AND "teamId" = $2;
+
+-- Upsert an event_member with teamId and rosterRole.
+-- name: UpsertEventTeamMember :exec
+INSERT INTO "event_member" (id, "eventId", "userId", "teamId", "rosterRole", "createdAt")
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT ("eventId", "userId") DO UPDATE SET
+  "teamId" = EXCLUDED."teamId",
+  "rosterRole" = EXCLUDED."rosterRole";
+
+-- Get an event_member's teamId and rosterRole.
+-- name: GetEventMemberTeamRole :one
+SELECT "teamId", "rosterRole" FROM "event_member" WHERE "eventId" = $1 AND "userId" = $2;
+
+-- List all event_members for a specific team in an event.
+-- name: ListEventMembersByTeam :many
+SELECT "userId", "rosterRole" FROM "event_member" WHERE "eventId" = $1 AND "teamId" = $2;
+
+-- Update an event_member's rosterRole (PRIMARY <-> BACKUP).
+-- name: UpdateEventMemberRosterRole :exec
+UPDATE "event_member" SET "rosterRole" = $1 WHERE "eventId" = $2 AND "userId" = $3;
+
+-- Count roster members by role for a team in an event.
+-- name: CountTeamRosterByRole :one
+SELECT COUNT(*) FROM "event_member" WHERE "eventId" = $1 AND "teamId" = $2 AND "rosterRole" = $3;
+
+-- Max primary/backup roster size currently enrolled across teams in an event (for UpdateEvent limit checks).
+-- name: GetMaxTeamRosterCountByRole :one
+SELECT COALESCE(MAX(c), 0)::integer FROM (
+  SELECT COUNT(*) AS c FROM "event_member"
+  WHERE "eventId" = $1 AND "teamId" IS NOT NULL AND "rosterRole" = $2
+  GROUP BY "teamId"
+) sub;
+
+-- Remove incoming user from unstarted races where outgoing user is also present (avoid unique conflict before swap).
+-- name: DeleteIncomingDuplicateUnstartedRaceMembers :exec
+DELETE FROM "race_event_member"
+WHERE "userId" = $3
+  AND "raceEventId" IN (
+    SELECT r.id FROM "race_event" r
+    JOIN "race_event_member" rem ON rem."raceEventId" = r.id
+    WHERE r."eventId" = $1 AND r."startsAt" IS NULL AND rem."userId" = $2
+  );
+
+-- Replace outgoing primary user with incoming backup user in unstarted races of an event.
+-- name: ReplaceUserInUnstartedRaces :exec
+UPDATE "race_event_member"
+SET "userId" = $3
+WHERE "userId" = $2
+  AND "raceEventId" IN (
+    SELECT id FROM "race_event" WHERE "eventId" = $1 AND "startsAt" IS NULL
+  );
+
+-- List team points overview (Constructors' sum of member points per registered team).
+-- name: ListTeamPointsOverview :many
+SELECT
+  et."teamId",
+  t.name,
+  t.slug,
+  t.logo,
+  COALESCE(SUM(epe.points), 0)::integer AS points,
+  COUNT(DISTINCT em."userId")::integer AS "memberCount"
+FROM "event_team" et
+JOIN "team" t ON t.id = et."teamId"
+LEFT JOIN "event_member" em ON em."eventId" = et."eventId" AND em."teamId" = et."teamId"
+LEFT JOIN "event_points_entry" epe ON epe."eventId" = et."eventId" AND epe."userId" = em."userId"
+WHERE et."eventId" = $1
+GROUP BY et."teamId", t.name, t.slug, t.logo
+ORDER BY points DESC, t.name ASC;
+

@@ -79,6 +79,9 @@ function AdminEventsListPage() {
   const [formScheduledAt, setFormScheduledAt] = useState<string>('')
   const [formParticipantLimit, setFormParticipantLimit] = useState<string>('')
   const [formMaxConcurrentRaceParticipations, setFormMaxConcurrentRaceParticipations] = useState<string>('')
+  const [formIsTeamEvent, setFormIsTeamEvent] = useState(false)
+  const [formMaxPrimaryRosterSize, setFormMaxPrimaryRosterSize] = useState<string>('')
+  const [formMaxBackupRosterSize, setFormMaxBackupRosterSize] = useState<string>('')
   const [formScoringRulesMode, setFormScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [formCustomScoringTables, setFormCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [submitting, setSubmitting] = useState(false)
@@ -123,6 +126,9 @@ function AdminEventsListPage() {
       setFormScheduledAt('')
       setFormParticipantLimit('')
       setFormMaxConcurrentRaceParticipations('')
+      setFormIsTeamEvent(false)
+      setFormMaxPrimaryRosterSize('')
+      setFormMaxBackupRosterSize('')
       setFormScoringRulesMode('STANDARD')
       setFormCustomScoringTables(DEFAULT_SCORING_TABLES)
     }
@@ -167,14 +173,26 @@ function AdminEventsListPage() {
 
     const limitNum = formParticipantLimit.trim() ? Number(formParticipantLimit) : null
     const maxConcurrentNum = formMaxConcurrentRaceParticipations.trim() ? Number(formMaxConcurrentRaceParticipations) : null
+    const maxPrimaryNum = formMaxPrimaryRosterSize.trim() ? Number(formMaxPrimaryRosterSize) : null
+    const maxBackupNum = formMaxBackupRosterSize.trim() ? Number(formMaxBackupRosterSize) : null
 
     if (limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
-      setFormError('Participant limit must be a positive whole number.')
+      setFormError(formIsTeamEvent ? 'Team limit must be a positive whole number.' : 'Participant limit must be a positive whole number.')
       return
     }
 
     if (maxConcurrentNum !== null && (isNaN(maxConcurrentNum) || !Number.isSafeInteger(maxConcurrentNum) || maxConcurrentNum <= 0)) {
       setFormError('Max races per participant must be a positive whole number.')
+      return
+    }
+
+    if (formIsTeamEvent && maxPrimaryNum !== null && (isNaN(maxPrimaryNum) || !Number.isSafeInteger(maxPrimaryNum) || maxPrimaryNum <= 0)) {
+      setFormError('Max primary roster size must be a positive whole number.')
+      return
+    }
+
+    if (formIsTeamEvent && maxBackupNum !== null && (isNaN(maxBackupNum) || !Number.isSafeInteger(maxBackupNum) || maxBackupNum < 0)) {
+      setFormError('Max backup roster size must be 0 or a positive whole number.')
       return
     }
 
@@ -197,6 +215,9 @@ function AdminEventsListPage() {
           scheduledAt: formScheduledAt ? new Date(formScheduledAt).toISOString() : null,
           participantLimit: formGranularParticipation ? null : limitNum,
           maxConcurrentRaceParticipations: formGranularParticipation ? maxConcurrentNum : null,
+          isTeamEvent: formIsTeamEvent,
+          maxPrimaryRosterSize: formIsTeamEvent ? maxPrimaryNum : null,
+          maxBackupRosterSize: formIsTeamEvent ? maxBackupNum : null,
         },
         authHeader,
       )
@@ -318,13 +339,20 @@ function AdminEventsListPage() {
                   {events.map((evt) => (
                     <tr key={evt.id}>
                       <td>
-                        <Link
-                          to="/admin/events/$eventId"
-                          params={{ eventId: evt.id }}
-                          style={{ fontWeight: 600, color: 'var(--fgColor-accent, #0969da)', textDecoration: 'none' }}
-                        >
-                          {evt.name}
-                        </Link>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <Link
+                            to="/admin/events/$eventId"
+                            params={{ eventId: evt.id }}
+                            style={{ fontWeight: 600, color: 'var(--fgColor-accent, #0969da)', textDecoration: 'none' }}
+                          >
+                            {evt.name}
+                          </Link>
+                          {evt.isTeamEvent && (
+                            <Label variant="accent" size="small">
+                              TEAM
+                            </Label>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <Label variant={statusLabelVariant(evt.status)} size="small">
@@ -457,6 +485,51 @@ function AdminEventsListPage() {
 
             <FormControl>
               <Checkbox
+                checked={formIsTeamEvent}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setFormIsTeamEvent(checked)
+                  if (!checked) {
+                    setFormMaxPrimaryRosterSize('')
+                    setFormMaxBackupRosterSize('')
+                  }
+                }}
+              />
+              <FormControl.Label>Team-Based Competition Event</FormControl.Label>
+              <FormControl.Caption>
+                Teams register with Primary and Backup rosters. Only Primary roster members can enter race lineups, and points aggregate into Team Standings.
+              </FormControl.Caption>
+            </FormControl>
+
+            {formIsTeamEvent && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <FormControl>
+                  <FormControl.Label>Max Primary Roster Size (Per Team)</FormControl.Label>
+                  <TextInput
+                    block
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 3 (leave blank for unlimited)"
+                    value={formMaxPrimaryRosterSize}
+                    onChange={(e) => setFormMaxPrimaryRosterSize(e.target.value)}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormControl.Label>Max Backup Roster Size (Per Team)</FormControl.Label>
+                  <TextInput
+                    block
+                    type="number"
+                    min={0}
+                    placeholder="e.g. 2 (leave blank for unlimited)"
+                    value={formMaxBackupRosterSize}
+                    onChange={(e) => setFormMaxBackupRosterSize(e.target.value)}
+                  />
+                </FormControl>
+              </div>
+            )}
+
+            <FormControl>
+              <Checkbox
                 checked={formGranularParticipation}
                 onChange={(e) => {
                   const checked = e.target.checked
@@ -476,12 +549,12 @@ function AdminEventsListPage() {
 
             {!formGranularParticipation ? (
               <FormControl>
-                <FormControl.Label>Participant Limit</FormControl.Label>
+                <FormControl.Label>{formIsTeamEvent ? 'Team Limit' : 'Participant Limit'}</FormControl.Label>
                 <TextInput
                   block
                   type="number"
                   min={1}
-                  placeholder="e.g. 20 (leave blank for unlimited)"
+                  placeholder={formIsTeamEvent ? 'e.g. 12 teams (leave blank for unlimited)' : 'e.g. 20 (leave blank for unlimited)'}
                   value={formParticipantLimit}
                   onChange={(e) => setFormParticipantLimit(e.target.value)}
                 />

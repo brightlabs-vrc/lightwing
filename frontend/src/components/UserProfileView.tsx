@@ -22,6 +22,9 @@ interface UserProfileViewProps {
 
 export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
   const { session } = useAuth()
+  const currentYear = new Date().getUTCFullYear()
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear)
+  const [availableYears, setAvailableYears] = useState<number[]>([currentYear])
   const [stats, setStats] = useState<LeaderboardEntry | null>(null)
   const [loadingStats, setLoadingStats] = useState(true)
   const isSelf = session?.user.id === user.id
@@ -48,7 +51,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
       try {
         setLoadingStats(true)
         setStats(null)
-        const lb = await getLeaderboard({ Search: user.slug || user.name })
+        const lb = await getLeaderboard({
+          Search: user.slug || user.name,
+          Year: selectedYear === 0 ? 0 : selectedYear,
+          AllTime: selectedYear === 0,
+          Limit: 50,
+        })
+        if (active && lb.availableYears && lb.availableYears.length > 0) {
+          setAvailableYears(lb.availableYears)
+        }
         const match = lb.entries.find((e) => e.userId === user.id || (user.slug && e.slug === user.slug))
         if (active && match) {
           setStats(match)
@@ -65,7 +76,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
     return () => {
       active = false
     }
-  }, [user.id, user.slug, user.name])
+  }, [user.id, user.slug, user.name, selectedYear])
 
   useEffect(() => {
     let active = true
@@ -73,7 +84,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
       try {
         setLoadingRecords(true)
         const offset = (page - 1) * pageSize
-        const res = await getUserRaceRecords(user.id, pageSize, offset)
+        const res = await getUserRaceRecords(user.id, pageSize, offset, selectedYear)
         if (active) {
           setRecords(res.records)
           setRecordsTotal(res.total)
@@ -93,7 +104,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
     return () => {
       active = false
     }
-  }, [user.id, page, pageSize])
+  }, [user.id, page, pageSize, selectedYear])
 
   return (
     <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
@@ -152,11 +163,29 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user }) => {
       </PixelCard>
 
       {/* Performance Summary Grid */}
-      <PixelSectionHeader
-        title="CAREER PERFORMANCE"
-        titleTone="gold"
-        size="md"
-      />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <PixelSectionHeader
+          title="CAREER PERFORMANCE"
+          titleTone="gold"
+          size="md"
+        />
+        <select
+          aria-label="Filter career stats by season"
+          value={selectedYear}
+          onChange={(e) => {
+            setSelectedYear(Number(e.target.value))
+            setPage(1)
+          }}
+          className="px-3 py-1.5 bg-retro-surface border-2 border-retro-border rounded text-xs text-retro-text font-sans focus:outline-none focus:border-retro-primary"
+        >
+          <option value={0}>All-Time</option>
+          {availableYears.map((y) => (
+            <option key={y} value={y}>
+              {y} Season
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mt-4 mb-6 sm:mb-8">
         <PixelCard className="bg-retro-surface text-center py-3.5 sm:py-5">

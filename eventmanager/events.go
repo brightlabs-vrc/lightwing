@@ -79,17 +79,25 @@ type EventListItem struct {
 	ScheduledAt                     *string `json:"scheduledAt"`
 	ParticipantLimit                *int    `json:"participantLimit"`
 	MaxConcurrentRaceParticipations *int    `json:"maxConcurrentRaceParticipations"`
+	IsTeamEvent                     bool    `json:"isTeamEvent"`
+	MaxPrimaryRosterSize            *int    `json:"maxPrimaryRosterSize"`
+	MaxBackupRosterSize             *int    `json:"maxBackupRosterSize"`
 	RaceCount                       int     `json:"raceCount"`
 	MemberCount                     int     `json:"memberCount"`
+	TeamCount                       int     `json:"teamCount"`
 	CreatedAt                       string  `json:"createdAt"`
 	UpdatedAt                       string  `json:"updatedAt"`
 }
 
 // EventMemberView is a single event participant.
 type EventMemberView struct {
-	UserID    string  `json:"userId"`
-	Name      string  `json:"name"`
-	ClassTier *string `json:"classTier"`
+	UserID     string  `json:"userId"`
+	Name       string  `json:"name"`
+	ClassTier  *string `json:"classTier"`
+	TeamID     *string `json:"teamId,omitempty"`
+	TeamName   *string `json:"teamName,omitempty"`
+	TeamSlug   *string `json:"teamSlug,omitempty"`
+	RosterRole *string `json:"rosterRole,omitempty"`
 }
 
 // EventScheduleView is a single schedule slot.
@@ -103,26 +111,38 @@ type EventScheduleView struct {
 
 // PointsEntryView is one row of the points overview.
 type PointsEntryView struct {
-	UserID string `json:"userId"`
-	Name   string `json:"name"`
-	Points int    `json:"points"`
+	UserID     string  `json:"userId"`
+	Name       string  `json:"name"`
+	Points     int     `json:"points"`
+	TeamID     *string `json:"teamId,omitempty"`
+	TeamName   *string `json:"teamName,omitempty"`
+	TeamSlug   *string `json:"teamSlug,omitempty"`
+	RosterRole *string `json:"rosterRole,omitempty"`
 }
 
 // LadderEntryView is one row of the ladder overview.
 type LadderEntryView struct {
-	UserID string `json:"userId"`
-	Name   string `json:"name"`
-	Elo    int    `json:"elo"`
-	Wins   int    `json:"wins"`
-	Losses int    `json:"losses"`
-	Rank   int    `json:"rank"`
+	UserID     string  `json:"userId"`
+	Name       string  `json:"name"`
+	Elo        int     `json:"elo"`
+	Wins       int     `json:"wins"`
+	Losses     int     `json:"losses"`
+	Rank       int     `json:"rank"`
+	TeamID     *string `json:"teamId,omitempty"`
+	TeamName   *string `json:"teamName,omitempty"`
+	TeamSlug   *string `json:"teamSlug,omitempty"`
+	RosterRole *string `json:"rosterRole,omitempty"`
 }
 
 // RaceEventMemberView is a single race participant.
 type RaceEventMemberView struct {
-	UserID    string  `json:"userId"`
-	Name      string  `json:"name"`
-	ClassTier *string `json:"classTier"`
+	UserID     string  `json:"userId"`
+	Name       string  `json:"name"`
+	ClassTier  *string `json:"classTier"`
+	TeamID     *string `json:"teamId,omitempty"`
+	TeamName   *string `json:"teamName,omitempty"`
+	TeamSlug   *string `json:"teamSlug,omitempty"`
+	RosterRole *string `json:"rosterRole,omitempty"`
 }
 
 // RaceEventView is a race belonging to an event.
@@ -146,36 +166,41 @@ type RaceEventView struct {
 //
 // Mirrors ts-legacy/eventmanager/events.ts EventDetail.
 type EventDetail struct {
-	ID                              string              `json:"id"`
-	Name                            string              `json:"name"`
-	Description                     *string             `json:"description"`
-	BannerURL                       *string             `json:"bannerUrl,omitempty"`
-	OwnerType                       string              `json:"ownerType"`
-	OrganizationID                  *string             `json:"organizationId"`
-	OwnerUserID                     *string             `json:"ownerUserId"`
-	OwnerName                       *string             `json:"ownerName"`
-	OwnerSlug                       *string             `json:"ownerSlug,omitempty"`
-	OwnerLogo                       *string             `json:"ownerLogo,omitempty"`
-	Status                          string              `json:"status"`
-	Tag                             string              `json:"tag"`
-	DeletedAt                       *string             `json:"deletedAt,omitempty"`
-	ScoringType                     int                 `json:"scoringType"`
-	ScoringTypeLabel                string              `json:"scoringTypeLabel"`
-	ScoringRulesMode                *string             `json:"scoringRulesMode"`
-	CustomScoringTables             json.RawMessage     `json:"customScoringTables"`
-	ClassRestriction                *string             `json:"classRestriction"`
-	GranularParticipation           bool                `json:"granularParticipation"`
-	SignupsLocked                   bool                `json:"signupsLocked"`
-	ScheduledAt                     *string             `json:"scheduledAt"`
-	ParticipantLimit                *int                `json:"participantLimit"`
-	MaxConcurrentRaceParticipations *int                `json:"maxConcurrentRaceParticipations"`
-	RaceEvents                      []RaceEventView     `json:"raceEvents"`
-	Members                         []EventMemberView   `json:"members"`
-	Schedules                       []EventScheduleView `json:"schedules"`
-	PointsOverview                  []PointsEntryView   `json:"pointsOverview"`
-	LadderOverview                  []LadderEntryView   `json:"ladderOverview"`
-	CreatedAt                       string              `json:"createdAt"`
-	UpdatedAt                       string              `json:"updatedAt"`
+	ID                              string                `json:"id"`
+	Name                            string                `json:"name"`
+	Description                     *string               `json:"description"`
+	BannerURL                       *string               `json:"bannerUrl,omitempty"`
+	OwnerType                       string                `json:"ownerType"`
+	OrganizationID                  *string               `json:"organizationId"`
+	OwnerUserID                     *string               `json:"ownerUserId"`
+	OwnerName                       *string               `json:"ownerName"`
+	OwnerSlug                       *string               `json:"ownerSlug,omitempty"`
+	OwnerLogo                       *string               `json:"ownerLogo,omitempty"`
+	Status                          string                `json:"status"`
+	Tag                             string                `json:"tag"`
+	DeletedAt                       *string               `json:"deletedAt,omitempty"`
+	ScoringType                     int                   `json:"scoringType"`
+	ScoringTypeLabel                string                `json:"scoringTypeLabel"`
+	ScoringRulesMode                *string               `json:"scoringRulesMode"`
+	CustomScoringTables             json.RawMessage       `json:"customScoringTables"`
+	ClassRestriction                *string               `json:"classRestriction"`
+	GranularParticipation           bool                  `json:"granularParticipation"`
+	SignupsLocked                   bool                  `json:"signupsLocked"`
+	ScheduledAt                     *string               `json:"scheduledAt"`
+	ParticipantLimit                *int                  `json:"participantLimit"`
+	MaxConcurrentRaceParticipations *int                  `json:"maxConcurrentRaceParticipations"`
+	IsTeamEvent                     bool                  `json:"isTeamEvent"`
+	MaxPrimaryRosterSize            *int                  `json:"maxPrimaryRosterSize"`
+	MaxBackupRosterSize             *int                  `json:"maxBackupRosterSize"`
+	RaceEvents                      []RaceEventView       `json:"raceEvents"`
+	Members                         []EventMemberView     `json:"members"`
+	Teams                           []EventTeamView       `json:"teams"`
+	Schedules                       []EventScheduleView   `json:"schedules"`
+	PointsOverview                  []PointsEntryView     `json:"pointsOverview"`
+	TeamPointsOverview              []TeamPointsEntryView `json:"teamPointsOverview,omitempty"`
+	LadderOverview                  []LadderEntryView     `json:"ladderOverview"`
+	CreatedAt                       string                `json:"createdAt"`
+	UpdatedAt                       string                `json:"updatedAt"`
 }
 
 // nullString converts sql.NullString to *string.
@@ -248,6 +273,9 @@ type eventRow struct {
 	ScheduledAt                     *time.Time
 	ParticipantLimit                sql.NullInt64
 	MaxConcurrentRaceParticipations sql.NullInt64
+	IsTeamEvent                     bool
+	MaxPrimaryRosterSize            sql.NullInt64
+	MaxBackupRosterSize             sql.NullInt64
 	CreatedAt                       time.Time
 	UpdatedAt                       time.Time
 }
@@ -273,6 +301,9 @@ func toEventRow(r sqlc.GetEventRowRow) *eventRow {
 		ScheduledAt:                     timePtrFromNull(r.ScheduledAt),
 		ParticipantLimit:                sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid},
 		MaxConcurrentRaceParticipations: sql.NullInt64{Int64: int64(r.MaxConcurrentRaceParticipations.Int32), Valid: r.MaxConcurrentRaceParticipations.Valid},
+		IsTeamEvent:                     r.IsTeamEvent,
+		MaxPrimaryRosterSize:            sql.NullInt64{Int64: int64(r.MaxPrimaryRosterSize.Int32), Valid: r.MaxPrimaryRosterSize.Valid},
+		MaxBackupRosterSize:             sql.NullInt64{Int64: int64(r.MaxBackupRosterSize.Int32), Valid: r.MaxBackupRosterSize.Valid},
 		CreatedAt:                       r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
@@ -330,25 +361,60 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 			tier := nullStringFromAny(m.ClassTier)
 			raceMembers[m.RaceEventId] = append(raceMembers[m.RaceEventId], RaceEventMemberView{
 				UserID: m.UserId, Name: m.VrchatUsername, ClassTier: classTierPtr(tier),
+				TeamID: nullString(m.TeamId), TeamName: nullString(m.TeamName),
+				TeamSlug: nullString(m.TeamSlug), RosterRole: nullString(m.RosterRole),
 			})
 			activeUserIDs[m.UserId] = true
 		}
 	}
 
 	// Event members.
-	type memberRow struct {
-		UserID string
-		Name   string
-		Tier   sql.NullString
-	}
-	var members []memberRow
+	memberViews := []EventMemberView{}
+	membersByTeam := map[string][]EventMemberView{}
 	emrows, err := q().ListEventMembersByEvent(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	for _, em := range emrows {
-		m := memberRow{UserID: em.UserId, Name: em.VrchatUsername, Tier: nullStringFromAny(em.ClassTier)}
-		members = append(members, m)
+		mv := EventMemberView{
+			UserID: em.UserId, Name: em.VrchatUsername, ClassTier: classTierPtr(nullStringFromAny(em.ClassTier)),
+			TeamID: nullString(em.TeamId), TeamName: nullString(em.TeamName),
+			TeamSlug: nullString(em.TeamSlug), RosterRole: nullString(em.RosterRole),
+		}
+		memberViews = append(memberViews, mv)
+		if em.TeamId.Valid && em.TeamId.String != "" {
+			membersByTeam[em.TeamId.String] = append(membersByTeam[em.TeamId.String], mv)
+		}
+	}
+
+	// Event teams (for team-based events).
+	teamViews := []EventTeamView{}
+	if e.IsTeamEvent {
+		etrows, err := q().ListEventTeamsByEvent(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		for _, et := range etrows {
+			primary := []EventMemberView{}
+			backup := []EventMemberView{}
+			for _, mv := range membersByTeam[et.TeamId] {
+				if mv.RosterRole != nil && *mv.RosterRole == RosterRoleBackup {
+					backup = append(backup, mv)
+				} else {
+					primary = append(primary, mv)
+				}
+			}
+			teamViews = append(teamViews, EventTeamView{
+				ID:            et.ID,
+				TeamID:        et.TeamId,
+				Name:          et.Name,
+				Slug:          et.Slug,
+				Logo:          nullString(et.Logo),
+				PrimaryRoster: primary,
+				BackupRoster:  backup,
+				CreatedAt:     isoTime(et.CreatedAt),
+			})
+		}
 	}
 
 	// Schedules.
@@ -366,6 +432,7 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 
 	// Scoring overviews matching the event's scoring type (the other stays null).
 	var pointsOverview []PointsEntryView
+	var teamPointsOverview []TeamPointsEntryView
 	var ladderOverview []LadderEntryView
 	if e.ScoringType == ScoringPoints {
 		pointsOverview = []PointsEntryView{}
@@ -376,7 +443,26 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		for _, pr := range prows {
 			pointsOverview = append(pointsOverview, PointsEntryView{
 				UserID: pr.UserId, Name: pr.VrchatUsername, Points: int(pr.Points),
+				TeamID: nullString(pr.TeamId), TeamName: nullString(pr.TeamName),
+				TeamSlug: nullString(pr.TeamSlug), RosterRole: nullString(pr.RosterRole),
 			})
+		}
+		if e.IsTeamEvent {
+			teamPointsOverview = []TeamPointsEntryView{}
+			trows, err := q().ListTeamPointsOverview(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			for _, tr := range trows {
+				teamPointsOverview = append(teamPointsOverview, TeamPointsEntryView{
+					TeamID:      tr.TeamId,
+					Name:        tr.Name,
+					Slug:        tr.Slug,
+					Logo:        nullString(tr.Logo),
+					Points:      int(tr.Points),
+					MemberCount: int(tr.MemberCount),
+				})
+			}
 		}
 	} else if e.ScoringType == ScoringLadder {
 		ladderOverview = []LadderEntryView{}
@@ -390,6 +476,8 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 			ladderOverview = append(ladderOverview, LadderEntryView{
 				UserID: lr.UserId, Name: lr.VrchatUsername,
 				Elo: int(lr.Elo), Wins: int(lr.Wins), Losses: int(lr.Losses), Rank: rank,
+				TeamID: nullString(lr.TeamId), TeamName: nullString(lr.TeamName),
+				TeamSlug: nullString(lr.TeamSlug), RosterRole: nullString(lr.RosterRole),
 			})
 		}
 	}
@@ -416,12 +504,6 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 			ParticipantLimit: nullInt(r.ParticipantLimit), Members: mems,
 		})
 	}
-	memberViews := make([]EventMemberView, 0, len(members))
-	for _, m := range members {
-		memberViews = append(memberViews, EventMemberView{
-			UserID: m.UserID, Name: m.Name, ClassTier: classTierPtr(m.Tier),
-		})
-	}
 	if schedules == nil {
 		schedules = []EventScheduleView{}
 	}
@@ -440,8 +522,11 @@ func LoadEvent(ctx context.Context, id string) (*EventDetail, error) {
 		ScheduledAt:                     nullTime(e.ScheduledAt),
 		ParticipantLimit:                nullInt(e.ParticipantLimit),
 		MaxConcurrentRaceParticipations: nullInt(e.MaxConcurrentRaceParticipations),
-		RaceEvents:                      raceViews, Members: memberViews, Schedules: schedules,
-		PointsOverview: pointsOverview, LadderOverview: ladderOverview,
+		IsTeamEvent:                     e.IsTeamEvent,
+		MaxPrimaryRosterSize:            nullInt(e.MaxPrimaryRosterSize),
+		MaxBackupRosterSize:             nullInt(e.MaxBackupRosterSize),
+		RaceEvents:                      raceViews, Members: memberViews, Teams: teamViews, Schedules: schedules,
+		PointsOverview: pointsOverview, TeamPointsOverview: teamPointsOverview, LadderOverview: ladderOverview,
 		CreatedAt: isoTime(e.CreatedAt), UpdatedAt: isoTime(e.UpdatedAt),
 	}, nil
 }
@@ -482,6 +567,9 @@ type CreateEventRequest struct {
 	ScheduledAt                     *string         `json:"scheduledAt,omitempty"`
 	ParticipantLimit                OptInt          `json:"participantLimit,omitempty"`
 	MaxConcurrentRaceParticipations OptInt          `json:"maxConcurrentRaceParticipations,omitempty"`
+	IsTeamEvent                     bool            `json:"isTeamEvent,omitempty"`
+	MaxPrimaryRosterSize            OptInt          `json:"maxPrimaryRosterSize,omitempty"`
+	MaxBackupRosterSize             OptInt          `json:"maxBackupRosterSize,omitempty"`
 }
 
 // CreateEventCore creates an event and returns its detail.
@@ -581,6 +669,25 @@ func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventReque
 		}
 	}
 
+	var maxPrimaryRoster, maxBackupRoster *int
+	if p.MaxPrimaryRosterSize.Set {
+		maxPrimaryRoster = p.MaxPrimaryRosterSize.Value
+	}
+	if p.MaxBackupRosterSize.Set {
+		maxBackupRoster = p.MaxBackupRosterSize.Value
+	}
+	if p.IsTeamEvent {
+		if maxPrimaryRoster != nil && *maxPrimaryRoster < 1 {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxPrimaryRosterSize must be at least 1"}
+		}
+		if maxBackupRoster != nil && *maxBackupRoster < 0 {
+			return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxBackupRosterSize must be 0 or greater"}
+		}
+	} else {
+		maxPrimaryRoster = nil
+		maxBackupRoster = nil
+	}
+
 	var scheduledAt *time.Time
 	if p.ScheduledAt != nil && *p.ScheduledAt != "" {
 		t, err := time.Parse(time.RFC3339Nano, *p.ScheduledAt)
@@ -643,12 +750,18 @@ func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventReque
 	if classRestriction != nil {
 		classRestr = *classRestriction
 	}
-	var participantLimitNull, maxConcurrentNull sql.NullInt32
+	var participantLimitNull, maxConcurrentNull, maxPrimaryNull, maxBackupNull sql.NullInt32
 	if participantLimit != nil {
 		participantLimitNull = sql.NullInt32{Int32: int32(*participantLimit), Valid: true}
 	}
 	if maxConcurrent != nil {
 		maxConcurrentNull = sql.NullInt32{Int32: int32(*maxConcurrent), Valid: true}
+	}
+	if maxPrimaryRoster != nil {
+		maxPrimaryNull = sql.NullInt32{Int32: int32(*maxPrimaryRoster), Valid: true}
+	}
+	if maxBackupRoster != nil {
+		maxBackupNull = sql.NullInt32{Int32: int32(*maxBackupRoster), Valid: true}
 	}
 	if err := q().CreateEvent(ctx, sqlc.CreateEventParams{
 		ID: id, Name: truncate(p.Name, 255), Description: nullStringFromPtr(description),
@@ -659,6 +772,7 @@ func CreateEventCore(ctx context.Context, actor *auth.Actor, p *CreateEventReque
 		CustomScoringTables: customTablesParam, ClassRestriction: classRestr,
 		GranularParticipation: isGranular, ScheduledAt: nullTimeFromPtr(scheduledAt),
 		ParticipantLimit: participantLimitNull, MaxConcurrentRaceParticipations: maxConcurrentNull,
+		IsTeamEvent: p.IsTeamEvent, MaxPrimaryRosterSize: maxPrimaryNull, MaxBackupRosterSize: maxBackupNull,
 		CreatedAt: now,
 	}); err != nil {
 		return nil, err
@@ -725,7 +839,10 @@ func toListItem(r sqlc.ListEventsRow) EventListItem {
 		ScheduledAt:                     nullTime(timePtrFromNull(r.ScheduledAt)),
 		ParticipantLimit:                nullInt(sql.NullInt64{Int64: int64(r.ParticipantLimit.Int32), Valid: r.ParticipantLimit.Valid}),
 		MaxConcurrentRaceParticipations: nullInt(sql.NullInt64{Int64: int64(r.MaxConcurrentRaceParticipations.Int32), Valid: r.MaxConcurrentRaceParticipations.Valid}),
-		RaceCount:                       int(r.Count), MemberCount: int(r.Count_2),
+		IsTeamEvent:                     r.IsTeamEvent,
+		MaxPrimaryRosterSize:            nullInt(sql.NullInt64{Int64: int64(r.MaxPrimaryRosterSize.Int32), Valid: r.MaxPrimaryRosterSize.Valid}),
+		MaxBackupRosterSize:             nullInt(sql.NullInt64{Int64: int64(r.MaxBackupRosterSize.Int32), Valid: r.MaxBackupRosterSize.Valid}),
+		RaceCount:                       int(r.Count), MemberCount: int(r.Count_2), TeamCount: int(r.TeamCount),
 		CreatedAt: isoTime(r.CreatedAt), UpdatedAt: isoTime(r.UpdatedAt),
 	}
 }
@@ -741,8 +858,11 @@ func toPublicListItem(r sqlc.ListPublicEventsRow) sqlc.ListEventsRow {
 		GranularParticipation: r.GranularParticipation, SignupsLocked: r.SignupsLocked,
 		ScheduledAt: r.ScheduledAt, ParticipantLimit: r.ParticipantLimit,
 		MaxConcurrentRaceParticipations: r.MaxConcurrentRaceParticipations,
+		IsTeamEvent:                     r.IsTeamEvent,
+		MaxPrimaryRosterSize:            r.MaxPrimaryRosterSize,
+		MaxBackupRosterSize:             r.MaxBackupRosterSize,
 		CreatedAt:                       r.CreatedAt, UpdatedAt: r.UpdatedAt,
-		Count: r.Count, Count_2: r.Count_2,
+		Count: r.Count, Count_2: r.Count_2, TeamCount: r.TeamCount,
 		OwnerName: r.OwnerName, OwnerSlug: r.OwnerSlug, OwnerLogo: r.OwnerLogo,
 	}
 }

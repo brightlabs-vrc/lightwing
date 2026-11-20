@@ -23,6 +23,7 @@ FROM "race_result" r
 JOIN "race_event" re ON re.id = r."raceEventId"
 JOIN "event" e ON e.id = re."eventId"
 WHERE r."userId" = $1
+  AND ($4::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $4::int)
 ORDER BY e."createdAt" DESC, re.sequence ASC
 LIMIT NULLIF($2::int, 0) OFFSET $3::int;
 
@@ -31,4 +32,5 @@ SELECT COUNT(*)
 FROM "race_result" r
 JOIN "race_event" re ON re.id = r."raceEventId"
 JOIN "event" e ON e.id = re."eventId"
-WHERE r."userId" = $1;
+WHERE r."userId" = $1
+  AND ($2::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $2::int);

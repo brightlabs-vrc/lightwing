@@ -190,6 +190,9 @@ func JoinEventCore(ctx context.Context, actor *auth.Actor, p *JoinEventRequest) 
 	if err != nil {
 		return nil, err
 	}
+	if event.IsTeamEvent {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "this is a team-based event; teams must register with a primary/backup roster"}
+	}
 	if event.Status != "PENDING" && event.Status != "ONGOING" {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "event is not open for public signup (must be PENDING or ONGOING)"}
 	}

@@ -84,6 +84,9 @@ function AdminEventDetailPage() {
     handleRestoreEvent,
     handleAddMember,
     handleRemoveMember,
+    handleUpsertEventTeamRoster,
+    handleSubstituteTeamMember,
+    handleRemoveEventTeam,
     handleAddRaceMember,
     handleRemoveRaceMember,
     handleCreateRace,
@@ -127,6 +130,8 @@ function AdminEventDetailPage() {
   const [editScheduledAt, setEditScheduledAt] = useState<string>('')
   const [editParticipantLimit, setEditParticipantLimit] = useState<string>('')
   const [editMaxConcurrentRaceParticipations, setEditMaxConcurrentRaceParticipations] = useState<string>('')
+  const [editMaxPrimaryRosterSize, setEditMaxPrimaryRosterSize] = useState<string>('')
+  const [editMaxBackupRosterSize, setEditMaxBackupRosterSize] = useState<string>('')
   const [editScoringRulesMode, setEditScoringRulesMode] = useState<'STANDARD' | 'CUSTOM'>('STANDARD')
   const [editCustomScoringTables, setEditCustomScoringTables] = useState<Record<string, Record<number, number>>>(DEFAULT_SCORING_TABLES)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -156,6 +161,8 @@ function AdminEventDetailPage() {
       setEditMaxConcurrentRaceParticipations(
         selectedEvent.maxConcurrentRaceParticipations !== null ? String(selectedEvent.maxConcurrentRaceParticipations) : '',
       )
+      setEditMaxPrimaryRosterSize(selectedEvent.maxPrimaryRosterSize !== null ? String(selectedEvent.maxPrimaryRosterSize) : '')
+      setEditMaxBackupRosterSize(selectedEvent.maxBackupRosterSize !== null ? String(selectedEvent.maxBackupRosterSize) : '')
       setEditScoringRulesMode((selectedEvent.scoringRulesMode as 'STANDARD' | 'CUSTOM') || 'STANDARD')
       if (selectedEvent.customScoringTables) {
         setEditCustomScoringTables(selectedEvent.customScoringTables as Record<string, Record<number, number>>)
@@ -168,13 +175,23 @@ function AdminEventDetailPage() {
   const performSaveEventDetails = async () => {
     const limitNum = editParticipantLimit.trim() ? Number(editParticipantLimit) : null
     const maxConcurrentNum = editMaxConcurrentRaceParticipations.trim() ? Number(editMaxConcurrentRaceParticipations) : null
+    const maxPrimaryNum = editMaxPrimaryRosterSize.trim() ? Number(editMaxPrimaryRosterSize) : null
+    const maxBackupNum = editMaxBackupRosterSize.trim() ? Number(editMaxBackupRosterSize) : null
 
     if (!editGranularParticipation && limitNum !== null && (isNaN(limitNum) || !Number.isSafeInteger(limitNum) || limitNum <= 0)) {
-      window.alert('Participant limit must be a positive whole number.')
+      window.alert(selectedEvent?.isTeamEvent ? 'Team limit must be a positive whole number.' : 'Participant limit must be a positive whole number.')
       return
     }
     if (editGranularParticipation && maxConcurrentNum !== null && (isNaN(maxConcurrentNum) || !Number.isSafeInteger(maxConcurrentNum) || maxConcurrentNum <= 0)) {
       window.alert('Max races per participant must be a positive whole number.')
+      return
+    }
+    if (selectedEvent?.isTeamEvent && maxPrimaryNum !== null && (isNaN(maxPrimaryNum) || !Number.isSafeInteger(maxPrimaryNum) || maxPrimaryNum <= 0)) {
+      window.alert('Max primary roster size must be a positive whole number.')
+      return
+    }
+    if (selectedEvent?.isTeamEvent && maxBackupNum !== null && (isNaN(maxBackupNum) || !Number.isSafeInteger(maxBackupNum) || maxBackupNum < 0)) {
+      window.alert('Max backup roster size must be 0 or a positive whole number.')
       return
     }
 
@@ -185,6 +202,8 @@ function AdminEventDetailPage() {
       scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : null,
       participantLimit: editGranularParticipation ? null : limitNum,
       maxConcurrentRaceParticipations: editGranularParticipation ? maxConcurrentNum : null,
+      maxPrimaryRosterSize: selectedEvent?.isTeamEvent ? maxPrimaryNum : null,
+      maxBackupRosterSize: selectedEvent?.isTeamEvent ? maxBackupNum : null,
       scoringRulesMode: editScoringRulesMode,
       customScoringTables: editScoringRulesMode === 'CUSTOM' ? editCustomScoringTables : null,
     })
@@ -410,6 +429,7 @@ function AdminEventDetailPage() {
               <Label variant={selectedEvent.tag === 'OFFICIAL' ? 'sponsors' : 'secondary'}>
                 {selectedEvent.tag || 'OFFICIAL'}
               </Label>
+              {selectedEvent.isTeamEvent && <Label variant="accent">Team Event</Label>}
               <Label variant={selectedEvent.signupsLocked ? 'danger' : 'success'}>
                 {selectedEvent.signupsLocked ? 'Signups Locked' : 'Signups Open'}
               </Label>
@@ -475,14 +495,14 @@ function AdminEventDetailPage() {
             </UnderlineNav.Item>
             <UnderlineNav.Item
               icon={PeopleIcon}
-              counter={selectedEvent.members.length}
+              counter={selectedEvent.isTeamEvent ? (selectedEvent.teams?.length ?? 0) : selectedEvent.members.length}
               aria-current={activeTab === 'members' ? 'page' : undefined}
               onSelect={(e) => {
                 e.preventDefault()
                 setActiveTab('members')
               }}
             >
-              Event Members
+              {selectedEvent.isTeamEvent ? 'Teams & Rosters' : 'Event Members'}
             </UnderlineNav.Item>
             <UnderlineNav.Item
               icon={TrophyIcon}
@@ -516,6 +536,9 @@ function AdminEventDetailPage() {
               setNewMemberUserId={setNewMemberUserId}
               handleAddMember={handleAddMember}
               handleRemoveMember={handleRemoveMember}
+              handleUpsertEventTeamRoster={handleUpsertEventTeamRoster}
+              handleSubstituteTeamMember={handleSubstituteTeamMember}
+              handleRemoveEventTeam={handleRemoveEventTeam}
             />
           )}
 
@@ -764,12 +787,12 @@ function AdminEventDetailPage() {
 
             {!editGranularParticipation ? (
               <FormControl>
-                <FormControl.Label>Participant Limit</FormControl.Label>
+                <FormControl.Label>{selectedEvent?.isTeamEvent ? 'Team Limit' : 'Participant Limit'}</FormControl.Label>
                 <TextInput
                   block
                   type="number"
                   min={1}
-                  placeholder="Leave blank for unlimited"
+                  placeholder={selectedEvent?.isTeamEvent ? 'Leave blank for unlimited teams' : 'Leave blank for unlimited'}
                   value={editParticipantLimit}
                   onChange={(e) => setEditParticipantLimit(e.target.value)}
                 />
@@ -786,6 +809,33 @@ function AdminEventDetailPage() {
                   onChange={(e) => setEditMaxConcurrentRaceParticipations(e.target.value)}
                 />
               </FormControl>
+            )}
+
+            {selectedEvent?.isTeamEvent && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <FormControl>
+                  <FormControl.Label>Max Primary Roster Size (Per Team)</FormControl.Label>
+                  <TextInput
+                    block
+                    type="number"
+                    min={1}
+                    placeholder="Leave blank for unlimited"
+                    value={editMaxPrimaryRosterSize}
+                    onChange={(e) => setEditMaxPrimaryRosterSize(e.target.value)}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormControl.Label>Max Backup Roster Size (Per Team)</FormControl.Label>
+                  <TextInput
+                    block
+                    type="number"
+                    min={0}
+                    placeholder="Leave blank for unlimited"
+                    value={editMaxBackupRosterSize}
+                    onChange={(e) => setEditMaxBackupRosterSize(e.target.value)}
+                  />
+                </FormControl>
+              </div>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--borderColor-muted, #d8dee4)' }}>

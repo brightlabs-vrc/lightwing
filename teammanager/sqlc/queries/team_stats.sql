@@ -75,3 +75,46 @@ JOIN "teamMember" tm ON tm."teamId" = t.id
 LEFT JOIN user_points up ON up."userId" = tm."userId"
 LEFT JOIN user_races ur ON ur."userId" = tm."userId"
 WHERE t.status = 'APPROVED';
+
+-- Team competition stats strictly from team-based events (year = 0 means all-time).
+-- name: GetAllApprovedTeamsCompetitionStats :many
+WITH team_event_scores AS (
+    SELECT
+        et."eventId",
+        et."teamId",
+        COALESCE(SUM(COALESCE(epe.points, 0)), 0)::bigint AS event_points
+    FROM "event_team" et
+    JOIN "event" e ON e.id = et."eventId"
+    JOIN "team" t ON t.id = et."teamId"
+    LEFT JOIN "event_member" em ON em."eventId" = et."eventId" AND em."teamId" = et."teamId"
+    LEFT JOIN "event_points_entry" epe ON epe."eventId" = et."eventId" AND epe."userId" = em."userId"
+    WHERE e."deletedAt" IS NULL
+      AND e."isTeamEvent" = TRUE
+      AND t.status = 'APPROVED'
+      AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
+    GROUP BY et."eventId", et."teamId"
+),
+ranked_team_events AS (
+    SELECT
+        "eventId",
+        "teamId",
+        event_points,
+        RANK() OVER (PARTITION BY "eventId" ORDER BY event_points DESC)::double precision AS event_rank
+    FROM team_event_scores
+)
+SELECT
+    "teamId" AS team_id,
+    COUNT(DISTINCT "eventId")::bigint AS team_events_participated,
+    COALESCE(SUM(event_points), 0)::bigint AS team_total_points,
+    COALESCE(AVG(event_points), 0)::double precision AS team_avg_points,
+    COALESCE(AVG(event_rank), 0)::double precision AS team_event_rank_avg
+FROM ranked_team_events
+GROUP BY "teamId";
+
+-- Available season years across non-deleted events.
+-- name: ListTeamStatYears :many
+SELECT DISTINCT EXTRACT(YEAR FROM COALESCE("scheduledAt", "createdAt"))::int AS year
+FROM "event"
+WHERE "deletedAt" IS NULL
+ORDER BY year DESC;
+

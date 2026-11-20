@@ -9,7 +9,7 @@ import {
   PixelButton,
 } from '@pxlkit/ui-kit'
 import type { teammanager } from '../lib/client'
-import { listPublicNewsletters } from '../lib/public-api'
+import { getTeamStats, listPublicNewsletters } from '../lib/public-api'
 import { formatLocalDateTime } from '../lib/datetime'
 import { UserLink } from './UserLink'
 import { MarkdownView } from './MarkdownView'
@@ -29,6 +29,33 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
   const isOrg =
     team.isOrganization ??
     (!team.primaryOrganizationId || team.primaryOrganizationId === team.id)
+
+  const currentYear = new Date().getUTCFullYear()
+  const initialStatsYear = team.stats?.year ?? currentYear
+  const [selectedStatsYear, setSelectedStatsYear] = useState<number>(initialStatsYear)
+  const [displayStats, setDisplayStats] = useState<teammanager.TeamStats>(team.stats)
+  const [loadingStats, setLoadingStats] = useState(false)
+
+  useEffect(() => {
+    setDisplayStats(team.stats)
+    setSelectedStatsYear(team.stats?.year ?? currentYear)
+  }, [team.id, team.stats, currentYear])
+
+  const handleStatsYearChange = async (nextYear: number) => {
+    setSelectedStatsYear(nextYear)
+    setLoadingStats(true)
+    try {
+      const fresh = await getTeamStats(team.id, {
+        year: nextYear === 0 ? 0 : nextYear,
+        allTime: nextYear === 0,
+      })
+      setDisplayStats(fresh)
+    } catch {
+      // keep existing stats on error
+    } finally {
+      setLoadingStats(false)
+    }
+  }
 
   const [orgNewsletters, setOrgNewsletters] = useState<teammanager.Newsletter[]>([])
   const [loadingNewsletters, setLoadingNewsletters] = useState(false)
@@ -249,57 +276,128 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
             {/* Team Aggregate Statistics - Competitive teams */}
             {!isOrg && (
               <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
-                <PixelSectionHeader
-                  title="TEAM STATISTICS"
-                  titleTone="purple"
-                  size="sm"
-                />
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <PixelSectionHeader
+                      title="TEAM STATISTICS"
+                      titleTone="purple"
+                      size="sm"
+                    />
+                    {displayStats?.seasonRankSource && (
+                      <PixelBadge tone={displayStats.seasonRankSource === 'TEAM_EVENTS' ? 'cyan' : 'neutral'}>
+                        {displayStats.seasonRankSource === 'TEAM_EVENTS' ? 'TEAM EVENTS' : 'MEMBER AVG'}
+                      </PixelBadge>
+                    )}
+                  </div>
+                  <select
+                    aria-label="Filter team stats by season"
+                    value={selectedStatsYear}
+                    disabled={loadingStats}
+                    onChange={(e) => void handleStatsYearChange(Number(e.target.value))}
+                    className="px-2.5 py-1 bg-retro-bg border-2 border-retro-border rounded text-xs text-retro-text font-sans focus:outline-none focus:border-retro-primary"
+                  >
+                    <option value={0}>All-Time</option>
+                    {(displayStats?.availableYears && displayStats.availableYears.length > 0
+                      ? displayStats.availableYears
+                      : [currentYear]
+                    ).map((y) => (
+                      <option key={y} value={y}>
+                        {y} Season
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                  <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
-                    <div className="font-pixel text-[10px] text-retro-muted mb-1">
-                      SEASON RANK
-                    </div>
-                    <div className="font-pixel text-2xl text-retro-gold font-bold">
-                      {team.stats?.seasonRank != null && team.stats.seasonRank > 0
-                        ? `#${team.stats.seasonRank}`
-                        : '—'}
-                    </div>
-                  </PixelCard>
+                {/* Official Team Competition Record */}
+                <div className="mt-3">
+                  <div className="font-pixel text-[10px] text-retro-cyan uppercase tracking-wider mb-2">
+                    TEAM COMPETITION RECORD
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
+                      <div className="font-pixel text-[10px] text-retro-muted mb-1">
+                        SEASON RANK
+                      </div>
+                      <div className="font-pixel text-2xl text-retro-gold font-bold">
+                        {displayStats?.seasonRank != null && displayStats.seasonRank > 0
+                          ? `#${displayStats.seasonRank}`
+                          : '—'}
+                      </div>
+                    </PixelCard>
 
-                  <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
-                    <div className="font-pixel text-[10px] text-retro-muted mb-1">
-                      RANKING AVERAGE
-                    </div>
-                    <div className="font-mono text-2xl text-retro-text font-bold">
-                      {team.stats?.rankingAverage != null && team.stats.rankingAverage > 0
-                        ? team.stats.rankingAverage.toFixed(1)
-                        : '—'}
-                    </div>
-                  </PixelCard>
+                    <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
+                      <div className="font-pixel text-[10px] text-retro-muted mb-1">
+                        TEAM POINTS
+                      </div>
+                      <div className="font-mono text-2xl text-retro-green font-bold">
+                        {(displayStats?.teamEventsParticipated ?? 0) > 0
+                          ? displayStats.teamTotalPoints.toLocaleString()
+                          : '—'}
+                      </div>
+                    </PixelCard>
 
-                  <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
-                    <div className="font-pixel text-[10px] text-retro-muted mb-1">
-                      AVG PTS / EVENT
-                    </div>
-                    <div className="font-mono text-2xl text-retro-text font-bold">
-                      {team.stats?.averagePointsPerEvent != null &&
-                      team.stats.averagePointsPerEvent > 0
-                        ? team.stats.averagePointsPerEvent.toFixed(1)
-                        : '—'}
-                    </div>
-                  </PixelCard>
+                    <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
+                      <div className="font-pixel text-[10px] text-retro-muted mb-1">
+                        TEAM EVENTS
+                      </div>
+                      <div className="font-mono text-2xl text-retro-text font-bold">
+                        {displayStats?.teamEventsParticipated ?? 0}
+                      </div>
+                    </PixelCard>
 
-                  <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
-                    <div className="font-pixel text-[10px] text-retro-muted mb-1">
-                      POINTS AVERAGE
-                    </div>
-                    <div className="font-mono text-2xl text-retro-green font-bold">
-                      {team.stats?.pointsAverage != null && team.stats.pointsAverage > 0
-                        ? team.stats.pointsAverage.toFixed(1)
-                        : '—'}
-                    </div>
-                  </PixelCard>
+                    <PixelCard className="bg-retro-bg text-center py-3.5 border border-retro-border">
+                      <div className="font-pixel text-[10px] text-retro-muted mb-1">
+                        AVG TEAM PLACE
+                      </div>
+                      <div className="font-mono text-2xl text-retro-text font-bold">
+                        {displayStats?.teamEventRankAverage != null && displayStats.teamEventRankAverage > 0
+                          ? `#${displayStats.teamEventRankAverage.toFixed(1)}`
+                          : '—'}
+                      </div>
+                    </PixelCard>
+                  </div>
+                </div>
+
+                {/* Member Roster Averages */}
+                <div className="mt-4 pt-3 border-t border-retro-border">
+                  <div className="font-pixel text-[10px] text-retro-muted uppercase tracking-wider mb-2">
+                    MEMBER ROSTER AVERAGES
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <PixelCard className="bg-retro-bg text-center py-3 border border-retro-border">
+                      <div className="font-pixel text-[10px] text-retro-muted mb-1">
+                        RANKING AVERAGE
+                      </div>
+                      <div className="font-mono text-xl text-retro-text font-bold">
+                        {displayStats?.rankingAverage != null && displayStats.rankingAverage > 0
+                          ? displayStats.rankingAverage.toFixed(1)
+                          : '—'}
+                      </div>
+                    </PixelCard>
+
+                    <PixelCard className="bg-retro-bg text-center py-3 border border-retro-border">
+                      <div className="font-pixel text-[10px] text-retro-muted mb-1">
+                        AVG PTS / EVENT
+                      </div>
+                      <div className="font-mono text-xl text-retro-text font-bold">
+                        {displayStats?.averagePointsPerEvent != null &&
+                        displayStats.averagePointsPerEvent > 0
+                          ? displayStats.averagePointsPerEvent.toFixed(1)
+                          : '—'}
+                      </div>
+                    </PixelCard>
+
+                    <PixelCard className="bg-retro-bg text-center py-3 border border-retro-border">
+                      <div className="font-pixel text-[10px] text-retro-muted mb-1">
+                        POINTS AVERAGE
+                      </div>
+                      <div className="font-mono text-xl text-retro-green font-bold">
+                        {displayStats?.pointsAverage != null && displayStats.pointsAverage > 0
+                          ? displayStats.pointsAverage.toFixed(1)
+                          : '—'}
+                      </div>
+                    </PixelCard>
+                  </div>
                 </div>
               </PixelCard>
             )}

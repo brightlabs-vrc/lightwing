@@ -17,10 +17,16 @@ FROM "race_result" r
 JOIN "race_event" re ON re.id = r."raceEventId"
 JOIN "event" e ON e.id = re."eventId"
 WHERE r."userId" = $1
+  AND ($2::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $2::int)
 `
 
-func (q *Queries) CountUserRaceRecords(ctx context.Context, userid string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countUserRaceRecords, userid)
+type CountUserRaceRecordsParams struct {
+	UserId  string
+	Column2 int32
+}
+
+func (q *Queries) CountUserRaceRecords(ctx context.Context, arg CountUserRaceRecordsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUserRaceRecords, arg.UserId, arg.Column2)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -50,6 +56,7 @@ FROM "race_result" r
 JOIN "race_event" re ON re.id = r."raceEventId"
 JOIN "event" e ON e.id = re."eventId"
 WHERE r."userId" = $1
+  AND ($4::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $4::int)
 ORDER BY e."createdAt" DESC, re.sequence ASC
 LIMIT NULLIF($2::int, 0) OFFSET $3::int
 `
@@ -58,6 +65,7 @@ type ListUserRaceRecordsParams struct {
 	UserId  string
 	Column2 int32
 	Column3 int32
+	Column4 int32
 }
 
 type ListUserRaceRecordsRow struct {
@@ -83,7 +91,7 @@ type ListUserRaceRecordsRow struct {
 
 // User race records query.
 func (q *Queries) ListUserRaceRecords(ctx context.Context, arg ListUserRaceRecordsParams) ([]ListUserRaceRecordsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listUserRaceRecords, arg.UserId, arg.Column2, arg.Column3)
+	rows, err := q.db.QueryContext(ctx, listUserRaceRecords, arg.UserId, arg.Column2, arg.Column3, arg.Column4)
 	if err != nil {
 		return nil, err
 	}

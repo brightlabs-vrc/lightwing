@@ -550,11 +550,13 @@ export function RaceDetailPane({
         </AlertBanner>
       )}
 
-      {/* Granular Participant lineup box */}
-      {selectedEvent.granularParticipation && (
+      {/* Granular or Team Event Participant lineup box */}
+      {(selectedEvent.granularParticipation || selectedEvent.isTeamEvent) && (
         <div className="primer-box" style={{ padding: '14px 16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Competitor Lineup</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
+              {selectedEvent.isTeamEvent ? 'Race Lineup (Primary Roster Only)' : 'Competitor Lineup'}
+            </h3>
             <span
               style={{
                 padding: '2px 8px',
@@ -569,6 +571,12 @@ export function RaceDetailPane({
             </span>
           </div>
 
+          {selectedEvent.isTeamEvent && (
+            <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+              Only <strong>PRIMARY</strong> team roster members appear below. To use a <strong>BACKUP</strong> member, sub them into the Primary Roster on the <strong>Event Members / Teams</strong> tab first.
+            </p>
+          )}
+
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -577,7 +585,23 @@ export function RaceDetailPane({
             style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}
           >
             <div style={{ flexGrow: 1, minWidth: '180px' }}>
-              {selectedEvent.granularParticipation ? (
+              {selectedEvent.isTeamEvent ? (
+                <RaceMemberCombobox
+                  value={newRaceMemberUserId}
+                  onChange={(val) => setNewRaceMemberUserId(val)}
+                  placeholder="Select competitor from registered teams' PRIMARY rosters..."
+                  members={selectedEvent.members
+                    .filter(
+                      (em) =>
+                        em.rosterRole === 'PRIMARY' &&
+                        !(selectedRace.members ?? []).some((rm) => rm.userId === em.userId),
+                    )
+                    .map((em) => ({
+                      ...em,
+                      name: em.teamName ? `${em.name} [${em.teamName}]` : em.name,
+                    }))}
+                />
+              ) : selectedEvent.granularParticipation ? (
                 <UserSearchCombobox value={newRaceMemberUserId} onChange={(val) => setNewRaceMemberUserId(val)} />
               ) : (
                 <RaceMemberCombobox
@@ -628,6 +652,11 @@ export function RaceDetailPane({
                   }}
                 >
                   <UserLink userId={m.userId} name={m.name} />
+                  {m.teamName && (
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--fgColor-accent, #0969da)' }}>
+                      [{m.teamName}]
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => void handleRemoveRaceMember(selectedRace.id, m.userId)}

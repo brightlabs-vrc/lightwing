@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	encoreauth "encore.dev/beta/auth"
 	"encore.dev/beta/errs"
@@ -130,4 +131,35 @@ func (s *Service) UpdateTeamStats(ctx context.Context, p *UpdateTeamStatsRequest
 		SeasonRank:            p.SeasonRank,
 		AveragePointsPerEvent: p.AveragePointsPerEvent,
 	})
+}
+
+// GetTeamStatsRequest queries team statistics for a specific season year or all-time.
+type GetTeamStatsRequest struct {
+	ID      string `query:"id"`
+	Year    int    `query:"year"`
+	AllTime bool   `query:"allTime"`
+}
+
+//encore:api public method=GET path=/api/team-stats
+func (s *Service) GetTeamStats(ctx context.Context, p *GetTeamStatsRequest) (*TeamStats, error) {
+	if p.ID == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "id is required"}
+	}
+	teamID := p.ID
+	if t, err := q().GetTeamByID(ctx, p.ID); err == nil {
+		teamID = t.ID
+	} else if t, err := q().GetTeamBySlug(ctx, p.ID); err == nil {
+		teamID = t.ID
+	}
+	year := int32(p.Year)
+	if p.AllTime {
+		year = 0
+	} else if year <= 0 {
+		year = int32(time.Now().UTC().Year())
+	}
+	stats, err := computeTeamStatsForYear(ctx, teamID, year, false)
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
 }

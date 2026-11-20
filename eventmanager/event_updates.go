@@ -34,6 +34,8 @@ type UpdateEventRequest struct {
 	ScheduledAt                     OptString       `json:"scheduledAt,omitempty"`
 	ParticipantLimit                OptInt          `json:"participantLimit,omitempty"`
 	MaxConcurrentRaceParticipations OptInt          `json:"maxConcurrentRaceParticipations,omitempty"`
+	MaxPrimaryRosterSize            OptInt          `json:"maxPrimaryRosterSize,omitempty"`
+	MaxBackupRosterSize             OptInt          `json:"maxBackupRosterSize,omitempty"`
 }
 
 // jsonEqual reports whether two JSON documents are semantically equal.
@@ -99,14 +101,26 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 
 	// Capacity checks before reducing a limit.
 	if !isGranular && participantLimit != nil {
-		currentCount64, err := q().GetEventMemberCount(ctx, p.ID)
-		if err != nil {
-			return nil, err
-		}
-		if err := AssertLimitCanBeReduced(int(currentCount64), *participantLimit,
-			CodeParticipantLimitBelowEnrollment,
-			"Participant limit cannot be lower than the current enrollment"); err != nil {
-			return nil, err
+		if existing.IsTeamEvent {
+			teamCount64, err := q().CountEventTeams(ctx, p.ID)
+			if err != nil {
+				return nil, err
+			}
+			if err := AssertLimitCanBeReduced(int(teamCount64), *participantLimit,
+				CodeParticipantLimitBelowEnrollment,
+				"Team limit cannot be lower than the current number of registered teams"); err != nil {
+				return nil, err
+			}
+		} else {
+			currentCount64, err := q().GetEventMemberCount(ctx, p.ID)
+			if err != nil {
+				return nil, err
+			}
+			if err := AssertLimitCanBeReduced(int(currentCount64), *participantLimit,
+				CodeParticipantLimitBelowEnrollment,
+				"Participant limit cannot be lower than the current enrollment"); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if isGranular && maxConcurrent != nil {
@@ -118,6 +132,55 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 			CodeParticipantLimitBelowEnrollment,
 			"Max races limit cannot be lower than any member's current race enrollment count"); err != nil {
 			return nil, err
+		}
+	}
+
+	var maxPrimaryRoster, maxBackupRoster *int
+	var clearMaxPrimary, clearMaxBackup bool
+	if existing.IsTeamEvent {
+		if p.MaxPrimaryRosterSize.Set {
+			if p.MaxPrimaryRosterSize.Value == nil {
+				clearMaxPrimary = true
+			} else {
+				if *p.MaxPrimaryRosterSize.Value < 1 {
+					return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxPrimaryRosterSize must be at least 1"}
+				}
+				maxEnrolled, err := q().GetMaxTeamRosterCountByRole(ctx, sqlc.GetMaxTeamRosterCountByRoleParams{
+					EventId:    p.ID,
+					RosterRole: sql.NullString{String: RosterRolePrimary, Valid: true},
+				})
+				if err != nil {
+					return nil, err
+				}
+				if err := AssertLimitCanBeReduced(int(maxEnrolled), *p.MaxPrimaryRosterSize.Value,
+					CodeParticipantLimitBelowEnrollment,
+					"Primary roster limit cannot be lower than a team's current primary roster size"); err != nil {
+					return nil, err
+				}
+				maxPrimaryRoster = p.MaxPrimaryRosterSize.Value
+			}
+		}
+		if p.MaxBackupRosterSize.Set {
+			if p.MaxBackupRosterSize.Value == nil {
+				clearMaxBackup = true
+			} else {
+				if *p.MaxBackupRosterSize.Value < 0 {
+					return nil, &errs.Error{Code: errs.InvalidArgument, Message: "maxBackupRosterSize must be 0 or greater"}
+				}
+				maxEnrolled, err := q().GetMaxTeamRosterCountByRole(ctx, sqlc.GetMaxTeamRosterCountByRoleParams{
+					EventId:    p.ID,
+					RosterRole: sql.NullString{String: RosterRoleBackup, Valid: true},
+				})
+				if err != nil {
+					return nil, err
+				}
+				if err := AssertLimitCanBeReduced(int(maxEnrolled), *p.MaxBackupRosterSize.Value,
+					CodeParticipantLimitBelowEnrollment,
+					"Backup roster limit cannot be lower than a team's current backup roster size"); err != nil {
+					return nil, err
+				}
+				maxBackupRoster = p.MaxBackupRosterSize.Value
+			}
 		}
 	}
 
@@ -261,6 +324,20 @@ func UpdateEventCore(ctx context.Context, actor *auth.Actor, p *UpdateEventReque
 		hasUpdate = true
 	} else if clearMaxConcurrent {
 		params.McClear = true
+		hasUpdate = true
+	}
+	if maxPrimaryRoster != nil {
+		params.MprVal = sql.NullInt32{Int32: int32(*maxPrimaryRoster), Valid: true}
+		hasUpdate = true
+	} else if clearMaxPrimary {
+		params.MprClear = true
+		hasUpdate = true
+	}
+	if maxBackupRoster != nil {
+		params.MbrVal = sql.NullInt32{Int32: int32(*maxBackupRoster), Valid: true}
+		hasUpdate = true
+	} else if clearMaxBackup {
+		params.MbrClear = true
 		hasUpdate = true
 	}
 

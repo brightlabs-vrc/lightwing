@@ -130,8 +130,9 @@ const createEvent = `-- name: CreateEvent :exec
 INSERT INTO "event" (id, name, description, "bannerUrl", "ownerType", "organizationId", "ownerUserId",
   status, tag, "scoringType", "scoringRulesMode", "customScoringTables", "classRestriction",
   "granularParticipation", "scheduledAt", "participantLimit", "maxConcurrentRaceParticipations",
+  "isTeamEvent", "maxPrimaryRosterSize", "maxBackupRosterSize",
   "createdAt", "updatedAt")
-VALUES ($1,$2,$3,$4,$5,$6,$7,'DRAFT',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17)
+VALUES ($1,$2,$3,$4,$5,$6,$7,'DRAFT',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$20)
 `
 
 type CreateEventParams struct {
@@ -151,6 +152,9 @@ type CreateEventParams struct {
 	ScheduledAt                     sql.NullTime
 	ParticipantLimit                sql.NullInt32
 	MaxConcurrentRaceParticipations sql.NullInt32
+	IsTeamEvent                     bool
+	MaxPrimaryRosterSize            sql.NullInt32
+	MaxBackupRosterSize             sql.NullInt32
 	CreatedAt                       time.Time
 }
 
@@ -173,6 +177,9 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) error 
 		arg.ScheduledAt,
 		arg.ParticipantLimit,
 		arg.MaxConcurrentRaceParticipations,
+		arg.IsTeamEvent,
+		arg.MaxPrimaryRosterSize,
+		arg.MaxBackupRosterSize,
 		arg.CreatedAt,
 	)
 	return err
@@ -453,7 +460,7 @@ func (q *Queries) GetEventMemberCount(ctx context.Context, eventid string) (int6
 }
 
 const getEventRow = `-- name: GetEventRow :one
-SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."createdAt", e."updatedAt",
+SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId", e.status, e.tag, e."deletedAt", e."scoringType", e."scoringRulesMode", e."customScoringTables", e."classRestriction", e."granularParticipation", e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations", e."isTeamEvent", e."maxPrimaryRosterSize", e."maxBackupRosterSize", e."createdAt", e."updatedAt",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -483,6 +490,9 @@ type GetEventRowRow struct {
 	ScheduledAt                     sql.NullTime
 	ParticipantLimit                sql.NullInt32
 	MaxConcurrentRaceParticipations sql.NullInt32
+	IsTeamEvent                     bool
+	MaxPrimaryRosterSize            sql.NullInt32
+	MaxBackupRosterSize             sql.NullInt32
 	CreatedAt                       time.Time
 	UpdatedAt                       time.Time
 	OwnerName                       string
@@ -514,6 +524,9 @@ func (q *Queries) GetEventRow(ctx context.Context, id string) (GetEventRowRow, e
 		&i.ScheduledAt,
 		&i.ParticipantLimit,
 		&i.MaxConcurrentRaceParticipations,
+		&i.IsTeamEvent,
+		&i.MaxPrimaryRosterSize,
+		&i.MaxBackupRosterSize,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwnerName,
@@ -1301,11 +1314,13 @@ func (q *Queries) ListEventMemberIDs(ctx context.Context, eventid string) ([]str
 }
 
 const listEventMembersByEvent = `-- name: ListEventMembersByEvent :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
+       m."teamId", t.name AS "teamName", t.slug AS "teamSlug", m."rosterRole"
 FROM "event_member" m
 JOIN "event" e ON e.id = m."eventId"
 JOIN "user" u ON u.id = m."userId"
 LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
+LEFT JOIN "team" t ON t.id = m."teamId"
 WHERE m."eventId" = $1
 `
 
@@ -1313,6 +1328,10 @@ type ListEventMembersByEventRow struct {
 	UserId         string
 	VrchatUsername string
 	ClassTier      interface{}
+	TeamId         sql.NullString
+	TeamName       sql.NullString
+	TeamSlug       sql.NullString
+	RosterRole     sql.NullString
 }
 
 // Event members with display names (used by LoadEvent).
@@ -1325,7 +1344,7 @@ func (q *Queries) ListEventMembersByEvent(ctx context.Context, eventid string) (
 	var items []ListEventMembersByEventRow
 	for rows.Next() {
 		var i ListEventMembersByEventRow
-		if err := rows.Scan(&i.UserId, &i.VrchatUsername, &i.ClassTier); err != nil {
+		if err := rows.Scan(&i.UserId, &i.VrchatUsername, &i.ClassTier, &i.TeamId, &i.TeamName, &i.TeamSlug, &i.RosterRole); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1443,9 +1462,11 @@ const listEvents = `-- name: ListEvents :many
 SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
+e."isTeamEvent", e."maxPrimaryRosterSize", e."maxBackupRosterSize",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+(SELECT COUNT(*) FROM "event_team" et WHERE et."eventId" = e.id) AS "teamCount",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -1489,10 +1510,14 @@ type ListEventsRow struct {
 	ScheduledAt                     sql.NullTime
 	ParticipantLimit                sql.NullInt32
 	MaxConcurrentRaceParticipations sql.NullInt32
+	IsTeamEvent                     bool
+	MaxPrimaryRosterSize            sql.NullInt32
+	MaxBackupRosterSize             sql.NullInt32
 	CreatedAt                       time.Time
 	UpdatedAt                       time.Time
 	Count                           int64
 	Count_2                         int64
+	TeamCount                       int64
 	OwnerName                       string
 	OwnerSlug                       string
 	OwnerLogo                       sql.NullString
@@ -1534,10 +1559,14 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListE
 			&i.ScheduledAt,
 			&i.ParticipantLimit,
 			&i.MaxConcurrentRaceParticipations,
+			&i.IsTeamEvent,
+			&i.MaxPrimaryRosterSize,
+			&i.MaxBackupRosterSize,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Count,
 			&i.Count_2,
+			&i.TeamCount,
 			&i.OwnerName,
 			&i.OwnerSlug,
 			&i.OwnerLogo,
@@ -1556,8 +1585,12 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListE
 }
 
 const listLadderOverview = `-- name: ListLadderOverview :many
-SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.elo, e.wins, e.losses
-FROM "event_ladder_entry" e JOIN "user" u ON u.id = e."userId"
+SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.elo, e.wins, e.losses,
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
+FROM "event_ladder_entry" e
+JOIN "user" u ON u.id = e."userId"
+LEFT JOIN "event_member" em ON em."eventId" = e."eventId" AND em."userId" = e."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE e."eventId" = $1 ORDER BY e.elo DESC
 `
 
@@ -1567,6 +1600,10 @@ type ListLadderOverviewRow struct {
 	Elo            int32
 	Wins           int32
 	Losses         int32
+	TeamId         sql.NullString
+	TeamName       sql.NullString
+	TeamSlug       sql.NullString
+	RosterRole     sql.NullString
 }
 
 func (q *Queries) ListLadderOverview(ctx context.Context, eventid string) ([]ListLadderOverviewRow, error) {
@@ -1584,6 +1621,10 @@ func (q *Queries) ListLadderOverview(ctx context.Context, eventid string) ([]Lis
 			&i.Elo,
 			&i.Wins,
 			&i.Losses,
+			&i.TeamId,
+			&i.TeamName,
+			&i.TeamSlug,
+			&i.RosterRole,
 		); err != nil {
 			return nil, err
 		}
@@ -1599,8 +1640,12 @@ func (q *Queries) ListLadderOverview(ctx context.Context, eventid string) ([]Lis
 }
 
 const listPointsOverview = `-- name: ListPointsOverview :many
-SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.points
-FROM "event_points_entry" e JOIN "user" u ON u.id = e."userId"
+SELECT e."userId", COALESCE(u."vrchatUsername", u.name), e.points,
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
+FROM "event_points_entry" e
+JOIN "user" u ON u.id = e."userId"
+LEFT JOIN "event_member" em ON em."eventId" = e."eventId" AND em."userId" = e."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE e."eventId" = $1 ORDER BY e.points DESC
 `
 
@@ -1608,6 +1653,10 @@ type ListPointsOverviewRow struct {
 	UserId         string
 	VrchatUsername string
 	Points         int32
+	TeamId         sql.NullString
+	TeamName       sql.NullString
+	TeamSlug       sql.NullString
+	RosterRole     sql.NullString
 }
 
 // Scoring overviews (used by LoadEvent).
@@ -1620,7 +1669,7 @@ func (q *Queries) ListPointsOverview(ctx context.Context, eventid string) ([]Lis
 	var items []ListPointsOverviewRow
 	for rows.Next() {
 		var i ListPointsOverviewRow
-		if err := rows.Scan(&i.UserId, &i.VrchatUsername, &i.Points); err != nil {
+		if err := rows.Scan(&i.UserId, &i.VrchatUsername, &i.Points, &i.TeamId, &i.TeamName, &i.TeamSlug, &i.RosterRole); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1638,9 +1687,11 @@ const listPublicEvents = `-- name: ListPublicEvents :many
 SELECT e.id, e.name, e.description, e."bannerUrl", e."ownerType", e."organizationId", e."ownerUserId",
 e.status, e.tag, e."deletedAt", e."scoringType", e."classRestriction", e."granularParticipation",
 e."signupsLocked", e."scheduledAt", e."participantLimit", e."maxConcurrentRaceParticipations",
+e."isTeamEvent", e."maxPrimaryRosterSize", e."maxBackupRosterSize",
 e."createdAt", e."updatedAt",
 (SELECT COUNT(*) FROM "race_event" r WHERE r."eventId" = e.id),
 (SELECT COUNT(*) FROM "event_member" m WHERE m."eventId" = e.id),
+(SELECT COUNT(*) FROM "event_team" et WHERE et."eventId" = e.id) AS "teamCount",
 COALESCE(o.name, u."vrchatUsername", u.name) AS "ownerName",
 COALESCE(o.slug, u.slug) AS "ownerSlug",
 COALESCE(o.logo, u.image) AS "ownerLogo"
@@ -1674,10 +1725,14 @@ type ListPublicEventsRow struct {
 	ScheduledAt                     sql.NullTime
 	ParticipantLimit                sql.NullInt32
 	MaxConcurrentRaceParticipations sql.NullInt32
+	IsTeamEvent                     bool
+	MaxPrimaryRosterSize            sql.NullInt32
+	MaxBackupRosterSize             sql.NullInt32
 	CreatedAt                       time.Time
 	UpdatedAt                       time.Time
 	Count                           int64
 	Count_2                         int64
+	TeamCount                       int64
 	OwnerName                       string
 	OwnerSlug                       string
 	OwnerLogo                       sql.NullString
@@ -1711,10 +1766,14 @@ func (q *Queries) ListPublicEvents(ctx context.Context, arg ListPublicEventsPara
 			&i.ScheduledAt,
 			&i.ParticipantLimit,
 			&i.MaxConcurrentRaceParticipations,
+			&i.IsTeamEvent,
+			&i.MaxPrimaryRosterSize,
+			&i.MaxBackupRosterSize,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Count,
 			&i.Count_2,
+			&i.TeamCount,
 			&i.OwnerName,
 			&i.OwnerSlug,
 			&i.OwnerLogo,
@@ -1733,12 +1792,15 @@ func (q *Queries) ListPublicEvents(ctx context.Context, arg ListPublicEventsPara
 }
 
 const listRaceEventMembers = `-- name: ListRaceEventMembers :many
-SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+SELECT m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
 FROM "race_event_member" m
 JOIN "race_event" r ON r.id = m."raceEventId"
 JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = m."userId"
 LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
+LEFT JOIN "event_member" em ON em."eventId" = r."eventId" AND em."userId" = m."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE m."raceEventId" = $1
 `
 
@@ -1746,6 +1808,10 @@ type ListRaceEventMembersRow struct {
 	UserId         string
 	VrchatUsername string
 	ClassTier      interface{}
+	TeamId         sql.NullString
+	TeamName       sql.NullString
+	TeamSlug       sql.NullString
+	RosterRole     sql.NullString
 }
 
 // Race members for a race.
@@ -1758,7 +1824,7 @@ func (q *Queries) ListRaceEventMembers(ctx context.Context, raceeventid string) 
 	var items []ListRaceEventMembersRow
 	for rows.Next() {
 		var i ListRaceEventMembersRow
-		if err := rows.Scan(&i.UserId, &i.VrchatUsername, &i.ClassTier); err != nil {
+		if err := rows.Scan(&i.UserId, &i.VrchatUsername, &i.ClassTier, &i.TeamId, &i.TeamName, &i.TeamSlug, &i.RosterRole); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1931,12 +1997,15 @@ func (q *Queries) ListRaceMemberPairs(ctx context.Context, eventid string) ([]Li
 }
 
 const listRaceMembersByEvent = `-- name: ListRaceMembersByEvent :many
-SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier"
+SELECT m."raceEventId", m."userId", COALESCE(u."vrchatUsername", u.name), oct."classTier",
+       em."teamId", t.name AS "teamName", t.slug AS "teamSlug", em."rosterRole"
 FROM "race_event_member" m
 JOIN "race_event" r ON r.id = m."raceEventId"
 JOIN "event" e ON e.id = r."eventId"
 JOIN "user" u ON u.id = m."userId"
 LEFT JOIN "org_class_tier" oct ON oct."organizationId" = e."organizationId" AND oct."userId" = m."userId"
+LEFT JOIN "event_member" em ON em."eventId" = r."eventId" AND em."userId" = m."userId"
+LEFT JOIN "team" t ON t.id = em."teamId"
 WHERE r."eventId" = $1
 `
 
@@ -1945,6 +2014,10 @@ type ListRaceMembersByEventRow struct {
 	UserId         string
 	VrchatUsername string
 	ClassTier      interface{}
+	TeamId         sql.NullString
+	TeamName       sql.NullString
+	TeamSlug       sql.NullString
+	RosterRole     sql.NullString
 }
 
 // Race members of an event with display names (used by LoadEvent).
@@ -1962,6 +2035,10 @@ func (q *Queries) ListRaceMembersByEvent(ctx context.Context, eventid string) ([
 			&i.UserId,
 			&i.VrchatUsername,
 			&i.ClassTier,
+			&i.TeamId,
+			&i.TeamName,
+			&i.TeamSlug,
+			&i.RosterRole,
 		); err != nil {
 			return nil, err
 		}
@@ -2288,7 +2365,9 @@ UPDATE "event" SET
   "classRestriction" = CASE WHEN $10::boolean THEN $11 ELSE "classRestriction" END,
   "scheduledAt" = CASE WHEN $12::boolean THEN $13 ELSE "scheduledAt" END,
   "participantLimit" = CASE WHEN $14::boolean THEN NULL ELSE COALESCE($15, "participantLimit") END,
-  "maxConcurrentRaceParticipations" = CASE WHEN $16::boolean THEN NULL ELSE COALESCE($17, "maxConcurrentRaceParticipations") END
+  "maxConcurrentRaceParticipations" = CASE WHEN $16::boolean THEN NULL ELSE COALESCE($17, "maxConcurrentRaceParticipations") END,
+  "maxPrimaryRosterSize" = CASE WHEN $21::boolean THEN NULL ELSE COALESCE($22, "maxPrimaryRosterSize") END,
+  "maxBackupRosterSize" = CASE WHEN $23::boolean THEN NULL ELSE COALESCE($24, "maxBackupRosterSize") END
 WHERE id = $18
 `
 
@@ -2312,6 +2391,10 @@ type UpdateEventParams struct {
 	PlVal     sql.NullInt32
 	McClear   bool
 	McVal     sql.NullInt32
+	MprClear  bool
+	MprVal    sql.NullInt32
+	MbrClear  bool
+	MbrVal    sql.NullInt32
 	ID        string
 }
 
@@ -2339,6 +2422,10 @@ func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) error 
 		arg.ID,
 		arg.BannerSet,
 		arg.BannerVal,
+		arg.MprClear,
+		arg.MprVal,
+		arg.MbrClear,
+		arg.MbrVal,
 	)
 	return err
 }

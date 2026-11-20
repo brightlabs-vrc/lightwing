@@ -484,6 +484,7 @@ type UserRaceRecordView struct {
 // ListUserRaceRecordsParams carries request query params for user race records.
 type ListUserRaceRecordsParams struct {
 	UserID string `query:"userId"`
+	Year   int    `query:"year"` // 0 means all-time
 	Limit  int    `query:"limit"`
 	Offset int    `query:"offset"`
 }
@@ -500,7 +501,15 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "userId is required"}
 	}
 
-	total64, err := q().CountUserRaceRecords(ctx, p.UserID)
+	year := p.Year
+	if year < 0 {
+		year = 0
+	}
+
+	total64, err := q().CountUserRaceRecords(ctx, sqlc.CountUserRaceRecordsParams{
+		UserId:  p.UserID,
+		Column2: int32(year),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -510,6 +519,7 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 		UserId:  p.UserID,
 		Column2: int32(p.Limit),
 		Column3: int32(p.Offset),
+		Column4: int32(year),
 	})
 	if err != nil {
 		return nil, err
@@ -550,7 +560,7 @@ func ListUserRaceRecordsCore(ctx context.Context, p *ListUserRaceRecordsParams) 
 //encore:api public method=GET path=/api/users/:userId/race-records
 func GetUserRaceRecords(ctx context.Context, userId string, p *ListUserRaceRecordsParams) (*ListUserRaceRecordsResponse, error) {
 	p.UserID = userId
-	cacheKey := fmt.Sprintf("%s:%d:%d", userId, p.Limit, p.Offset)
+	cacheKey := fmt.Sprintf("%s:%d:%d:%d", userId, p.Year, p.Limit, p.Offset)
 	if userRaceRecordsCache != nil {
 		if cached, err := userRaceRecordsCache.Get(ctx, userRaceRecordsCacheKey{Key: cacheKey}); err == nil {
 			return &cached, nil

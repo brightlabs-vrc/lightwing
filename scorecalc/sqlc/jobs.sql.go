@@ -91,7 +91,8 @@ LEFT JOIN (
     COUNT(DISTINCT epe."eventId") AS events_participated
   FROM "event_points_entry" epe
   JOIN "event" e ON e.id = epe."eventId"
-  WHERE EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+  WHERE e."deletedAt" IS NULL
+    AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
   GROUP BY epe."userId"
 ) p ON p."userId" = u.id
 LEFT JOIN (
@@ -103,7 +104,8 @@ LEFT JOIN (
   FROM "race_result" rr
   JOIN "race_event" re ON re.id = rr."raceEventId"
   JOIN "event" e ON e.id = re."eventId"
-  WHERE EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+  WHERE e."deletedAt" IS NULL
+    AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
   GROUP BY rr."userId"
 ) r ON r."userId" = u.id
 LEFT JOIN (
@@ -112,7 +114,8 @@ LEFT JOIN (
     COUNT(DISTINCT EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))) AS seasons_count
   FROM "event_points_entry" epe
   JOIN "event" e ON e.id = epe."eventId"
-  WHERE EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+  WHERE e."deletedAt" IS NULL
+    AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
   GROUP BY epe."userId"
 ) s ON s."userId" = u.id
 LEFT JOIN (
@@ -130,19 +133,27 @@ LEFT JOIN (
     FROM "event_member" em
     JOIN "event" e ON e.id = em."eventId"
     WHERE e."organizationId" IS NOT NULL
-      AND EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+      AND e."deletedAt" IS NULL
+      AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
     UNION
     SELECT DISTINCT epe."userId", e.id AS "eventId", e."organizationId"
     FROM "event_points_entry" epe
     JOIN "event" e ON e.id = epe."eventId"
     WHERE e."organizationId" IS NOT NULL
-      AND EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int
+      AND e."deletedAt" IS NULL
+      AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
   ) ev
   JOIN "org_class_tier" oct ON oct."organizationId" = ev."organizationId" AND oct."userId" = ev."userId"
   WHERE oct."classTier" IN ('G3', 'G2', 'G1')
   GROUP BY ev."userId"
 ) ct ON ct."userId" = u.id
-LEFT JOIN "user_rating_snapshot" urs ON urs."userId" = u.id AND urs."year" = $1::int
+LEFT JOIN (
+  SELECT DISTINCT ON ("userId")
+    "userId", "rating", "ratingDeviation", "ratingVolatility", "peakRating", "seasonRatingDelta", "isProvisional"
+  FROM "user_rating_snapshot"
+  WHERE ($1::int = 0 OR "year" = $1::int)
+  ORDER BY "userId", "year" DESC
+) urs ON urs."userId" = u.id
 WHERE (COALESCE(p.total_points, 0) > 0 OR COALESCE(r.races_participated, 0) > 0)
 ORDER BY total_points DESC
 `
@@ -199,6 +210,158 @@ func (q *Queries) CalculateLeaderboardStats(ctx context.Context, year int32) ([]
 			&i.PeakRating,
 			&i.SeasonRatingDelta,
 			&i.IsProvisional,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const calculateTeamLeaderboardStats = `-- name: CalculateTeamLeaderboardStats :many
+WITH team_event_scores AS (
+  SELECT
+    et."eventId",
+    et."teamId",
+    COALESCE(SUM(COALESCE(epe.points, 0)), 0)::bigint AS event_points
+  FROM "event_team" et
+  JOIN "event" e ON e.id = et."eventId"
+  JOIN "team" t ON t.id = et."teamId"
+  LEFT JOIN "event_member" em ON em."eventId" = et."eventId" AND em."teamId" = et."teamId"
+  LEFT JOIN "event_points_entry" epe ON epe."eventId" = et."eventId" AND epe."userId" = em."userId"
+  WHERE e."deletedAt" IS NULL
+    AND e."isTeamEvent" = TRUE
+    AND t.status = 'APPROVED'
+    AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
+  GROUP BY et."eventId", et."teamId"
+),
+ranked_team_events AS (
+  SELECT
+    "eventId",
+    "teamId",
+    event_points,
+    RANK() OVER (PARTITION BY "eventId" ORDER BY event_points DESC)::float8 AS event_rank
+  FROM team_event_scores
+),
+team_comp AS (
+  SELECT
+    "teamId",
+    COUNT(DISTINCT "eventId")::int AS team_events_participated,
+    COALESCE(SUM(event_points), 0)::int AS team_total_points,
+    COALESCE(AVG(event_points), 0)::float8 AS team_avg_points,
+    COALESCE(AVG(event_rank), 0)::float8 AS team_event_rank_avg
+  FROM ranked_team_events
+  GROUP BY "teamId"
+),
+user_points AS (
+  SELECT
+    epe."userId",
+    COALESCE(SUM(epe.points), 0)::bigint AS total_points,
+    COUNT(DISTINCT epe."eventId")::bigint AS events_participated
+  FROM "event_points_entry" epe
+  JOIN "event" e ON e.id = epe."eventId"
+  WHERE e."deletedAt" IS NULL
+    AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
+  GROUP BY epe."userId"
+),
+user_races AS (
+  SELECT
+    rr."userId",
+    COALESCE(AVG(rr.position) FILTER (WHERE rr.position IS NOT NULL AND rr.position > 0), 0)::float8 AS avg_position,
+    COALESCE(SUM(rr.points), 0)::bigint AS race_points,
+    COUNT(DISTINCT re."eventId")::bigint AS race_events_participated
+  FROM "race_result" rr
+  JOIN "race_event" re ON re.id = rr."raceEventId"
+  JOIN "event" e ON e.id = re."eventId"
+  WHERE e."deletedAt" IS NULL
+    AND ($1::int = 0 OR EXTRACT(YEAR FROM COALESCE(e."scheduledAt", e."createdAt"))::int = $1::int)
+  GROUP BY rr."userId"
+),
+member_avgs AS (
+  SELECT
+    tm."teamId",
+    COUNT(DISTINCT tm."userId")::int AS member_count,
+    COALESCE(AVG(GREATEST(COALESCE(up.total_points, 0), COALESCE(ur.race_points, 0)))
+      FILTER (WHERE GREATEST(COALESCE(up.total_points, 0), COALESCE(ur.race_points, 0)) > 0), 0)::float8 AS member_points_avg,
+    COALESCE(AVG(ur.avg_position) FILTER (WHERE ur.avg_position > 0), 0)::float8 AS member_ranking_avg,
+    COALESCE(AVG(
+      GREATEST(COALESCE(up.total_points, 0), COALESCE(ur.race_points, 0))::float8 /
+      NULLIF(GREATEST(COALESCE(up.events_participated, 0), COALESCE(ur.race_events_participated, 0)), 0)
+    ) FILTER (WHERE GREATEST(COALESCE(up.total_points, 0), COALESCE(ur.race_points, 0)) > 0
+      AND GREATEST(COALESCE(up.events_participated, 0), COALESCE(ur.race_events_participated, 0)) > 0), 0)::float8 AS member_avg_points_per_event
+  FROM "teamMember" tm
+  LEFT JOIN user_points up ON up."userId" = tm."userId"
+  LEFT JOIN user_races ur ON ur."userId" = tm."userId"
+  GROUP BY tm."teamId"
+)
+SELECT
+  t.id AS team_id,
+  t.name AS name,
+  t.slug AS slug,
+  t.logo AS logo,
+  COALESCE(ma.member_count, 0)::int AS member_count,
+  COALESCE(tc.team_events_participated, 0)::int AS team_events_participated,
+  COALESCE(tc.team_total_points, 0)::int AS team_total_points,
+  COALESCE(tc.team_avg_points, 0)::float8 AS team_avg_points,
+  COALESCE(tc.team_event_rank_avg, 0)::float8 AS team_event_rank_avg,
+  COALESCE(ma.member_points_avg, 0)::float8 AS member_points_avg,
+  COALESCE(ma.member_ranking_avg, 0)::float8 AS member_ranking_avg,
+  COALESCE(ma.member_avg_points_per_event, 0)::float8 AS member_avg_points_per_event
+FROM "team" t
+LEFT JOIN team_comp tc ON tc."teamId" = t.id
+LEFT JOIN member_avgs ma ON ma."teamId" = t.id
+WHERE t.status = 'APPROVED'
+  AND (
+    COALESCE(tc.team_events_participated, 0) > 0
+    OR COALESCE(ma.member_points_avg, 0) > 0
+    OR COALESCE(ma.member_ranking_avg, 0) > 0
+  )
+ORDER BY team_total_points DESC, member_points_avg DESC, t.name ASC
+`
+
+type CalculateTeamLeaderboardStatsRow struct {
+	TeamID                 string
+	Name                   string
+	Slug                   string
+	Logo                   sql.NullString
+	MemberCount            int32
+	TeamEventsParticipated int32
+	TeamTotalPoints        int32
+	TeamAvgPoints          float64
+	TeamEventRankAvg       float64
+	MemberPointsAvg        float64
+	MemberRankingAvg       float64
+	MemberAvgPointsPerEvent float64
+}
+
+func (q *Queries) CalculateTeamLeaderboardStats(ctx context.Context, year int32) ([]CalculateTeamLeaderboardStatsRow, error) {
+	rows, err := q.db.QueryContext(ctx, calculateTeamLeaderboardStats, year)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CalculateTeamLeaderboardStatsRow
+	for rows.Next() {
+		var i CalculateTeamLeaderboardStatsRow
+		if err := rows.Scan(
+			&i.TeamID,
+			&i.Name,
+			&i.Slug,
+			&i.Logo,
+			&i.MemberCount,
+			&i.TeamEventsParticipated,
+			&i.TeamTotalPoints,
+			&i.TeamAvgPoints,
+			&i.TeamEventRankAvg,
+			&i.MemberPointsAvg,
+			&i.MemberRankingAvg,
+			&i.MemberAvgPointsPerEvent,
 		); err != nil {
 			return nil, err
 		}

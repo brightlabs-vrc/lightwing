@@ -27,12 +27,20 @@ type Service struct{}
 
 // --- Types (mirror the TS interfaces) ---
 
-// TeamStats holds a team's aggregate "container" statistics.
+// TeamStats holds a team's aggregate "container" statistics, separating official
+// team-based competition stats from member-averaged individual performance.
 type TeamStats struct {
-	RankingAverage        *float64 `json:"rankingAverage"`
-	PointsAverage         *float64 `json:"pointsAverage"`
-	SeasonRank            *int32   `json:"seasonRank"`
-	AveragePointsPerEvent *float64 `json:"averagePointsPerEvent"`
+	RankingAverage          *float64 `json:"rankingAverage"`
+	PointsAverage           *float64 `json:"pointsAverage"`
+	SeasonRank              *int32   `json:"seasonRank"`
+	AveragePointsPerEvent   *float64 `json:"averagePointsPerEvent"`
+	TeamEventsParticipated  int      `json:"teamEventsParticipated"`
+	TeamTotalPoints         int      `json:"teamTotalPoints"`
+	TeamAveragePoints       *float64 `json:"teamAveragePoints,omitempty"`
+	TeamEventRankAverage    *float64 `json:"teamEventRankAverage,omitempty"`
+	SeasonRankSource        string   `json:"seasonRankSource,omitempty"` // "TEAM_EVENTS" | "MEMBER_AVERAGE"
+	Year                    int      `json:"year,omitempty"`             // 0 = All-Time
+	AvailableYears          []int    `json:"availableYears,omitempty"`
 }
 
 // TeamMemberSummary is a single membership with display name.
@@ -362,40 +370,133 @@ func hasAnyMemberActivity(rows []sqlc.GetTeamMembersLeaderboardStatsRow) bool {
 	return false
 }
 
+func getAvailableTeamStatYears(ctx context.Context, currentYear int) []int {
+	years32, err := q().ListTeamStatYears(ctx)
+	if err != nil {
+		return []int{currentYear}
+	}
+	seen := make(map[int]bool, len(years32)+1)
+	years := make([]int, 0, len(years32)+1)
+	for _, y := range years32 {
+		yi := int(y)
+		if !seen[yi] {
+			seen[yi] = true
+			years = append(years, yi)
+		}
+	}
+	if !seen[currentYear] {
+		years = append(years, currentYear)
+	}
+	sort.Slice(years, func(i, j int) bool { return years[i] > years[j] })
+	return years
+}
+
 func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 	currentYear := int32(time.Now().UTC().Year())
-	targetYear := currentYear
+	return computeTeamStatsForYear(ctx, teamID, currentYear, true)
+}
 
+func computeTeamStatsForYear(ctx context.Context, teamID string, year int32, allowAllTimeFallback bool) (TeamStats, error) {
+	currentYear := time.Now().UTC().Year()
+	targetYear := year
+	availYears := getAvailableTeamStatYears(ctx, currentYear)
+
+	// 1. Fetch Member Roster Averages for targetYear
 	stats, err := q().GetTeamMembersLeaderboardStats(ctx, sqlc.GetTeamMembersLeaderboardStatsParams{
 		TeamID: teamID,
-		Year:   currentYear,
+		Year:   targetYear,
 	})
 	if err != nil {
 		return TeamStats{}, err
 	}
 
-	// Fall back to all-time stats if no member has current-year activity
-	if len(stats) > 0 && !hasAnyMemberActivity(stats) {
+	// 2. Fetch Team Competition Stats across all approved teams for targetYear
+	compRows, compErr := q().GetAllApprovedTeamsCompetitionStats(ctx, targetYear)
+	hasTeamCompForYear := compErr == nil && len(compRows) > 0
+
+	// Fall back to all-time only when requested (initial team load) and no activity exists for currentYear
+	if allowAllTimeFallback && targetYear != 0 && !hasAnyMemberActivity(stats) && !hasTeamCompForYear {
 		allTimeStats, allErr := q().GetTeamMembersLeaderboardStats(ctx, sqlc.GetTeamMembersLeaderboardStatsParams{
 			TeamID: teamID,
 			Year:   0,
 		})
-		if allErr == nil && hasAnyMemberActivity(allTimeStats) {
-			stats = allTimeStats
+		allTimeComp, allCompErr := q().GetAllApprovedTeamsCompetitionStats(ctx, 0)
+		if (allErr == nil && hasAnyMemberActivity(allTimeStats)) || (allCompErr == nil && len(allTimeComp) > 0) {
+			if allErr == nil {
+				stats = allTimeStats
+			}
+			if allCompErr == nil {
+				compRows = allTimeComp
+				hasTeamCompForYear = len(compRows) > 0
+			}
 			targetYear = 0
 		}
 	}
 
-	if len(stats) == 0 {
-		return TeamStats{}, nil
+	result := aggregateRowsToTeamStats(stats)
+	result.Year = int(targetYear)
+	result.AvailableYears = availYears
+
+	// Populate this team's Team Competition Stats
+	if compErr == nil {
+		for _, cr := range compRows {
+			if cr.TeamID == teamID {
+				result.TeamEventsParticipated = int(cr.TeamEventsParticipated)
+				result.TeamTotalPoints = int(cr.TeamTotalPoints)
+				if cr.TeamEventsParticipated > 0 {
+					avgPts := cr.TeamAvgPoints
+					result.TeamAveragePoints = &avgPts
+					if cr.TeamEventRankAvg > 0 {
+						avgRank := cr.TeamEventRankAvg
+						result.TeamEventRankAverage = &avgRank
+					}
+				}
+				break
+			}
+		}
 	}
 
-	result := aggregateRowsToTeamStats(stats)
+	// 3. Compute SeasonRank: prioritize TEAM_EVENTS when any approved teams have team-event results in targetYear
+	if hasTeamCompForYear {
+		sortedComp := make([]sqlc.GetAllApprovedTeamsCompetitionStatsRow, len(compRows))
+		copy(sortedComp, compRows)
+		sort.Slice(sortedComp, func(i, j int) bool {
+			if sortedComp[i].TeamTotalPoints != sortedComp[j].TeamTotalPoints {
+				return sortedComp[i].TeamTotalPoints > sortedComp[j].TeamTotalPoints
+			}
+			ri, rj := math.MaxFloat64, math.MaxFloat64
+			if sortedComp[i].TeamEventRankAvg > 0 {
+				ri = sortedComp[i].TeamEventRankAvg
+			}
+			if sortedComp[j].TeamEventRankAvg > 0 {
+				rj = sortedComp[j].TeamEventRankAvg
+			}
+			if ri != rj {
+				return ri < rj
+			}
+			if sortedComp[i].TeamAvgPoints != sortedComp[j].TeamAvgPoints {
+				return sortedComp[i].TeamAvgPoints > sortedComp[j].TeamAvgPoints
+			}
+			return sortedComp[i].TeamID < sortedComp[j].TeamID
+		})
+		for idx, cr := range sortedComp {
+			if cr.TeamID == teamID {
+				rank := int32(idx + 1)
+				result.SeasonRank = &rank
+				result.SeasonRankSource = "TEAM_EVENTS"
+				break
+			}
+		}
+		if result.SeasonRank != nil {
+			return result, nil
+		}
+	}
+
+	// Fallback: SeasonRank from Member Roster Averages when no team-based events exist for this team/season
 	if result.PointsAverage == nil && result.RankingAverage == nil && result.AveragePointsPerEvent == nil {
 		return result, nil
 	}
 
-	// Calculate SeasonRank across all approved teams for targetYear
 	allRows, allErr := q().GetAllApprovedTeamsMembersLeaderboardStats(ctx, targetYear)
 	if allErr == nil {
 		rowsByTeam := make(map[string][]sqlc.GetTeamMembersLeaderboardStatsRow)
@@ -407,7 +508,6 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 				EventsParticipated: r.EventsParticipated,
 			})
 		}
-		// Ensure target teamID is present in rowsByTeam
 		if _, exists := rowsByTeam[teamID]; !exists {
 			rowsByTeam[teamID] = stats
 		}
@@ -465,6 +565,7 @@ func computeTeamStats(ctx context.Context, teamID string) (TeamStats, error) {
 			if st.teamID == teamID {
 				rank := int32(idx + 1)
 				result.SeasonRank = &rank
+				result.SeasonRankSource = "MEMBER_AVERAGE"
 				break
 			}
 		}

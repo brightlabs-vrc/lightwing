@@ -596,6 +596,8 @@ export async function updateAdminEvent(
     scheduledAt?: string | null
     participantLimit?: number | null
     maxConcurrentRaceParticipations?: number | null
+    maxPrimaryRosterSize?: number | null
+    maxBackupRosterSize?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
@@ -612,6 +614,8 @@ export async function updateAdminEvent(
       scheduledAt: params.scheduledAt,
       participantLimit: params.participantLimit,
       maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations,
+      maxPrimaryRosterSize: params.maxPrimaryRosterSize,
+      maxBackupRosterSize: params.maxBackupRosterSize,
     } as unknown as eventmanager.UpdateEventRequest)
   }
 
@@ -628,6 +632,8 @@ export async function updateAdminEvent(
         scheduledAt: params.scheduledAt !== undefined ? params.scheduledAt : evt.scheduledAt,
         participantLimit: params.participantLimit !== undefined ? params.participantLimit : evt.participantLimit,
         maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations !== undefined ? params.maxConcurrentRaceParticipations : evt.maxConcurrentRaceParticipations,
+        maxPrimaryRosterSize: params.maxPrimaryRosterSize !== undefined ? params.maxPrimaryRosterSize : evt.maxPrimaryRosterSize,
+        maxBackupRosterSize: params.maxBackupRosterSize !== undefined ? params.maxBackupRosterSize : evt.maxBackupRosterSize,
         updatedAt: new Date().toISOString(),
       } as unknown as eventmanager.EventDetail
     }
@@ -682,6 +688,9 @@ export async function createAdminEvent(
     scheduledAt?: string | null
     participantLimit?: number | null
     maxConcurrentRaceParticipations?: number | null
+    isTeamEvent?: boolean
+    maxPrimaryRosterSize?: number | null
+    maxBackupRosterSize?: number | null
   },
   authorization: string,
 ): Promise<eventmanager.EventDetail> {
@@ -702,6 +711,9 @@ export async function createAdminEvent(
       scheduledAt: params.scheduledAt ?? null,
       participantLimit: params.participantLimit ?? null,
       maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations ?? null,
+      isTeamEvent: params.isTeamEvent ?? false,
+      maxPrimaryRosterSize: params.maxPrimaryRosterSize ?? null,
+      maxBackupRosterSize: params.maxBackupRosterSize ?? null,
     } as unknown as eventmanager.CreateEventRequest)
   }
 
@@ -724,10 +736,15 @@ export async function createAdminEvent(
     scheduledAt: params.scheduledAt ?? null,
     participantLimit: params.participantLimit ?? null,
     maxConcurrentRaceParticipations: params.maxConcurrentRaceParticipations ?? null,
+    isTeamEvent: params.isTeamEvent ?? false,
+    maxPrimaryRosterSize: params.maxPrimaryRosterSize ?? null,
+    maxBackupRosterSize: params.maxBackupRosterSize ?? null,
     raceEvents: [],
     members: [],
+    teams: [],
     schedules: [],
     pointsOverview: params.scoringType === 1 ? [] : null,
+    teamPointsOverview: params.scoringType === 1 && params.isTeamEvent ? [] : undefined,
     ladderOverview: params.scoringType === 2 ? [] : null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -1263,6 +1280,58 @@ export async function removeEventMember(
   })
 
   recomputeMockOverview(eventId)
+  return getAdminEvent(eventId)
+}
+
+export async function upsertEventTeamRoster(
+  eventId: string,
+  teamId: string,
+  primaryUserIds: string[],
+  backupUserIds: string[],
+  _authorization?: string,
+): Promise<eventmanager.EventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.UpsertEventTeamRoster({
+      eventId,
+      teamId,
+      primaryUserIds,
+      backupUserIds,
+    })
+  }
+  return getAdminEvent(eventId)
+}
+
+export async function substituteEventTeamMember(
+  eventId: string,
+  teamId: string,
+  incomingUserId: string,
+  outgoingUserId?: string | null,
+  replaceInUpcomingRaces = true,
+  _authorization?: string,
+): Promise<eventmanager.EventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.SubstituteEventTeamMember({
+      eventId,
+      teamId,
+      incomingUserId,
+      outgoingUserId: outgoingUserId ?? undefined,
+      replaceInUpcomingRaces,
+    })
+  }
+  return getAdminEvent(eventId)
+}
+
+export async function removeEventTeam(
+  eventId: string,
+  teamId: string,
+  _authorization?: string,
+): Promise<eventmanager.EventDetail> {
+  if (!MOCK_MODE) {
+    return appClient.eventmanager.RemoveEventTeam({
+      EventID: eventId,
+      TeamID: teamId,
+    })
+  }
   return getAdminEvent(eventId)
 }
 

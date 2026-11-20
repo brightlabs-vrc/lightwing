@@ -1,9 +1,20 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { usePageHead } from '../../hooks/usePageHead'
 import { buildSeoMeta } from '../../lib/seo'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPublicEvent, joinEvent, leaveEvent, listPublicRaceEvents, getPublicRaceResults, joinRaceEvent, leaveRaceEvent } from '../../lib/public-api'
+import {
+  getPublicEvent,
+  getPublicTeamProfile,
+  joinEvent,
+  leaveEvent,
+  listPublicRaceEvents,
+  getPublicRaceResults,
+  joinRaceEvent,
+  leaveRaceEvent,
+} from '../../lib/public-api'
+import { upsertEventTeamRoster, removeEventTeam } from '../../lib/admin-api'
 import { formatLocalDateTime } from '../../lib/datetime'
 import { computeRaceEffectiveResults } from '../../lib/standings'
 import { MarkdownView } from '../../components/MarkdownView'
@@ -17,10 +28,12 @@ import {
   PixelSpinner,
   PixelSectionHeader,
   PixelEmptyState,
+  PixelModal,
+  PixelAlert,
   type PixelTableColumn,
   useToast,
 } from '@pxlkit/ui-kit'
-import type { eventmanager } from '../../lib/client'
+import type { eventmanager, teammanager } from '../../lib/client'
 import type { EventStatus, EventTag } from '../../types'
 import { PixelSkeletonDetail } from '../../components/LoadingSkeleton'
 
@@ -99,6 +112,7 @@ function EventDetailPage() {
   const loaderData = Route.useLoaderData()
   const queryClient = useQueryClient()
   const { session } = useAuth()
+  const { toast } = useToast()
 
   const { data: event, isLoading, error } = useQuery({
     queryKey: ['public-event', eventId],
@@ -113,6 +127,62 @@ function EventDetailPage() {
     type: 'website',
   })
 
+  // Team Admin self-service roster modal state
+  const [showTeamModal, setShowTeamModal] = useState(false)
+  const [selectedTeamId, setSelectedTeamId] = useState('')
+  const [selectedTeamDetail, setSelectedTeamDetail] = useState<teammanager.Team | null>(null)
+  const [loadingTeamDetail, setLoadingTeamDetail] = useState(false)
+  const [primaryUserIds, setPrimaryUserIds] = useState<string[]>([])
+  const [backupUserIds, setBackupUserIds] = useState<string[]>([])
+  const [teamRosterError, setTeamRosterError] = useState<string | null>(null)
+
+  const adminTeams = (session?.user.teams ?? []).filter((t) => {
+    const role = (t.role || '').toLowerCase()
+    return role === 'administrator' || role === 'admin' || role === 'owner'
+  })
+
+  useEffect(() => {
+    if (!showTeamModal) return
+    if (!selectedTeamId && adminTeams.length > 0) {
+      setSelectedTeamId(adminTeams[0].organizationId)
+    }
+  }, [showTeamModal, selectedTeamId, adminTeams.length])
+
+  useEffect(() => {
+    if (!showTeamModal || !selectedTeamId) {
+      setSelectedTeamDetail(null)
+      return
+    }
+    let cancelled = false
+    setLoadingTeamDetail(true)
+    setTeamRosterError(null)
+    void getPublicTeamProfile(selectedTeamId)
+      .then((detail) => {
+        if (cancelled) return
+        setSelectedTeamDetail(detail)
+        const existing = (event?.teams ?? []).find((t) => t.teamId === selectedTeamId)
+        if (existing) {
+          setPrimaryUserIds((existing.primaryRoster ?? []).map((m) => m.userId))
+          setBackupUserIds((existing.backupRoster ?? []).map((m) => m.userId))
+        } else {
+          setPrimaryUserIds([])
+          setBackupUserIds([])
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSelectedTeamDetail(null)
+          setTeamRosterError(err instanceof Error ? err.message : 'Unable to load team details.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTeamDetail(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [showTeamModal, selectedTeamId, event?.teams])
+
   const joinMutation = useMutation({
     mutationFn: (id: string) => joinEvent(id, `Bearer ${session?.session.token ?? ''}`),
     onSuccess: () => {
@@ -124,6 +194,40 @@ function EventDetailPage() {
     mutationFn: (id: string) => leaveEvent(id, `Bearer ${session?.session.token ?? ''}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['public-event', eventId] })
+    },
+  })
+
+  const saveTeamRosterMutation = useMutation({
+    mutationFn: () =>
+      upsertEventTeamRoster(
+        eventId,
+        selectedTeamId,
+        primaryUserIds,
+        backupUserIds,
+        `Bearer ${session?.session.token ?? ''}`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', eventId] })
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', eventId] })
+      toast({ tone: 'green', title: 'Team roster saved!' })
+      setShowTeamModal(false)
+    },
+    onError: (err: any) => {
+      setTeamRosterError(err?.message || 'Failed to save team roster.')
+    },
+  })
+
+  const withdrawTeamMutation = useMutation({
+    mutationFn: (teamId: string) =>
+      removeEventTeam(eventId, teamId, `Bearer ${session?.session.token ?? ''}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['public-event', eventId] })
+      queryClient.invalidateQueries({ queryKey: ['public-event-races', eventId] })
+      toast({ tone: 'neutral', title: 'Team withdrawn from event.' })
+      setShowTeamModal(false)
+    },
+    onError: (err: any) => {
+      setTeamRosterError(err?.message || 'Failed to withdraw team.')
     },
   })
 
@@ -140,7 +244,6 @@ function EventDetailPage() {
         <PixelEmptyState
           title="Error loading event"
           description="Something went wrong while fetching the event details."
-
         />
       </PixelContainer>
     )
@@ -151,6 +254,47 @@ function EventDetailPage() {
   const isMember = session && event.members.some((m) => m.userId === session.user.id)
   const isConcluded = event.status === 'CONCLUDED'
   const isGranular = event.granularParticipation
+  const registeredTeams = event.teams ?? []
+  const teamLimitReached =
+    event.isTeamEvent &&
+    !isGranular &&
+    event.participantLimit !== null &&
+    registeredTeams.length >= event.participantLimit
+
+  const toggleTeamMemberRole = (userId: string, role: 'NONE' | 'PRIMARY' | 'BACKUP') => {
+    setTeamRosterError(null)
+    if (role === 'NONE') {
+      setPrimaryUserIds((prev) => prev.filter((id) => id !== userId))
+      setBackupUserIds((prev) => prev.filter((id) => id !== userId))
+      return
+    }
+    if (role === 'PRIMARY') {
+      if (
+        !primaryUserIds.includes(userId) &&
+        event.maxPrimaryRosterSize !== null &&
+        event.maxPrimaryRosterSize > 0 &&
+        primaryUserIds.length >= event.maxPrimaryRosterSize
+      ) {
+        setTeamRosterError(`Primary roster limit is ${event.maxPrimaryRosterSize} per team.`)
+        return
+      }
+      setBackupUserIds((prev) => prev.filter((id) => id !== userId))
+      setPrimaryUserIds((prev) => (prev.includes(userId) ? prev : [...prev, userId]))
+      return
+    }
+    if (role === 'BACKUP') {
+      if (
+        !backupUserIds.includes(userId) &&
+        event.maxBackupRosterSize !== null &&
+        backupUserIds.length >= event.maxBackupRosterSize
+      ) {
+        setTeamRosterError(`Backup roster limit is ${event.maxBackupRosterSize} per team.`)
+        return
+      }
+      setPrimaryUserIds((prev) => prev.filter((id) => id !== userId))
+      setBackupUserIds((prev) => (prev.includes(userId) ? prev : [...prev, userId]))
+    }
+  }
 
   const participantColumns: PixelTableColumn<eventmanager.EventMemberView>[] = [
     {
@@ -201,14 +345,60 @@ function EventDetailPage() {
       : []),
   ]
 
+  const teamStandingsColumns: PixelTableColumn<eventmanager.TeamPointsEntryView>[] = [
+    { key: 'rank', header: '#', width: 64, render: (_t, idx) => idx + 1 },
+    {
+      key: 'team',
+      header: 'TEAM',
+      render: (t) => (
+        <Link
+          to="/$user"
+          params={{ user: t.slug || t.teamId }}
+          className="font-medium text-retro-text hover:text-retro-primary transition-colors inline-flex items-center gap-2"
+        >
+          {t.logo && (
+            <img
+              src={t.logo}
+              alt={t.name}
+              className="w-5 h-5 rounded border border-retro-border object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          )}
+          <span>{t.name}</span>
+        </Link>
+      ),
+    },
+    {
+      key: 'memberCount',
+      header: 'SCORING RACERS',
+      align: 'right',
+      width: 140,
+      render: (t) => <span className="text-retro-muted">{t.memberCount}</span>,
+    },
+    {
+      key: 'points',
+      header: 'TEAM POINTS',
+      align: 'right',
+      width: 128,
+      render: (t) => <span className="text-retro-gold font-bold">{t.points}</span>,
+    },
+  ]
+
   const pointsColumns: PixelTableColumn<eventmanager.PointsEntryView>[] = [
     { key: 'rank', header: '#', width: 64, render: (_e, idx) => idx + 1 },
     {
       key: 'name',
       header: 'PARTICIPANT',
       render: (e) => (
-        <div className="truncate font-medium max-w-[240px]" title={e.name}>
-          {e.name}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="truncate font-medium max-w-[200px]" title={e.name}>
+            {e.name}
+          </span>
+          {event.isTeamEvent && e.teamName && (
+            <PixelBadge tone="purple">{e.teamName}</PixelBadge>
+          )}
         </div>
       ),
     },
@@ -227,8 +417,13 @@ function EventDetailPage() {
       key: 'name',
       header: 'PARTICIPANT',
       render: (e) => (
-        <div className="truncate font-medium max-w-[240px]" title={e.name}>
-          {e.name}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="truncate font-medium max-w-[200px]" title={e.name}>
+            {e.name}
+          </span>
+          {event.isTeamEvent && e.teamName && (
+            <PixelBadge tone="purple">{e.teamName}</PixelBadge>
+          )}
         </div>
       ),
     },
@@ -247,6 +442,9 @@ function EventDetailPage() {
       render: (e) => `${e.wins}-${e.losses}`,
     },
   ]
+
+  const selectedTeamAlreadyRegistered = registeredTeams.some((t) => t.teamId === selectedTeamId)
+  const isSelectedTeamApprovedTeam = Boolean(selectedTeamDetail && selectedTeamDetail.status === 'APPROVED')
 
   return (
     <PixelContainer maxWidth="full" padding="md">
@@ -278,7 +476,8 @@ function EventDetailPage() {
                 </div>
               )}
             </PixelStack>
-            <PixelStack direction="row" gap={2}>
+            <PixelStack direction="row" gap={2} wrap>
+              {event.isTeamEvent && <PixelBadge tone="purple">TEAM EVENT</PixelBadge>}
               <PixelBadge tone={TAG_TONE[(event.tag as EventTag) || 'COMMUNITY']}>
                 {(TAG_LABELS[(event.tag as EventTag) || 'COMMUNITY']).toUpperCase()}
               </PixelBadge>
@@ -296,62 +495,184 @@ function EventDetailPage() {
               CLASS RESTRICTION:{' '}
               {event.classRestriction && event.classRestriction !== 'PRE_OP' && event.classRestriction !== 'OP' ? CLASS_TIER_LABELS[event.classRestriction as any] : 'OPEN TO ALL'}
             </PixelBadge>
+            {event.isTeamEvent && (
+              <PixelBadge tone="cyan">
+                ROSTER LIMITS: PRIMARY {event.maxPrimaryRosterSize ?? '∞'} · BACKUP {event.maxBackupRosterSize ?? '∞'}
+              </PixelBadge>
+            )}
           </PixelStack>
 
-          {!isGranular && (
+          {event.isTeamEvent ? (
             <div className="pt-4 border-t-2 border-retro-border">
               {!session ? (
                 <PixelButton asChild variant="solid" tone="purple" className="pxl-btn-flat">
                   <Link to="/auth" search={{ redirect: `/events/${eventId}` }}>
-                    SIGN IN TO JOIN
+                    SIGN IN TO REGISTER TEAM
                   </Link>
                 </PixelButton>
-              ) : (
+              ) : adminTeams.length > 0 ? (
                 <PixelStack gap={2}>
-                  <PixelButton
-                    variant="solid"
-                    tone={isMember ? 'red' : 'green'}
-                    className="pxl-btn-flat"
-                    disabled={isConcluded || event.status === 'DRAFT' || event.status === 'PENDING_DELETION' || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending || (!isMember && event.participantLimit !== null && event.members.length >= event.participantLimit)}
-                    loading={joinMutation.isPending || leaveMutation.isPending}
-                    onClick={() => {
-                      if (isConcluded) return
-                      if (isMember) {
-                        leaveMutation.mutate(eventId)
-                      } else {
-                        joinMutation.mutate(eventId)
-                      }
-                    }}
-                  >
-                    {isMember ? 'WITHDRAW FROM EVENT' : (event.participantLimit !== null && event.members.length >= event.participantLimit) ? 'EVENT FULL' : 'SIGN UP FOR EVENT'}
-                  </PixelButton>
+                  <div>
+                    <PixelButton
+                      variant="solid"
+                      tone="green"
+                      className="pxl-btn-flat"
+                      disabled={isConcluded || event.status === 'DRAFT' || event.status === 'PENDING_DELETION' || event.signupsLocked}
+                      onClick={() => {
+                        setTeamRosterError(null)
+                        setShowTeamModal(true)
+                      }}
+                    >
+                      REGISTER / MANAGE TEAM ROSTER
+                    </PixelButton>
+                  </div>
                   {event.signupsLocked && (
-                    <div className="text-retro-muted font-pixel text-xs mt-2">
+                    <div className="text-retro-muted font-pixel text-xs">
                       SIGNUPS ARE LOCKED FOR THIS EVENT
                     </div>
                   )}
                 </PixelStack>
+              ) : (
+                <div className="text-retro-muted font-sans text-xs">
+                  This is a team-based event. Approved Team Admins can register their team and assign Primary &amp; Backup rosters here while signups are open.
+                </div>
               )}
             </div>
+          ) : (
+            !isGranular && (
+              <div className="pt-4 border-t-2 border-retro-border">
+                {!session ? (
+                  <PixelButton asChild variant="solid" tone="purple" className="pxl-btn-flat">
+                    <Link to="/auth" search={{ redirect: `/events/${eventId}` }}>
+                      SIGN IN TO JOIN
+                    </Link>
+                  </PixelButton>
+                ) : (
+                  <PixelStack gap={2}>
+                    <PixelButton
+                      variant="solid"
+                      tone={isMember ? 'red' : 'green'}
+                      className="pxl-btn-flat"
+                      disabled={isConcluded || event.status === 'DRAFT' || event.status === 'PENDING_DELETION' || event.signupsLocked || joinMutation.isPending || leaveMutation.isPending || (!isMember && event.participantLimit !== null && event.members.length >= event.participantLimit)}
+                      loading={joinMutation.isPending || leaveMutation.isPending}
+                      onClick={() => {
+                        if (isConcluded) return
+                        if (isMember) {
+                          leaveMutation.mutate(eventId)
+                        } else {
+                          joinMutation.mutate(eventId)
+                        }
+                      }}
+                    >
+                      {isMember ? 'WITHDRAW FROM EVENT' : (event.participantLimit !== null && event.members.length >= event.participantLimit) ? 'EVENT FULL' : 'SIGN UP FOR EVENT'}
+                    </PixelButton>
+                    {event.signupsLocked && (
+                      <div className="text-retro-muted font-pixel text-xs mt-2">
+                        SIGNUPS ARE LOCKED FOR THIS EVENT
+                      </div>
+                    )}
+                  </PixelStack>
+                )}
+              </div>
+            )
           )}
         </PixelStack>
       </PixelCard>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        {/* Left Column: Participants Panel */}
+        {/* Left Column: Participants or Registered Teams Panel */}
         <div>
-          <PixelSectionHeader
-            title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
-            size="sm"
-            spacing="tight"
-          />
-          <div className="public-table">
-            <PixelTable
-              columns={participantColumns}
-              data={event.members}
-              emptyState={<span className="font-pixel text-xs text-retro-muted">NO MEMBERS YET</span>}
-            />
-          </div>
+          {event.isTeamEvent ? (
+            <>
+              <PixelSectionHeader
+                title={`REGISTERED TEAMS (${registeredTeams.length}${!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
+                size="sm"
+                spacing="tight"
+              />
+              {registeredTeams.length === 0 ? (
+                <PixelCard>
+                  <div className="font-pixel text-xs text-retro-muted text-center py-4">
+                    NO TEAMS REGISTERED YET
+                  </div>
+                </PixelCard>
+              ) : (
+                <PixelStack gap={3}>
+                  {registeredTeams.map((team) => (
+                    <PixelCard key={team.teamId}>
+                      <PixelStack gap={3}>
+                        <PixelStack direction="row" justify="between" align="center" wrap>
+                          <Link
+                            to="/$user"
+                            params={{ user: team.slug || team.teamId }}
+                            className="flex items-center gap-2 font-pixel text-sm text-retro-text hover:text-retro-primary transition-colors"
+                          >
+                            {team.logo ? (
+                              <img
+                                src={team.logo}
+                                alt={team.name}
+                                className="w-7 h-7 rounded border border-retro-border object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none'
+                                }}
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded border border-retro-border bg-retro-primary/20 text-retro-primary text-[10px] font-bold flex items-center justify-center">
+                                {team.name.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <span>{team.name}</span>
+                          </Link>
+                          <div className="flex gap-1">
+                            <PixelBadge tone="green">PRIMARY: {(team.primaryRoster ?? []).length}</PixelBadge>
+                            <PixelBadge tone="neutral">BACKUP: {(team.backupRoster ?? []).length}</PixelBadge>
+                          </div>
+                        </PixelStack>
+
+                        <div>
+                          <div className="font-pixel text-[10px] text-retro-muted mb-1">PRIMARY ROSTER</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(team.primaryRoster ?? []).map((m) => (
+                              <PixelBadge key={m.userId} tone="green">
+                                {m.name}
+                              </PixelBadge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {(team.backupRoster ?? []).length > 0 && (
+                          <div>
+                            <div className="font-pixel text-[10px] text-retro-muted mb-1">BACKUP ROSTER</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(team.backupRoster ?? []).map((m) => (
+                                <PixelBadge key={m.userId} tone="neutral">
+                                  {m.name}
+                                </PixelBadge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </PixelStack>
+                    </PixelCard>
+                  ))}
+                </PixelStack>
+              )}
+            </>
+          ) : (
+            <>
+              <PixelSectionHeader
+                title={`PARTICIPANTS (${event.members.length}${!event.granularParticipation && event.participantLimit !== null && event.participantLimit > 0 ? ` / ${event.participantLimit}` : ''})`}
+                size="sm"
+                spacing="tight"
+              />
+              <div className="public-table">
+                <PixelTable
+                  columns={participantColumns}
+                  data={event.members}
+                  emptyState={<span className="font-pixel text-xs text-retro-muted">NO MEMBERS YET</span>}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right Column: Event Description & Schedule Panel */}
@@ -465,12 +786,37 @@ function EventDetailPage() {
         </div>
       </div>
 
+      {/* Team Standings (Constructors) */}
+      {event.isTeamEvent && event.scoringType === 1 && (
+        <div className="mt-8">
+          <PixelStack direction="row" gap={3} align="center" wrap className="mb-4">
+            <h2 className="font-pixel text-sm tracking-wider text-retro-gold">
+              TEAM STANDINGS (CONSTRUCTORS)
+            </h2>
+            {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
+              <PixelBadge tone="green">FINAL</PixelBadge>
+            ) : (
+              <PixelBadge tone="gold">PROVISIONAL</PixelBadge>
+            )}
+          </PixelStack>
+          <div className="public-table">
+            <PixelTable
+              columns={teamStandingsColumns}
+              data={event.teamPointsOverview ?? []}
+              emptyState={
+                <span className="font-pixel text-xs text-retro-muted">NO TEAM RESULTS RECORDED</span>
+              }
+            />
+          </div>
+        </div>
+      )}
+
       {/* Standings (Points) */}
       {event.pointsOverview && (
         <div className="mt-8">
           <PixelStack direction="row" gap={3} align="center" wrap className="mb-4">
             <h2 className="font-pixel text-sm tracking-wider text-retro-text">
-              STANDINGS (POINTS)
+              {event.isTeamEvent ? 'INDIVIDUAL STANDINGS (POINTS)' : 'STANDINGS (POINTS)'}
             </h2>
             {event.status === 'OFFICIAL' || event.status === 'CONCLUDED' ? (
               <PixelBadge tone="green">FINAL</PixelBadge>
@@ -520,6 +866,138 @@ function EventDetailPage() {
         <PixelSectionHeader title="RACES" size="sm" spacing="tight" />
         <EventRacesList event={event} />
       </div>
+
+      {/* Team Admin Self-Service Roster Modal */}
+      {showTeamModal && (
+        <PixelModal
+          open={showTeamModal}
+          onClose={() => setShowTeamModal(false)}
+          title="MANAGE TEAM ROSTER"
+        >
+          <div className="space-y-4">
+            {teamRosterError && <PixelAlert tone="red" message={teamRosterError} />}
+
+            <div>
+              <label className="block font-pixel text-xs text-retro-muted mb-1">SELECT TEAM</label>
+              <select
+                value={selectedTeamId}
+                onChange={(e) => setSelectedTeamId(e.target.value)}
+                className="w-full px-3 py-2 bg-retro-bg border-2 border-retro-border text-retro-text font-sans text-sm"
+              >
+                {adminTeams.map((t) => (
+                  <option key={t.organizationId} value={t.organizationId}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {loadingTeamDetail ? (
+              <PixelSpinner size="sm" label="Loading team members..." />
+            ) : selectedTeamDetail && !isSelectedTeamApprovedTeam ? (
+              <PixelAlert
+                tone="gold"
+                message="Only approved Teams can register for team events."
+              />
+            ) : selectedTeamDetail ? (
+              <>
+                <div className="flex gap-2 flex-wrap">
+                  <PixelBadge tone="green">
+                    PRIMARY: {primaryUserIds.length} / {event.maxPrimaryRosterSize ?? '∞'}
+                  </PixelBadge>
+                  <PixelBadge tone="neutral">
+                    BACKUP: {backupUserIds.length} / {event.maxBackupRosterSize ?? '∞'}
+                  </PixelBadge>
+                </div>
+
+                {!selectedTeamAlreadyRegistered && teamLimitReached && (
+                  <PixelAlert
+                    tone="red"
+                    message={`This event has reached its maximum team capacity (${event.participantLimit} teams).`}
+                  />
+                )}
+
+                <div className="max-h-64 overflow-y-auto space-y-2 border-2 border-retro-border p-2 bg-retro-bg">
+                  {(selectedTeamDetail.members ?? []).map((m) => {
+                    const isPrimary = primaryUserIds.includes(m.userId)
+                    const isBackup = backupUserIds.includes(m.userId)
+                    return (
+                      <div
+                        key={m.userId}
+                        className="flex items-center justify-between gap-2 p-2 border border-retro-border bg-retro-surface"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-retro-text truncate">{m.name}</div>
+                          <div className="text-xs text-retro-muted truncate">{m.role}</div>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <PixelButton
+                            type="button"
+                            size="sm"
+                            variant={isPrimary ? 'solid' : 'ghost'}
+                            tone={isPrimary ? 'green' : 'neutral'}
+                            onClick={() => toggleTeamMemberRole(m.userId, isPrimary ? 'NONE' : 'PRIMARY')}
+                          >
+                            PRIMARY
+                          </PixelButton>
+                          <PixelButton
+                            type="button"
+                            size="sm"
+                            variant={isBackup ? 'solid' : 'ghost'}
+                            tone={isBackup ? 'cyan' : 'neutral'}
+                            onClick={() => toggleTeamMemberRole(m.userId, isBackup ? 'NONE' : 'BACKUP')}
+                          >
+                            BACKUP
+                          </PixelButton>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex justify-between items-center gap-2 pt-2 border-t-2 border-retro-border">
+                  {selectedTeamAlreadyRegistered ? (
+                    <PixelButton
+                      type="button"
+                      variant="ghost"
+                      tone="red"
+                      size="sm"
+                      loading={withdrawTeamMutation.isPending}
+                      onClick={() => {
+                        if (window.confirm('Withdraw this team and its roster from the event?')) {
+                          withdrawTeamMutation.mutate(selectedTeamId)
+                        }
+                      }}
+                    >
+                      WITHDRAW TEAM
+                    </PixelButton>
+                  ) : (
+                    <span />
+                  )}
+                  <div className="flex gap-2">
+                    <PixelButton type="button" variant="ghost" tone="neutral" onClick={() => setShowTeamModal(false)}>
+                      CANCEL
+                    </PixelButton>
+                    <PixelButton
+                      type="button"
+                      variant="solid"
+                      tone="green"
+                      loading={saveTeamRosterMutation.isPending}
+                      disabled={
+                        primaryUserIds.length === 0 ||
+                        (!selectedTeamAlreadyRegistered && teamLimitReached)
+                      }
+                      onClick={() => saveTeamRosterMutation.mutate()}
+                    >
+                      SAVE ROSTER
+                    </PixelButton>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </PixelModal>
+      )}
     </PixelContainer>
   )
 }
@@ -611,13 +1089,18 @@ function RaceStandingsTable({
     {
       key: 'participant',
       header: 'PARTICIPANT',
-      width: 180,
+      width: 210,
       render: (r) => {
         const member = members.find((m) => m.userId === r.userId)
         const name = member?.name ?? r.userId
         return (
-          <div className="truncate font-medium max-w-[170px]" title={name}>
-            {name}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="truncate font-medium max-w-[140px]" title={name}>
+              {name}
+            </span>
+            {member?.teamName && (
+              <PixelBadge tone="purple">{member.teamName}</PixelBadge>
+            )}
           </div>
         )
       },
@@ -702,7 +1185,10 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
   const queryClient = useQueryClient()
   const { session } = useAuth()
   const { toast } = useToast()
-  const isMember = session && event.members.some((m) => m.userId === session.user.id)
+  const currentMember = session ? event.members.find((m) => m.userId === session.user.id) : undefined
+  const isMember = Boolean(currentMember)
+  const isEligiblePrimary = !event.isTeamEvent || currentMember?.rosterRole === 'PRIMARY'
+  const isBackupOnly = Boolean(event.isTeamEvent && currentMember && currentMember.rosterRole !== 'PRIMARY')
 
   const joinRaceMutation = useMutation({
     mutationFn: ({ raceId }: { raceId: string }) =>
@@ -808,13 +1294,17 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                             SIGN IN
                           </Link>
                         </PixelButton>
+                      ) : event.isTeamEvent && !isEligiblePrimary && !isRaceMember ? (
+                        <PixelBadge tone="neutral">
+                          {isBackupOnly ? 'BACKUP ONLY' : 'PRIMARY ROSTER ONLY'}
+                        </PixelBadge>
                       ) : (
                         <PixelButton
                           variant="solid"
                           tone={isRaceMember ? 'red' : 'green'}
                           size="sm"
                           className="pxl-btn-flat font-pixel text-[10px]"
-                            disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending || (!isRaceMember && race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit)}
+                          disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending || (!isRaceMember && race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit)}
                           onClick={() => {
                             if (isRaceMember) {
                               leaveRaceMutation.mutate({ raceId: race.id })
@@ -823,28 +1313,32 @@ function EventRacesList({ event }: { event: eventmanager.EventDetail }) {
                             }
                           }}
                         >
-                            {isRaceMember ? 'WITHDRAW' : (race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit) ? 'FULL' : 'SIGN UP'}
+                          {isRaceMember ? 'WITHDRAW' : (race.participantLimit !== null && (race.members ?? []).length >= race.participantLimit) ? 'FULL' : 'SIGN UP'}
                         </PixelButton>
                       )}
                     </>
                   )}
                   {!event.granularParticipation && isMember && (
-                    <PixelButton
-                      variant="solid"
-                      tone={isRaceMember ? 'red' : 'green'}
-                      size="sm"
-                      className="pxl-btn-flat font-pixel text-[10px]"
-                      disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
-                      onClick={() => {
-                        if (isRaceMember) {
-                          leaveRaceMutation.mutate({ raceId: race.id })
-                        } else {
-                          joinRaceMutation.mutate({ raceId: race.id })
-                        }
-                      }}
-                    >
-                      {isRaceMember ? 'WITHDRAW' : 'SIGN UP'}
-                    </PixelButton>
+                    isBackupOnly && !isRaceMember ? (
+                      <PixelBadge tone="neutral">BACKUP ONLY</PixelBadge>
+                    ) : (
+                      <PixelButton
+                        variant="solid"
+                        tone={isRaceMember ? 'red' : 'green'}
+                        size="sm"
+                        className="pxl-btn-flat font-pixel text-[10px]"
+                        disabled={event.signupsLocked || joinRaceMutation.isPending || leaveRaceMutation.isPending}
+                        onClick={() => {
+                          if (isRaceMember) {
+                            leaveRaceMutation.mutate({ raceId: race.id })
+                          } else {
+                            joinRaceMutation.mutate({ raceId: race.id })
+                          }
+                        }}
+                      >
+                        {isRaceMember ? 'WITHDRAW' : 'SIGN UP'}
+                      </PixelButton>
+                    )
                   )}
                 </PixelStack>
               </PixelStack>

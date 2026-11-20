@@ -83,6 +83,22 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
             <strong>{selectedEvent.signupsLocked ? 'Locked (Self-service disabled)' : 'Open (Self-service enabled)'}</strong>
           </div>
         </div>
+
+        <div className="primer-box" style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--fgColor-muted, #636c76)', marginBottom: '4px' }}>
+            Competition Format
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--fgColor-default, #1f2328)' }}>
+            <strong>{selectedEvent.isTeamEvent ? 'Team-Based Event' : 'Individual Event'}</strong>
+            {selectedEvent.isTeamEvent && (
+              <div style={{ marginTop: '2px', fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>
+                Roster Limits: Primary{' '}
+                <strong>{selectedEvent.maxPrimaryRosterSize ?? 'Unlimited'}</strong> · Backup{' '}
+                <strong>{selectedEvent.maxBackupRosterSize ?? 'Unlimited'}</strong>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Description */}
@@ -113,10 +129,52 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
         </div>
       )}
 
-      {/* Overall Standings Leaderboard */}
+      {/* Team Standings Leaderboard (Constructors' Sum) */}
+      {selectedEvent.isTeamEvent && selectedEvent.scoringType === 1 && (
+        <div className="primer-box">
+          <div className="primer-box-header">
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Team Standings (Constructors&apos; Points)</h3>
+          </div>
+          {selectedEvent.teamPointsOverview && selectedEvent.teamPointsOverview.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="primer-table" style={{ tableLayout: 'fixed', minWidth: '520px' }}>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: '70px' }}>Rank</th>
+                    <th scope="col" style={{ width: '45%' }}>Team</th>
+                    <th scope="col" style={{ width: '20%' }}>Roster Size</th>
+                    <th scope="col" style={{ width: '130px' }}>Total Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedEvent.teamPointsOverview.map((team, idx) => (
+                    <tr key={team.teamId}>
+                      <td><strong>#{idx + 1}</strong></td>
+                      <td>
+                        <strong>{team.name}</strong>{' '}
+                        <code style={{ fontSize: '11px', color: 'var(--fgColor-muted, #636c76)' }}>@{team.slug}</code>
+                      </td>
+                      <td>{team.memberCount}</td>
+                      <td><strong>{team.points} pts</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={{ margin: 0, padding: '16px', fontSize: '13px', color: 'var(--fgColor-muted, #636c76)' }}>
+              No team standings recorded yet.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Overall Individual Standings Leaderboard */}
       <div className="primer-box">
         <div className="primer-box-header">
-          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Current Event Overall Leaderboard</h3>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>
+            {selectedEvent.isTeamEvent ? 'Individual Standings Leaderboard' : 'Current Event Overall Leaderboard'}
+          </h3>
         </div>
         {selectedEvent.scoringType === 1 ? (
           selectedEvent.pointsOverview && selectedEvent.pointsOverview.length > 0 ? (
@@ -125,9 +183,10 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                 <thead>
                   <tr>
                     <th scope="col" style={{ width: '70px' }}>Rank</th>
-                    <th scope="col" style={{ width: '40%' }}>Name</th>
-                    <th scope="col" style={{ width: '35%' }}>User ID</th>
-                    <th scope="col" style={{ width: '130px' }}>Total Points</th>
+                    <th scope="col" style={{ width: selectedEvent.isTeamEvent ? '32%' : '40%' }}>Name</th>
+                    {selectedEvent.isTeamEvent && <th scope="col" style={{ width: '25%' }}>Team</th>}
+                    <th scope="col" style={{ width: selectedEvent.isTeamEvent ? '22%' : '35%' }}>User ID</th>
+                    <th scope="col" style={{ width: '120px' }}>Total Points</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -137,6 +196,22 @@ export function EventSummaryTab({ selectedEvent }: EventSummaryTabProps) {
                       <td>
                         <UserLink userId={item.userId} name={item.name} />
                       </td>
+                      {selectedEvent.isTeamEvent && (
+                        <td>
+                          {item.teamName ? (
+                            <span>
+                              {item.teamName}{' '}
+                              {item.rosterRole && (
+                                <code style={{ fontSize: '10px', color: 'var(--fgColor-muted, #636c76)' }}>
+                                  ({item.rosterRole})
+                                </code>
+                              )}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--fgColor-muted, #636c76)' }}>—</span>
+                          )}
+                        </td>
+                      )}
                       <td>
                         <code style={{ fontSize: '12px', color: 'var(--fgColor-muted, #636c76)' }}>{item.userId}</code>
                       </td>

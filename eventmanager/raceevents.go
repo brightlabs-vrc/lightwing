@@ -74,7 +74,11 @@ func loadRaceMembers(ctx context.Context, raceID string) ([]RaceEventMemberView,
 	for _, r := range rows {
 		members = append(members, RaceEventMemberView{
 			UserID: r.UserId, Name: r.VrchatUsername,
-			ClassTier: nullString(nullStringFromAny(r.ClassTier)),
+			ClassTier:  nullString(nullStringFromAny(r.ClassTier)),
+			TeamID:     nullString(r.TeamId),
+			TeamName:   nullString(r.TeamName),
+			TeamSlug:   nullString(r.TeamSlug),
+			RosterRole: nullString(r.RosterRole),
 		})
 	}
 	return members, nil
@@ -90,7 +94,11 @@ func loadRaceMembersForEvent(ctx context.Context, eventID string) (map[string][]
 	for _, r := range rows {
 		m := RaceEventMemberView{
 			UserID: r.UserId, Name: r.VrchatUsername,
-			ClassTier: classTierPtr(nullStringFromAny(r.ClassTier)),
+			ClassTier:  classTierPtr(nullStringFromAny(r.ClassTier)),
+			TeamID:     nullString(r.TeamId),
+			TeamName:   nullString(r.TeamName),
+			TeamSlug:   nullString(r.TeamSlug),
+			RosterRole: nullString(r.RosterRole),
 		}
 		membersByRace[r.RaceEventId] = append(membersByRace[r.RaceEventId], m)
 	}
@@ -682,7 +690,20 @@ func AddRaceEventMemberCore(ctx context.Context, actor *auth.Actor, p *RaceMembe
 	if err != nil {
 		return nil, err
 	}
-	if !memberExists && !e.GranularParticipation {
+	if e.IsTeamEvent {
+		if !memberExists {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "competitor must be registered on a team's PRIMARY roster for this team-based event"}
+		}
+		teamRole, err := qq.GetEventMemberTeamRole(ctx, sqlc.GetEventMemberTeamRoleParams{
+			EventId: p.EventID, UserId: p.UserID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if !teamRole.TeamId.Valid || !teamRole.RosterRole.Valid || teamRole.RosterRole.String != RosterRolePrimary {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "only PRIMARY roster members can be added to race lineups; sub in this BACKUP member to PRIMARY first"}
+		}
+	} else if !memberExists && !e.GranularParticipation {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
 	if !isEligibleTier(userTier, raceRestriction(r, e)) {
@@ -765,7 +786,7 @@ func removeRaceMemberUser(ctx context.Context, e *eventRow, eventID, raceID, use
 	}); err != nil {
 		return err
 	}
-	if e.GranularParticipation {
+	if e.GranularParticipation && !e.IsTeamEvent {
 		activeCount64, err := q().GetActiveRaceCountForUser(ctx, sqlc.GetActiveRaceCountForUserParams{
 			UserId: userID, EventId: eventID,
 		})
@@ -895,7 +916,20 @@ func JoinRaceEventCore(ctx context.Context, actor *auth.Actor, p *RaceJoinReques
 	if err != nil {
 		return nil, err
 	}
-	if !memberExists && !e.GranularParticipation {
+	if e.IsTeamEvent {
+		if !memberExists {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "you must be registered on a team's PRIMARY roster to join races in this team-based event"}
+		}
+		teamRole, err := qq.GetEventMemberTeamRole(ctx, sqlc.GetEventMemberTeamRoleParams{
+			EventId: p.EventID, UserId: userID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if !teamRole.TeamId.Valid || !teamRole.RosterRole.Valid || teamRole.RosterRole.String != RosterRolePrimary {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "only PRIMARY roster members can join race lineups; ask an admin to sub you into the primary roster"}
+		}
+	} else if !memberExists && !e.GranularParticipation {
 		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "user is not a member of this event"}
 	}
 	if !isEligibleTier(userTier, raceRestriction(r, e)) {

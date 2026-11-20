@@ -50,7 +50,8 @@ type GetLeaderboardParams struct {
 	SortBy    string `query:"sortBy"`    // "points", "rating", "avgPosition", "avgPointsPerSeason"
 	Search    string `query:"search"`    // search participant name or @username
 	ClassTier string `query:"classTier"` // filter by class tier e.g. "G1", "G2", "G3", "OP"
-	Year      int    `query:"year"`      // calendar year cutoff (defaults to current UTC year)
+	Year      int    `query:"year"`      // calendar year cutoff (defaults to current UTC year unless allTime is true)
+	AllTime   bool   `query:"allTime"`   // when true, aggregates across all seasons (year = 0)
 	Limit     int    `query:"limit"`     // pagination limit
 	Offset    int    `query:"offset"`    // pagination offset
 }
@@ -82,6 +83,9 @@ var (
 )
 
 func yearCacheID(year int) string {
+	if year <= 0 {
+		return "global:alltime"
+	}
 	return "global:" + string(rune('0'+year/1000)) + string(rune('0'+(year/100)%10)) + string(rune('0'+(year/10)%10)) + string(rune('0'+year%10))
 }
 
@@ -97,6 +101,7 @@ func InvalidateLeaderboardCache(ctx context.Context) {
 
 	if leaderboardCache != nil {
 		_, _ = leaderboardCache.Delete(ctx, leaderboardCacheKey{ID: "global"})
+		_, _ = leaderboardCache.Delete(ctx, leaderboardCacheKey{ID: "global:alltime"})
 		_, _ = leaderboardCache.Delete(ctx, leaderboardCacheKey{ID: yearCacheID(time.Now().UTC().Year())})
 		for _, y := range years {
 			_, _ = leaderboardCache.Delete(ctx, leaderboardCacheKey{ID: yearCacheID(y)})
@@ -267,7 +272,9 @@ func getAvailableYears(ctx context.Context, currentYear int) []int {
 //encore:api public method=GET path=/api/leaderboard
 func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardResponse, error) {
 	year := p.Year
-	if year <= 0 {
+	if p.AllTime {
+		year = 0
+	} else if year <= 0 {
 		year = time.Now().UTC().Year()
 	}
 	entries, calculatedAt, err := getLeaderboardData(ctx, year)
@@ -379,5 +386,194 @@ func GetLeaderboard(ctx context.Context, p *GetLeaderboardParams) (*LeaderboardR
 		Year:           year,
 		AvailableYears: getAvailableYears(ctx, time.Now().UTC().Year()),
 		CalculatedAt:   calculatedAt.Format(time.RFC3339),
+	}, nil
+}
+
+// --- Team Leaderboard ---
+
+// TeamLeaderboardEntry represents one row on the global team leaderboard.
+type TeamLeaderboardEntry struct {
+	Rank                    int     `json:"rank"`
+	TeamID                  string  `json:"teamId"`
+	Name                    string  `json:"name"`
+	Slug                    string  `json:"slug"`
+	Logo                    *string `json:"logo"`
+	MemberCount             int     `json:"memberCount"`
+	TeamEventsParticipated  int     `json:"teamEventsParticipated"`
+	TeamTotalPoints         int     `json:"teamTotalPoints"`
+	TeamAveragePoints       float64 `json:"teamAveragePoints"`
+	TeamEventRankAverage    float64 `json:"teamEventRankAverage"`
+	MemberPointsAverage     float64 `json:"memberPointsAverage"`
+	MemberRankingAverage    float64 `json:"memberRankingAverage"`
+	MemberAvgPointsPerEvent float64 `json:"memberAvgPointsPerEvent"`
+	RankingSource           string  `json:"rankingSource"` // "TEAM_EVENTS" | "MEMBER_AVERAGE"
+}
+
+// TeamLeaderboardResponse holds paginated team leaderboard rows along with total count.
+type TeamLeaderboardResponse struct {
+	Entries        []TeamLeaderboardEntry `json:"entries"`
+	Total          int                    `json:"total"`
+	Year           int                    `json:"year"`
+	AvailableYears []int                  `json:"availableYears"`
+	RankingSource  string                 `json:"rankingSource"`
+	CalculatedAt   string                 `json:"calculatedAt"`
+}
+
+// GetTeamLeaderboardParams specifies sorting, filtering, and pagination query params for teams.
+type GetTeamLeaderboardParams struct {
+	SortBy  string `query:"sortBy"`  // "points", "avgRank", "avgPoints"
+	Search  string `query:"search"`  // search team name or @slug
+	Year    int    `query:"year"`    // calendar year (defaults to current UTC year unless allTime is true)
+	AllTime bool   `query:"allTime"` // when true, aggregates across all seasons (year = 0)
+	Limit   int    `query:"limit"`
+	Offset  int    `query:"offset"`
+}
+
+// GetTeamLeaderboard returns global team standings for a season or all-time.
+//
+//encore:api public method=GET path=/api/team-leaderboard
+func GetTeamLeaderboard(ctx context.Context, p *GetTeamLeaderboardParams) (*TeamLeaderboardResponse, error) {
+	year := p.Year
+	if p.AllTime {
+		year = 0
+	} else if year <= 0 {
+		year = time.Now().UTC().Year()
+	}
+
+	rows, err := q().CalculateTeamLeaderboardStats(ctx, int32(year))
+	if err != nil {
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to calculate team leaderboard"}
+	}
+
+	hasAnyTeamEvents := false
+	for _, r := range rows {
+		if r.TeamEventsParticipated > 0 {
+			hasAnyTeamEvents = true
+			break
+		}
+	}
+	rankingSource := "MEMBER_AVERAGE"
+	if hasAnyTeamEvents {
+		rankingSource = "TEAM_EVENTS"
+	}
+
+	allEntries := make([]TeamLeaderboardEntry, 0, len(rows))
+	for _, r := range rows {
+		var logo *string
+		if r.Logo.Valid && r.Logo.String != "" {
+			l := r.Logo.String
+			logo = &l
+		}
+		entrySource := "MEMBER_AVERAGE"
+		if r.TeamEventsParticipated > 0 {
+			entrySource = "TEAM_EVENTS"
+		}
+		allEntries = append(allEntries, TeamLeaderboardEntry{
+			TeamID:                  r.TeamID,
+			Name:                    r.Name,
+			Slug:                    r.Slug,
+			Logo:                    logo,
+			MemberCount:             int(r.MemberCount),
+			TeamEventsParticipated:  int(r.TeamEventsParticipated),
+			TeamTotalPoints:         int(r.TeamTotalPoints),
+			TeamAveragePoints:       r.TeamAvgPoints,
+			TeamEventRankAverage:    r.TeamEventRankAvg,
+			MemberPointsAverage:     r.MemberPointsAvg,
+			MemberRankingAverage:    r.MemberRankingAvg,
+			MemberAvgPointsPerEvent: r.MemberAvgPointsPerEvent,
+			RankingSource:           entrySource,
+		})
+	}
+
+	sortBy := strings.TrimSpace(p.SortBy)
+	switch sortBy {
+	case "avgRank":
+		sort.SliceStable(allEntries, func(i, j int) bool {
+			if hasAnyTeamEvents {
+				ri, rj := allEntries[i].TeamEventRankAverage, allEntries[j].TeamEventRankAverage
+				if (ri > 0) != (rj > 0) {
+					return ri > 0
+				}
+				if ri != rj {
+					return ri < rj
+				}
+				return allEntries[i].TeamTotalPoints > allEntries[j].TeamTotalPoints
+			}
+			ri, rj := allEntries[i].MemberRankingAverage, allEntries[j].MemberRankingAverage
+			if (ri > 0) != (rj > 0) {
+				return ri > 0
+			}
+			if ri != rj {
+				return ri < rj
+			}
+			return allEntries[i].MemberPointsAverage > allEntries[j].MemberPointsAverage
+		})
+	case "avgPoints":
+		sort.SliceStable(allEntries, func(i, j int) bool {
+			if hasAnyTeamEvents {
+				if allEntries[i].TeamAveragePoints != allEntries[j].TeamAveragePoints {
+					return allEntries[i].TeamAveragePoints > allEntries[j].TeamAveragePoints
+				}
+				return allEntries[i].TeamTotalPoints > allEntries[j].TeamTotalPoints
+			}
+			if allEntries[i].MemberAvgPointsPerEvent != allEntries[j].MemberAvgPointsPerEvent {
+				return allEntries[i].MemberAvgPointsPerEvent > allEntries[j].MemberAvgPointsPerEvent
+			}
+			return allEntries[i].MemberPointsAverage > allEntries[j].MemberPointsAverage
+		})
+	default: // "points"
+		sort.SliceStable(allEntries, func(i, j int) bool {
+			if hasAnyTeamEvents {
+				if allEntries[i].TeamTotalPoints != allEntries[j].TeamTotalPoints {
+					return allEntries[i].TeamTotalPoints > allEntries[j].TeamTotalPoints
+				}
+				if allEntries[i].TeamEventsParticipated != allEntries[j].TeamEventsParticipated {
+					return allEntries[i].TeamEventsParticipated > allEntries[j].TeamEventsParticipated
+				}
+				return allEntries[i].MemberPointsAverage > allEntries[j].MemberPointsAverage
+			}
+			if allEntries[i].MemberPointsAverage != allEntries[j].MemberPointsAverage {
+				return allEntries[i].MemberPointsAverage > allEntries[j].MemberPointsAverage
+			}
+			return allEntries[i].Name < allEntries[j].Name
+		})
+	}
+
+	for i := range allEntries {
+		allEntries[i].Rank = i + 1
+	}
+
+	filtered := make([]TeamLeaderboardEntry, 0, len(allEntries))
+	searchLower := strings.ToLower(strings.TrimSpace(p.Search))
+	for _, e := range allEntries {
+		if searchLower != "" {
+			if !strings.Contains(strings.ToLower(e.Name), searchLower) &&
+				!strings.Contains(strings.ToLower(e.Slug), searchLower) {
+				continue
+			}
+		}
+		filtered = append(filtered, e)
+	}
+
+	total := len(filtered)
+	offset := p.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > total {
+		offset = total
+	}
+	end := total
+	if p.Limit > 0 && offset+p.Limit < total {
+		end = offset + p.Limit
+	}
+
+	return &TeamLeaderboardResponse{
+		Entries:        filtered[offset:end],
+		Total:          total,
+		Year:           year,
+		AvailableYears: getAvailableYears(ctx, time.Now().UTC().Year()),
+		RankingSource:  rankingSource,
+		CalculatedAt:   time.Now().UTC().Format(time.RFC3339),
 	}, nil
 }
