@@ -104,7 +104,14 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
     (org) => org.id !== team.id
   )
   const affiliatedTeams = team.teams || []
-  const memberCount = team.members?.length || 0
+  const allMembers = team.members || []
+  const memberCount = allMembers.length
+  const isStaffRole = (role: string) => {
+    const normalized = (role || '').trim().toLowerCase()
+    return normalized !== '' && normalized !== 'member'
+  }
+  const staffMembers = allMembers.filter((m) => isStaffRole(m.role))
+  const regularMembers = allMembers.filter((m) => !isStaffRole(m.role))
 
   return (
     <PixelContainer maxWidth="full" padding="none" className="max-w-6xl mx-auto">
@@ -197,16 +204,16 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
               )}
             </PixelCard>
 
-            {/* Staff / Member Directory List */}
+            {/* Staff Directory List (strictly staff roles; never mixed with regular members or affiliated team rosters) */}
             <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
               <PixelSectionHeader
-                title={isOrg ? 'STAFF' : 'STAFF & MEMBERS'}
+                title="STAFF"
                 titleTone="purple"
                 size="sm"
               />
-              <div className="mt-3 flex flex-col gap-2">
-                {team.members && team.members.length > 0 ? (
-                  team.members.map((m) => (
+              <div data-testid="staff-directory" className="mt-3 flex flex-col gap-2">
+                {staffMembers.length > 0 ? (
+                  staffMembers.map((m) => (
                     <div
                       key={m.userId}
                       className="flex items-center justify-between gap-2 p-2 rounded bg-retro-bg/60 border border-retro-border hover:border-retro-primary transition-all"
@@ -253,11 +260,59 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({ team }) => {
                   ))
                 ) : (
                   <div className="font-sans text-xs text-retro-muted py-2">
-                    No active team members recorded.
+                    No staff recorded.
                   </div>
                 )}
               </div>
             </PixelCard>
+
+            {/* Regular Members Directory List (separate from staff) */}
+            {regularMembers.length > 0 && (
+              <PixelCard className="bg-retro-surface border-2 border-retro-border-strong">
+                <PixelSectionHeader
+                  title="MEMBERS"
+                  titleTone="cyan"
+                  size="sm"
+                />
+                <div data-testid="members-directory" className="mt-3 flex flex-col gap-2">
+                  {regularMembers.map((m) => (
+                    <div
+                      key={m.userId}
+                      className="flex items-center justify-between gap-2 p-2 rounded bg-retro-bg/60 border border-retro-border hover:border-retro-primary transition-all"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Link
+                          to="/$user"
+                          params={{ user: m.slug || m.userId }}
+                          className="shrink-0"
+                        >
+                          <img
+                            src={m.image || '/fallback_avatar.jpg'}
+                            alt={m.name}
+                            onError={(e) => {
+                              e.currentTarget.src = '/fallback_avatar.jpg'
+                            }}
+                            className="w-8 h-8 rounded-full object-cover border border-retro-border bg-retro-bg"
+                          />
+                        </Link>
+                        <div className="flex flex-col min-w-0">
+                          <UserLink
+                            userId={m.userId}
+                            name={m.name}
+                            slug={m.slug}
+                            className="font-bold text-xs text-retro-text hover:text-retro-primary truncate"
+                          />
+                          <span className="text-[11px] text-retro-muted font-sans truncate">
+                            @{m.slug || m.userId}
+                          </span>
+                        </div>
+                      </div>
+                      <PixelBadge tone="neutral">{m.role}</PixelBadge>
+                    </div>
+                  ))}
+                </div>
+              </PixelCard>
+            )}
           </div>
 
           {/* Right Main Content on Desktop / First on Mobile: About, Team Statistics, Affiliated Orgs/Teams, Newsletters */}

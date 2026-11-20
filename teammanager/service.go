@@ -833,15 +833,13 @@ func loadTeam(ctx context.Context, id string) (*Team, error) {
 								i := r.Image.String
 								img = &i
 							}
-							role := "member"
-							if r.Role.Valid && r.Role.String != "" {
-								role = r.Role.String
-							}
+							// Members inherited from affiliated teams append to the org's member list
+							// but must never appear as organization staff.
 							t.Members = append(t.Members, TeamMemberSummary{
 								UserID: r.UserId,
 								Name:   displayName(r.Name, r.VrchatUsername),
 								Slug:   slug,
-								Role:   role,
+								Role:   "member",
 								Image:  img,
 							})
 						}

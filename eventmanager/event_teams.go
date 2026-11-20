@@ -281,9 +281,6 @@ func UpsertEventTeamRosterCore(ctx context.Context, actor *auth.Actor, p *Upsert
 		}); err != nil {
 			return nil, err
 		}
-		if err := EnsureEventStandingsRow(ctx, p.EventID, uid, event.ScoringType); err != nil {
-			return nil, err
-		}
 	}
 
 	return LoadEvent(ctx, p.EventID)
@@ -392,6 +389,13 @@ func SubstituteEventTeamMemberCore(ctx context.Context, actor *auth.Actor, p *Su
 			}); err != nil {
 				return nil, err
 			}
+		} else {
+			if err := qq.DeleteUserFromUnstartedRaces(ctx, sqlc.DeleteUserFromUnstartedRacesParams{
+				EventId: p.EventID,
+				UserId:  outgoingID,
+			}); err != nil {
+				return nil, err
+			}
 		}
 		if err := stx.Commit(); err != nil {
 			return nil, err
@@ -421,6 +425,10 @@ func SubstituteEventTeamMemberCore(ctx context.Context, actor *auth.Actor, p *Su
 		}); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := EnsureEventStandingsRow(ctx, p.EventID, p.IncomingUserID, event.ScoringType); err != nil {
+		return nil, err
 	}
 
 	return LoadEvent(ctx, p.EventID)

@@ -126,11 +126,18 @@ describe('TeamProfileView', () => {
         image: '',
         role: 'administrator',
       },
+      {
+        userId: 'u4',
+        name: 'TrackRunner',
+        slug: 'runner',
+        image: '',
+        role: 'member',
+      },
     ],
   }
 
-  it('renders organization details with ORGANIZATION badge, tight avatar cluster, STAFF header, and AFFILIATED TEAMS without team stats', () => {
-    render(<TeamProfileView team={mockOrg} />)
+  it('renders organization details with ORGANIZATION badge, tight avatar cluster, separated STAFF and MEMBERS directories, and AFFILIATED TEAMS without team stats', () => {
+    const { unmount } = render(<TeamProfileView team={mockOrg} />)
 
     expect(screen.getByText('Twilight Festival')).not.toBeNull()
     expect(screen.getByText('ORGANIZATION')).not.toBeNull()
@@ -140,23 +147,41 @@ describe('TeamProfileView', () => {
     expect(screen.getByText('Team Spica')).not.toBeNull()
     expect(screen.queryByText('TEAM STATISTICS')).toBeNull()
 
+    const staffDir = screen.getByTestId('staff-directory')
+    expect(staffDir.textContent).toContain('Sir Brycius')
+    expect(staffDir.textContent).not.toContain('Bluebrealk')
+
+    const membersDir = screen.getByTestId('members-directory')
+    expect(membersDir.textContent).toContain('Bluebrealk')
+    expect(membersDir.textContent).not.toContain('Sir Brycius')
+
     const avatarCluster = screen.getByTestId('members-avatar-cluster')
     expect(avatarCluster.className).toContain('flex-wrap')
     expect(avatarCluster.className).toContain('gap-1.5')
+    unmount()
   })
 
-  it('renders competitive team details with TEAM badge, STAFF & MEMBERS header, AFFILIATED ORGANIZATIONS, and calculated TEAM STATISTICS', () => {
-    render(<TeamProfileView team={mockIndependentTeam} />)
+  it('renders competitive team details with TEAM badge, separated STAFF and MEMBERS directories, AFFILIATED ORGANIZATIONS, and calculated TEAM STATISTICS', () => {
+    const { unmount } = render(<TeamProfileView team={mockIndependentTeam} />)
 
     expect(screen.getByText('Apex Racing Syndicate')).not.toBeNull()
     expect(screen.getByText('TEAM')).not.toBeNull()
     expect(screen.getByText('MANAGE TEAM')).not.toBeNull()
-    expect(screen.getByText('STAFF & MEMBERS')).not.toBeNull()
+    expect(screen.getByText('STAFF')).not.toBeNull()
     expect(screen.getByText('TEAM STATISTICS')).not.toBeNull()
     expect(screen.getByText('AFFILIATED ORGANIZATIONS (1)')).not.toBeNull()
     expect(screen.getByText('#1')).not.toBeNull()
     expect(screen.getByText('1.5')).not.toBeNull()
     expect(screen.getByText('15.0')).not.toBeNull()
     expect(screen.getByText('45.0')).not.toBeNull()
+
+    const staffDir = screen.getByTestId('staff-directory')
+    expect(staffDir.textContent).toContain('SpeedRacer')
+    expect(staffDir.textContent).not.toContain('TrackRunner')
+
+    const membersDir = screen.getByTestId('members-directory')
+    expect(membersDir.textContent).toContain('TrackRunner')
+    expect(membersDir.textContent).not.toContain('SpeedRacer')
+    unmount()
   })
 })

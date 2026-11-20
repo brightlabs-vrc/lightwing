@@ -713,10 +713,9 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 			}
 		}
 	}
-	// All registered users per race: event members (non-granular) + result
+	// All registered users per race: event members (non-granular; PRIMARY only for team events) + result
 	// holders + explicit race members.
-	var granular bool
-	granular, err = q().GetEventGranularity(ctx, eventID)
+	evRow, err := requireEventRow(ctx, eventID)
 	if err != nil {
 		return err
 	}
@@ -727,8 +726,13 @@ func ApplyAutoDeferralsForEvent(ctx context.Context, eventID string, modifiedRac
 		}
 		raceUsers[raceID][userID] = true
 	}
-	if !granular {
-		memberIDs, err := q().ListEventMemberIDs(ctx, eventID)
+	if !evRow.GranularParticipation {
+		var memberIDs []string
+		if evRow.IsTeamEvent {
+			memberIDs, err = q().ListPrimaryEventMemberIDs(ctx, eventID)
+		} else {
+			memberIDs, err = q().ListEventMemberIDs(ctx, eventID)
+		}
 		if err != nil {
 			return err
 		}

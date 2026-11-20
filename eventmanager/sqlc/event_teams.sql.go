@@ -501,4 +501,32 @@ func (q *Queries) RaceResultExistsForUser(ctx context.Context, arg RaceResultExi
 	return exists, err
 }
 
+const listPrimaryEventMemberIDs = `-- name: ListPrimaryEventMemberIDs :many
+SELECT "userId" FROM "event_member" WHERE "eventId" = $1 AND "rosterRole" = 'PRIMARY'
+`
+
+func (q *Queries) ListPrimaryEventMemberIDs(ctx context.Context, eventid string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listPrimaryEventMemberIDs, eventid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var userid string
+		if err := rows.Scan(&userid); err != nil {
+			return nil, err
+		}
+		items = append(items, userid)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+
 
